@@ -1,0 +1,221 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import dynamic from 'next/dynamic'
+import Link from 'next/link'
+import { Search, Bell, Menu, User, LogOut, Ticket, Bot } from 'lucide-react'
+
+const AIAssistant = dynamic(() => import('./AIAssistant'), { ssr: false })
+
+interface TopBarProps {
+  section?: string
+  onToggle?: () => void
+}
+
+export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
+  const [profileOpen, setProfileOpen] = useState(false)
+  const [visible, setVisible] = useState(false)
+  const [isAIOpen, setIsAIOpen] = useState(false)
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const [notificationsVisible, setNotificationsVisible] = useState(false)
+  const [unreadCount, setUnreadCount] = useState(0) // Default 0 to match empty state
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      const target = e.target as Element;
+      if (!target.closest('#profile-menu')) {
+        closeMenu()
+      }
+      if (!target.closest('#notifications-menu')) {
+        closeNotifications()
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const closeMenu = () => {
+    setVisible(false)
+    setTimeout(() => setProfileOpen(false), 200)
+  }
+
+  const openMenu = () => {
+    setProfileOpen(true)
+    setTimeout(() => setVisible(true), 10)
+  }
+
+  const closeNotifications = () => {
+    setNotificationsVisible(false)
+    setTimeout(() => setNotificationsOpen(false), 200)
+  }
+
+  const openNotifications = () => {
+    setNotificationsOpen(true)
+    setTimeout(() => setNotificationsVisible(true), 10)
+  }
+
+  return (
+    <header className="flex items-center justify-between h-12 bg-white border-b border-gray-100 px-4">
+      {/* Left Section - Menu & Section */}
+      <div className="flex items-center gap-3">
+        <button
+          onClick={onToggle}
+          className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors text-gray-700 hover:text-gray-900"
+        >
+          <Menu size={15} />
+        </button>
+        <div className="flex flex-col leading-tight">
+          <span className="text-[8px] text-gray-300 uppercase tracking-widest">Sección</span>
+          <span className="text-[10px] text-gray-700 font-semibold uppercase tracking-wide">{section}</span>
+        </div>
+      </div>
+
+      {/* Center Section - Search */}
+      <div className="flex-1 mx-8 max-w-[420px]">
+        <div className="flex items-center gap-2 bg-gray-100 rounded-full px-4 py-1.5" style={{ height: '32px' }}>
+          <Search size={15} className="text-gray-400 flex-shrink-0" />
+          <input
+            type="text"
+            placeholder="Buscar proyectos, registros, fotografías..."
+            className="bg-transparent outline-none text-[10px] w-full placeholder:text-[10px] placeholder-gray-400"
+          />
+        </div>
+      </div>
+
+      {/* Right Section */}
+      <div className="flex items-center gap-4">
+        {/* AI Button */}
+        <button
+          onClick={() => setIsAIOpen(true)}
+          className="p-2 rounded-full hover:bg-gray-100 transition-colors text-gray-600 hover:text-gray-800"
+          title="Asistente IA"
+        >
+          <Bot size={15} />
+        </button>
+
+        {/* Tickets Button */}
+        <Link
+          href="/tickets"
+          className="p-2 rounded-full hover:bg-gray-100 transition-colors text-gray-600 hover:text-gray-800 relative"
+          title="Tickets"
+        >
+          <Ticket size={15} />
+          <span className="absolute -top-0.5 -right-0.5 bg-red-600 text-white text-[7px] font-bold w-3.5 h-3.5 rounded-full flex items-center justify-center">2</span>
+        </Link>
+
+        {/* Notifications Button & Dropdown */}
+        <div id="notifications-menu" className="relative">
+          <button
+            onClick={() => (notificationsOpen ? closeNotifications() : openNotifications())}
+            className="relative bg-[#EED9B9]/30 p-2 rounded-2xl cursor-pointer hover:bg-[#EED9B9]/50 transition-all duration-300 flex items-center justify-center"
+          >
+            <Bell size={15} className="text-[#9B0F06]" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-[#9B0F06] text-white text-[8px] font-bold w-3.5 h-3.5 rounded-full flex items-center justify-center animate-pulse">
+                {unreadCount}
+              </span>
+            )}
+          </button>
+
+          {/* Notifications Dropdown */}
+          {notificationsOpen && (
+            <div className={`absolute top-[42px] right-0 w-60 bg-white border border-gray-100 rounded-lg shadow-xl z-50 overflow-hidden transition-all duration-200 ease-out ${
+              notificationsVisible
+                ? 'opacity-100 translate-y-0 scale-100'
+                : 'opacity-0 -translate-y-2 scale-95'
+            }`}>
+              <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-gray-100">
+                <div>
+                  <h4 className="text-[11px] font-bold text-gray-800 leading-tight">Notificaciones</h4>
+                  <p className="text-[9px] text-gray-400 mt-0.5">{unreadCount} sin leer</p>
+                </div>
+                <button
+                  onClick={closeNotifications}
+                  className="text-gray-400 hover:text-gray-600 transition-colors text-[14px] leading-none"
+                >
+                  &times;
+                </button>
+              </div>
+
+              <div className="px-4 py-7 text-center flex flex-col items-center justify-center">
+                <Bell size={20} className="text-gray-300 mb-2 transition-transform duration-500 hover:rotate-12" />
+                <p className="text-[10px] font-semibold text-gray-500">No hay actividad que mostrar</p>
+                <p className="text-[8px] text-gray-400 mt-0.5 leading-normal max-w-[160px] mx-auto">
+                  Te notificaremos cuando ocurra algo importante.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Profile Dropdown */}
+        <div id="profile-menu" className="relative">
+          <button
+            onClick={() => (profileOpen ? closeMenu() : openMenu())}
+            className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+          >
+            <div className="w-7 h-7 bg-[#9B0F06] rounded-full flex items-center justify-center">
+              <span className="text-[10px] font-semibold text-white">JD</span>
+            </div>
+            <div className="flex items-baseline gap-1">
+              <span className="text-[10px] text-gray-500">Hola,</span>
+              <span className="text-[10px] font-semibold text-gray-800">Usuario</span>
+            </div>
+          </button>
+
+          {/* Dropdown Menu */}
+          {profileOpen && (
+            <div className={`absolute top-[42px] right-0 w-48 bg-white border border-gray-100 rounded-lg shadow-xl z-50 overflow-hidden transition-all duration-200 ease-out ${
+              visible
+                ? 'opacity-100 translate-y-0 scale-100'
+                : 'opacity-0 -translate-y-2 scale-95'
+            }`}>
+
+              {/* Header usuario */}
+              <div className="px-4 py-3 border-b border-gray-100">
+                <p className="text-[11px] font-bold text-gray-800 leading-tight">Juan Diego</p>
+                <p className="text-[10px] text-gray-500 mt-0.5">Administrador</p>
+              </div>
+
+              {/* Ítems */}
+              <div className="py-1">
+
+                <Link
+                  href="/perfil"
+                  onClick={closeMenu}
+                  className="flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition-colors text-[11px] text-gray-600">
+                  <User size={13} className="text-gray-400" />
+                  <span>Mi perfil</span>
+                </Link>
+
+                <Link
+                  href="/soporte"
+                  onClick={closeMenu}
+                  className="flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition-colors text-[11px] text-gray-600">
+                  <User size={13} className="text-gray-400" />
+                  <span>Soporte</span>
+                </Link>
+
+                <hr className="border-gray-100 mx-4 my-1" />
+
+                <button
+                  onClick={() => {
+                    closeMenu()
+                    setTimeout(() => { window.location.href = '/login' }, 200)
+                  }}
+                  className="flex items-center gap-3 px-4 py-2 hover:bg-red-50 transition-colors w-full text-left text-[11px]">
+                  <LogOut size={13} className="text-[#D53E0F]" />
+                  <span className="text-[#D53E0F] font-medium">Cerrar sesión</span>
+                </button>
+
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Drawers */}
+      <AIAssistant isOpen={isAIOpen} onClose={() => setIsAIOpen(false)} />
+    </header>
+  )
+}

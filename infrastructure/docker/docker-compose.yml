@@ -1,0 +1,41 @@
+version: '3.9'
+
+services:
+  api:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - NODE_ENV=development
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - GCS_PROJECT_ID=${GCS_PROJECT_ID}
+      - GCS_BUCKET_NAME=${GCS_BUCKET_NAME}
+      - GCS_KEY_FILE=${GCS_KEY_FILE}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - CORS_ORIGIN=http://localhost:3000
+    env_file:
+      - ../backend/.env
+    volumes:
+      - ../backend/src:/app/src
+    networks:
+      - domun-network
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - api
+    networks:
+      - domun-network
+
+networks:
+  domun-network:
+    driver: bridge

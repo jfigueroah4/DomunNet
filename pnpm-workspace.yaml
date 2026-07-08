@@ -1,0 +1,8 @@
+packages:
+  - 'frontend'
+  - 'backend'
+  - 'packages/*'
+allowBuilds:
+  puppeteer: true
+  sharp: true
+  unrs-resolver: true
