@@ -4,22 +4,20 @@ import helmet from 'helmet'
 import morgan from 'morgan'
 import rateLimit from 'express-rate-limit'
 
-import { responseError, responseNotFound } from '@/shared/response'
-import { publicRouter } from '@/modules/public/public.routes'
-import { authRouter } from '@/modules/auth/auth.routes'
-import { usuariosRouter } from '@/modules/usuarios/usuarios.routes'
-import { rolesRouter } from '@/modules/roles/roles.routes'
-import { configuracionRouter } from '@/modules/configuracion/configuracion.routes'
-import { catalogosRouter } from '@/modules/catalogos/catalogos.routes'
-import { backupRouter } from '@/modules/backup/backup.routes'
+import { entorno } from '@/configuracion/entorno'
+import { sendError, sendResponse } from '@/shared/response'
+import { publicoRutas } from '@/modules/publico/publico.rutas'
+import { autenticacionRutas } from '@/modules/autenticacion/autenticacion.rutas'
+import { usuariosRutas } from '@/modules/usuarios/usuarios.rutas'
+import { rolesRutas } from '@/modules/roles/roles.rutas'
+import { configuracionRutas } from '@/modules/configuracion/configuracion.rutas'
+import { catalogosRutas } from '@/modules/catalogos/catalogos.rutas'
+import { respaldoRutas } from '@/modules/respaldo/respaldo.rutas'
 
 const app = express()
-const PORT = Number(process.env.PORT || 3001)
-const NODE_ENV = process.env.NODE_ENV || 'development'
-const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:3000'
-
+const PORT = entorno.puerto
 app.use(helmet())
-app.use(cors({ origin: CORS_ORIGIN, credentials: true }))
+app.use(cors({ origin: entorno.origenCors, credentials: true }))
 app.use(morgan('combined'))
 app.use(
   rateLimit({
@@ -31,32 +29,34 @@ app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 
 app.get('/health', (_req, res) => {
-  res.json({
-    success: true,
-    data: {
+  sendResponse(
+    res,
+    200,
+    {
       status: 'ok',
       timestamp: new Date().toISOString(),
-      environment: NODE_ENV,
+      environment: entorno.modo,
     },
-    message: 'API operativa',
-    errors: null,
-  })
+    'API operativa'
+  )
 })
 
-app.use('/api/v1', publicRouter)
-app.use('/api/v1/auth', authRouter)
-app.use('/api/v1/usuarios', usuariosRouter)
-app.use('/api/v1/roles', rolesRouter)
-app.use('/api/v1/configuracion', configuracionRouter)
-app.use('/api/v1/catalogos', catalogosRouter)
-app.use('/api/v1/backup', backupRouter)
+app.use('/api/v1/publico', publicoRutas)
+app.use('/api/v1/autenticacion', autenticacionRutas)
+app.use('/api/v1/auth', autenticacionRutas)
+app.use('/api/v1/usuarios', usuariosRutas)
+app.use('/api/v1/roles', rolesRutas)
+app.use('/api/v1/configuracion', configuracionRutas)
+app.use('/api/v1/catalogos', catalogosRutas)
+app.use('/api/v1/respaldo', respaldoRutas)
+app.use('/api/v1/backup', respaldoRutas)
 
-app.use((_req, res) => responseNotFound(res, 'Endpoint no encontrado'))
+app.use((_req, res) => sendError(res, 404, 'Endpoint no encontrado'))
 app.use((error: Error, _req: express.Request, res: express.Response) => {
-  responseError(res, 500, 'Error interno del servidor', error.message)
+  sendError(res, 500, 'Error interno del servidor', error.message)
 })
 
 app.listen(PORT, () => {
   console.log(`Servidor ejecutándose en puerto ${PORT}`)
-  console.log(`Environment: ${NODE_ENV}`)
+  console.log(`Environment: ${entorno.modo}`)
 })

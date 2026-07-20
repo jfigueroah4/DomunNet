@@ -18,7 +18,7 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
   const [isAIOpen, setIsAIOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [notificationsVisible, setNotificationsVisible] = useState(false)
-  const [unreadCount, setUnreadCount] = useState(0) // Default 0 to match empty state
+  const [unreadCount] = useState(0) // Default 0 to match empty state
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {

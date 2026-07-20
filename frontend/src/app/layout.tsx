@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Poppins } from 'next/font/google'
 import './globals.css'
 import LoadingScreen from '@/components/ui/LoadingScreen'
+import Providers from '@/app/providers'
 
 const poppins = Poppins({
   subsets: ['latin'],
@@ -29,8 +30,10 @@ export default function RootLayout({
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </head>
       <body className={`${poppins.className} min-h-screen bg-[#F3F4F7] text-[#07152B] antialiased`}>
-        <LoadingScreen />
-        {children}
+        <Providers>
+          <LoadingScreen />
+          {children}
+        </Providers>
       </body>
     </html>
   )

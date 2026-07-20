@@ -3,13 +3,73 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import { isAxiosError } from 'axios';
 import { Eye, EyeOff, User, Lock, Info, X } from 'lucide-react';
 import LoginInput from '@/components/ui/LoginInput';
 import LoginButton from '@/components/ui/LoginButton';
 import ValidationMessage from '@/components/ui/ValidationMessage';
 import PasswordRecoveryModal from '@/components/modals/PasswordRecoveryModal';
 import SupportModal from '@/components/modals/SupportModal';
-import { DEMO_ROLES } from '@/data/roles';
+import { api } from '@/lib/api/cliente';
+
+const ACCESOS_RAPIDOS = [
+  {
+    id: 'admin',
+    name: 'Natalia Aguilar',
+    email: 'natalia.aguilar@gmail.com',
+    password: 'Admin123*',
+    role: 'Administrador',
+  },
+  {
+    id: 'supervisor',
+    name: 'Marco Estrada',
+    email: 'marco.estrada@outlook.com',
+    password: 'Supervisor123*',
+    role: 'Supervisor',
+  },
+  {
+    id: 'inspector',
+    name: 'Valeria Cifuentes',
+    email: 'valeria.cifuentes@gmail.com',
+    password: 'Inspector123*',
+    role: 'Inspector',
+  },
+  {
+    id: 'campo',
+    name: 'Luis Arriaga',
+    email: 'luis.arriaga@outlook.com',
+    password: 'Campo123*',
+    role: 'Campo',
+  },
+  {
+    id: 'contratista',
+    name: 'Andrés Lemus',
+    email: 'andres.lemus@gmail.com',
+    password: 'Contratista123*',
+    role: 'Contratista',
+  },
+  {
+    id: 'gerencia',
+    name: 'Paola Barrios',
+    email: 'paola.barrios@gmail.com',
+    password: 'Gerencia123*',
+    role: 'Gerencia',
+  },
+  {
+    id: 'contratante',
+    name: 'Sofía Montenegro',
+    email: 'sofia.montenegro@gmail.com',
+    password: 'Contratante123*',
+    role: 'Contratante',
+  },
+  {
+    id: 'proveedor',
+    name: 'Claudia Rosales',
+    email: 'claudia.rosales@gmail.com',
+    password: 'Proveedor123*',
+    role: 'Proveedor',
+  },
+]
 
 export default function LoginPage() {
   const router = useRouter();
@@ -23,9 +83,29 @@ export default function LoginPage() {
   const [validationMessage, setValidationMessage] = useState('');
   const [validationStatus, setValidationStatus] = useState<'idle' | 'success' | 'warning' | 'error'>('idle');
   const [showValidation, setShowValidation] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const iniciarSesion = async (correo: string, contrasena: string) => {
+    await api.post('/auth/iniciar-sesion', {
+      correo,
+      contrasena,
+    });
+
+    setValidationMessage('¡Bienvenido!');
+    setValidationStatus('success');
+    setShowValidation(true);
+
+    setTimeout(() => {
+      router.replace('/');
+    }, 300);
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (isSubmitting) {
+      return;
+    }
     
     // Validaciones básicas
     if (!username) {
@@ -42,14 +122,21 @@ export default function LoginPage() {
       return;
     }
 
-    // Sin autenticación real — redirige directamente al dashboard
-    setValidationMessage('¡Bienvenido!');
-    setValidationStatus('success');
-    setShowValidation(true);
-    
-    setTimeout(() => {
-      router.push('/');
-    }, 300);
+    setIsSubmitting(true);
+
+    try {
+      await iniciarSesion(username, password);
+    } catch (error) {
+      const mensaje = isAxiosError(error)
+        ? (error.response?.data as { message?: string } | undefined)?.message ?? 'No se pudo iniciar sesión'
+        : 'No se pudo iniciar sesión';
+
+      setValidationMessage(mensaje);
+      setValidationStatus('error');
+      setShowValidation(true);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -174,7 +261,9 @@ export default function LoginPage() {
           </div>
 
           {/* Login Button */}
-          <LoginButton type="submit">Iniciar sesión</LoginButton>
+          <LoginButton type="submit" disabled={isSubmitting}>
+            {isSubmitting ? 'Ingresando...' : 'Iniciar sesión'}
+          </LoginButton>
         </form>
 
         {/* Support Link */}
@@ -201,7 +290,7 @@ export default function LoginPage() {
             style={{ fontFamily: 'Poppins, sans-serif' }}
           >
             <Info size={13} />
-            <span>Acceso Rápido - Demo</span>
+            <span>Acceso Rápido</span>
           </button>
         </div>
       </div>
@@ -217,8 +306,8 @@ export default function LoginPage() {
                   <Info size={14} className="text-red-500" />
                 </div>
                 <div>
-                  <h2 className="text-white font-bold text-lg">Acceso Rápido - Demo</h2>
-                  <p className="text-gray-400 text-xs mt-1">Selecciona una cuenta para acceder</p>
+                  <h2 className="text-white font-bold text-lg">Acceso Rápido</h2>
+                  <p className="text-gray-400 text-xs mt-1">Selecciona una cuenta válida para entrar al sistema</p>
                 </div>
               </div>
               <button
@@ -231,24 +320,34 @@ export default function LoginPage() {
 
             {/* Roles Grid */}
             <div className="grid grid-cols-2 gap-3 mb-4">
-              {DEMO_ROLES.map((role) => (
+              {ACCESOS_RAPIDOS.map((role) => (
                 <button
                   key={role.id}
-                  onClick={() => {
-                    setUsername(role.email);
-                    setPassword('password');
+                  onClick={async () => {
                     setIsQuickAccessOpen(false);
-                    setValidationMessage(`Acceso rápido: ${role.name}`);
-                    setValidationStatus('success');
-                    setShowValidation(true);
-                    setTimeout(() => {
-                      router.push('/');
-                    }, 300);
+                    setIsSubmitting(true);
+
+                    try {
+                      setUsername(role.email);
+                      setPassword(role.password);
+                      await iniciarSesion(role.email, role.password);
+                    } catch (error) {
+                      const mensaje = isAxiosError(error)
+                        ? (error.response?.data as { message?: string } | undefined)?.message ?? 'No se pudo iniciar sesión'
+                        : 'No se pudo iniciar sesión';
+
+                      setValidationMessage(mensaje);
+                      setValidationStatus('error');
+                      setShowValidation(true);
+                    } finally {
+                      setIsSubmitting(false);
+                    }
                   }}
                   className="p-3 rounded-xl border border-gray-700 hover:border-red-500 hover:bg-red-500/10 transition-all cursor-pointer text-center"
                 >
                   <div className="text-white font-semibold text-sm">{role.name}</div>
                   <div className="text-gray-400 text-xs mt-1 truncate">{role.email}</div>
+                  <div className="text-gray-500 text-[10px] mt-1 truncate">{role.role}</div>
                 </button>
               ))}
             </div>
@@ -256,7 +355,7 @@ export default function LoginPage() {
             {/* Nota */}
             <div className="text-gray-400 text-xs p-3 bg-gray-800 rounded-lg border border-gray-700">
               <p className="font-medium text-gray-300 mb-1">Nota:</p>
-              <p>Estas son credenciales de demostración para probar la aplicación con diferentes roles.</p>
+              <p>Estas son las credenciales reales de acceso inicial sembradas en el sistema.</p>
             </div>
           </div>
         </div>

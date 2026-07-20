@@ -2,7 +2,7 @@ export type ApiErrors = Array<{ field?: string; message: string }> | string | nu
 
 export type EstadoRegistro = 'Activo' | 'Inactivo'
 
-export type RolNombre =
+export type RolSistemaBase =
   | 'Administrador'
   | 'Supervisor'
   | 'Inspector'
@@ -12,21 +12,82 @@ export type RolNombre =
   | 'Campo'
   | 'Proveedor'
 
-export type PermisoClave =
-  | 'usuarios.read'
-  | 'usuarios.write'
-  | 'roles.read'
-  | 'roles.write'
-  | 'configuracion.read'
-  | 'configuracion.write'
-  | 'catalogos.read'
-  | 'catalogos.write'
-  | 'backup.read'
-  | 'backup.write'
+export type RolNombre = string
+
+export type PermisoClave = string
 
 export interface JwtPayloadLike {
   sub: string
   nombre: string
   rol: RolNombre
-  permisos: PermisoClave[]
+  permisos: string[]
+}
+
+export interface UsuarioRegistro {
+  id: string
+  nombre: string
+  correo: string
+  telefono: string
+  rol: RolNombre
+  estado: EstadoRegistro
+  departamento: string
+  proyectosAsignados: string[]
+  ultimoAcceso: string
+  fechaCreacion: string
+  contrasena: string
+}
+
+export interface RolRegistro {
+  id: string
+  nombre: RolNombre
+  descripcion: string
+  color: string
+  permisos: string[]
+  usuariosAsignados: string[]
+  estado: EstadoRegistro
+}
+
+export interface ConfiguracionGeneral {
+  empresa: string
+  zonaHoraria: string
+  idioma: string
+  tema: 'claro' | 'oscuro'
+}
+
+export interface NotificacionesSistema {
+  bitacora: boolean
+  proyectos: boolean
+  fotografias: boolean
+  reportes: boolean
+  soporte: boolean
+  canales: {
+    email: boolean
+    sms: boolean
+    inApp: boolean
+  }
+}
+
+export interface CatalogoItem {
+  id: string
+  codigo: string
+  nombre: string
+  descripcion: string
+  estado: EstadoRegistro
+}
+
+export interface CatalogoGrupo {
+  id: string
+  titulo: string
+  descripcion: string
+  items: CatalogoItem[]
+}
+
+export interface RespaldoSistema {
+  generadoEn: string
+  generadoPor: string
+  usuarios: UsuarioRegistro[]
+  roles: RolRegistro[]
+  configuracionGeneral: ConfiguracionGeneral
+  notificaciones: NotificacionesSistema
+  catalogos: CatalogoGrupo[]
 }
