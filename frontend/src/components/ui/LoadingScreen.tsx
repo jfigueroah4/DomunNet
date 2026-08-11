@@ -4,16 +4,25 @@ import { useEffect, useState } from 'react'
 import Image from 'next/image'
 
 export default function LoadingScreen() {
-  const [mounted, setMounted] = useState(true)
+  const [show, setShow] = useState(false)
   const [fade, setFade] = useState(false)
 
   useEffect(() => {
+    // Verificar si ya se mostró en esta sesión
+    const yaCargado = sessionStorage.getItem('domun_cargado')
+    if (yaCargado) {
+      return
+    }
+
+    setShow(true)
+
     const fadeTimer = setTimeout(() => {
       setFade(true)
     }, 1000)
 
     const unmountTimer = setTimeout(() => {
-      setMounted(false)
+      setShow(false)
+      sessionStorage.setItem('domun_cargado', 'true')
     }, 1300)
 
     return () => {
@@ -22,14 +31,33 @@ export default function LoadingScreen() {
     }
   }, [])
 
-  if (!mounted) return null
+  if (!show) return null
 
   return (
     <div
-      className={`fixed inset-0 bg-[#F3F4F7] z-[9999] flex flex-col items-center justify-center transition-opacity duration-300 ${
+      id="global-loading-screen"
+      className={`fixed inset-0 bg-[#F3F4F7] z-[9999] flex flex-col items-center justify-center transition-opacity duration-500 ${
         fade ? 'opacity-0 pointer-events-none' : 'opacity-100'
       }`}
     >
+      {/* Script de escape/fallback de emergencia por si la hidratación de JS tarda o se bloquea */}
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `
+            setTimeout(function() {
+              var screen = document.getElementById('global-loading-screen');
+              if (screen) {
+                screen.style.transition = 'opacity 0.5s ease';
+                screen.style.opacity = '0';
+                screen.style.pointerEvents = 'none';
+                setTimeout(function() {
+                  screen.style.display = 'none';
+                }, 500);
+              }
+            }, 1200);
+          `
+        }}
+      />
       <div className="flex flex-col items-center gap-4">
         {/* Animated Logo */}
         <div className="relative w-16 h-16 animate-pulse">

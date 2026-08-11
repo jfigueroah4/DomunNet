@@ -52,16 +52,15 @@ export function UsuarioTabla({
               const proyectosCount = usuario.rol === 'Administrador' ? 2 : 1;
               const fechaAcceso = usuario.ultimoAcceso ? usuario.ultimoAcceso.split(' ')[0] : '';
               
+              const nombreCompleto = `${usuario.primer_nombre} ${usuario.segundo_nombre || ''} ${usuario.primer_apellido} ${usuario.segundo_apellido || ''}`.replace(/\s+/g, ' ').trim();
+              const iniciales = (usuario.primer_nombre[0] || '') + (usuario.primer_apellido[0] || '');
+
               // Dynamic subtitle mapping to match the second image style
-              let subtitle = usuario.departamento || '';
-              if (usuario.nombre.includes('Carlos')) subtitle = 'Administrador del sistema';
-              else if (usuario.nombre.includes('Laura')) subtitle = 'Supervisora de obra vial';
-              else if (usuario.nombre.includes('Marco')) subtitle = 'Ingeniero residente';
-              else if (usuario.nombre.includes('Roberto')) subtitle = 'Inspector de calidad';
-              else if (usuario.nombre.includes('Felipe')) subtitle = 'Supervisor de proyectos';
-              else if (usuario.nombre.includes('Sandra')) subtitle = 'Inspectora de obra';
-              else if (usuario.nombre.includes('Alfredo')) subtitle = 'Inspector de control';
-              else if (usuario.nombre.includes('María')) subtitle = 'Administradora del sistema';
+              let subtitle = '';
+              if (nombreCompleto.includes('Natalia')) subtitle = 'Administrador del sistema';
+              else if (nombreCompleto.includes('Marco')) subtitle = 'Ingeniero residente';
+              else if (usuario.rol === 'Administrador') subtitle = 'Administrador del sistema';
+              else subtitle = usuario.rol;
 
               return (
                 <tr
@@ -71,14 +70,10 @@ export function UsuarioTabla({
                   <td className="px-3 py-2">
                     <div className="flex items-center gap-2.5">
                       <div className="w-7 h-7 rounded-full bg-[#9B0F06] flex items-center justify-center text-[9px] font-bold text-white uppercase shrink-0">
-                        {usuario.nombre
-                          .split(' ')
-                          .slice(0, 2)
-                          .map((n) => n[0])
-                          .join('')}
+                        {iniciales}
                       </div>
                       <div>
-                        <p className="font-semibold text-[10px] text-gray-800 leading-tight">{usuario.nombre}</p>
+                        <p className="font-semibold text-[10px] text-gray-800 leading-tight">{nombreCompleto}</p>
                         <p className="text-[8px] text-gray-400 mt-0.5">
                           {subtitle}
                         </p>

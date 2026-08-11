@@ -9,7 +9,8 @@
     "start": "next start",
     "lint": "next lint",
     "clean": "node -e \"require('fs').rmSync('.next',{recursive:true,force:true})\"",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test": "node run-tests.js"
   },
   "dependencies": {
     "@supabase/ssr": "^0.0.10",

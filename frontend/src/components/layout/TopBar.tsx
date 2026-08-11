@@ -4,12 +4,19 @@ import { useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { Search, Bell, Menu, User, LogOut, Ticket, Bot } from 'lucide-react'
+import { api } from '@/lib/api/cliente'
 
 const AIAssistant = dynamic(() => import('./AIAssistant'), { ssr: false })
 
 interface TopBarProps {
   section?: string
   onToggle?: () => void
+}
+
+interface UserProfile {
+  nombre: string
+  apellido: string
+  rol: string
 }
 
 export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
@@ -19,6 +26,21 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [notificationsVisible, setNotificationsVisible] = useState(false)
   const [unreadCount] = useState(0) // Default 0 to match empty state
+  const [profile, setProfile] = useState<UserProfile | null>(null)
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const res = await api.get('/auth/perfil')
+        if (res.data?.success && res.data?.data) {
+          setProfile(res.data.data)
+        }
+      } catch (err) {
+        console.error('Error al cargar perfil en TopBar:', err)
+      }
+    }
+    fetchProfile()
+  }, [])
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -155,11 +177,15 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
             className="flex items-center gap-2 hover:opacity-80 transition-opacity"
           >
             <div className="w-7 h-7 bg-[#9B0F06] rounded-full flex items-center justify-center">
-              <span className="text-[10px] font-semibold text-white">JD</span>
+              <span className="text-[10px] font-semibold text-white">
+                {profile ? `${profile.nombre ? profile.nombre.charAt(0) : ''}${profile.apellido ? profile.apellido.charAt(0) : ''}`.toUpperCase() : 'U'}
+              </span>
             </div>
             <div className="flex items-baseline gap-1">
               <span className="text-[10px] text-gray-500">Hola,</span>
-              <span className="text-[10px] font-semibold text-gray-800">Usuario</span>
+              <span className="text-[10px] font-semibold text-gray-800">
+                {profile ? profile.nombre : 'Usuario'}
+              </span>
             </div>
           </button>
 
@@ -173,8 +199,12 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
 
               {/* Header usuario */}
               <div className="px-4 py-3 border-b border-gray-100">
-                <p className="text-[11px] font-bold text-gray-800 leading-tight">Juan Diego</p>
-                <p className="text-[10px] text-gray-500 mt-0.5">Administrador</p>
+                <p className="text-[11px] font-bold text-gray-800 leading-tight">
+                  {profile ? `${profile.nombre} ${profile.apellido}`.trim() : 'Usuario'}
+                </p>
+                <p className="text-[10px] text-gray-500 mt-0.5">
+                  {profile ? profile.rol : 'Usuario'}
+                </p>
               </div>
 
               {/* Ítems */}
@@ -199,8 +229,13 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
                 <hr className="border-gray-100 mx-4 my-1" />
 
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     closeMenu()
+                    try {
+                      await api.post('/auth/cerrar-sesion')
+                    } catch (e) {
+                      console.error('Error al cerrar sesión:', e)
+                    }
                     setTimeout(() => { window.location.href = '/login' }, 200)
                   }}
                   className="flex items-center gap-3 px-4 py-2 hover:bg-red-50 transition-colors w-full text-left text-[11px]">

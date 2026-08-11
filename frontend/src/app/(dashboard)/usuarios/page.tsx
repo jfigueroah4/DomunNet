@@ -1,17 +1,19 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
-import { Plus, Users, Shield, UserCog, Search } from 'lucide-react'
-import { USUARIOS_MOCK } from '@/data/usuarios.mock'
+import { useState, useEffect, useCallback } from 'react'
+import { Plus, Users, Shield, UserCog, Search, Loader2 } from 'lucide-react'
+import { api } from '@/lib/api/cliente'
 import { Usuario, RolUsuario, EstadoUsuario } from '@/types/usuario'
 import { UsuarioCard } from '@/components/modules/usuarios/UsuarioCard'
 import { UsuarioTabla } from '@/components/modules/usuarios/UsuarioTabla'
 import { UsuarioDrawer, UsuarioDrawerMode } from '@/components/modules/usuarios/UsuarioDrawer'
 import { UsuarioDeleteModal } from '@/components/modules/usuarios/UsuarioDeleteModal'
+import { toast } from 'sonner'
 
 export default function UsuariosPage() {
-  const [usuarios, setUsuarios] = useState(USUARIOS_MOCK)
+  const [usuarios, setUsuarios] = useState<Usuario[]>([])
+  const [loading, setLoading] = useState(true)
   const [busqueda, setBusqueda] = useState('')
   const [filtroRol, setFiltroRol] = useState<RolUsuario | 'Todos'>('Todos')
   const [filtroEstado, setFiltroEstado] = useState<EstadoUsuario | 'Todos'>('Todos')
@@ -21,9 +23,28 @@ export default function UsuariosPage() {
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [usuarioEliminar, setUsuarioEliminar] = useState<Usuario | undefined>()
 
+  const cargarUsuarios = useCallback(async () => {
+    try {
+      setLoading(true)
+      const res = await api.get('/usuarios')
+      if (res.data && res.data.success) {
+        setUsuarios(res.data.data || [])
+      }
+    } catch (error) {
+      console.error('Error al cargar usuarios:', error)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    cargarUsuarios()
+  }, [cargarUsuarios])
+
   const usuariosFiltrados = usuarios.filter((usuario) => {
+    const nombreCompleto = `${usuario.primer_nombre} ${usuario.segundo_nombre || ''} ${usuario.primer_apellido} ${usuario.segundo_apellido || ''}`.replace(/\s+/g, ' ').trim()
     const cumpleBusqueda =
-      usuario.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
+      nombreCompleto.toLowerCase().includes(busqueda.toLowerCase()) ||
       usuario.correo.toLowerCase().includes(busqueda.toLowerCase())
 
     const cumpleRol = filtroRol === 'Todos' || usuario.rol === filtroRol
@@ -36,7 +57,7 @@ export default function UsuariosPage() {
     total: usuarios.length,
     Administrador: usuarios.filter((u) => u.rol === 'Administrador').length,
     Operativos: usuarios.filter((u) => u.rol !== 'Administrador').length,
-    Inspector: usuarios.filter((u) => u.rol === 'Inspector').length,
+    IngenieroResidente: usuarios.filter((u) => u.rol === 'IngenieroResidente').length,
   }
 
   const abrirDrawer = (mode: UsuarioDrawerMode, usuario?: Usuario) => {
@@ -49,52 +70,85 @@ export default function UsuariosPage() {
   const handleVer = (usuario: Usuario) => abrirDrawer('view', usuario)
   const handleEditar = (usuario: Usuario) => abrirDrawer('edit', usuario)
 
-  const handleGuardarUsuario = (payload: {
-    nombre: string
+  const handleGuardarUsuario = async (payload: {
+    primer_nombre: string
+    segundo_nombre: string | null
+    primer_apellido: string
+    segundo_apellido: string | null
     correo: string
     telefono: string
     rol: RolUsuario
     estado: 'Activo' | 'Inactivo' | 'Suspendido'
-    departamento: string
-    password: string
+    password?: string
+    username?: string | null
   }) => {
-    if (drawerMode === 'edit' && usuarioActivo) {
-      setUsuarios((actuales) =>
-        actuales.map((usuario) =>
-          usuario.id === usuarioActivo.id
-            ? {
-                ...usuario,
-                nombre: payload.nombre,
-                correo: payload.correo,
-                telefono: payload.telefono,
-                rol: payload.rol,
-                estado: payload.estado,
-                departamento: payload.departamento,
-              }
-            : usuario
-        )
-      )
-      return
-    }
+    try {
+      // Construir payload solo con los campos que el backend espera
+      const payloadApi: Record<string, unknown> = {
+        primer_nombre: payload.primer_nombre,
+        segundo_nombre: payload.segundo_nombre || null,
+        primer_apellido: payload.primer_apellido,
+        segundo_apellido: payload.segundo_apellido || null,
+        correo: payload.correo,
+        telefono: payload.telefono || '',
+        rol: payload.rol,
+        // El backend solo acepta 'Activo' | 'Inactivo'; 'Suspendido' se mapea a 'Inactivo'
+        estado: payload.estado === 'Suspendido' ? 'Inactivo' : payload.estado,
+        username: payload.username || null,
+      }
+      // Solo incluir contrasena si tiene valor (min 6 chars requerido por el backend)
+      if (payload.password && payload.password.trim().length >= 6) {
+        payloadApi.contrasena = payload.password.trim()
+      }
 
-    const nuevoUsuario: Usuario = {
-      id: `usr-${Date.now()}`,
-      nombre: payload.nombre || 'Nuevo Usuario',
-      correo: payload.correo,
-      telefono: payload.telefono,
-      rol: payload.rol,
-      estado: payload.estado,
-      departamento: payload.departamento,
-      fechaCreacion: new Date().toLocaleDateString('es-GT'),
-      ultimoAcceso: 'Ahora',
-    }
+      if (drawerMode === 'edit' && usuarioActivo) {
+        await api.put(`/usuarios/${usuarioActivo.id}`, payloadApi)
+        toast.success('Usuario actualizado exitosamente')
+      } else {
+        await api.post('/usuarios', payloadApi)
+        toast.success('Usuario creado exitosamente')
+      }
 
-    setUsuarios((actuales) => [nuevoUsuario, ...actuales])
+      await cargarUsuarios()
+      handleCerrarDrawer()
+    } catch (error) {
+      console.error('Error al guardar usuario:', error)
+      toast.error('Error al guardar el usuario. Por favor verifica los datos.')
+    }
   }
 
   const handleEliminar = (id: string) => {
     setUsuarioEliminar(usuarios.find((usuario) => usuario.id === id))
     setDeleteOpen(true)
+  }
+
+  const handleConfirmarEliminar = async (accion: 'eliminar' | 'suspender') => {
+    if (!usuarioEliminar) return
+    try {
+      if (accion === 'suspender') {
+        await api.put(`/usuarios/${usuarioEliminar.id}`, {
+          primer_nombre: usuarioEliminar.primer_nombre,
+          segundo_nombre: usuarioEliminar.segundo_nombre || null,
+          primer_apellido: usuarioEliminar.primer_apellido,
+          segundo_apellido: usuarioEliminar.segundo_apellido || null,
+          correo: usuarioEliminar.correo,
+          telefono: usuarioEliminar.telefono || '',
+          rol: usuarioEliminar.rol,
+          estado: 'Inactivo', // El backend solo acepta 'Activo' | 'Inactivo'
+        })
+        toast.success('Usuario suspendido exitosamente')
+      } else {
+        await api.delete(`/usuarios/${usuarioEliminar.id}`)
+        toast.success('Usuario eliminado exitosamente')
+      }
+      await cargarUsuarios()
+    } catch (error) {
+      console.error(`Error al ${accion} usuario:`, error)
+      toast.error(`No se pudo ${accion} el usuario.`)
+    } finally {
+      setDeleteOpen(false)
+      setUsuarioEliminar(undefined)
+    }
   }
 
   const handleCerrarDrawer = () => {
@@ -146,7 +200,7 @@ export default function UsuariosPage() {
           <p className="text-[24px] font-bold leading-none text-[#0066CC]">{contadores.Operativos}</p>
         </div>
 
-        <UsuarioCard rol="Inspector" cantidad={contadores.Inspector} />
+        <UsuarioCard rol="IngenieroResidente" cantidad={contadores.IngenieroResidente} />
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2.5">
@@ -163,7 +217,7 @@ export default function UsuariosPage() {
           </div>
 
           <div className="flex flex-wrap gap-1">
-            {['Todos', 'Administrador', 'Supervisor', 'Inspector'].map((rol) => (
+            {['Todos', 'Administrador', 'Gerencia', 'IngenieroResidente', 'Laboratorista', 'AuxiliarDeCampo', 'Contratante'].map((rol) => (
               <button
                 key={rol}
                 onClick={() => setFiltroRol(rol as RolUsuario | 'Todos')}
@@ -195,7 +249,12 @@ export default function UsuariosPage() {
         </div>
       </div>
 
-      {usuariosFiltrados.length > 0 ? (
+      {loading ? (
+        <div className="flex flex-col items-center justify-center p-12 bg-white border border-gray-100 rounded-2xl shadow-sm">
+          <Loader2 className="h-8 w-8 animate-spin text-[#9B0F06]" />
+          <p className="mt-2 text-[11px] text-gray-500 font-medium">Cargando registros reales...</p>
+        </div>
+      ) : usuariosFiltrados.length > 0 ? (
         <UsuarioTabla
           usuarios={usuariosFiltrados}
           onVer={handleVer}
@@ -224,13 +283,7 @@ export default function UsuariosPage() {
           setDeleteOpen(false)
           setUsuarioEliminar(undefined)
         }}
-        onConfirm={() => {
-          if (usuarioEliminar) {
-            setUsuarios((actuales) => actuales.filter((usuario) => usuario.id !== usuarioEliminar.id))
-          }
-          setDeleteOpen(false)
-          setUsuarioEliminar(undefined)
-        }}
+        onConfirm={handleConfirmarEliminar}
         usuario={usuarioEliminar}
       />
     </div>

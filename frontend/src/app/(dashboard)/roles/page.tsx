@@ -8,6 +8,7 @@ import { DEMO_ROLES, Role } from '@/data/roles'
 import { USUARIOS_MOCK } from '@/data/usuarios.mock'
 import { RoleDrawer, RoleDrawerMode } from '@/components/modules/roles/RoleDrawer'
 import { RoleDeleteModal } from '@/components/modules/roles/RoleDeleteModal'
+import { toast } from 'sonner'
 
 const iconPorRol: Record<string, LucideIcon> = {
   Administrador: Shield,
@@ -90,6 +91,7 @@ export default function RolesPage() {
             : role
         )
       )
+      toast.success('Rol actualizado exitosamente')
       return
     }
 
@@ -103,6 +105,7 @@ export default function RolesPage() {
     }
 
     setRoles((actuales) => [nuevoRol, ...actuales])
+    toast.success('Rol creado exitosamente')
   }
 
   const handleDelete = (role: Role) => {
@@ -273,6 +276,7 @@ export default function RolesPage() {
         onConfirm={() => {
           if (roleEliminar) {
             setRoles((actuales) => actuales.filter((role) => role.id !== roleEliminar.id))
+            toast.success('Rol eliminado exitosamente')
           }
           setDeleteOpen(false)
           setRoleEliminar(undefined)

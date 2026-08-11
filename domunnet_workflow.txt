@@ -1,0 +1,233 @@
+================================================================================
+          DOMUNNET - MANUAL COMPLETO Y DETALLADO DEL FLUJO DE TRABAJO
+================================================================================
+
+Este documento describe de manera exhaustiva el flujo de trabajo, arquitectura,
+pasos de interacción, campos de datos, validaciones y la lógica de cada uno de
+los módulos que componen la plataforma DomunNet (C:\DomunNet).
+
+La plataforma está construida sobre una arquitectura de Monorepositorio:
+- frontend: Next.js (App Router, Client Components, Zustand para estados).
+- backend: Node.js, Express, TypeScript, Supabase (PostgreSQL + Supabase Auth).
+
+--------------------------------------------------------------------------------
+1. MÓDULO DE AUTENTICACIÓN Y CONTROL DE ACCESO
+--------------------------------------------------------------------------------
+Este módulo gestiona el ingreso de usuarios, la verificación de credenciales,
+la persistencia de la sesión mediante cookies y la seguridad de las rutas.
+
+A. Interfaz de Usuario (Frontend):
+   - Pantalla de inicio de sesión (/login) con campos para Correo y Contraseña.
+   - Panel de "Accesos Rápidos" para testing con credenciales pre-cargadas de
+     roles comunes (Administrador, Supervisor, Inspector, Campo, Contratista,
+     Gerencia, Contratante, Proveedor).
+   - Modal de Recuperación de Contraseña: Envío de enlace de restablecimiento.
+   - Modal de Soporte: Para incidencias de acceso.
+
+B. Flujo de Datos y Pasos Técnicos:
+   1. Ingreso de datos por parte del usuario.
+   2. Petición HTTP POST enviada a `/auth/iniciar-sesion`.
+   3. Backend valida el cuerpo de la petición mediante esquemas Zod (valida
+      formato de correo y longitud de contraseña).
+   4. El backend invoca a `clienteSupabase.auth.signInWithPassword` para validar
+      las credenciales en la base de datos de usuarios de Supabase Auth.
+   5. Búsqueda del usuario en la tabla interna `usuario` para recuperar:
+      - Estado (debe ser 'Activo').
+      - ID de Rol y Permisos asociados.
+      - Datos adicionales (nombre y apellido).
+   6. Vinculación: Si el usuario existe pero no tiene registrado su
+      `auth_user_id` de Supabase, se realiza una actualización (update) física.
+   7. Firma de Token JWT (expira en 8 horas) con datos de sesión:
+      - ID del usuario (sub).
+      - Nombre completo.
+      - Rol.
+      - Lista de permisos.
+   8. Creación de Refresh Token (UUID de un solo uso) guardado en la tabla
+      `sesion_usuario` de la base de datos.
+   9. Envío de Cookies seguras HTTP-Only al navegador:
+      - `token`: Contiene el JWT de acceso (vida de 8 horas).
+      - `refreshToken`: Token de renovación (vida de 7 días).
+   10. Redirección automática al Dashboard principal (/).
+   11. Cierre de Sesión (/logout): Envía petición DELETE a la base de datos para
+       invalidar el refresh token, limpia las cookies del cliente y redirige a
+       /login.
+
+--------------------------------------------------------------------------------
+2. MÓDULO DE PROYECTOS
+--------------------------------------------------------------------------------
+Gestión central de las obras de construcción vial y civil.
+
+A. Interfaz de Usuario (Frontend):
+   - Tablero Principal (/proyectos):
+     * Tarjetas de Resumen (KPIs): Cantidad total, Borradores, Activos,
+       En Revisión, Completados.
+     * Barra de búsqueda por nombre, ubicación, responsable o código.
+     * Filtro por Estado del Proyecto.
+     * Switch de Vista: Cuadrícula (Cards) / Lista.
+   - Creación y Edición (/proyectos/nuevo y /proyectos/[id]/editar):
+     * Formularios para: Código del proyecto, Nombre, Descripción, Ubicación,
+       Responsable de obra, Presupuesto, Avance inicial, Fechas de Inicio/Fin,
+       Categorías de obra y documentos iniciales.
+
+B. Detalle del Proyecto (/proyectos/[id]):
+   Contiene una barra de pestañas para dividir la información:
+
+   Pestaña 1: Información General
+     - Muestra presupuesto total, ubicación, responsable, fechas de proyecto.
+     - Lista el equipo de trabajo (supervisor vial, ingeniero estructural, etc.).
+     - Asignación de roles y permisos del proyecto específico.
+
+   Pestaña 2: Cronograma (Visualización del Timeline)
+     - Indicador destacado con el porcentaje de avance físico general.
+     - Leyenda cromática de estados (Completado, Activo, En revisión, Borrador,
+       Cancelado).
+     - Representación secuencial unida por una línea discontinua vertical.
+     - Fichas de Fase individuales mostrando:
+       * Indicador visual de cumplimiento (icono de Check verde si está al 100%).
+       * Nombre de la fase.
+       * Fechas programadas de inicio y fin.
+       * Porcentaje individual y barra de progreso.
+
+   Pestaña 3: Documentos
+     - Listado de archivos del proyecto (planos, presupuestos, especificaciones).
+     - Datos por archivo: Nombre, extensión, tamaño, fecha de subida y autor.
+     - Soporte de descarga directa y botón para agregar nuevo archivo.
+
+   Pestaña 4: Fotografías
+     - Mosaico de capturas correspondientes al proyecto.
+
+--------------------------------------------------------------------------------
+3. MÓDULO DE BITÁCORA DE OBRA
+--------------------------------------------------------------------------------
+Este módulo representa el cuaderno de obra digital. Registra eventos diarios
+relacionados con el avance físico, contingencias o calidad.
+
+A. Interfaz de Usuario (Frontend):
+   - Muro / Feed (/bitacora):
+     * Lista de registros del día agrupados por fecha en orden descendente.
+     * Barra de filtros: Texto de búsqueda, tipo de suceso, proyecto asociado,
+       estado y rangos de fechas (Desde / Hasta).
+     * Botón "Generar Informe": Exporta folios filtrados.
+     * Botón "Nuevo Registro": Redirige al formulario asistido.
+
+B. Paso a Paso del Formulario de Creación (Zustand State Store):
+   Para registrar una nueva entrada de bitácora, el usuario sigue un wizard de
+   5 pasos con validación estricta:
+
+   PASO 1: Información General
+     - Proyecto (obligatorio): Selección de la lista de obras asignadas.
+     - Categoría de Trabajo (obligatorio): Descapote, Movimiento de tierras,
+       Sub-base, Base granular, Carpeta asfáltica, Cunetas, Alcantarillas o
+       Señalización.
+     - Fecha del Registro (obligatorio): Selector de fecha.
+     - Turno (opcional): Diurno o Nocturno.
+     - Responsable (opcional): Selección del firmante.
+     - Ubicación / Estación del día (obligatorio): Texto descriptivo del tramo
+       (Ej: "KM 22+300 al 24+100").
+     * Validación: Se verifica la existencia de todos los campos obligatorios
+       antes de desbloquear el botón "Siguiente".
+
+   PASO 2: Condiciones Climáticas (Opcional)
+     - Tipo de Clima: Botones gráficos para seleccionar Soleado, Parcialmente
+       nublado, Nublado, Lluvia ligera o Lluvia fuerte.
+     - Observación Climática: Campo de texto libre para detallar imprevistos.
+     - Suspensión de Actividades: Switch booleano (Sí/No) para dejar constancia
+       si el mal clima obligó a detener los trabajos.
+
+   PASO 3: Renglones de Trabajo (Obligatorio)
+     - El usuario debe detallar las tareas agregando filas dinámicas. Cada fila
+       requiere:
+       * Renglón: Selección de la actividad (ej. Excavación, Colocación).
+       * Lado: Ubicación en la vía (Izquierdo, Derecho, Ambos).
+       * Estación Inicio: Progresiva inicial (Ej. 0+150).
+       * Estación Fin: Progresiva final (Ej. 0+400).
+       * Observaciones: Anotación específica del tramo.
+     * Validación: Debe existir al menos un renglón agregado y todos sus campos
+       no deben estar vacíos.
+
+   PASO 4: Laboratorio y Ensayos de Calidad (Opcional)
+     - Interruptor "Habilitar Laboratorio".
+     - Al activarse, despliega:
+       * Tipo de Ensayo: Selector (ej. Concreto fresco, Compactación).
+       * Resultado del Ensayo: Campo de texto libre para valores técnicos.
+       * Responsable de Laboratorio: Firma o nombre del técnico a cargo.
+
+   PASO 5: Cierre y Firma (Obligatorio)
+     - Observaciones de Cierre: Descripción del final de jornada.
+     - Firma del Supervisor: Entrada de texto con el nombre del supervisor
+       que autoriza el envío del folio de bitácora.
+     * Al terminar, el sistema guarda el registro y limpia la tienda de Zustand.
+
+--------------------------------------------------------------------------------
+4. MÓDULO DE FOTOGRAFÍAS
+--------------------------------------------------------------------------------
+Almacena y categoriza la evidencia visual del progreso y los incidentes en
+los proyectos.
+
+A. Interfaz de Usuario (Frontend):
+   - Galería de Imágenes (/fotografias):
+     * Filtros: Por texto de título, tipo (Avance, Incidente, Calidad, Visita),
+       proyecto, bitácora y fecha.
+     * Vistas: Cuadrícula de fotos (Grid) y Vista Feed (foto + metadata).
+   - Lightbox Interactivo:
+     * Al hacer clic en una foto, se visualiza en tamaño completo con botones
+       de navegación anterior/siguiente.
+     * Muestra la metadata completa: Título, fecha de captura, geolocalización,
+       autor, proyecto y bitácora enlazada.
+
+B. Carga de Imágenes:
+   - Panel de arrastrar y soltar (Drag and Drop) para subir archivos de imagen.
+   - Formulario de metadatos: Título, tipo de imagen y enlace a la bitácora del día.
+
+--------------------------------------------------------------------------------
+5. MÓDULO DE REPORTES Y ESTADÍSTICAS
+--------------------------------------------------------------------------------
+Sección analítica del sistema para visualización de KPIs consolidados.
+
+A. Componentes del Reporte (/reportes):
+   - Tarjetas de Indicadores (KPIs):
+     * Proyectos Activos (Conteo en base a estados).
+     * Avance Físico Promedio general del portafolio.
+     * Cantidad total de registros en bitácora.
+     * Fotografías subidas en total.
+   - Sección de Avance por Proyecto:
+     * Lista de proyectos con barra de progreso comparativa y badge de estado.
+   - Gráfico de Barras:
+     * Comparativa de actividades y registros diarios de la última semana.
+   - Gráfico de Dona:
+     * Porcentaje de registros divididos según su categoría (ej. 45% Actividad,
+       25% Incidentes, 30% Visitas).
+   - Tabla Detallada de Proyectos:
+     * Columnas: Proyecto, Código, Responsable, Avance Físico, Estado.
+   - Acciones de Exportación:
+     * Descarga de bases de datos de reportes en archivos CSV o informes en PDF.
+
+--------------------------------------------------------------------------------
+6. MÓDULO DE USUARIOS Y ROLES (ADMINISTRACIÓN)
+--------------------------------------------------------------------------------
+Módulo para el control de accesos, creación de cuentas y asignación de permisos
+del sistema.
+
+A. Interfaz de Usuario (Frontend):
+   - Dashboard de Usuarios (/usuarios):
+     * Tarjetas indicadoras con el total de usuarios, cantidad de administradores,
+       usuarios operativos y cantidad de inspectores.
+     * Buscador y filtros de Rol y Estado.
+     * Tabla con columnas de Nombre, Correo, Teléfono, Rol, Estado, Departamento,
+       Fecha de creación y Último acceso.
+   - Drawer Lateral (Creación / Edición):
+     * Formulario para registrar nombre, correo, teléfono, rol, estado (Activo,
+       Inactivo), departamento y contraseña.
+   - Modal de Eliminación:
+     * Confirmación de borrado lógico (inactivación) o físico.
+
+B. Roles y Permisos (Base de Datos):
+   - Controlado por las tablas relacionales de la base de datos en Supabase:
+     * `usuarios`: Almacena credenciales encriptadas (contrasena_hash + salt),
+       datos del perfil y proyectos asignados.
+     * `roles`: Nombre del rol (ej: Administrador, Supervisor) y color distintivo.
+     * `permisos`: Lista de permisos del sistema (ej: 'bitacora: Edicion').
+     * `rol_permisos`: Tabla intermedia que asocia roles con sus permisos.
+   - Flujo de Modificación: El backend (/usuarios/usuarios.servicio.ts) permite
+     listar, obtener, crear (generando hash de contraseña), actualizar y eliminar.
+================================================================================

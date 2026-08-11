@@ -16,12 +16,14 @@ export function UsuarioFormularioDrawer({
   usuario,
 }: UsuarioFormularioDrawerProps) {
   const [formData, setFormData] = useState({
-    nombre: usuario?.nombre || '',
+    primer_nombre: usuario?.primer_nombre || '',
+    segundo_nombre: usuario?.segundo_nombre || '',
+    primer_apellido: usuario?.primer_apellido || '',
+    segundo_apellido: usuario?.segundo_apellido || '',
     correo: usuario?.correo || '',
     telefono: usuario?.telefono || '',
-    rol: (usuario?.rol as RolUsuario) || ('Inspector' as RolUsuario),
+    rol: (usuario?.rol as RolUsuario) || ('IngenieroResidente' as RolUsuario),
     estado: usuario?.estado || 'Activo',
-    departamento: usuario?.departamento || '',
     password: '',
   })
 
@@ -73,19 +75,63 @@ export function UsuarioFormularioDrawer({
 
         {/* Contenido */}
         <div className="p-5 space-y-4">
-          {/* Nombre */}
-          <div>
-            <label className="text-[10px] font-semibold text-gray-700 block mb-1.5">
-              Nombre Completo
-            </label>
-            <input
-              type="text"
-              name="nombre"
-              value={formData.nombre}
-              onChange={handleChange}
-              placeholder="Ej: Juan Pérez García"
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-[10px] text-gray-700 bg-white focus:outline-none focus:border-[#9B0F06] placeholder:text-gray-400"
-            />
+          {/* Nombres */}
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[10px] font-semibold text-gray-700 block mb-1.5">
+                Primer Nombre
+              </label>
+              <input
+                type="text"
+                name="primer_nombre"
+                value={formData.primer_nombre}
+                onChange={handleChange}
+                placeholder="Ej: Juan"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-[10px] text-gray-700 bg-white focus:outline-none focus:border-[#9B0F06] placeholder:text-gray-400"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-semibold text-gray-700 block mb-1.5">
+                Segundo Nombre
+              </label>
+              <input
+                type="text"
+                name="segundo_nombre"
+                value={formData.segundo_nombre}
+                onChange={handleChange}
+                placeholder="Ej: Carlos"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-[10px] text-gray-700 bg-white focus:outline-none focus:border-[#9B0F06] placeholder:text-gray-400"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[10px] font-semibold text-gray-700 block mb-1.5">
+                Primer Apellido
+              </label>
+              <input
+                type="text"
+                name="primer_apellido"
+                value={formData.primer_apellido}
+                onChange={handleChange}
+                placeholder="Ej: Pérez"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-[10px] text-gray-700 bg-white focus:outline-none focus:border-[#9B0F06] placeholder:text-gray-400"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-semibold text-gray-700 block mb-1.5">
+                Segundo Apellido
+              </label>
+              <input
+                type="text"
+                name="segundo_apellido"
+                value={formData.segundo_apellido}
+                onChange={handleChange}
+                placeholder="Ej: García"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-[10px] text-gray-700 bg-white focus:outline-none focus:border-[#9B0F06] placeholder:text-gray-400"
+              />
+            </div>
           </div>
 
           {/* Correo */}
@@ -118,25 +164,6 @@ export function UsuarioFormularioDrawer({
             />
           </div>
 
-          {/* Departamento */}
-          <div>
-            <label className="text-[10px] font-semibold text-gray-700 block mb-1.5">
-              Departamento
-            </label>
-            <select
-              name="departamento"
-              value={formData.departamento}
-              onChange={handleChange}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-[10px] text-gray-700 bg-white focus:outline-none focus:border-[#9B0F06]"
-            >
-              <option value="">Seleccionar...</option>
-              <option value="TI">TI</option>
-              <option value="Proyectos">Proyectos</option>
-              <option value="Inspección">Inspección</option>
-              <option value="Administración">Administración</option>
-            </select>
-          </div>
-
           {/* Rol */}
           <div>
             <label className="text-[10px] font-semibold text-gray-700 block mb-1.5">
@@ -149,8 +176,11 @@ export function UsuarioFormularioDrawer({
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-[10px] text-gray-700 bg-white focus:outline-none focus:border-[#9B0F06]"
             >
               <option value="Administrador">Administrador</option>
-              <option value="Supervisor">Supervisor</option>
-              <option value="Inspector">Inspector</option>
+              <option value="Gerencia">Gerencia</option>
+              <option value="IngenieroResidente">Ingeniero Residente</option>
+              <option value="Laboratorista">Laboratorista</option>
+              <option value="AuxiliarDeCampo">Auxiliar de Campo</option>
+              <option value="Contratante">Contratante</option>
             </select>
           </div>
 

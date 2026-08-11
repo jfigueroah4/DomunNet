@@ -22,15 +22,30 @@ const rolConfig: Record<
     color: '#9B0F06',
     icono: Shield,
   },
-  Supervisor: {
-    label: 'Supervisores',
+  Gerencia: {
+    label: 'Gerencia',
+    color: '#7C3AED',
+    icono: Shield,
+  },
+  IngenieroResidente: {
+    label: 'Ingeniero Residente',
     color: '#0066CC',
     icono: CheckCircle,
   },
-  Inspector: {
-    label: 'Inspectores',
+  Laboratorista: {
+    label: 'Laboratorista',
     color: '#D53E0F',
     icono: Eye,
+  },
+  AuxiliarDeCampo: {
+    label: 'Auxiliar de Campo',
+    color: '#059669',
+    icono: Shield,
+  },
+  Contratante: {
+    label: 'Contratante',
+    color: '#4F46E5',
+    icono: CheckCircle,
   },
 }
 

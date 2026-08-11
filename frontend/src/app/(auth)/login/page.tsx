@@ -11,63 +11,63 @@ import ValidationMessage from '@/components/ui/ValidationMessage';
 import PasswordRecoveryModal from '@/components/modals/PasswordRecoveryModal';
 import SupportModal from '@/components/modals/SupportModal';
 import { api } from '@/lib/api/cliente';
+import { validateLoginInput } from '@/lib/utils/validations';
 
-const ACCESOS_RAPIDOS = [
+const esDesarrollo = process.env.NODE_ENV !== 'production'
+
+type AccesoRapido = {
+  id: string
+  name: string
+  email: string
+  password: string
+  role: string
+  roleLabel?: string
+}
+
+const ACCESOS_RAPIDOS: AccesoRapido[] = [
   {
     id: 'admin',
-    name: 'Natalia Aguilar',
-    email: 'natalia.aguilar@gmail.com',
-    password: 'Admin123*',
+    name: 'Daniel Figueroa',
+    email: 'daniel.figueroa@domunnet.test',
+    password: 'mariobros25',
     role: 'Administrador',
   },
   {
-    id: 'supervisor',
-    name: 'Marco Estrada',
-    email: 'marco.estrada@outlook.com',
-    password: 'Supervisor123*',
-    role: 'Supervisor',
-  },
-  {
-    id: 'inspector',
-    name: 'Valeria Cifuentes',
-    email: 'valeria.cifuentes@gmail.com',
-    password: 'Inspector123*',
-    role: 'Inspector',
-  },
-  {
-    id: 'campo',
-    name: 'Luis Arriaga',
-    email: 'luis.arriaga@outlook.com',
-    password: 'Campo123*',
-    role: 'Campo',
-  },
-  {
-    id: 'contratista',
-    name: 'Andrés Lemus',
-    email: 'andres.lemus@gmail.com',
-    password: 'Contratista123*',
-    role: 'Contratista',
-  },
-  {
     id: 'gerencia',
-    name: 'Paola Barrios',
-    email: 'paola.barrios@gmail.com',
-    password: 'Gerencia123*',
+    name: 'Jorge Figueroa',
+    email: 'jorge.figueroa@domunnet.test',
+    password: 'mariobros25',
     role: 'Gerencia',
   },
   {
-    id: 'contratante',
-    name: 'Sofía Montenegro',
-    email: 'sofia.montenegro@gmail.com',
-    password: 'Contratante123*',
-    role: 'Contratante',
+    id: 'ingeniero-residente',
+    name: 'Raul Alvarado',
+    email: 'raul.alvarado@domunnet.test',
+    password: 'mariobros25',
+    role: 'IngenieroResidente',
+    roleLabel: 'Ingeniero Residente',
   },
   {
-    id: 'proveedor',
-    name: 'Claudia Rosales',
-    email: 'claudia.rosales@gmail.com',
-    password: 'Proveedor123*',
-    role: 'Proveedor',
+    id: 'laboratorista',
+    name: 'Camila Figueroa',
+    email: 'camila.figueroa@domunnet.test',
+    password: 'mariobros25',
+    role: 'Laboratorista',
+  },
+  {
+    id: 'auxiliar-campo',
+    name: 'Mario Tzul',
+    email: 'mario.tzul@domunnet.test',
+    password: 'mariobros25',
+    role: 'AuxiliarDeCampo',
+    roleLabel: 'Auxiliar de Campo',
+  },
+  {
+    id: 'contratante',
+    name: 'Paola Recinos',
+    email: 'paola.recinos@domunnet.test',
+    password: 'mariobros25',
+    role: 'Contratante',
   },
 ]
 
@@ -85,9 +85,9 @@ export default function LoginPage() {
   const [showValidation, setShowValidation] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const iniciarSesion = async (correo: string, contrasena: string) => {
+  const iniciarSesion = async (identificador: string, contrasena: string) => {
     await api.post('/auth/iniciar-sesion', {
-      correo,
+      correo: identificador, // El backend recibe 'correo' pero el servicio de autenticacion del backend lo procesa como identificador (correo o username)
       contrasena,
     });
 
@@ -106,17 +106,11 @@ export default function LoginPage() {
     if (isSubmitting) {
       return;
     }
-    
-    // Validaciones básicas
-    if (!username) {
-      setValidationMessage('Ingrese su usuario');
-      setValidationStatus('warning');
-      setShowValidation(true);
-      return;
-    }
 
-    if (!password) {
-      setValidationMessage('Ingrese su contraseña');
+    // Validaciones básicas usando función reutilizable
+    const validacion = validateLoginInput(username, password);
+    if (!validacion.valid) {
+      setValidationMessage(validacion.error || 'Error de validación');
       setValidationStatus('warning');
       setShowValidation(true);
       return;
@@ -143,7 +137,7 @@ export default function LoginPage() {
     <div className="relative min-h-screen w-full overflow-hidden bg-gray-900">
       {/* Fondo con ilustración de camiones */}
       <div
-        className="absolute inset-x-0 bottom-[-80px] w-full h-[120vh] overflow-hidden"
+        className="absolute inset-x-0 bottom-[-80px] w-full h-[120vh] overflow-hidden pointer-events-none"
         style={{
           backgroundImage: 'url(/fondo_carretas.png)',
           backgroundSize: 'cover',
@@ -164,14 +158,16 @@ export default function LoginPage() {
       {/* Contenedor principal centrado */}
       <div className="relative z-10 flex min-h-screen flex-col items-center justify-center px-4 py-6">
         {/* Notificación de validación - Posición fija sin afectar layout */}
-        <div className="absolute top-24 left-1/2 -translate-x-1/2 w-full max-w-xs">
-          <ValidationMessage
-            status={validationStatus}
-            message={validationMessage}
-            show={showValidation}
-            onClose={() => setShowValidation(false)}
-          />
-        </div>
+        {showValidation && (
+          <div className="absolute top-24 left-1/2 -translate-x-1/2 w-full max-w-xs z-50">
+            <ValidationMessage
+              status={validationStatus}
+              message={validationMessage}
+              show={showValidation}
+              onClose={() => setShowValidation(false)}
+            />
+          </div>
+        )}
 
         {/* Logo DOMUN */}
         <div className="mb-3 animate-fadeIn">
@@ -187,14 +183,14 @@ export default function LoginPage() {
         </div>
 
         {/* Título */}
-        <div className="mb-1 text-center animate-fadeIn" style={{ animationDelay: '0.1s' }}>
+        <div className="mb-1 text-center animate-fadeIn" style={{ animationDelay: '0.02s' }}>
           <h1 className="text-xl font-bold text-white" style={{ fontFamily: 'Poppins, sans-serif' }}>
             Bienvenido a DOMUN
           </h1>
         </div>
 
         {/* Subtítulo */}
-        <div className="mb-4 text-center animate-fadeIn" style={{ animationDelay: '0.2s' }}>
+        <div className="mb-4 text-center animate-fadeIn" style={{ animationDelay: '0.04s' }}>
           <p className="text-xs font-light text-white/80" style={{ fontFamily: 'Poppins, sans-serif' }}>
             Gestión inteligente de transporte
           </p>
@@ -204,14 +200,14 @@ export default function LoginPage() {
         <form
           onSubmit={handleLogin}
           className="w-full max-w-xs animate-fadeIn"
-          style={{ animationDelay: '0.3s' }}
+          style={{ animationDelay: '0.06s' }}
         >
           {/* Input Usuario */}
           <div className="mb-4">
             <LoginInput
               icon={<User size={20} />}
               type="text"
-              placeholder="Usuario"
+              placeholder="Correo o usuario"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
             />
@@ -267,7 +263,7 @@ export default function LoginPage() {
         </form>
 
         {/* Support Link */}
-        <div className="mt-6 text-center animate-fadeIn" style={{ animationDelay: '0.4s' }}>
+        <div className="mt-6 text-center animate-fadeIn" style={{ animationDelay: '0.08s' }}>
           <button
             type="button"
             onClick={() => setIsSupportOpen(true)}
@@ -281,81 +277,74 @@ export default function LoginPage() {
           </button>
         </div>
 
-        {/* Quick Access Link */}
-        <div className="mt-2 text-center animate-fadeIn" style={{ animationDelay: '0.5s' }}>
-          <button
-            type="button"
-            onClick={() => setIsQuickAccessOpen(true)}
-            className="text-xs text-white hover:text-white/80 transition-colors flex items-center justify-center gap-2 mx-auto group"
-            style={{ fontFamily: 'Poppins, sans-serif' }}
-          >
-            <Info size={13} />
-            <span>Acceso Rápido</span>
-          </button>
-        </div>
+        {/* Quick Access Link — solo en desarrollo */}
+        {esDesarrollo && (
+          <div className="mt-2 text-center animate-fadeIn" style={{ animationDelay: '0.1s' }}>
+            <button
+              type="button"
+              onClick={() => setIsQuickAccessOpen(true)}
+              className="text-xs text-white hover:text-white/80 transition-colors flex items-center justify-center gap-2 mx-auto group"
+              style={{ fontFamily: 'Poppins, sans-serif' }}
+            >
+              <Info size={13} />
+              <span>Acceso Rápido</span>
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Quick Access Modal */}
-      {isQuickAccessOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
-          <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full max-w-md shadow-2xl animate-in">
+      {/* Quick Access Modal — solo en desarrollo */}
+      {esDesarrollo && isQuickAccessOpen && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-[9999] px-4">
+          <div className="bg-gray-900/95 border border-gray-700 rounded-2xl p-5 w-full max-w-sm shadow-2xl animate-in">
             {/* Header */}
-            <div className="flex items-start justify-between mb-6">
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-full border-2 border-red-500 flex items-center justify-center flex-shrink-0">
-                  <Info size={14} className="text-red-500" />
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex items-start gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-[#9B0F06]/20 border border-[#9B0F06]/40 flex items-center justify-center flex-shrink-0">
+                  <Info size={14} className="text-[#cc1111]" />
                 </div>
                 <div>
-                  <h2 className="text-white font-bold text-lg">Acceso Rápido</h2>
-                  <p className="text-gray-400 text-xs mt-1">Selecciona una cuenta válida para entrar al sistema</p>
+                  <h2 className="text-white font-bold text-base leading-tight">Acceso Rápido - Demo</h2>
+                  <p className="text-gray-400 text-[11px] mt-0.5">Selecciona una cuenta para acceder</p>
                 </div>
               </div>
               <button
+                type="button"
                 onClick={() => setIsQuickAccessOpen(false)}
-                className="text-gray-400 hover:text-white transition-colors"
+                className="text-gray-400 hover:text-white transition-colors p-0.5"
+                aria-label="Cerrar acceso rápido"
               >
                 <X size={16} />
               </button>
             </div>
 
             {/* Roles Grid */}
-            <div className="grid grid-cols-2 gap-3 mb-4">
-              {ACCESOS_RAPIDOS.map((role) => (
+            <div className="grid grid-cols-2 gap-2.5 mb-3">
+              {ACCESOS_RAPIDOS.map((cuenta) => (
                 <button
-                  key={role.id}
-                  onClick={async () => {
+                  key={cuenta.id}
+                  type="button"
+                  onClick={() => {
+                    setUsername(cuenta.email);
+                    setPassword(cuenta.password);
                     setIsQuickAccessOpen(false);
-                    setIsSubmitting(true);
-
-                    try {
-                      setUsername(role.email);
-                      setPassword(role.password);
-                      await iniciarSesion(role.email, role.password);
-                    } catch (error) {
-                      const mensaje = isAxiosError(error)
-                        ? (error.response?.data as { message?: string } | undefined)?.message ?? 'No se pudo iniciar sesión'
-                        : 'No se pudo iniciar sesión';
-
-                      setValidationMessage(mensaje);
-                      setValidationStatus('error');
-                      setShowValidation(true);
-                    } finally {
-                      setIsSubmitting(false);
-                    }
                   }}
-                  className="p-3 rounded-xl border border-gray-700 hover:border-red-500 hover:bg-red-500/10 transition-all cursor-pointer text-center"
+                  className="px-2.5 py-2.5 rounded-xl border border-gray-700 hover:border-[#9B0F06] hover:bg-[#9B0F06]/10 transition-all cursor-pointer text-center"
                 >
-                  <div className="text-white font-semibold text-sm">{role.name}</div>
-                  <div className="text-gray-400 text-xs mt-1 truncate">{role.email}</div>
-                  <div className="text-gray-500 text-[10px] mt-1 truncate">{role.role}</div>
+                  <div className="text-white font-semibold text-xs leading-tight">
+                    {cuenta.roleLabel ?? cuenta.role}
+                  </div>
+                  <div className="text-gray-400 text-[10px] mt-1 truncate">{cuenta.email}</div>
                 </button>
               ))}
             </div>
 
             {/* Nota */}
-            <div className="text-gray-400 text-xs p-3 bg-gray-800 rounded-lg border border-gray-700">
-              <p className="font-medium text-gray-300 mb-1">Nota:</p>
-              <p>Estas son las credenciales reales de acceso inicial sembradas en el sistema.</p>
+            <div className="text-xs p-2.5 bg-[#9B0F06]/15 rounded-lg border border-[#9B0F06]/30 text-gray-300">
+              <p>
+                <span className="font-semibold text-white">Nota:</span>{' '}
+                Estas son cuentas de prueba sembradas en el sistema para validar cada rol.
+              </p>
             </div>
           </div>
         </div>

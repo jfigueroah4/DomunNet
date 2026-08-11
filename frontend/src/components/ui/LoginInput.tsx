@@ -43,7 +43,7 @@ export default function LoginInput({
           placeholder-white/50
           font-poppins text-xs
           outline-none
-          transition-all duration-300
+          transition-all duration-150
           hover:border-white/70
           focus:border-red-400 focus:shadow-lg focus:shadow-red-500/20
           ${icon ? 'pl-12' : 'pl-4'}

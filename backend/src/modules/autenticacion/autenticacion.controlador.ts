@@ -2,13 +2,13 @@ import { Request, Response } from 'express'
 import { z } from 'zod'
 import { sendError, sendResponse } from '@/shared/response'
 import { SolicitudAutenticada } from '@/middlewares/autenticacion.middleware'
-import { iniciarSesion, refrescarSesion } from '@/modules/autenticacion/autenticacion.servicio'
+import { iniciarSesion } from '@/modules/autenticacion/autenticacion.servicio'
 import { obtenerCookie } from '@/shared/utils/cookies'
 import { entorno } from '@/configuracion/entorno'
 import { clienteSupabase } from '@/configuracion/cliente-supabase'
 
 const esquemaInicioSesion = z.object({
-  correo: z.string().email(),
+  correo: z.string().min(2),
   contrasena: z.string().min(1),
 })
 
@@ -34,7 +34,7 @@ export async function iniciarSesionControlador(req: Request, res: Response) {
       return sendError(res, 401, 'Credenciales incorrectas')
     }
 
-    // Configurar cookies httpOnly seguras
+    // Configurar cookie del token; el refresh debe manejarlo el cliente/Supabase
     res.cookie('token', acceso.token, {
       httpOnly: true,
       secure: entorno.modo === 'production',
@@ -42,69 +42,24 @@ export async function iniciarSesionControlador(req: Request, res: Response) {
       maxAge: 8 * 60 * 60 * 1000 // 8 horas
     })
 
-    res.cookie('refreshToken', acceso.refreshToken, {
-      httpOnly: true,
-      secure: entorno.modo === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 días
-    })
-
     return sendResponse(res, 200, { usuario: acceso.usuario }, 'Inicio de sesión correcto')
-  } catch (error: any) {
-    return sendError(res, 500, 'Error al iniciar sesión', error.message)
+  } catch (error: unknown) {
+    console.error('[autenticacion.controlador] Error no controlado en iniciarSesion', {
+      identificador: resultado.success ? resultado.data.correo : req.body?.correo,
+      error,
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    })
+    const mensaje = error instanceof Error ? error.message : 'Error desconocido'
+    return sendError(res, 500, 'Error al iniciar sesión', mensaje)
   }
 }
 
-export async function refrescarSesionControlador(req: Request, res: Response) {
-  const cookieHeader = req.headers.cookie
-  const refreshToken = obtenerCookie(cookieHeader, 'refreshToken')
-
-  if (!refreshToken) {
-    return sendError(res, 401, 'No hay token de refresco disponible')
-  }
-
-  try {
-    const acceso = await refrescarSesion(
-      refreshToken,
-      req.ip,
-      req.headers['user-agent'] as string
-    )
-
-    if (!acceso) {
-      res.clearCookie('token')
-      res.clearCookie('refreshToken')
-      return sendError(res, 401, 'Sesión no válida o expirada')
-    }
-
-    res.cookie('token', acceso.token, {
-      httpOnly: true,
-      secure: entorno.modo === 'production',
-      sameSite: 'strict',
-      maxAge: 8 * 60 * 60 * 1000
-    })
-
-    res.cookie('refreshToken', acceso.refreshToken, {
-      httpOnly: true,
-      secure: entorno.modo === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000
-    })
-
-    return sendResponse(res, 200, { usuario: acceso.usuario }, 'Token renovado correctamente')
-  } catch (error: any) {
-    return sendError(res, 500, 'Error renovando sesión', error.message)
-  }
-}
 
 export async function cerrarSesionControlador(req: Request, res: Response) {
   const cookieHeader = req.headers.cookie
-  const refreshToken = obtenerCookie(cookieHeader, 'refreshToken')
-
   try {
-    if (refreshToken) {
-      await clienteSupabase.from('sesion_usuario').delete().eq('refresh_token', refreshToken)
-    }
-
+    // No eliminamos sesiones en BD; Supabase Auth maneja la invalidación.
     res.clearCookie('token')
     res.clearCookie('refreshToken')
 
@@ -119,15 +74,50 @@ export async function obtenerPerfilControlador(req: SolicitudAutenticada, res: R
     return sendError(res, 401, 'No autenticado')
   }
 
-  return sendResponse(
-    res,
-    200,
-    {
-      id: req.usuario.sub,
-      nombre: req.usuario.nombre,
-      rol: req.usuario.rol,
-      permisos: req.usuario.permisos,
-    },
-    'Perfil recuperado'
-  )
+  try {
+    const { data: usuario, error } = await clienteSupabase
+      .from('usuario')
+      .select('id, correo, rol_id, activo, ultimo_acceso, fecha_registro, dato_usuario(nombre, apellido, telefono, direccion, cargo)')
+      .eq('id', req.usuario.sub)
+      .maybeSingle()
+
+    if (error || !usuario) {
+      return sendResponse(
+        res,
+        200,
+        {
+          id: req.usuario.sub,
+          nombre: req.usuario.nombre,
+          apellido: '',
+          rol: req.usuario.rol,
+          permisos: req.usuario.permisos,
+        },
+        'Perfil recuperado (token)'
+      )
+    }
+
+    const dato = Array.isArray(usuario.dato_usuario) ? usuario.dato_usuario[0] : usuario.dato_usuario
+
+    return sendResponse(
+      res,
+      200,
+      {
+        id: usuario.id,
+        correo: usuario.correo,
+        activo: usuario.activo,
+        ultimoAcceso: usuario.ultimo_acceso,
+        fechaRegistro: usuario.fecha_registro,
+        nombre: dato?.nombre || '',
+        apellido: dato?.apellido || '',
+        telefono: dato?.telefono || '',
+        direccion: dato?.direccion || '',
+        cargo: dato?.cargo || '',
+        rol: req.usuario.rol,
+        permisos: req.usuario.permisos,
+      },
+      'Perfil recuperado'
+    )
+  } catch (err: any) {
+    return sendError(res, 500, 'Error al recuperar perfil', err.message)
+  }
 }

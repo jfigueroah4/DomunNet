@@ -15,15 +15,30 @@ const rolConfig: Record<
     bg: 'bg-red-50',
     text: 'text-[#9B0F06]',
   },
-  Supervisor: {
-    label: 'Supervisor',
+  Gerencia: {
+    label: 'Gerencia',
+    bg: 'bg-purple-50',
+    text: 'text-[#7C3AED]',
+  },
+  IngenieroResidente: {
+    label: 'Ingeniero Residente',
     bg: 'bg-blue-50',
     text: 'text-[#0066CC]',
   },
-  Inspector: {
-    label: 'Inspector',
+  Laboratorista: {
+    label: 'Laboratorista',
     bg: 'bg-orange-50',
     text: 'text-[#D53E0F]',
+  },
+  AuxiliarDeCampo: {
+    label: 'Auxiliar de Campo',
+    bg: 'bg-emerald-50',
+    text: 'text-[#059669]',
+  },
+  Contratante: {
+    label: 'Contratante',
+    bg: 'bg-indigo-50',
+    text: 'text-[#4F46E5]',
   },
 }
 

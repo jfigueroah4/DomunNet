@@ -2,6 +2,12 @@
 
 import BitacoraFormulario from '@/components/modules/bitacora/BitacoraFormulario'
 
-export default function EditarBitacoraPage() {
-  return <BitacoraFormulario modo="editar" />
+interface EditarBitacoraPageProps {
+  params: {
+    id: string
+  }
+}
+
+export default function EditarBitacoraPage({ params }: EditarBitacoraPageProps) {
+  return <BitacoraFormulario modo="editar" id={params.id} />
 }

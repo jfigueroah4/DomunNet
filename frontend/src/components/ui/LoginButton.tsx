@@ -25,7 +25,7 @@ export default function LoginButton({
         text-white
         font-poppins font-semibold text-base
         rounded-full
-        transition-all duration-300
+        transition-all duration-150
         hover:bg-white
         hover:text-[#9B0F06]
         hover:scale-[1.03]

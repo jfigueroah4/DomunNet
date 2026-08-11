@@ -190,7 +190,8 @@ async function obtenerRolId(nombreRol: string) {
     .upsert(
       {
         nombre_rol: nombreRol,
-        nivel: rolesIniciales.find((rol) => rol.nombre_rol === nombreRol)?.nivel || 0,
+        nivel_permisos: rolesIniciales.find((rol) => rol.nombre_rol === nombreRol)?.nivel || 0,
+        permisos: {},
         activo: true,
       },
       { onConflict: 'nombre_rol' }
@@ -233,11 +234,12 @@ async function sincronizarUsuario(usuario: UsuarioSemilla, rolId: string, authUs
     .upsert(
       {
         usuario_id: usuarioGuardado.id,
-        nombre,
-        apellido,
+        primer_nombre: nombre,
+        segundo_nombre: partesNombre.length > 2 ? partesNombre.slice(1, -1).join(' ') : null,
+        primer_apellido: apellido,
+        segundo_apellido: null,
         telefono: usuario.telefono,
         direccion: usuario.direccion,
-        cargo: usuario.cargo,
       },
       { onConflict: 'usuario_id' }
     )

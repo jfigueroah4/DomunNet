@@ -7,17 +7,20 @@ export interface FiltrosUsuarios {
 }
 
 export interface DatosUsuario {
-  nombre: string
+  primer_nombre: string
+  segundo_nombre?: string | null
+  primer_apellido: string
+  segundo_apellido?: string | null
   correo: string
   telefono: string
   rol: string
   estado: 'Activo' | 'Inactivo'
-  departamento: string // Se mapeará como cargo en dato_usuario
   contrasena?: string
   proyectosAsignados?: string[]
+  username?: string | null
 }
 
-type FilaUsuarioJoin = {
+export type FilaUsuarioJoin = {
   id: string
   auth_user_id: string | null
   correo: string
@@ -27,15 +30,21 @@ type FilaUsuarioJoin = {
   fecha_registro: string
   updated_at: string
   dato_usuario: {
-    nombre: string
-    apellido: string
+    primer_nombre: string
+    segundo_nombre?: string | null
+    primer_apellido: string
+    segundo_apellido?: string | null
     telefono: string | null
-    cargo: string | null
+    avatar_url?: string | null
+    username?: string | null
   } | {
-    nombre: string
-    apellido: string
+    primer_nombre: string
+    segundo_nombre?: string | null
+    primer_apellido: string
+    segundo_apellido?: string | null
     telefono: string | null
-    cargo: string | null
+    avatar_url?: string | null
+    username?: string | null
   }[] | null
 }
 
@@ -44,29 +53,38 @@ type FilaRol = {
   nombre_rol: string
 }
 
-function normalizar(texto: string) {
-  return texto.trim().toLowerCase()
+export function normalizar(texto: string) {
+  return texto.trim().replace(/\s+/g, ' ').toLowerCase()
 }
 
-function formatearFecha(valor: string | null) {
+export function formatearFecha(valor: string | null) {
   if (!valor) return 'Nunca'
   const fecha = new Date(valor)
   if (Number.isNaN(fecha.getTime())) return valor
   return fecha.toLocaleDateString('es-GT')
 }
 
-function mapearUsuario(fila: FilaUsuarioJoin, nombreRol: string | null) {
+export function mapearUsuario(fila: FilaUsuarioJoin, nombreRol: string | null) {
   const dato = Array.isArray(fila.dato_usuario) ? fila.dato_usuario[0] : fila.dato_usuario
-  const nombreCompleto = dato ? `${dato.nombre} ${dato.apellido}`.trim() : 'Sin Nombre'
+  const nombreCompleto = dato
+    ? [`${dato.primer_nombre}`, dato.segundo_nombre, `${dato.primer_apellido}`, dato.segundo_apellido]
+        .map((p) => (p ?? '').trim())
+        .filter(Boolean)
+        .join(' ') || 'Sin Nombre'
+    : 'Sin Nombre'
   return {
     id: fila.id,
+    primer_nombre: dato?.primer_nombre || '',
+    segundo_nombre: dato?.segundo_nombre || '',
+    primer_apellido: dato?.primer_apellido || '',
+    segundo_apellido: dato?.segundo_apellido || '',
+    username: dato?.username || '',
     nombre: nombreCompleto,
     correo: fila.correo,
     telefono: dato?.telefono || '',
     rol: nombreRol || 'Sin asignar',
     estado: fila.activo ? 'Activo' : 'Inactivo',
-    departamento: dato?.cargo || '', // Usamos cargo para departamento
-    proyectosAsignados: [],          // Se puede expandir en el futuro usando proyecto_usuario
+    proyectosAsignados: [],
     ultimoAcceso: formatearFecha(fila.ultimo_acceso),
     fechaCreacion: formatearFecha(fila.fecha_registro),
   }
@@ -92,7 +110,7 @@ async function obtenerRolesPorId() {
 async function obtenerUsuariosBase() {
   const { data, error } = await clienteSupabase
     .from('usuario')
-    .select('id, auth_user_id, correo, rol_id, activo, ultimo_acceso, fecha_registro, updated_at, dato_usuario(nombre, apellido, telefono, cargo)')
+    .select('id, auth_user_id, correo, rol_id, activo, ultimo_acceso, fecha_registro, updated_at, dato_usuario(primer_nombre, segundo_nombre, primer_apellido, segundo_apellido, telefono, avatar_url, username)')
     .order('fecha_registro', { ascending: false })
 
   if (error) throw new Error(error.message)
@@ -105,7 +123,7 @@ export async function listarUsuarios(filtros: FiltrosUsuarios = {}) {
 
   return usuarios.filter((usuario) => {
     const dato = Array.isArray(usuario.dato_usuario) ? usuario.dato_usuario[0] : usuario.dato_usuario
-    const nombreCompleto = dato ? `${dato.nombre} ${dato.apellido}`.trim() : ''
+    const nombreCompleto = dato ? `${dato.primer_nombre} ${dato.segundo_nombre || ''} ${dato.primer_apellido} ${dato.segundo_apellido || ''}`.replace(/\s+/g, ' ').trim() : ''
     const nombreRol = usuario.rol_id ? mapaRoles.get(usuario.rol_id) || 'Sin asignar' : 'Sin asignar'
     const estadoStr = usuario.activo ? 'Activo' : 'Inactivo'
 
@@ -113,7 +131,6 @@ export async function listarUsuarios(filtros: FiltrosUsuarios = {}) {
       !busqueda ||
       normalizar(nombreCompleto).includes(busqueda) ||
       normalizar(usuario.correo).includes(busqueda) ||
-      normalizar(dato?.cargo || '').includes(busqueda) ||
       normalizar(nombreRol).includes(busqueda)
 
     const cumpleRol = !filtros.rol || filtros.rol === 'Todos' || nombreRol === filtros.rol
@@ -126,7 +143,7 @@ export async function listarUsuarios(filtros: FiltrosUsuarios = {}) {
 export async function obtenerUsuarioPorId(id: string) {
   const { data, error } = await clienteSupabase
     .from('usuario')
-    .select('id, correo, rol_id, activo, ultimo_acceso, fecha_registro, updated_at, dato_usuario(nombre, apellido, telefono, cargo)')
+    .select('id, correo, rol_id, activo, ultimo_acceso, fecha_registro, updated_at, dato_usuario(primer_nombre, segundo_nombre, primer_apellido, segundo_apellido, telefono, avatar_url, username)')
     .eq('id', id)
     .maybeSingle()
 
@@ -158,6 +175,31 @@ async function validarCorreoUnico(correo: string, idIgnorado?: string) {
   }
 }
 
+async function validarUsernameUnico(username: string, idUsuarioIgnorado?: string) {
+  const usernameNormalizado = username.trim().toLowerCase()
+  const { data, error } = await clienteSupabase
+    .from('dato_usuario')
+    .select('usuario_id, username')
+    .ilike('username', usernameNormalizado)
+  if (error) throw new Error(error.message)
+
+  const conflicto = (data || []).find(
+    (registro: { usuario_id: string; username: string }) => !idUsuarioIgnorado || registro.usuario_id !== idUsuarioIgnorado
+  )
+  if (conflicto) {
+    throw new Error('Ya existe un usuario con ese username')
+  }
+}
+
+export async function verificarUsernameDisponible(username: string, excluirId?: string): Promise<boolean> {
+  try {
+    await validarUsernameUnico(username, excluirId)
+    return true
+  } catch (error) {
+    return false
+  }
+}
+
 async function obtenerCuentaUsuario(id: string) {
   const { data, error } = await clienteSupabase
     .from('usuario')
@@ -176,9 +218,36 @@ export async function crearUsuario(datos: DatosUsuario) {
   const rol = await validarRolExiste(datos.rol)
   await validarCorreoUnico(datos.correo)
 
-  const partesNombre = datos.nombre.trim().split(/\s+/)
-  const nombre = partesNombre[0] || ''
-  const apellido = partesNombre.slice(1).join(' ') || ''
+  let usernameUnico = datos.username?.trim().toLowerCase()
+  if (usernameUnico) {
+    await validarUsernameUnico(usernameUnico)
+  } else {
+    // Generar username único con fallback
+    const inicialNombre = normalizar(datos.primer_nombre).charAt(0)
+    const apellidoNormalizado = normalizar(datos.primer_apellido).replace(/\s+/g, '')
+    const usernameBase = `${inicialNombre}${apellidoNormalizado}`
+
+    usernameUnico = usernameBase
+    let contador = 1
+    let existe = true
+
+    while (existe) {
+      const { data, error } = await clienteSupabase
+        .from('dato_usuario')
+        .select('username')
+        .eq('username', usernameUnico)
+        .maybeSingle()
+
+      if (error) throw new Error(error.message)
+
+      if (data) {
+        contador++
+        usernameUnico = `${usernameBase}${contador}`
+      } else {
+        existe = false
+      }
+    }
+  }
 
   const contrasena = datos.contrasena || 'Temporal123*'
   const { data: cuentaAuth, error: errorAuth } = await clienteSupabase.auth.admin.createUser({
@@ -186,10 +255,9 @@ export async function crearUsuario(datos: DatosUsuario) {
     password: contrasena,
     email_confirm: true,
     user_metadata: {
-      nombre,
-      apellido,
+      nombre: datos.primer_nombre,
+      apellido: datos.primer_apellido,
       telefono: datos.telefono,
-      cargo: datos.departamento,
       rol: datos.rol,
     },
   })
@@ -220,10 +288,14 @@ export async function crearUsuario(datos: DatosUsuario) {
     .from('dato_usuario')
     .insert({
       usuario_id: nuevoUsuario.id,
-      nombre,
-      apellido,
+      primer_nombre: datos.primer_nombre,
+      segundo_nombre: datos.segundo_nombre || null,
+      primer_apellido: datos.primer_apellido,
+      segundo_apellido: datos.segundo_apellido || null,
       telefono: datos.telefono,
-      cargo: datos.departamento,
+      email: datos.correo,
+      username: usernameUnico,
+      password_hash: null, // explicit NULL
     })
 
   if (errorDato) {
@@ -246,6 +318,50 @@ export async function actualizarUsuario(id: string, datos: DatosUsuario) {
 
   const rol = await validarRolExiste(datos.rol)
   await validarCorreoUnico(datos.correo, id)
+
+  // Obtener dato_usuario actual para ver si ya tiene username
+  const { data: datoActual } = await clienteSupabase
+    .from('dato_usuario')
+    .select('username')
+    .eq('usuario_id', id)
+    .maybeSingle()
+
+  let usernameFinal = datos.username?.trim().toLowerCase()
+  if (usernameFinal) {
+    if (usernameFinal !== datoActual?.username) {
+      await validarUsernameUnico(usernameFinal, id)
+    }
+  } else {
+    usernameFinal = datoActual?.username
+    if (!usernameFinal) {
+      // Generar username único con fallback
+      const inicialNombre = normalizar(datos.primer_nombre).charAt(0)
+      const apellidoNormalizado = normalizar(datos.primer_apellido).replace(/\s+/g, '')
+      const usernameBase = `${inicialNombre}${apellidoNormalizado}`
+
+      let usernameUnico = usernameBase
+      let contador = 1
+      let existe = true
+
+      while (existe) {
+        const { data, error } = await clienteSupabase
+          .from('dato_usuario')
+          .select('username')
+          .eq('username', usernameUnico)
+          .maybeSingle()
+
+        if (error) throw new Error(error.message)
+
+        if (data) {
+          contador++
+          usernameUnico = `${usernameBase}${contador}`
+        } else {
+          existe = false
+        }
+      }
+      usernameFinal = usernameUnico
+    }
+  }
 
   const payloadUsuario: Record<string, unknown> = {
     correo: datos.correo,
@@ -278,20 +394,19 @@ export async function actualizarUsuario(id: string, datos: DatosUsuario) {
   const { error: errorUsuario } = await clienteSupabase.from('usuario').update(payloadUsuario).eq('id', id)
   if (errorUsuario) throw new Error(errorUsuario.message)
 
-  // Dividir nombre y apellido
-  const partesNombre = datos.nombre.trim().split(/\s+/)
-  const nombre = partesNombre[0] || ''
-  const apellido = partesNombre.slice(1).join(' ') || ''
-
   // 2. Actualizar o insertar dato_usuario
   const { error: errorDato } = await clienteSupabase
     .from('dato_usuario')
     .upsert({
       usuario_id: id,
-      nombre,
-      apellido,
+      primer_nombre: datos.primer_nombre,
+      segundo_nombre: datos.segundo_nombre || null,
+      primer_apellido: datos.primer_apellido,
+      segundo_apellido: datos.segundo_apellido || null,
       telefono: datos.telefono,
-      cargo: datos.departamento,
+      email: datos.correo,
+      username: usernameFinal,
+      password_hash: null, // explicit NULL
       updated_at: new Date().toISOString()
     }, { onConflict: 'usuario_id' })
 

@@ -3,33 +3,76 @@ import { sendError } from '@/shared/response'
 import { PermisoClave, RolNombre } from '@/shared/types/api.types'
 import { SolicitudAutenticada } from '@/middlewares/autenticacion.middleware'
 
-const permisosPorDefecto: Record<RolNombre, PermisoClave[]> = {
+const permisosPorDefecto: Record<string, string[]> = {
   Administrador: [
-    'usuarios.read',
-    'usuarios.write',
-    'roles.read',
-    'roles.write',
-    'configuracion.read',
-    'configuracion.write',
-    'catalogos.read',
-    'catalogos.write',
-    'backup.read',
-    'backup.write',
+    '*.read',
+    '*.write',
+    '*.delete',
+    '*.export',
+    '*.admin',
   ],
-  Supervisor: ['usuarios.read', 'roles.read', 'configuracion.read', 'catalogos.read', 'backup.read'],
-  Inspector: ['usuarios.read', 'configuracion.read', 'catalogos.read'],
-  Contratante: ['usuarios.read', 'roles.read', 'configuracion.read'],
-  Contratista: ['usuarios.read', 'configuracion.read'],
-  Gerencia: ['usuarios.read', 'roles.read', 'configuracion.read', 'catalogos.read', 'backup.read'],
-  Campo: ['usuarios.read', 'configuracion.read', 'catalogos.read'],
-  Proveedor: ['usuarios.read', 'configuracion.read'],
+  Gerencia: [
+    'dashboard.read',
+    'reportes.read',
+    'reportes.export',
+    'proyectos.read',
+    'alertas.read',
+    'finanzas.read',
+  ],
+  IngenieroResidente: [
+    'bitacora.read',
+    'bitacora.write',
+    'bitacora.firmar',
+    'control_calidad.read',
+    'control_calidad.write',
+    'hoja_sabana.read',
+    'hoja_sabana.write',
+    'reportes.read',
+    'reportes.export',
+    'plazos.read',
+    'plazos.write',
+  ],
+  Laboratorista: [
+    'control_calidad.read',
+    'control_calidad.write',
+    'bitacora.read',
+  ],
+  AuxiliarDeCampo: [
+    'bitacora.read',
+    'bitacora.write',
+    'evidencia_fotografica.read',
+    'evidencia_fotografica.write',
+    'clima.read',
+    'clima.write',
+    'ubicacion.read',
+    'ubicacion.write',
+  ],
+  Contratante: [
+    'dashboard.read',
+    'reportes.read',
+    'reportes.export',
+    'proyectos.read',
+    'evidencia_fotografica.read',
+  ],
 }
 
-export function permisosDeRol(rol: RolNombre): PermisoClave[] {
+export function permisosDeRol(rol: string): string[] {
   return permisosPorDefecto[rol] || []
 }
 
-export function requierePermisos(...permisos: PermisoClave[]) {
+export function tienePermiso(permisosUsuario: string[], permisoRequerido: string): boolean {
+  const parts = permisoRequerido.split('.')
+  const modulo = parts[0]
+  const accion = parts[1] || ''
+  return (
+    permisosUsuario.includes(permisoRequerido) ||
+    permisosUsuario.includes('*') ||
+    permisosUsuario.includes(`*.${accion}`) ||
+    permisosUsuario.includes(`${modulo}.*`)
+  )
+}
+
+export function requierePermisos(...permisos: string[]) {
   return (req: SolicitudAutenticada, res: Response, next: NextFunction) => {
     const usuario = req.usuario
     if (!usuario) {
@@ -37,7 +80,8 @@ export function requierePermisos(...permisos: PermisoClave[]) {
     }
 
     const permisosUsuario = usuario.permisos?.length ? usuario.permisos : permisosDeRol(usuario.rol)
-    const autorizado = permisos.some((permiso) => permisosUsuario.includes(permiso))
+
+    const autorizado = permisos.some((permiso) => tienePermiso(permisosUsuario, permiso))
 
     if (!autorizado) {
       return sendError(res, 403, 'No tienes permisos para realizar esta acción')
@@ -47,7 +91,7 @@ export function requierePermisos(...permisos: PermisoClave[]) {
   }
 }
 
-export function requiereRol(...roles: RolNombre[]) {
+export function requiereRol(...roles: string[]) {
   return (req: SolicitudAutenticada, res: Response, next: NextFunction) => {
     if (!req.usuario) {
       return sendError(res, 401, 'No autenticado')

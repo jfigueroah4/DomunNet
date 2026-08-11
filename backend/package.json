@@ -12,7 +12,8 @@
     "seed": "node -r tsconfig-paths/register dist/scripts/semilla-inicial.js",
     "lint": "eslint src --ext .ts",
     "type-check": "tsc --noEmit",
-    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\""
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "test": "node run-tests.js"
   },
   "dependencies": {
     "@google-cloud/storage": "^7.0.0",

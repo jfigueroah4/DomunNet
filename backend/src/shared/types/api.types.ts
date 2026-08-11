@@ -25,16 +25,19 @@ export interface JwtPayloadLike {
 
 export interface UsuarioRegistro {
   id: string
-  nombre: string
+  primer_nombre: string
+  segundo_nombre?: string | null
+  primer_apellido: string
+  segundo_apellido?: string | null
+  username?: string | null
   correo: string
   telefono: string
   rol: RolNombre
   estado: EstadoRegistro
-  departamento: string
   proyectosAsignados: string[]
   ultimoAcceso: string
   fechaCreacion: string
-  contrasena: string
+  contrasena?: string
 }
 
 export interface RolRegistro {

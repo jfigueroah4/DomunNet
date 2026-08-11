@@ -7,17 +7,21 @@ import {
   listarUsuarios,
   obtenerUsuarioPorId,
   actualizarUsuario,
+  verificarUsernameDisponible,
 } from '@/modules/usuarios/usuarios.servicio'
 
-const esquemaUsuario = z.object({
-  nombre: z.string().min(2),
+export const esquemaUsuario = z.object({
+  primer_nombre: z.string().min(1),
+  segundo_nombre: z.string().optional().nullable(),
+  primer_apellido: z.string().min(1),
+  segundo_apellido: z.string().optional().nullable(),
   correo: z.string().email(),
   telefono: z.string().min(4),
   rol: z.string().min(2),
   estado: z.enum(['Activo', 'Inactivo']),
-  departamento: z.string().min(2),
   contrasena: z.string().min(6).optional(),
   proyectosAsignados: z.array(z.string()).optional(),
+  username: z.string().regex(/^[a-zA-Z0-9_.-]+$/, 'Nombre de usuario inválido (sin espacios ni @)').min(3).max(30).optional().nullable().or(z.literal('')),
 })
 
 export async function listarUsuariosControlador(req: Request, res: Response) {
@@ -87,4 +91,17 @@ export async function eliminarUsuarioControlador(req: Request, res: Response) {
   } catch (error) {
     return sendError(res, 404, 'No se pudo eliminar el usuario', error instanceof Error ? error.message : error)
   }
+}
+
+export async function validarUsernameControlador(req: Request, res: Response) {
+  const username = req.query.username
+  const excluirId = req.query.excluir_id as string | undefined
+
+  if (typeof username !== 'string' || !username) {
+    return sendError(res, 400, 'El parámetro username es requerido')
+  }
+
+  const usernameNormalizado = username.trim().toLowerCase()
+  const disponible = await verificarUsernameDisponible(usernameNormalizado, excluirId)
+  return sendResponse(res, 200, { disponible }, 'Verificación de username realizada')
 }

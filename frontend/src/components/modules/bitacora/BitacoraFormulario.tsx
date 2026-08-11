@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Save,
@@ -18,11 +18,15 @@ import {
   Trash2,
   MapPin,
   Users,
+  AlertCircle,
 } from 'lucide-react'
 import { PROYECTOS_MOCK } from '@/data/proyectos.mock'
+import { BITACORA_MOCK } from '@/data/bitacora.mock'
+import { useBitacoraFormStore, Renglon } from '@/stores/useBitacoraFormStore'
 
 interface BitacoraFormularioProps {
   modo?: 'crear' | 'editar'
+  id?: string
 }
 
 const categoriasTrabajo = [
@@ -56,10 +60,6 @@ const climaOpciones = [
   { id: 'lluvia_fuerte', label: 'Lluvia fuerte', icon: CloudLightning },
 ] as const
 
-const renglonesIniciales = [
-  { id: '1', renglon: '', lado: 'Ambos', estInicio: '0+000', estFin: '0+000', observaciones: '' },
-]
-
 const resumenPaso = [
   'Info General',
   'Condiciones',
@@ -68,34 +68,78 @@ const resumenPaso = [
   'Cierre',
 ]
 
-type ClimaId = (typeof climaOpciones)[number]['id']
-type Renglon = {
-  id: string
-  renglon: string
-  lado: string
-  estInicio: string
-  estFin: string
-  observaciones: string
-}
-
-export default function BitacoraFormulario({ modo = 'crear' }: BitacoraFormularioProps) {
+export default function BitacoraFormulario({ modo = 'crear', id }: BitacoraFormularioProps) {
   const router = useRouter()
-  const [pasoActual, setPasoActual] = useState(1)
-  const [proyectoId, setProyectoId] = useState('')
-  const [categoriaTrabajo, setCategoriaTrabajo] = useState('')
-  const [fechaRegistro, setFechaRegistro] = useState(new Date().toISOString().slice(0, 10))
-  const [turno, setTurno] = useState('Diurno')
-  const [responsable, setResponsable] = useState('Natalia Aguilar')
-  const [ubicacion, setUbicacion] = useState('')
-  const [clima, setClima] = useState<ClimaId>('soleado')
-  const [observacionClimatica, setObservacionClimatica] = useState('')
-  const [suspendieronActividades, setSuspendieronActividades] = useState(false)
-  const [renglones, setRenglones] = useState<Renglon[]>(renglonesIniciales)
-  const [laboratorioHabilitado, setLaboratorioHabilitado] = useState(false)
-  const [tipoEnsayo, setTipoEnsayo] = useState('Concreto fresco')
-  const [resultadoEnsayo, setResultadoEnsayo] = useState('')
-  const [observacionesCierre, setObservacionesCierre] = useState('')
-  const [firmaSupervisor, setFirmaSupervisor] = useState('')
+  const [errorValidacion, setErrorValidacion] = useState<string | null>(null)
+
+  // Zustand state
+  const {
+    pasoActual,
+    proyectoId,
+    categoriaTrabajo,
+    fechaRegistro,
+    turno,
+    responsable,
+    ubicacion,
+    clima,
+    observacionClimatica,
+    suspendieronActividades,
+    renglones,
+    laboratorioHabilitado,
+    tipoEnsayo,
+    resultadoEnsayo,
+    laboratorioResponsable,
+    observacionesCierre,
+    firmaSupervisor,
+    setField,
+    resetForm,
+  } = useBitacoraFormStore()
+
+  // Reset or Load store on mount
+  useEffect(() => {
+    if (modo === 'crear') {
+      resetForm()
+    } else if (modo === 'editar' && id) {
+      const registro = BITACORA_MOCK.find((r) => r.id === id)
+      if (registro) {
+        // Convert date DD/MM/YYYY to YYYY-MM-DD
+        let formattedDate = registro.fecha
+        if (registro.fecha.includes('/')) {
+          const parts = registro.fecha.split('/')
+          if (parts.length === 3) {
+            formattedDate = `${parts[2]}-${parts[1]}-${parts[0]}`
+          }
+        }
+        setField('pasoActual', 1)
+        setField('proyectoId', registro.proyectoId)
+        setField('fechaRegistro', formattedDate)
+        setField('ubicacion', registro.ubicacion)
+        setField('observacionesCierre', registro.descripcion)
+        setField('responsable', registro.autor)
+        setField('categoriaTrabajo', 'Descapote')
+        setField('turno', 'Diurno')
+        setField('clima', 'soleado')
+        setField('observacionClimatica', '')
+        setField('suspendieronActividades', false)
+        setField('laboratorioHabilitado', false)
+        setField('tipoEnsayo', 'Concreto fresco')
+        setField('resultadoEnsayo', '')
+        setField('laboratorioResponsable', '')
+        setField('firmaSupervisor', registro.autor)
+        // Set mock renglones
+        setField('renglones', [
+          { id: '1', renglon: 'Asfalto', lado: 'Ambos', estInicio: '0+000', estFin: '0+500', observaciones: '' }
+        ])
+      }
+    }
+  }, [modo, id, resetForm, setField])
+
+  // Handle reload (F5) - force to step 1 if the form is empty
+  useEffect(() => {
+    if (!proyectoId && pasoActual > 1) {
+      setField('pasoActual', 1)
+    }
+  }, [proyectoId, pasoActual, setField])
 
   const proyectoSeleccionado = useMemo(
     () => PROYECTOS_MOCK.find((proyecto) => proyecto.id === proyectoId) ?? null,
@@ -105,32 +149,91 @@ export default function BitacoraFormulario({ modo = 'crear' }: BitacoraFormulari
   const pasoMaximo = resumenPaso.length
 
   const agregarRenglon = () => {
-    setRenglones((prev) => [
-      ...prev,
-      {
-        id: `${Date.now()}-${prev.length}`,
-        renglon: '',
-        lado: 'Ambos',
-        estInicio: '0+000',
-        estFin: '0+000',
-        observaciones: '',
-      },
-    ])
+    setErrorValidacion(null)
+    const nuevo: Renglon = {
+      id: `${Date.now()}-${renglones.length}`,
+      renglon: '',
+      lado: 'Ambos',
+      estInicio: '0+000',
+      estFin: '0+000',
+      observaciones: '',
+    }
+    setField('renglones', [...renglones, nuevo])
   }
 
   const actualizarRenglon = (id: string, campo: keyof Renglon, valor: string) => {
-    setRenglones((prev) =>
-      prev.map((renglon) => (renglon.id === id ? { ...renglon, [campo]: valor } : renglon))
+    setErrorValidacion(null)
+    const actualizados = renglones.map((r) =>
+      r.id === id ? { ...r, [campo]: valor } : r
     )
+    setField('renglones', actualizados)
   }
 
   const eliminarRenglon = (id: string) => {
-    setRenglones((prev) => (prev.length > 1 ? prev.filter((renglon) => renglon.id !== id) : prev))
+    setErrorValidacion(null)
+    if (renglones.length > 1) {
+      setField('renglones', renglones.filter((r) => r.id !== id))
+    }
+  }
+
+  const validarPaso = (paso: number): boolean => {
+    setErrorValidacion(null)
+
+    if (paso === 1) {
+      if (!proyectoId) {
+        setErrorValidacion('Debe seleccionar un proyecto.')
+        return false
+      }
+      if (!categoriaTrabajo) {
+        setErrorValidacion('Debe seleccionar una categoría de trabajo.')
+        return false
+      }
+      if (!fechaRegistro) {
+        setErrorValidacion('Debe ingresar la fecha del registro.')
+        return false
+      }
+      if (!ubicacion.trim()) {
+        setErrorValidacion('Debe ingresar la ubicación / estación del día.')
+        return false
+      }
+    }
+
+    if (paso === 3) {
+      if (renglones.length === 0) {
+        setErrorValidacion('Debe agregar al menos un renglón de trabajo.')
+        return false
+      }
+      for (let i = 0; i < renglones.length; i++) {
+        const r = renglones[i]
+        if (!r.renglon) {
+          setErrorValidacion(`En la fila ${i + 1}, debe seleccionar el Renglón.`)
+          return false
+        }
+        if (!r.lado) {
+          setErrorValidacion(`En la fila ${i + 1}, debe especificar el Lado.`)
+          return false
+        }
+        if (!r.estInicio.trim()) {
+          setErrorValidacion(`En la fila ${i + 1}, debe ingresar la Estación de Inicio.`)
+          return false
+        }
+        if (!r.estFin.trim()) {
+          setErrorValidacion(`En la fila ${i + 1}, debe ingresar la Estación de Fin.`)
+          return false
+        }
+      }
+    }
+
+    return true
   }
 
   const handleSiguiente = () => {
+    if (!validarPaso(pasoActual)) {
+      return
+    }
+
     if (pasoActual < pasoMaximo) {
-      setPasoActual((actual) => actual + 1)
+      setField('pasoActual', pasoActual + 1)
       return
     }
 
@@ -138,10 +241,15 @@ export default function BitacoraFormulario({ modo = 'crear' }: BitacoraFormulari
   }
 
   const handleAnterior = () => {
-    setPasoActual((actual) => Math.max(1, actual - 1))
+    setErrorValidacion(null)
+    setField('pasoActual', Math.max(1, pasoActual - 1))
   }
 
   const handleGuardar = () => {
+    if (!validarPaso(1) || !validarPaso(3)) {
+      return
+    }
+
     const datosRegistro = {
       proyectoId,
       categoriaTrabajo,
@@ -156,11 +264,13 @@ export default function BitacoraFormulario({ modo = 'crear' }: BitacoraFormulari
       laboratorioHabilitado,
       tipoEnsayo,
       resultadoEnsayo,
+      laboratorioResponsable,
       observacionesCierre,
       firmaSupervisor,
     }
 
     console.log(`Registro ${modo === 'crear' ? 'creado' : 'actualizado'}:`, datosRegistro)
+    resetForm()
     router.push('/bitacora')
   }
 
@@ -180,7 +290,7 @@ export default function BitacoraFormulario({ modo = 'crear' }: BitacoraFormulari
               </label>
               <select
                 value={proyectoId}
-                onChange={(e) => setProyectoId(e.target.value)}
+                onChange={(e) => setField('proyectoId', e.target.value)}
                 className="h-11 w-full rounded-xl border border-gray-200 bg-white px-4 text-[13px] text-gray-700 focus:border-[#9B0F06] focus:outline-none"
               >
                 <option value="">-- Seleccionar proyecto --</option>
@@ -198,7 +308,7 @@ export default function BitacoraFormulario({ modo = 'crear' }: BitacoraFormulari
               </label>
               <select
                 value={categoriaTrabajo}
-                onChange={(e) => setCategoriaTrabajo(e.target.value)}
+                onChange={(e) => setField('categoriaTrabajo', e.target.value)}
                 className="h-11 w-full rounded-xl border border-gray-200 bg-white px-4 text-[13px] text-gray-700 focus:border-[#9B0F06] focus:outline-none"
               >
                 <option value="">-- Seleccionar categoría --</option>
@@ -217,18 +327,18 @@ export default function BitacoraFormulario({ modo = 'crear' }: BitacoraFormulari
               <input
                 type="date"
                 value={fechaRegistro}
-                onChange={(e) => setFechaRegistro(e.target.value)}
+                onChange={(e) => setField('fechaRegistro', e.target.value)}
                 className="h-11 w-full rounded-xl border border-gray-200 bg-white px-4 text-[13px] text-gray-700 focus:border-[#9B0F06] focus:outline-none"
               />
             </div>
 
             <div>
               <label className="mb-1 block text-[10px] font-semibold uppercase tracking-widest text-gray-500">
-                Turno
+                Turno (Opcional)
               </label>
               <select
                 value={turno}
-                onChange={(e) => setTurno(e.target.value)}
+                onChange={(e) => setField('turno', e.target.value)}
                 className="h-11 w-full rounded-xl border border-gray-200 bg-white px-4 text-[13px] text-gray-700 focus:border-[#9B0F06] focus:outline-none"
               >
                 {turnos.map((opcion) => (
@@ -241,11 +351,11 @@ export default function BitacoraFormulario({ modo = 'crear' }: BitacoraFormulari
 
             <div>
               <label className="mb-1 block text-[10px] font-semibold uppercase tracking-widest text-gray-500">
-                Responsable
+                Responsable (Opcional)
               </label>
               <select
                 value={responsable}
-                onChange={(e) => setResponsable(e.target.value)}
+                onChange={(e) => setField('responsable', e.target.value)}
                 className="h-11 w-full rounded-xl border border-gray-200 bg-white px-4 text-[13px] text-gray-700 focus:border-[#9B0F06] focus:outline-none"
               >
                 {responsables.map((opcion) => (
@@ -264,7 +374,7 @@ export default function BitacoraFormulario({ modo = 'crear' }: BitacoraFormulari
               <input
                 type="text"
                 value={ubicacion}
-                onChange={(e) => setUbicacion(e.target.value)}
+                onChange={(e) => setField('ubicacion', e.target.value)}
                 className="h-11 w-full rounded-xl border border-gray-200 bg-white px-4 text-[13px] text-gray-700 focus:border-[#9B0F06] focus:outline-none"
                 placeholder="Ej: KM 22+300 al 24+100"
               />
@@ -279,12 +389,14 @@ export default function BitacoraFormulario({ modo = 'crear' }: BitacoraFormulari
         <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
           <div className="mb-5 flex items-center gap-2 pb-3 border-b border-gray-100">
             <SunMedium size={15} className="text-[#F59E0B]" />
-            <h3 className="text-sm font-semibold text-gray-800">Condiciones Climáticas</h3>
+            <h3 className="text-sm font-semibold text-gray-800">
+              Condiciones Climáticas <span className="text-xs font-normal text-gray-400">(Opcional)</span>
+            </h3>
           </div>
 
           <div className="mb-5">
             <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-gray-500">
-              Tipo de clima *
+              Tipo de clima
             </p>
             <div className="grid gap-3 md:grid-cols-5">
               {climaOpciones.map((opcion) => {
@@ -294,7 +406,8 @@ export default function BitacoraFormulario({ modo = 'crear' }: BitacoraFormulari
                 return (
                   <button
                     key={opcion.id}
-                    onClick={() => setClima(opcion.id)}
+                    type="button"
+                    onClick={() => setField('clima', opcion.id)}
                     className={`rounded-2xl border px-4 py-5 transition-all ${
                       activo
                         ? 'border-[#F59E0B] bg-[#FFF8EC] text-[#F59E0B] shadow-sm'
@@ -319,7 +432,7 @@ export default function BitacoraFormulario({ modo = 'crear' }: BitacoraFormulari
             </label>
             <textarea
               value={observacionClimatica}
-              onChange={(e) => setObservacionClimatica(e.target.value)}
+              onChange={(e) => setField('observacionClimatica', e.target.value)}
               rows={4}
               className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-[13px] text-gray-700 focus:border-[#9B0F06] focus:outline-none"
               placeholder="Describe las condiciones del día..."
@@ -335,7 +448,8 @@ export default function BitacoraFormulario({ modo = 'crear' }: BitacoraFormulari
                 <p className="text-[10px] text-gray-400">Indica si hubo pausa por condiciones adversas</p>
               </div>
               <button
-                onClick={() => setSuspendieronActividades((actual) => !actual)}
+                type="button"
+                onClick={() => setField('suspendieronActividades', !suspendieronActividades)}
                 className={`relative h-6 w-11 rounded-full transition-colors ${
                   suspendieronActividades ? 'bg-[#9B0F06]' : 'bg-gray-300'
                 }`}
@@ -361,7 +475,7 @@ export default function BitacoraFormulario({ modo = 'crear' }: BitacoraFormulari
           </div>
 
           <p className="mb-3 text-[12px] text-gray-500">
-            Registra las estaciones kilométricas del tramo trabajado (ej. 0+500 a 1+200).
+            Registra las estaciones kilométricas del tramo trabajado (ej. 0+500 a 1+200). Todos los campos marcados con (*) son obligatorios.
           </p>
 
           <div className="space-y-3">
@@ -369,14 +483,14 @@ export default function BitacoraFormulario({ modo = 'crear' }: BitacoraFormulari
               <div key={renglon.id} className="grid items-end gap-3 rounded-2xl border border-gray-100 bg-[#FAFAFB] p-3 xl:grid-cols-[1.5fr_0.7fr_0.7fr_0.7fr_1fr_auto]">
                 <div>
                   <label className="mb-1 block text-[10px] font-semibold uppercase tracking-widest text-gray-400">
-                    Renglón
+                    Renglón *
                   </label>
                   <select
                     value={renglon.renglon}
                     onChange={(e) => actualizarRenglon(renglon.id, 'renglon', e.target.value)}
                     className="h-10 w-full rounded-xl border border-gray-200 bg-white px-3 text-[13px] text-gray-700 focus:border-[#9B0F06] focus:outline-none"
                   >
-                    <option value="">--</option>
+                    <option value="">-- Seleccionar --</option>
                     <option value="Descapote">Descapote</option>
                     <option value="Corte">Corte</option>
                     <option value="Base granular">Base granular</option>
@@ -389,23 +503,24 @@ export default function BitacoraFormulario({ modo = 'crear' }: BitacoraFormulari
 
                 <div>
                   <label className="mb-1 block text-[10px] font-semibold uppercase tracking-widest text-gray-400">
-                    Lado
+                    Lado *
                   </label>
                   <select
                     value={renglon.lado}
                     onChange={(e) => actualizarRenglon(renglon.id, 'lado', e.target.value)}
                     className="h-10 w-full rounded-xl border border-gray-200 bg-white px-3 text-[13px] text-gray-700 focus:border-[#9B0F06] focus:outline-none"
                   >
-                    <option>Ambos</option>
-                    <option>Izquierdo</option>
-                    <option>Derecho</option>
-                    <option>Centro</option>
+                    <option value="">-- Seleccionar --</option>
+                    <option value="Ambos">Ambos</option>
+                    <option value="Izquierdo">Izquierdo</option>
+                    <option value="Derecho">Derecho</option>
+                    <option value="Centro">Centro</option>
                   </select>
                 </div>
 
                 <div>
                   <label className="mb-1 block text-[10px] font-semibold uppercase tracking-widest text-gray-400">
-                    Est. Inicio
+                    Est. Inicio *
                   </label>
                   <input
                     value={renglon.estInicio}
@@ -417,7 +532,7 @@ export default function BitacoraFormulario({ modo = 'crear' }: BitacoraFormulari
 
                 <div>
                   <label className="mb-1 block text-[10px] font-semibold uppercase tracking-widest text-gray-400">
-                    Est. Fin
+                    Est. Fin *
                   </label>
                   <input
                     value={renglon.estFin}
@@ -429,7 +544,7 @@ export default function BitacoraFormulario({ modo = 'crear' }: BitacoraFormulari
 
                 <div>
                   <label className="mb-1 block text-[10px] font-semibold uppercase tracking-widest text-gray-400">
-                    Observaciones
+                    Observaciones (opcional)
                   </label>
                   <input
                     value={renglon.observaciones}
@@ -440,6 +555,7 @@ export default function BitacoraFormulario({ modo = 'crear' }: BitacoraFormulari
                 </div>
 
                 <button
+                  type="button"
                   onClick={() => eliminarRenglon(renglon.id)}
                   className="inline-flex h-10 items-center justify-center rounded-xl border border-gray-200 px-3 text-gray-400 transition-colors hover:border-[#9B0F06] hover:text-[#9B0F06]"
                   title="Eliminar renglón"
@@ -451,6 +567,7 @@ export default function BitacoraFormulario({ modo = 'crear' }: BitacoraFormulari
           </div>
 
           <button
+            type="button"
             onClick={agregarRenglon}
             className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[#E9C8C3] bg-[#FFF7F6] py-3 text-[12px] font-semibold text-[#9B0F06] transition-colors hover:bg-[#FFEDEA]"
           >
@@ -466,7 +583,9 @@ export default function BitacoraFormulario({ modo = 'crear' }: BitacoraFormulari
         <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
           <div className="mb-5 flex items-center gap-2 pb-3 border-b border-gray-100">
             <FlaskConical size={15} className="text-[#9B0F06]" />
-            <h3 className="text-sm font-semibold text-gray-800">Ensayos de Laboratorio</h3>
+            <h3 className="text-sm font-semibold text-gray-800">
+              Ensayos de Laboratorio <span className="text-xs font-normal text-gray-400">(Opcional)</span>
+            </h3>
           </div>
 
           <div className="rounded-2xl border border-gray-100 bg-[#F8FAFC] px-4 py-4">
@@ -478,7 +597,8 @@ export default function BitacoraFormulario({ modo = 'crear' }: BitacoraFormulari
                 <p className="text-[10px] text-gray-400">Activa para registrar resultados</p>
               </div>
               <button
-                onClick={() => setLaboratorioHabilitado((actual) => !actual)}
+                type="button"
+                onClick={() => setField('laboratorioHabilitado', !laboratorioHabilitado)}
                 className={`relative h-6 w-11 rounded-full transition-colors ${
                   laboratorioHabilitado ? 'bg-[#9B0F06]' : 'bg-gray-300'
                 }`}
@@ -499,7 +619,7 @@ export default function BitacoraFormulario({ modo = 'crear' }: BitacoraFormulari
                   </label>
                   <select
                     value={tipoEnsayo}
-                    onChange={(e) => setTipoEnsayo(e.target.value)}
+                    onChange={(e) => setField('tipoEnsayo', e.target.value)}
                     className="h-11 w-full rounded-xl border border-gray-200 bg-white px-4 text-[13px] text-gray-700 focus:border-[#9B0F06] focus:outline-none"
                   >
                     <option>Concreto fresco</option>
@@ -515,7 +635,7 @@ export default function BitacoraFormulario({ modo = 'crear' }: BitacoraFormulari
                   </label>
                   <input
                     value={resultadoEnsayo}
-                    onChange={(e) => setResultadoEnsayo(e.target.value)}
+                    onChange={(e) => setField('resultadoEnsayo', e.target.value)}
                     className="h-11 w-full rounded-xl border border-gray-200 bg-white px-4 text-[13px] text-gray-700 focus:border-[#9B0F06] focus:outline-none"
                     placeholder="Ej: Conforme / No conforme"
                   />
@@ -524,11 +644,11 @@ export default function BitacoraFormulario({ modo = 'crear' }: BitacoraFormulari
                 <div>
                   <label className="mb-1 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-widest text-gray-500">
                     <Users size={11} />
-                    Responsable
+                    Responsable de Laboratorio
                   </label>
                   <input
-                    value={responsable}
-                    onChange={(e) => setResponsable(e.target.value)}
+                    value={laboratorioResponsable}
+                    onChange={(e) => setField('laboratorioResponsable', e.target.value)}
                     className="h-11 w-full rounded-xl border border-gray-200 bg-white px-4 text-[13px] text-gray-700 focus:border-[#9B0F06] focus:outline-none"
                     placeholder="Nombre del laboratorista"
                   />
@@ -544,7 +664,9 @@ export default function BitacoraFormulario({ modo = 'crear' }: BitacoraFormulari
       <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
         <div className="mb-5 flex items-center gap-2 pb-3 border-b border-gray-100">
           <Check size={15} className="text-[#007866]" />
-          <h3 className="text-sm font-semibold text-gray-800">Cierre del Registro</h3>
+          <h3 className="text-sm font-semibold text-gray-800">
+            Cierre del Registro <span className="text-xs font-normal text-gray-400">(Opcional)</span>
+          </h3>
         </div>
 
         <div className="grid gap-3 md:grid-cols-2">
@@ -553,7 +675,7 @@ export default function BitacoraFormulario({ modo = 'crear' }: BitacoraFormulari
             <p className="mt-1 text-sm font-semibold text-gray-800">
               {proyectoSeleccionado ? proyectoSeleccionado.nombre : 'Sin proyecto seleccionado'}
             </p>
-            <p className="mt-1 text-[11px] text-gray-500">
+            <p className="mt-1 text-[11px] text-gray-500 font-medium text-gray-400">
               {proyectoSeleccionado?.codigo ?? '--'}
             </p>
           </div>
@@ -561,7 +683,7 @@ export default function BitacoraFormulario({ modo = 'crear' }: BitacoraFormulari
           <div className="rounded-2xl bg-[#F8FAFC] p-4">
             <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Renglones</p>
             <p className="mt-1 text-sm font-semibold text-gray-800">{renglones.length} renglones registrados</p>
-            <p className="mt-1 text-[11px] text-gray-500">
+            <p className="mt-1 text-[11px] text-gray-500 font-medium text-gray-400">
               {renglones.some((r) => r.renglon) ? 'Con información lista para guardar' : 'Pendiente de completar'}
             </p>
           </div>
@@ -573,7 +695,7 @@ export default function BitacoraFormulario({ modo = 'crear' }: BitacoraFormulari
           </label>
           <textarea
             value={observacionesCierre}
-            onChange={(e) => setObservacionesCierre(e.target.value)}
+            onChange={(e) => setField('observacionesCierre', e.target.value)}
             rows={4}
             className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-[13px] text-gray-700 focus:border-[#9B0F06] focus:outline-none"
             placeholder="Resumen de actividades, incidentes o acuerdos..."
@@ -586,7 +708,7 @@ export default function BitacoraFormulario({ modo = 'crear' }: BitacoraFormulari
           </label>
           <input
             value={firmaSupervisor}
-            onChange={(e) => setFirmaSupervisor(e.target.value)}
+            onChange={(e) => setField('firmaSupervisor', e.target.value)}
             className="h-11 w-full rounded-xl border border-gray-200 bg-white px-4 text-[13px] text-gray-700 focus:border-[#9B0F06] focus:outline-none"
             placeholder="Nombre de quien valida el cierre"
           />
@@ -599,6 +721,7 @@ export default function BitacoraFormulario({ modo = 'crear' }: BitacoraFormulari
     <div className="space-y-4">
       <div className="flex items-center gap-2">
         <button
+          type="button"
           onClick={() => router.back()}
           className="rounded-lg p-1.5 transition-colors hover:bg-gray-100"
         >
@@ -659,10 +782,19 @@ export default function BitacoraFormulario({ modo = 'crear' }: BitacoraFormulari
         </div>
       </div>
 
+      {/* Validation Error Banner */}
+      {errorValidacion && (
+        <div className="flex items-center gap-2 rounded-xl bg-red-50 p-4 text-[12px] font-medium text-red-800 border border-red-200">
+          <AlertCircle size={16} className="text-red-600 flex-shrink-0" />
+          <span>{errorValidacion}</span>
+        </div>
+      )}
+
       {renderPasoActual()}
 
       <div className="flex items-center justify-between">
         <button
+          type="button"
           onClick={handleAnterior}
           disabled={pasoActual === 1}
           className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2.5 text-[12px] font-medium text-gray-500 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
@@ -672,6 +804,7 @@ export default function BitacoraFormulario({ modo = 'crear' }: BitacoraFormulari
         </button>
 
         <button
+          type="button"
           onClick={handleSiguiente}
           className="inline-flex items-center gap-2 rounded-lg bg-[#9B0F06] px-5 py-2.5 text-[12px] font-semibold text-white shadow-sm transition-colors hover:bg-[#5E0006]"
         >

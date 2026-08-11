@@ -21,8 +21,8 @@ const config: Config = {
         },
       },
       animation: {
-        fadeIn: 'fadeIn 0.6s ease-out forwards',
-        slideUp: 'slideUp 0.4s ease-out',
+        fadeIn: 'fadeIn 0.25s ease-out forwards',
+        slideUp: 'slideUp 0.2s ease-out',
         'pulse-gradient': 'radiusGradientPulse 6s ease-in-out infinite',
       },
       keyframes: {
