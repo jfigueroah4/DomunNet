@@ -9,7 +9,7 @@ Sistema integral de control de obras con dashboard en tiempo real.
 - **Next.js 14** con App Router
 - **TypeScript**
 - **Tailwind CSS**
-- Deploy en **Vercel**
+- Despliegue pendiente de configurar
 
 ### Backend
 
@@ -133,5 +133,5 @@ docker-compose -f docker-compose.yml -f docker-compose.prod.yml up
 
 ## Deployment
 
-- **Frontend**: Se despliega automáticamente en Vercel al hacer push a `main`
+- **Frontend**: Despliegue pendiente de configurar
 - **Backend**: Se despliega automáticamente en Railway al hacer push a `main`
