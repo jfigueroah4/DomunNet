@@ -184,24 +184,7 @@ export default function UsuariosPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-2.5 md:grid-cols-4">
-        <div className="rounded-xl bg-[#9B0F06] p-3 text-white shadow-sm">
-          <p className="text-[9px] font-medium tracking-wide text-red-100 opacity-80">Total Usuarios</p>
-          <p className="text-[24px] font-bold leading-none mt-2">{contadores.total}</p>
-        </div>
 
-        <UsuarioCard rol="Administrador" cantidad={contadores.Administrador} />
-
-        <div className="rounded-xl border border-gray-100 bg-white p-3 shadow-sm">
-          <div className="flex items-center gap-1.5 mb-2 text-gray-400">
-            <UserCog size={12} className="text-[#0066CC] opacity-80" />
-            <span className="text-[9px] font-medium tracking-wide text-gray-400">Operativos</span>
-          </div>
-          <p className="text-[24px] font-bold leading-none text-[#0066CC]">{contadores.Operativos}</p>
-        </div>
-
-        <UsuarioCard rol="IngenieroResidente" cantidad={contadores.IngenieroResidente} />
-      </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2.5 bg-white p-2.5 rounded-xl border border-gray-100 shadow-2xs">
         <div className="flex flex-wrap items-center gap-2">

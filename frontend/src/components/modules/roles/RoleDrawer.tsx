@@ -277,7 +277,8 @@ export function RoleDrawer({
               )}
             </div>
           )}
-            <div className="px-5 py-4 border-t border-gray-100 flex justify-end gap-2 bg-white">
+          </div>
+          <div className="px-5 py-4 border-t border-gray-100 flex justify-end gap-2 bg-white">
               <button
                 onClick={onClose}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-[11px] font-semibold rounded-lg transition-colors shadow-2xs"

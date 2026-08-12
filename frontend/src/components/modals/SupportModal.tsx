@@ -52,28 +52,20 @@ export default function SupportModal({ isOpen, onClose }: SupportModalProps) {
         {/* Support Contacts */}
         <div className="space-y-4 flex flex-col items-center">
           {/* Email */}
-          <a
-            href="mailto:josuedanielf2002@gmail.com"
-            style={{ border: 'none', background: 'transparent', boxShadow: 'none', cursor: 'pointer' }}
-            className="flex items-center gap-3 text-white transition-opacity hover:opacity-80"
-          >
+          <div className="flex items-center gap-3 text-white">
             <Mail size={18} className="text-white/70" />
             <span className="font-poppins text-xs">
               josuedanielf2002@gmail.com
             </span>
-          </a>
+          </div>
 
           {/* Phone */}
-          <a
-            href="tel:+50256252922"
-            style={{ border: 'none', background: 'transparent', boxShadow: 'none', cursor: 'pointer' }}
-            className="flex items-center gap-3 text-white transition-opacity hover:opacity-80"
-          >
+          <div className="flex items-center gap-3 text-white">
             <Phone size={18} className="text-white/70" />
             <span className="font-poppins text-xs">
               +502 5625-2922
             </span>
-          </a>
+          </div>
         </div>
 
         {/* Close button */}
