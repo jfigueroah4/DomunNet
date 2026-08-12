@@ -169,14 +169,14 @@ export default function UsuariosPage() {
         <div className="flex items-center gap-2">
           <Link
             href="/roles"
-            className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-2 text-[11px] font-medium text-gray-600 transition-colors hover:border-[#9B0F06] hover:text-[#9B0F06]"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-[11px] font-semibold rounded-lg transition-colors shadow-2xs"
           >
             <Shield size={12} />
             Gestión de Roles
           </Link>
           <button
             onClick={handleNuevo}
-            className="inline-flex items-center gap-1.5 rounded-md bg-[#9B0F06] px-3 py-2 text-[11px] font-semibold text-white shadow-sm transition-colors hover:bg-[#5E0006]"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#9B0F06] hover:bg-[#5E0006] text-white text-[11px] font-bold rounded-lg transition-colors shadow-sm"
           >
             <Plus size={12} />
             Nuevo Usuario
@@ -203,7 +203,7 @@ export default function UsuariosPage() {
         <UsuarioCard rol="IngenieroResidente" cantidad={contadores.IngenieroResidente} />
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-2.5 bg-white p-2.5 rounded-xl border border-gray-100 shadow-2xs">
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative md:w-48 w-full">
             <Search size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -212,19 +212,19 @@ export default function UsuariosPage() {
               placeholder="Buscar usuario..."
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
-              className="h-8 w-full rounded-md border border-gray-200 bg-white pl-7 pr-2.5 text-[10px] text-gray-700 placeholder:text-gray-400 focus:border-[#9B0F06] focus:outline-none"
+              className="w-full pl-8 pr-3 py-1.5 border border-gray-200 rounded-lg text-[10px] text-gray-700 focus:outline-none focus:border-[#9B0F06] transition-colors"
             />
           </div>
 
-          <div className="flex flex-wrap gap-1">
+          <div className="flex items-center gap-0.5 bg-gray-100 p-0.5 rounded-lg">
             {['Todos', 'Administrador', 'Gerencia', 'IngenieroResidente', 'Laboratorista', 'AuxiliarDeCampo', 'Contratante'].map((rol) => (
               <button
                 key={rol}
                 onClick={() => setFiltroRol(rol as RolUsuario | 'Todos')}
-                className={`rounded-full px-3 py-1 text-[10px] font-medium transition-colors ${
+                className={`px-3 py-1 text-[10px] transition-colors rounded-md ${
                   filtroRol === rol
-                    ? 'bg-[#9B0F06] text-white font-semibold'
-                    : 'border border-gray-200 bg-[#FCFCFD] text-gray-600 hover:border-[#9B0F06]'
+                    ? 'bg-white text-gray-800 shadow-2xs font-semibold'
+                    : 'text-gray-500 hover:text-gray-700 font-medium'
                 }`}
               >
                 {rol}

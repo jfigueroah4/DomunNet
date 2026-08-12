@@ -23,7 +23,7 @@ export function UsuarioDeleteModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
-      <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
+      <div className="relative bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl">
         <div className="mb-5 flex items-start justify-between">
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-50 text-[#D53E0F]">
             <Trash2 size={20} />
@@ -74,7 +74,7 @@ export function UsuarioDeleteModal({
           </label>
         </div>
 
-        <div className="mt-5 rounded-2xl border border-gray-100 bg-gray-50 p-4">
+        <div className="mt-5 bg-gray-50 p-3 rounded-xl border border-gray-100">
           <p className="text-[12px] font-semibold text-gray-800">{usuario?.nombre ?? 'Usuario'}</p>
           <p className="text-[10px] text-gray-500">{usuario?.correo}</p>
           <p className="text-[10px] text-gray-500">{usuario?.rol}</p>

@@ -19,30 +19,30 @@ export function UsuarioTabla({
   onEliminar,
 }: UsuarioTablaProps) {
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+    <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-2xs">
       <div className="overflow-x-auto">
-        <table className="w-full text-[9px]">
-          <thead>
-            <tr className="bg-gray-50 border-b border-gray-100">
-              <th className="text-left px-3 py-2 text-[8px] text-gray-400 uppercase tracking-wide font-semibold">
+        <table className="w-full text-left border-collapse min-w-[900px]">
+          <thead className="bg-gray-50 border-b border-gray-100">
+            <tr>
+              <th className="px-4 py-3 text-[9px] text-gray-400 uppercase tracking-wide font-semibold">
                 Usuario
               </th>
-              <th className="text-left px-3 py-2 text-[8px] text-gray-400 uppercase tracking-wide font-semibold">
+              <th className="px-4 py-3 text-[9px] text-gray-400 uppercase tracking-wide font-semibold">
                 Correo
               </th>
-              <th className="text-left px-3 py-2 text-[8px] text-gray-400 uppercase tracking-wide font-semibold">
+              <th className="px-4 py-3 text-[9px] text-gray-400 uppercase tracking-wide font-semibold">
                 Rol
               </th>
-              <th className="text-left px-3 py-2 text-[8px] text-gray-400 uppercase tracking-wide font-semibold">
+              <th className="px-4 py-3 text-[9px] text-gray-400 uppercase tracking-wide font-semibold">
                 Estado
               </th>
-              <th className="text-left px-3 py-2 text-[8px] text-gray-400 uppercase tracking-wide font-semibold">
+              <th className="px-4 py-3 text-[9px] text-gray-400 uppercase tracking-wide font-semibold">
                 Último Acceso
               </th>
-              <th className="text-left px-3 py-2 text-[8px] text-gray-400 uppercase tracking-wide font-semibold">
+              <th className="px-4 py-3 text-[9px] text-gray-400 uppercase tracking-wide font-semibold">
                 Proyectos
               </th>
-              <th className="text-right px-3 py-2 text-[8px] text-gray-400 uppercase tracking-wide font-semibold">
+              <th className="text-right px-4 py-3 text-[9px] text-gray-400 uppercase tracking-wide font-semibold">
                 Acciones
               </th>
             </tr>
@@ -65,11 +65,11 @@ export function UsuarioTabla({
               return (
                 <tr
                   key={usuario.id}
-                  className="border-b border-gray-50 hover:bg-gray-50 transition-colors"
+                  className="hover:bg-gray-50 border-t border-gray-50 transition-colors"
                 >
-                  <td className="px-3 py-2">
+                  <td className="px-4 py-3">
                     <div className="flex items-center gap-2.5">
-                      <div className="w-7 h-7 rounded-full bg-[#9B0F06] flex items-center justify-center text-[9px] font-bold text-white uppercase shrink-0">
+                      <div className="w-8 h-8 rounded-full bg-[#9B0F06] text-[10px] font-bold text-white flex items-center justify-center shrink-0">
                         {iniciales}
                       </div>
                       <div>
@@ -80,20 +80,20 @@ export function UsuarioTabla({
                       </div>
                     </div>
                   </td>
-                  <td className="px-3 py-2 text-gray-600 font-medium">{usuario.correo}</td>
-                  <td className="px-3 py-2">
+                  <td className="px-4 py-3 text-[9px] text-gray-600 font-medium">{usuario.correo}</td>
+                  <td className="px-4 py-3 text-[9px]">
                     <UsuarioRolBadge rol={usuario.rol} />
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-4 py-3 text-[9px]">
                     <UsuarioEstadoBadge estado={usuario.estado} />
                   </td>
-                  <td className="px-3 py-2 text-gray-500 font-medium">{fechaAcceso}</td>
-                  <td className="px-3 py-2">
+                  <td className="px-4 py-3 text-[9px] text-gray-500 font-medium">{fechaAcceso}</td>
+                  <td className="px-4 py-3 text-[9px]">
                     <span className="font-semibold text-[#9B0F06]">{proyectosCount}</span>{' '}
                     <span className="text-gray-400">proyecto{proyectosCount !== 1 ? 's' : ''}</span>
                   </td>
-                  <td className="px-3 py-2">
-                    <div className="flex items-center justify-end gap-0.5">
+                  <td className="px-4 py-3">
+                    <div className="flex items-center justify-end gap-1">
                       <button
                         onClick={() => onVer(usuario)}
                         className="p-1 text-gray-400 transition-colors hover:text-[#9B0F06]"

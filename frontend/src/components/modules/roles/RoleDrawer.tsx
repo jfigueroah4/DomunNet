@@ -98,14 +98,11 @@ export function RoleDrawer({
 
   return (
     <>
-      {isOpen && <div className="fixed inset-0 z-40 bg-black/45" onClick={onClose} />}
-
-      <div
-        className={`fixed right-0 top-0 z-50 h-full w-[460px] overflow-y-auto bg-white shadow-2xl transition-transform duration-300 ${
-          isOpen ? 'translate-x-0' : 'translate-x-full'
-        }`}
-      >
-        <div className="sticky top-0 flex items-start justify-between border-b border-gray-100 bg-white px-5 py-4">
+      {isOpen && (
+        <div className="fixed inset-0 z-50 flex justify-end overflow-hidden">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px]" onClick={onClose} />
+          <aside className="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-right">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-gray-50">
           <div className="flex items-start gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-red-50 text-[#9B0F06]">
               {isUsersMode ? <Users size={18} /> : isViewMode ? <Eye size={18} /> : <PencilLine size={18} />}
@@ -130,10 +127,10 @@ export function RoleDrawer({
           >
             <X size={16} className="text-gray-600" />
           </button>
-        </div>
-
-        <div className="px-5 py-5">
-          <div className="mb-4 rounded-2xl border border-gray-100 bg-[#FAFAFB] p-4">
+            </div>
+            
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+              <div className="bg-gray-50 p-3 rounded-xl border border-gray-100">
             <div className="flex items-center gap-3">
               <div
                 className="flex h-14 w-14 items-center justify-center rounded-2xl text-sm font-bold text-white"
@@ -280,26 +277,26 @@ export function RoleDrawer({
               )}
             </div>
           )}
+            <div className="px-5 py-4 border-t border-gray-100 flex justify-end gap-2 bg-white">
+              <button
+                onClick={onClose}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-[11px] font-semibold rounded-lg transition-colors shadow-2xs"
+              >
+                {isViewMode ? 'Cerrar' : 'Cancelar'}
+              </button>
+              {!isViewMode && (
+                <button
+                  onClick={handleGuardar}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-[#9B0F06] hover:bg-[#5E0006] text-white text-[11px] font-bold rounded-lg transition-colors shadow-sm"
+                >
+                  <Save size={14} />
+                  {mode === 'create' ? 'Crear Rol' : 'Guardar Cambios'}
+                </button>
+              )}
+            </div>
+          </aside>
         </div>
-
-        <div className="sticky bottom-0 flex gap-2 border-t border-gray-100 bg-gray-50 px-5 py-4">
-          <button
-            onClick={onClose}
-            className="flex-1 rounded-xl border border-gray-200 py-2.5 text-[12px] font-medium text-gray-600 transition-colors hover:bg-gray-100"
-          >
-            {isViewMode ? 'Cerrar' : 'Cancelar'}
-          </button>
-          {!isViewMode && (
-            <button
-              onClick={handleGuardar}
-              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#9B0F06] py-2.5 text-[12px] font-semibold text-white transition-colors hover:bg-[#5E0006]"
-            >
-              <Save size={14} />
-              {mode === 'create' ? 'Crear Rol' : 'Guardar Cambios'}
-            </button>
-          )}
-        </div>
-      </div>
+      )}
     </>
   )
 }

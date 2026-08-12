@@ -12,33 +12,33 @@ const rolConfig: Record<
 > = {
   Administrador: {
     label: 'Administrador',
-    bg: 'bg-red-50',
+    bg: 'bg-[#FEF2F2]',
     text: 'text-[#9B0F06]',
   },
   Gerencia: {
     label: 'Gerencia',
-    bg: 'bg-purple-50',
-    text: 'text-[#7C3AED]',
+    bg: 'bg-[#ECFDF5]',
+    text: 'text-[#065F46]',
   },
   IngenieroResidente: {
     label: 'Ingeniero Residente',
-    bg: 'bg-blue-50',
-    text: 'text-[#0066CC]',
+    bg: 'bg-[#EFF6FF]',
+    text: 'text-[#1E40AF]',
   },
   Laboratorista: {
     label: 'Laboratorista',
-    bg: 'bg-orange-50',
-    text: 'text-[#D53E0F]',
+    bg: 'bg-[#F3E8FF]',
+    text: 'text-[#5B21B6]',
   },
   AuxiliarDeCampo: {
     label: 'Auxiliar de Campo',
-    bg: 'bg-emerald-50',
-    text: 'text-[#059669]',
+    bg: 'bg-[#FEF3C7]',
+    text: 'text-[#92400E]',
   },
   Contratante: {
     label: 'Contratante',
-    bg: 'bg-indigo-50',
-    text: 'text-[#4F46E5]',
+    bg: 'bg-[#F3F4F6]',
+    text: 'text-[#374151]',
   },
 }
 
