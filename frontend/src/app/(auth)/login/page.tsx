@@ -3,15 +3,13 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { isAxiosError } from 'axios';
-import { Eye, EyeOff, User, Lock, Info, X } from 'lucide-react';
+import { toast } from 'sonner';
+import { Eye, EyeOff, User, Lock, Info, X, Check } from 'lucide-react';
 import LoginInput from '@/components/ui/LoginInput';
 import LoginButton from '@/components/ui/LoginButton';
-import ValidationMessage from '@/components/ui/ValidationMessage';
 import PasswordRecoveryModal from '@/components/modals/PasswordRecoveryModal';
 import SupportModal from '@/components/modals/SupportModal';
 import { api } from '@/lib/api/cliente';
-import { validateLoginInput } from '@/lib/utils/validations';
 
 const esDesarrollo = process.env.NODE_ENV !== 'production'
 
@@ -75,15 +73,76 @@ export default function LoginPage() {
   const router = useRouter();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [emailError, setEmailError] = useState(false);
+  const [passwordError, setPasswordError] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [isPasswordRecoveryOpen, setIsPasswordRecoveryOpen] = useState(false);
   const [isSupportOpen, setIsSupportOpen] = useState(false);
   const [isQuickAccessOpen, setIsQuickAccessOpen] = useState(false);
-  const [validationMessage, setValidationMessage] = useState('');
-  const [validationStatus, setValidationStatus] = useState<'idle' | 'success' | 'warning' | 'error'>('idle');
-  const [showValidation, setShowValidation] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const showErrorToast = (message: string) => {
+    toast.dismiss();
+    toast.custom(
+      (t) => (
+        <div style={{
+          background: '#FFFFFF',
+          border: '1px solid #F0F0F0',
+          borderRadius: '8px',
+          padding: '8px 12px',
+          fontFamily: "'Poppins', sans-serif",
+          fontSize: '12px',
+          color: '#1F1F1F',
+          width: 'max-content',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          boxShadow: '0 2px 10px rgba(0,0,0,0.05)'
+        }}>
+          <div style={{ width: '18px', height: '18px', borderRadius: '50%', background: '#FF4D4F', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <X size={11} color="#FFFFFF" strokeWidth={3} />
+          </div>
+          <span>{message}</span>
+          <button type="button" onClick={() => toast.dismiss(t as unknown as number)} style={{ marginLeft: '4px', display: 'flex', alignItems: 'center', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0 }}>
+            <X size={14} color="#999" />
+          </button>
+        </div>
+      ),
+      { duration: 3500, position: 'top-center' }
+    );
+  };
+
+  const showSuccessToast = (message: string) => {
+    toast.dismiss();
+    toast.custom(
+      (t) => (
+        <div style={{
+          background: '#FFFFFF',
+          border: '1px solid #F0F0F0',
+          borderRadius: '8px',
+          padding: '8px 12px',
+          fontFamily: "'Poppins', sans-serif",
+          fontSize: '12px',
+          color: '#1F1F1F',
+          width: 'max-content',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          boxShadow: '0 2px 10px rgba(0,0,0,0.05)'
+        }}>
+          <div style={{ width: '18px', height: '18px', borderRadius: '50%', background: '#52C41A', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Check size={11} color="#FFFFFF" strokeWidth={3} />
+          </div>
+          <span>{message}</span>
+          <button type="button" onClick={() => toast.dismiss(t as unknown as number)} style={{ marginLeft: '4px', display: 'flex', alignItems: 'center', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0 }}>
+            <X size={14} color="#999" />
+          </button>
+        </div>
+      ),
+      { duration: 3500, position: 'top-center' }
+    );
+  };
 
   const iniciarSesion = async (identificador: string, contrasena: string) => {
     await api.post('/auth/iniciar-sesion', {
@@ -91,9 +150,7 @@ export default function LoginPage() {
       contrasena,
     });
 
-    setValidationMessage('¡Bienvenido!');
-    setValidationStatus('success');
-    setShowValidation(true);
+    showSuccessToast("¡Sesión iniciada correctamente!");
 
     setTimeout(() => {
       router.replace('/');
@@ -107,12 +164,11 @@ export default function LoginPage() {
       return;
     }
 
-    // Validaciones básicas usando función reutilizable
-    const validacion = validateLoginInput(username, password);
-    if (!validacion.valid) {
-      setValidationMessage(validacion.error || 'Error de validación');
-      setValidationStatus('warning');
-      setShowValidation(true);
+    if (!username.trim() || !password.trim()) {
+      if (!username.trim()) setEmailError(true);
+      if (!password.trim()) setPasswordError(true);
+
+      showErrorToast("Ingresa tu correo/usuario y contraseña para continuar.");
       return;
     }
 
@@ -121,13 +177,9 @@ export default function LoginPage() {
     try {
       await iniciarSesion(username, password);
     } catch (error) {
-      const mensaje = isAxiosError(error)
-        ? (error.response?.data as { message?: string } | undefined)?.message ?? 'No se pudo iniciar sesión'
-        : 'No se pudo iniciar sesión';
-
-      setValidationMessage(mensaje);
-      setValidationStatus('error');
-      setShowValidation(true);
+      setEmailError(true);
+      setPasswordError(true);
+      showErrorToast("Credenciales incorrectas. Verifica tu usuario y contraseña.");
     } finally {
       setIsSubmitting(false);
     }
@@ -135,6 +187,15 @@ export default function LoginPage() {
 
   return (
     <div className="relative min-h-screen w-full overflow-hidden bg-gray-900">
+      <style>{`
+        [data-sonner-toast] {
+          background: transparent !important;
+          border: none !important;
+          box-shadow: none !important;
+          padding: 0 !important;
+          width: auto !important;
+        }
+      `}</style>
       {/* Fondo con ilustración de camiones */}
       <div
         className="absolute inset-x-0 bottom-[-80px] w-full h-[120vh] overflow-hidden pointer-events-none"
@@ -157,17 +218,6 @@ export default function LoginPage() {
 
       {/* Contenedor principal centrado */}
       <div className="relative z-10 flex min-h-screen flex-col items-center justify-center px-4 py-6">
-        {/* Notificación de validación - Posición fija sin afectar layout */}
-        {showValidation && (
-          <div className="absolute top-24 left-1/2 -translate-x-1/2 w-full max-w-xs z-50">
-            <ValidationMessage
-              status={validationStatus}
-              message={validationMessage}
-              show={showValidation}
-              onClose={() => setShowValidation(false)}
-            />
-          </div>
-        )}
 
         {/* Logo DOMUN */}
         <div className="mb-3 animate-fadeIn">
@@ -209,7 +259,11 @@ export default function LoginPage() {
               type="text"
               placeholder="Correo o usuario"
               value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              error={emailError}
+              onChange={(e) => {
+                setUsername(e.target.value);
+                if (emailError) setEmailError(false);
+              }}
             />
           </div>
 
@@ -220,7 +274,11 @@ export default function LoginPage() {
               type={showPassword ? 'text' : 'password'}
               placeholder="Contraseña"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              error={passwordError}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                if (passwordError) setPasswordError(false);
+              }}
               rightIcon={
                 <button
                   type="button"

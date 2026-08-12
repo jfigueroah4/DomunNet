@@ -50,26 +50,28 @@ export default function SupportModal({ isOpen, onClose }: SupportModalProps) {
         </p>
 
         {/* Support Contacts */}
-        <div className="space-y-2">
+        <div className="space-y-4 flex flex-col items-center">
           {/* Email */}
           <a
-            href="mailto:soporte@umg.edu.gt"
-            className="flex items-center gap-3 w-full h-[40px] px-3 bg-transparent border-2 border-white/30 rounded-lg text-white hover:border-white/60 hover:bg-white/5 transition-all duration-300 group"
+            href="mailto:josuedanielf2002@gmail.com"
+            style={{ border: 'none', background: 'transparent', boxShadow: 'none', cursor: 'pointer' }}
+            className="flex items-center gap-3 text-white transition-opacity hover:opacity-80"
           >
-            <Mail size={18} className="text-white/70 group-hover:text-white transition-colors" />
-            <span className="font-poppins text-xs group-hover:text-white">
-              soporte@umg.edu.gt
+            <Mail size={18} className="text-white/70" />
+            <span className="font-poppins text-xs">
+              josuedanielf2002@gmail.com
             </span>
           </a>
 
           {/* Phone */}
           <a
-            href="tel:+5022411800"
-            className="flex items-center gap-3 w-full h-[40px] px-3 bg-transparent border-2 border-white/30 rounded-lg text-white hover:border-white/60 hover:bg-white/5 transition-all duration-300 group"
+            href="tel:+50256252922"
+            style={{ border: 'none', background: 'transparent', boxShadow: 'none', cursor: 'pointer' }}
+            className="flex items-center gap-3 text-white transition-opacity hover:opacity-80"
           >
-            <Phone size={18} className="text-white/70 group-hover:text-white transition-colors" />
-            <span className="font-poppins text-xs group-hover:text-white">
-              +502 2411-1800
+            <Phone size={18} className="text-white/70" />
+            <span className="font-poppins text-xs">
+              +502 5625-2922
             </span>
           </a>
         </div>
