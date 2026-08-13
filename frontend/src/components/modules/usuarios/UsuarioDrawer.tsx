@@ -1,9 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Save, X, Eye, PencilLine, UserPlus, Mail, Phone, FolderOpen, Edit2 } from 'lucide-react'
+import { Save, X, Eye, PencilLine, UserPlus, Mail, Phone, FolderOpen, Edit2, Loader2, KeyRound } from 'lucide-react'
 import { Usuario, RolUsuario, EstadoUsuario } from '@/types/usuario'
 import { api } from '@/lib/api/cliente'
+import { toast } from 'sonner'
 import { showErrorToast } from '@/components/ui/Toast'
 
 export type UsuarioDrawerMode = 'create' | 'edit' | 'view'
@@ -26,6 +27,7 @@ const defaultForm = (usuario?: Usuario) => ({
   rol: (usuario?.rol as RolUsuario) || ('Administrador' as RolUsuario),
   estado: (usuario?.estado as EstadoUsuario) || 'Activo',
   contrasena: '',
+  contrasenaAnterior: '',
   username: usuario?.username || '',
   direccion: '',
   diaNacimiento: '',
@@ -40,6 +42,8 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
   const [usernameDisponible, setUsernameDisponible] = useState<boolean | null>(null)
   const [usernameCargando, setUsernameCargando] = useState(false)
   const [drawerProyectosAbierto, setDrawerProyectosAbierto] = useState(false)
+  const [isEditingPassword, setIsEditingPassword] = useState(false)
+  const [passwordCargando, setPasswordCargando] = useState(false)
   
   const [errors, setErrors] = useState({
     primerNombre: false,
@@ -56,6 +60,7 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
       setFormData(defaultForm(usuario))
       setIsUsernameManuallyEdited(!!usuario?.username)
       setUsernameDisponible(null)
+      setIsEditingPassword(false)
       setErrors({
         primerNombre: false,
         primerApellido: false,
@@ -167,6 +172,10 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
     const esValida = valor.length >= 8 || (mode !== 'create' && valor === '')
     setErrors({ ...errors, contrasena: !esValida })
   }
+  
+  const handleContrasenaAnteriorChange = (valor: string) => {
+    setFormData({ ...formData, contrasenaAnterior: valor })
+  }
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
@@ -177,6 +186,31 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
       setErrors({ ...errors, username: !value.trim() })
     }
     setFormData((prev) => ({ ...prev, [name]: value }))
+  }
+  
+  const handleGuardarContrasena = async () => {
+    if (!usuario?.id) return;
+    
+    if (!formData.contrasenaAnterior || formData.contrasena.length < 8) {
+      showErrorToast("Ingresa la contraseña actual y una nueva de al menos 8 caracteres")
+      return;
+    }
+    
+    setPasswordCargando(true)
+    try {
+      await api.post(`/usuarios/${usuario.id}/cambiar-contraseña`, {
+        contrasenaAnterior: formData.contrasenaAnterior,
+        nuevaContrasena: formData.contrasena
+      })
+      toast.success('Contraseña cambiada exitosamente')
+      setIsEditingPassword(false)
+      setFormData(prev => ({...prev, contrasenaAnterior: '', contrasena: ''}))
+    } catch (error) {
+      console.error('Error al cambiar contraseña:', error)
+      showErrorToast('Error al cambiar la contraseña. Verifica la contraseña actual.')
+    } finally {
+      setPasswordCargando(false)
+    }
   }
 
   const handleGuardarUsuario = () => {
@@ -190,7 +224,7 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
       telefono: ![4, 8].includes(formData.telefono.length),
       fechaNacimiento: faltaFecha || edad < 18,
       correo: formData.correo ? !validarEmail(formData.correo) : true,
-      contrasena: mode === 'create' ? formData.contrasena.length < 8 : (formData.contrasena.length > 0 && formData.contrasena.length < 8),
+      contrasena: mode === 'create' ? formData.contrasena.length < 8 : false,
       username: !formData.username.trim(),
     }
     
@@ -210,9 +244,8 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
       telefono: formData.telefono,
       rol: formData.rol,
       estado: formData.estado,
-      password: formData.contrasena,
+      password: mode === 'create' ? formData.contrasena : undefined,
       username: formData.username,
-      // Pass other fields if needed, like address or birthdate depending on API
     })
     onClose()
   }
@@ -449,25 +482,60 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
 
           <div className="grid grid-cols-2 gap-3 mb-3">
             <div>
-              <label className="mb-1 block text-[10px] font-medium text-gray-600">Contraseña *</label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="password"
-                  placeholder="••••••••"
-                  value={formData.contrasena}
-                  onChange={(e) => handlePasswordChange(e.target.value)}
-                  disabled={isViewMode || !!usuario}
-                  className={`h-8 flex-1 rounded-lg border px-2.5 py-1.5 text-[10px] focus:outline-none disabled:bg-gray-50 transition-colors ${
-                    errors.contrasena ? 'border-[#FF4D4F] bg-red-50/20' : 'border-gray-200 focus:border-[#9B0F06]'
-                  }`}
-                />
-                {!isViewMode && !!usuario && (
-                  <button type="button" className="text-[9px] text-gray-500 hover:text-[#9B0F06] flex items-center gap-1 transition-colors flex-shrink-0">
+              <label className="mb-1 block text-[10px] font-medium text-gray-600">Contraseña {mode === 'create' ? '*' : ''}</label>
+              {mode === 'edit' && !isEditingPassword ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="password"
+                    placeholder="••••••••"
+                    disabled
+                    className="h-8 flex-1 rounded-lg border px-2.5 py-1.5 text-[10px] bg-gray-50 border-gray-200 text-gray-400"
+                  />
+                  <button type="button" onClick={() => setIsEditingPassword(true)} className="text-[9px] text-gray-500 hover:text-[#9B0F06] flex items-center gap-1 transition-colors flex-shrink-0 bg-gray-100 h-8 px-2 rounded-md">
                     <Edit2 size={11} /> Cambiar
                   </button>
-                )}
-              </div>
-              {errors.contrasena && <p className="text-[9px] text-[#FF4D4F] mt-1">Mínimo 8 caracteres</p>}
+                </div>
+              ) : mode === 'edit' && isEditingPassword ? (
+                <div className="flex flex-col gap-2 p-2 bg-gray-50 rounded-xl border border-gray-100">
+                  <input
+                    type="password"
+                    placeholder="Contraseña actual"
+                    value={formData.contrasenaAnterior}
+                    onChange={(e) => handleContrasenaAnteriorChange(e.target.value)}
+                    className="h-8 w-full rounded-lg border px-2.5 py-1.5 text-[10px] focus:outline-none border-gray-200 focus:border-[#9B0F06]"
+                  />
+                  <input
+                    type="password"
+                    placeholder="Nueva contraseña"
+                    value={formData.contrasena}
+                    onChange={(e) => handlePasswordChange(e.target.value)}
+                    className={`h-8 w-full rounded-lg border px-2.5 py-1.5 text-[10px] focus:outline-none transition-colors ${
+                      errors.contrasena ? 'border-[#FF4D4F] bg-red-50/20' : 'border-gray-200 focus:border-[#9B0F06]'
+                    }`}
+                  />
+                  {errors.contrasena && <p className="text-[9px] text-[#FF4D4F]">Mínimo 8 caracteres</p>}
+                  <div className="flex justify-end gap-1 mt-1">
+                    <button type="button" onClick={() => setIsEditingPassword(false)} className="text-[9px] px-2 py-1 text-gray-500 hover:bg-gray-200 rounded transition-colors">Cancelar</button>
+                    <button type="button" onClick={handleGuardarContrasena} disabled={passwordCargando} className="text-[9px] px-2 py-1 bg-[#9B0F06] text-white font-medium rounded hover:bg-[#5E0006] transition-colors flex items-center gap-1">
+                      {passwordCargando ? <Loader2 size={10} className="animate-spin" /> : <KeyRound size={10} />} Guardar
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="password"
+                    placeholder="••••••••"
+                    value={formData.contrasena}
+                    onChange={(e) => handlePasswordChange(e.target.value)}
+                    disabled={isViewMode}
+                    className={`h-8 flex-1 rounded-lg border px-2.5 py-1.5 text-[10px] focus:outline-none disabled:bg-gray-50 transition-colors ${
+                      errors.contrasena ? 'border-[#FF4D4F] bg-red-50/20' : 'border-gray-200 focus:border-[#9B0F06]'
+                    }`}
+                  />
+                </div>
+              )}
+              {mode === 'create' && errors.contrasena && <p className="text-[9px] text-[#FF4D4F] mt-1">Mínimo 8 caracteres</p>}
             </div>
             
             <div className="grid grid-cols-2 gap-2">

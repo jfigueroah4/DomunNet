@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { Eye, PencilLine, Plus, Shield, Trash2, Users, UserPlus } from 'lucide-react'
+import { Eye, PencilLine, Plus, Shield, Trash2, Users, UserPlus, ChevronLeft, ChevronRight } from 'lucide-react'
 import { DEMO_ROLES, Role } from '@/data/roles'
 import { USUARIOS_MOCK } from '@/data/usuarios.mock'
 import { RoleDrawer, RoleDrawerMode } from '@/components/modules/roles/RoleDrawer'
@@ -29,6 +29,10 @@ export default function RolesPage() {
   const [roleActivo, setRoleActivo] = useState<Role | undefined>()
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [roleEliminar, setRoleEliminar] = useState<Role | undefined>()
+  
+  // Pagination state
+  const [paginaActual, setPaginaActual] = useState(1)
+  const [registrosPorPagina, setRegistrosPorPagina] = useState(10)
 
   const rolesConUsuarios = useMemo(
     () =>
@@ -45,22 +49,12 @@ export default function RolesPage() {
     [roles]
   )
 
-  const metrics = useMemo(() => {
-    const usuariosAsignados = rolesConUsuarios.reduce(
-      (acc, role) => acc + role.usuariosAsignados.length,
-      0
-    )
-    const permisosConfigurados = rolesConUsuarios.reduce(
-      (acc, role) => acc + role.permisos.length,
-      0
-    )
-
-    return {
-      totalRoles: rolesConUsuarios.length,
-      usuariosAsignados,
-      permisosConfigurados,
-    }
-  }, [rolesConUsuarios])
+  const totalPaginas = Math.ceil(rolesConUsuarios.length / registrosPorPagina)
+  
+  const rolesPaginados = useMemo(() => {
+    const inicio = (paginaActual - 1) * registrosPorPagina
+    return rolesConUsuarios.slice(inicio, inicio + registrosPorPagina)
+  }, [rolesConUsuarios, paginaActual, registrosPorPagina])
 
   const abrirDrawer = (mode: RoleDrawerMode, role?: Role) => {
     setRoleActivo(role)
@@ -119,128 +113,120 @@ export default function RolesPage() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-start justify-between gap-4">
+    <div className="space-y-3.5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <Link href="/usuarios" className="text-[11px] font-medium text-gray-500 hover:text-[#9B0F06]">
+          <h1 className="text-[18px] font-extrabold leading-none text-gray-800">Roles</h1>
+          <p className="mt-1 text-[11px] text-gray-400">
+            Listado de roles, permisos y usuarios asignados
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Link
+            href="/usuarios"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-[11px] font-semibold rounded-lg transition-colors shadow-2xs"
+          >
             ← Volver a Usuarios
           </Link>
-          <h1 className="mt-2 text-[22px] font-extrabold leading-none text-gray-800">Roles</h1>
-          <p className="mt-2 text-[12px] text-gray-400">Listado de roles, permisos y usuarios asignados</p>
-        </div>
-
-        <button
-          onClick={() => abrirDrawer('create')}
-          className="inline-flex items-center gap-2 rounded-lg bg-[#9B0F06] px-4 py-2.5 text-[12px] font-semibold text-white shadow-sm transition-colors hover:bg-[#5E0006]"
-        >
-          <Plus size={14} />
-          Agregar Rol
-        </button>
-      </div>
-
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <div className="rounded-2xl bg-[#9B0F06] p-4 text-white">
-          <p className="text-[10px] uppercase tracking-widest opacity-75">Total roles</p>
-          <p className="mt-2 text-3xl font-bold leading-none">{metrics.totalRoles}</p>
-        </div>
-        <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
-          <p className="text-[10px] uppercase tracking-widest text-gray-400">Usuarios asignados</p>
-          <p className="mt-2 text-3xl font-bold leading-none text-gray-800">{metrics.usuariosAsignados}</p>
-        </div>
-        <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
-          <p className="text-[10px] uppercase tracking-widest text-gray-400">Permisos configurados</p>
-          <p className="mt-2 text-3xl font-bold leading-none text-gray-800">{metrics.permisosConfigurados}</p>
+          <button
+            onClick={() => abrirDrawer('create')}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#9B0F06] hover:bg-[#5E0006] text-white text-[11px] font-bold rounded-lg transition-colors shadow-sm"
+          >
+            <Plus size={12} />
+            Agregar Rol
+          </button>
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-2xs">
         <div className="overflow-x-auto">
-          <table className="w-full text-[12px]">
-            <thead>
-              <tr className="border-b border-gray-100 bg-gray-50">
-                <th className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wide text-gray-400">Rol</th>
-                <th className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wide text-gray-400">Descripción</th>
-                <th className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wide text-gray-400">Permisos</th>
-                <th className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wide text-gray-400">Usuarios</th>
-                <th className="px-4 py-3 text-right text-[10px] font-semibold uppercase tracking-wide text-gray-400">Acciones</th>
+          <table className="w-full text-left border-collapse min-w-[900px]">
+            <thead className="bg-gray-50 border-b border-gray-100">
+              <tr>
+                <th className="px-4 py-3 text-[9px] text-gray-400 uppercase tracking-wide font-semibold">Rol</th>
+                <th className="px-4 py-3 text-[9px] text-gray-400 uppercase tracking-wide font-semibold">Descripción</th>
+                <th className="px-4 py-3 text-[9px] text-gray-400 uppercase tracking-wide font-semibold">Permisos</th>
+                <th className="px-4 py-3 text-[9px] text-gray-400 uppercase tracking-wide font-semibold">Usuarios</th>
+                <th className="px-4 py-3 text-[9px] text-gray-400 uppercase tracking-wide font-semibold text-right">Acciones</th>
               </tr>
             </thead>
             <tbody>
-              {rolesConUsuarios.map((role) => {
+              {rolesPaginados.map((role) => {
                 const Icon = iconPorRol[role.name] ?? Shield
 
                 return (
-                  <tr key={role.id} className="border-b border-gray-50 transition-colors hover:bg-gray-50">
-                    <td className="px-4 py-4">
-                      <div className="flex items-center gap-3">
+                  <tr key={role.id} className="hover:bg-gray-50 border-t border-gray-50 transition-colors">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2.5">
                         <div
-                          className="flex h-11 w-11 items-center justify-center rounded-2xl text-white"
+                          className="w-8 h-8 rounded-full flex items-center justify-center text-white shrink-0"
                           style={{ backgroundColor: role.color }}
                         >
-                          <Icon size={18} />
+                          <Icon size={12} />
                         </div>
                         <div>
-                          <p className="text-[14px] font-semibold text-gray-800">{role.name}</p>
-                          <p className="text-[11px] text-gray-400">{role.email}</p>
+                          <p className="font-semibold text-[10px] text-gray-800 leading-tight">{role.name}</p>
+                          <p className="text-[8px] text-gray-400 mt-0.5">{role.email}</p>
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-4 text-[12px] text-gray-600">{role.descripcion}</td>
-                    <td className="px-4 py-4">
+                    <td className="px-4 py-3 text-[9px] text-gray-600 font-medium">{role.descripcion}</td>
+                    <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-1.5">
                         {role.permisos.slice(0, 3).map((permiso) => (
                           <span
                             key={permiso}
-                            className="rounded-full bg-gray-100 px-2.5 py-1 text-[10px] text-gray-500"
+                            className="rounded-md bg-gray-100 px-2 py-0.5 text-[9px] text-gray-600 font-medium"
                           >
                             {permiso}
                           </span>
                         ))}
                         {role.permisos.length > 3 && (
-                          <span className="rounded-full bg-gray-100 px-2.5 py-1 text-[10px] text-gray-500">
+                          <span className="rounded-md bg-gray-100 px-2 py-0.5 text-[9px] text-gray-600 font-medium">
                             +{role.permisos.length - 3}
                           </span>
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-4">
+                    <td className="px-4 py-3">
                       <button
                         onClick={() => abrirDrawer('users', role)}
-                        className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-[12px] font-medium text-gray-700 transition-colors hover:border-[#9B0F06] hover:text-[#9B0F06]"
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-2.5 py-1 text-[9px] font-semibold text-gray-700 transition-colors hover:border-[#9B0F06] hover:text-[#9B0F06]"
                       >
-                        <Users size={14} />
+                        <Users size={11} />
                         {role.usuariosAsignados.length} usuarios
                       </button>
                     </td>
-                    <td className="px-4 py-4">
-                      <div className="flex items-center justify-end gap-1.5">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-end gap-1">
                         <button
                           onClick={() => abrirDrawer('view', role)}
-                          className="rounded-lg p-2 text-gray-400 transition-colors hover:text-[#9B0F06]"
+                          className="p-1 text-gray-400 transition-colors hover:text-[#9B0F06]"
                           title="Ver"
                         >
-                          <Eye size={14} />
+                          <Eye size={12} />
                         </button>
                         <button
                           onClick={() => abrirDrawer('edit', role)}
-                          className="rounded-lg p-2 text-gray-400 transition-colors hover:text-[#9B0F06]"
+                          className="p-1 text-gray-400 transition-colors hover:text-[#9B0F06]"
                           title="Editar"
                         >
-                          <PencilLine size={14} />
+                          <PencilLine size={12} />
                         </button>
                         <button
                           onClick={() => abrirDrawer('users', role)}
-                          className="rounded-lg p-2 text-gray-400 transition-colors hover:text-[#9B0F06]"
+                          className="p-1 text-gray-400 transition-colors hover:text-[#9B0F06]"
                           title="Asignar usuarios"
                         >
-                          <UserPlus size={14} />
+                          <UserPlus size={12} />
                         </button>
                         <button
                           onClick={() => handleDelete(role)}
-                          className="rounded-lg p-2 text-gray-400 transition-colors hover:text-red-600"
+                          className="p-1 text-gray-400 transition-colors hover:text-red-600"
                           title="Eliminar"
                         >
-                          <Trash2 size={14} />
+                          <Trash2 size={12} />
                         </button>
                       </div>
                     </td>
@@ -249,6 +235,48 @@ export default function RolesPage() {
               })}
             </tbody>
           </table>
+        </div>
+      </div>
+      
+      {/* Pagination Controls */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-xl border border-gray-100 shadow-2xs">
+        <div className="flex items-center gap-2 text-[10px] text-gray-500">
+          <span>Mostrar</span>
+          <select
+            value={registrosPorPagina}
+            onChange={(e) => {
+              setRegistrosPorPagina(Number(e.target.value))
+              setPaginaActual(1)
+            }}
+            className="h-7 rounded-md border border-gray-200 bg-white px-1 focus:border-[#9B0F06] focus:outline-none cursor-pointer"
+          >
+            {[5, 10, 15, 20].map((num) => (
+              <option key={num} value={num}>{num}</option>
+            ))}
+          </select>
+          <span>registros por página</span>
+        </div>
+        
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setPaginaActual(Math.max(1, paginaActual - 1))}
+            disabled={paginaActual === 1}
+            className="p-1 rounded-md border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            <ChevronLeft size={14} />
+          </button>
+          
+          <div className="text-[10px] text-gray-600 font-medium px-2">
+            Página {paginaActual} de {totalPaginas || 1}
+          </div>
+          
+          <button
+            onClick={() => setPaginaActual(Math.min(totalPaginas, paginaActual + 1))}
+            disabled={paginaActual === totalPaginas || totalPaginas === 0}
+            className="p-1 rounded-md border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            <ChevronRight size={14} />
+          </button>
         </div>
       </div>
 

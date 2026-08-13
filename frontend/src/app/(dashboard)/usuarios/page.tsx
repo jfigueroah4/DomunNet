@@ -1,8 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { useState, useEffect, useCallback } from 'react'
-import { Plus, Users, Shield, Search, Loader2 } from 'lucide-react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { Plus, Users, Shield, Search, Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
 import { api } from '@/lib/api/cliente'
 import { Usuario, RolUsuario, EstadoUsuario } from '@/types/usuario'
 import { UsuarioTabla } from '@/components/modules/usuarios/UsuarioTabla'
@@ -16,6 +16,10 @@ export default function UsuariosPage() {
   const [busqueda, setBusqueda] = useState('')
   const [filtroRol, setFiltroRol] = useState<RolUsuario | 'Todos'>('Todos')
   const [filtroEstado, setFiltroEstado] = useState<EstadoUsuario | 'Todos'>('Todos')
+  
+  const [paginaActual, setPaginaActual] = useState(1)
+  const [registrosPorPagina, setRegistrosPorPagina] = useState(10)
+
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [drawerMode, setDrawerMode] = useState<UsuarioDrawerMode>('create')
   const [usuarioActivo, setUsuarioActivo] = useState<Usuario | undefined>()
@@ -40,17 +44,41 @@ export default function UsuariosPage() {
     cargarUsuarios()
   }, [cargarUsuarios])
 
-  const usuariosFiltrados = usuarios.filter((usuario) => {
-    const nombreCompleto = `${usuario.primer_nombre} ${usuario.segundo_nombre || ''} ${usuario.primer_apellido} ${usuario.segundo_apellido || ''}`.replace(/\s+/g, ' ').trim()
-    const cumpleBusqueda =
-      nombreCompleto.toLowerCase().includes(busqueda.toLowerCase()) ||
-      usuario.correo.toLowerCase().includes(busqueda.toLowerCase())
+  // Map "Desactivado" UI to "Suspendido" internal state and vice versa for filtering
+  const usuariosFiltrados = useMemo(() => {
+    return usuarios.filter((usuario) => {
+      const nombreCompleto = `${usuario.primer_nombre} ${usuario.segundo_nombre || ''} ${usuario.primer_apellido} ${usuario.segundo_apellido || ''}`.replace(/\s+/g, ' ').trim()
+      const cumpleBusqueda =
+        nombreCompleto.toLowerCase().includes(busqueda.toLowerCase()) ||
+        usuario.correo.toLowerCase().includes(busqueda.toLowerCase())
 
-    const cumpleRol = filtroRol === 'Todos' || usuario.rol === filtroRol
-    const cumpleEstado = filtroEstado === 'Todos' || usuario.estado === filtroEstado
+      const cumpleRol = filtroRol === 'Todos' || usuario.rol === filtroRol
+      
+      let estadoAFiltrar = filtroEstado;
+      // If user selected "Desactivado" tab, filter by "Suspendido"
+      if (filtroEstado as any === 'Desactivado') estadoAFiltrar = 'Suspendido';
+      
+      const cumpleEstado = filtroEstado === 'Todos' || usuario.estado === estadoAFiltrar
 
-    return cumpleBusqueda && cumpleRol && cumpleEstado
-  })
+      return cumpleBusqueda && cumpleRol && cumpleEstado
+    })
+  }, [usuarios, busqueda, filtroRol, filtroEstado])
+
+  const totalPaginas = Math.ceil(usuariosFiltrados.length / registrosPorPagina)
+  
+  const usuariosPaginados = useMemo(() => {
+    const inicio = (paginaActual - 1) * registrosPorPagina
+    return usuariosFiltrados.slice(inicio, inicio + registrosPorPagina)
+  }, [usuariosFiltrados, paginaActual, registrosPorPagina])
+  
+  useEffect(() => {
+    setPaginaActual(1)
+  }, [busqueda, filtroRol, filtroEstado, registrosPorPagina])
+
+  const rolesUnicos = useMemo(() => {
+    const roles = new Set(usuarios.map(u => u.rol));
+    return Array.from(roles);
+  }, [usuarios]);
 
   const abrirDrawer = (mode: UsuarioDrawerMode, usuario?: Usuario) => {
     setUsuarioActivo(usuario)
@@ -192,30 +220,30 @@ export default function UsuariosPage() {
           </div>
 
           <div className="flex items-center gap-0.5 bg-gray-100 p-0.5 rounded-lg">
-            {['Todos', 'Administrador', 'Gerencia', 'IngenieroResidente', 'Laboratorista', 'AuxiliarDeCampo', 'Contratante'].map((rol) => (
+            {['Todos', 'Activo', 'Inactivo', 'Desactivado'].map((estado) => (
               <button
-                key={rol}
-                onClick={() => setFiltroRol(rol as RolUsuario | 'Todos')}
+                key={estado}
+                onClick={() => setFiltroEstado(estado as EstadoUsuario | 'Todos')}
                 className={`px-3 py-1 text-[10px] transition-colors rounded-md ${
-                  filtroRol === rol
+                  filtroEstado === estado
                     ? 'bg-white text-gray-800 shadow-2xs font-semibold'
                     : 'text-gray-500 hover:text-gray-700 font-medium'
                 }`}
               >
-                {rol}
+                {estado}
               </button>
             ))}
           </div>
 
           <select
-            value={filtroEstado}
-            onChange={(e) => setFiltroEstado(e.target.value as EstadoUsuario | 'Todos')}
+            value={filtroRol}
+            onChange={(e) => setFiltroRol(e.target.value as RolUsuario | 'Todos')}
             className="h-8 rounded-md border border-gray-200 bg-white px-2 text-[10px] text-gray-600 focus:border-[#9B0F06] focus:outline-none cursor-pointer"
           >
-            <option value="Todos">Todos los estados</option>
-            <option value="Activo">Activo</option>
-            <option value="Inactivo">Inactivo</option>
-            <option value="Suspendido">Suspendido</option>
+            <option value="Todos">Todos los roles</option>
+            {rolesUnicos.map((rol) => (
+              <option key={rol} value={rol}>{rol}</option>
+            ))}
           </select>
         </div>
 
@@ -227,15 +255,56 @@ export default function UsuariosPage() {
       {loading ? (
         <div className="flex flex-col items-center justify-center p-12 bg-white border border-gray-100 rounded-2xl shadow-sm">
           <Loader2 className="h-8 w-8 animate-spin text-[#9B0F06]" />
-          <p className="mt-2 text-[11px] text-gray-500 font-medium">Cargando registros reales...</p>
+          <p className="mt-2 text-[11px] text-gray-500 font-medium">Cargando datos</p>
         </div>
-      ) : usuariosFiltrados.length > 0 ? (
-        <UsuarioTabla
-          usuarios={usuariosFiltrados}
-          onVer={handleVer}
-          onEditar={handleEditar}
-          onEliminar={handleEliminar}
-        />
+      ) : usuariosPaginados.length > 0 ? (
+        <div className="space-y-4">
+          <UsuarioTabla
+            usuarios={usuariosPaginados}
+            onVer={handleVer}
+            onEditar={handleEditar}
+            onEliminar={handleEliminar}
+          />
+          
+          {/* Pagination Controls */}
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-xl border border-gray-100 shadow-2xs">
+            <div className="flex items-center gap-2 text-[10px] text-gray-500">
+              <span>Mostrar</span>
+              <select
+                value={registrosPorPagina}
+                onChange={(e) => setRegistrosPorPagina(Number(e.target.value))}
+                className="h-7 rounded-md border border-gray-200 bg-white px-1 focus:border-[#9B0F06] focus:outline-none cursor-pointer"
+              >
+                {[5, 10, 15, 20].map((num) => (
+                  <option key={num} value={num}>{num}</option>
+                ))}
+              </select>
+              <span>registros por página</span>
+            </div>
+            
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setPaginaActual(Math.max(1, paginaActual - 1))}
+                disabled={paginaActual === 1}
+                className="p-1 rounded-md border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronLeft size={14} />
+              </button>
+              
+              <div className="text-[10px] text-gray-600 font-medium px-2">
+                Página {paginaActual} de {totalPaginas}
+              </div>
+              
+              <button
+                onClick={() => setPaginaActual(Math.min(totalPaginas, paginaActual + 1))}
+                disabled={paginaActual === totalPaginas}
+                className="p-1 rounded-md border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronRight size={14} />
+              </button>
+            </div>
+          </div>
+        </div>
       ) : (
         <div className="rounded-2xl border border-gray-100 bg-white p-12 text-center shadow-sm">
           <Users size={32} className="mx-auto mb-3 text-gray-300" />

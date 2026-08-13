@@ -24,20 +24,20 @@ export function UsuarioDeleteModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
       <div className="relative bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl">
-        <div className="mb-5 flex items-start justify-between">
+        <div className="mb-5 relative flex justify-center">
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-50 text-[#D53E0F]">
             <Trash2 size={20} />
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+            className="absolute right-0 top-0 rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
           >
             <X size={16} />
           </button>
         </div>
 
-        <h3 className="text-[18px] font-bold text-gray-800">Acción sobre Usuario</h3>
-        <p className="mt-2 text-[12px] leading-relaxed text-gray-500">
+        <h3 className="text-[18px] font-bold text-gray-800 text-center">Acción sobre Usuario</h3>
+        <p className="mt-2 text-[12px] leading-relaxed text-gray-500 text-center">
           Selecciona la acción que deseas realizar para el usuario <span className="font-semibold text-gray-800">{usuario?.nombre ?? 'este usuario'}</span>.
         </p>
 
@@ -54,7 +54,6 @@ export function UsuarioDeleteModal({
             />
             <div>
               <p className="text-[11px] font-semibold text-gray-800">Suspender temporalmente</p>
-              <p className="text-[9px] text-gray-400">El usuario no podrá iniciar sesión pero mantendrá sus datos intactos.</p>
             </div>
           </label>
 
@@ -69,7 +68,6 @@ export function UsuarioDeleteModal({
             />
             <div>
               <p className="text-[11px] font-semibold text-gray-800">Eliminar permanentemente</p>
-              <p className="text-[9px] text-gray-400">Elimina el usuario y su cuenta de acceso de forma permanente. Esta acción no se puede deshacer.</p>
             </div>
           </label>
         </div>
