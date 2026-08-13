@@ -2,10 +2,9 @@
 
 import Link from 'next/link'
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, Users, Shield, UserCog, Search, Loader2 } from 'lucide-react'
+import { Plus, Users, Shield, Search, Loader2 } from 'lucide-react'
 import { api } from '@/lib/api/cliente'
 import { Usuario, RolUsuario, EstadoUsuario } from '@/types/usuario'
-import { UsuarioCard } from '@/components/modules/usuarios/UsuarioCard'
 import { UsuarioTabla } from '@/components/modules/usuarios/UsuarioTabla'
 import { UsuarioDrawer, UsuarioDrawerMode } from '@/components/modules/usuarios/UsuarioDrawer'
 import { UsuarioDeleteModal } from '@/components/modules/usuarios/UsuarioDeleteModal'
@@ -52,13 +51,6 @@ export default function UsuariosPage() {
 
     return cumpleBusqueda && cumpleRol && cumpleEstado
   })
-
-  const contadores = {
-    total: usuarios.length,
-    Administrador: usuarios.filter((u) => u.rol === 'Administrador').length,
-    Operativos: usuarios.filter((u) => u.rol !== 'Administrador').length,
-    IngenieroResidente: usuarios.filter((u) => u.rol === 'IngenieroResidente').length,
-  }
 
   const abrirDrawer = (mode: UsuarioDrawerMode, usuario?: Usuario) => {
     setUsuarioActivo(usuario)

@@ -96,12 +96,13 @@ export function RoleDrawer({
     )
   }
 
+  if (!isOpen) return null;
+
   return (
     <>
-      {isOpen && (
-        <div className="fixed inset-0 z-50 flex justify-end overflow-hidden">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px]" onClick={onClose} />
-          <aside className="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-right">
+      <div className="fixed inset-0 z-50 flex justify-end overflow-hidden">
+        <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px]" onClick={onClose} />
+        <aside className="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-right">
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-gray-50">
           <div className="flex items-start gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-red-50 text-[#9B0F06]">
@@ -297,7 +298,6 @@ export function RoleDrawer({
             </div>
           </aside>
         </div>
-      )}
     </>
   )
 }
