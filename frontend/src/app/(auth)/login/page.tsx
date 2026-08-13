@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useCustomToast } from '@/hooks/useCustomToast';
-import { Eye, EyeOff, User, Lock, Info, X, Check } from 'lucide-react';
+import { Eye, EyeOff, User, Lock, Info, X } from 'lucide-react';
 import LoginInput from '@/components/ui/LoginInput';
 import LoginButton from '@/components/ui/LoginButton';
 import PasswordRecoveryModal from '@/components/modals/PasswordRecoveryModal';
