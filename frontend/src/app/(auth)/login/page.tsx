@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { toast } from 'sonner';
+import { useCustomToast } from '@/hooks/useCustomToast';
 import { Eye, EyeOff, User, Lock, Info, X, Check } from 'lucide-react';
 import LoginInput from '@/components/ui/LoginInput';
 import LoginButton from '@/components/ui/LoginButton';
@@ -82,67 +82,7 @@ export default function LoginPage() {
   const [isQuickAccessOpen, setIsQuickAccessOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const showErrorToast = (message: string) => {
-    toast.dismiss();
-    toast.custom(
-      (t) => (
-        <div style={{
-          background: '#FFFFFF',
-          border: '1px solid #F0F0F0',
-          borderRadius: '8px',
-          padding: '8px 12px',
-          fontFamily: "'Poppins', sans-serif",
-          fontSize: '12px',
-          color: '#1F1F1F',
-          width: 'max-content',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          boxShadow: '0 2px 10px rgba(0,0,0,0.05)'
-        }}>
-          <div style={{ width: '18px', height: '18px', borderRadius: '50%', background: '#FF4D4F', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <X size={11} color="#FFFFFF" strokeWidth={3} />
-          </div>
-          <span>{message}</span>
-          <button type="button" onClick={() => toast.dismiss(t as unknown as number)} style={{ marginLeft: '4px', display: 'flex', alignItems: 'center', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0 }}>
-            <X size={14} color="#999" />
-          </button>
-        </div>
-      ),
-      { duration: 3500, position: 'top-center' }
-    );
-  };
-
-  const showSuccessToast = (message: string) => {
-    toast.dismiss();
-    toast.custom(
-      (t) => (
-        <div style={{
-          background: '#FFFFFF',
-          border: '1px solid #F0F0F0',
-          borderRadius: '8px',
-          padding: '8px 12px',
-          fontFamily: "'Poppins', sans-serif",
-          fontSize: '12px',
-          color: '#1F1F1F',
-          width: 'max-content',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          boxShadow: '0 2px 10px rgba(0,0,0,0.05)'
-        }}>
-          <div style={{ width: '18px', height: '18px', borderRadius: '50%', background: '#52C41A', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <Check size={11} color="#FFFFFF" strokeWidth={3} />
-          </div>
-          <span>{message}</span>
-          <button type="button" onClick={() => toast.dismiss(t as unknown as number)} style={{ marginLeft: '4px', display: 'flex', alignItems: 'center', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0 }}>
-            <X size={14} color="#999" />
-          </button>
-        </div>
-      ),
-      { duration: 3500, position: 'top-center' }
-    );
-  };
+  const { showErrorToast, showSuccessToast } = useCustomToast();
 
   const iniciarSesion = async (identificador: string, contrasena: string) => {
     await api.post('/auth/iniciar-sesion', {

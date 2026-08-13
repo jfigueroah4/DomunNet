@@ -8,6 +8,21 @@ import { api } from '@/lib/api/cliente'
 
 const AIAssistant = dynamic(() => import('./AIAssistant'), { ssr: false })
 
+import { useRouter } from 'next/navigation'
+
+const systemRoutes = [
+  { name: 'Inicio', path: '/inicio' },
+  { name: 'Proyectos', path: '/proyectos' },
+  { name: 'Bitácora', path: '/bitacora' },
+  { name: 'Fotografías', path: '/fotografias' },
+  { name: 'Reportes', path: '/reportes' },
+  { name: 'Usuarios', path: '/usuarios' },
+  { name: 'Roles', path: '/roles' },
+  { name: 'Configuración', path: '/configuracion' },
+  { name: 'Mi Perfil', path: '/perfil' },
+  { name: 'Soporte', path: '/soporte' }
+]
+
 interface TopBarProps {
   section?: string
   onToggle?: () => void
@@ -20,6 +35,7 @@ interface UserProfile {
 }
 
 export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
+  const router = useRouter()
   const [profileOpen, setProfileOpen] = useState(false)
   const [visible, setVisible] = useState(false)
   const [isAIOpen, setIsAIOpen] = useState(false)
@@ -27,6 +43,11 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
   const [notificationsVisible, setNotificationsVisible] = useState(false)
   const [unreadCount] = useState(0) // Default 0 to match empty state
   const [profile, setProfile] = useState<UserProfile | null>(null)
+  
+  // Search suggestion state
+  const [searchQuery, setSearchQuery] = useState('')
+  const [suggestions, setSuggestions] = useState<typeof systemRoutes>([])
+  const [showSearchDropdown, setShowSearchDropdown] = useState(false)
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -50,6 +71,9 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
       }
       if (!target.closest('#notifications-menu')) {
         closeNotifications()
+      }
+      if (!target.closest('#search-bar-container')) {
+        setShowSearchDropdown(false)
       }
     }
     document.addEventListener('mousedown', handler)
@@ -76,6 +100,38 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
     setTimeout(() => setNotificationsVisible(true), 10)
   }
 
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const query = e.target.value
+    setSearchQuery(query)
+
+    if (query.trim() === '') {
+      setSuggestions([])
+      setShowSearchDropdown(false)
+      return
+    }
+
+    const filtered = systemRoutes.filter(route =>
+      route.name.toLowerCase().includes(query.toLowerCase()) ||
+      route.path.toLowerCase().includes(query.toLowerCase())
+    )
+    setSuggestions(filtered)
+    setShowSearchDropdown(true)
+  }
+
+  const handleSuggestionClick = (path: string) => {
+    router.push(path)
+    setSearchQuery('')
+    setShowSearchDropdown(false)
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      if (suggestions.length > 0) {
+        handleSuggestionClick(suggestions[0].path)
+      }
+    }
+  }
+
   return (
     <header className="flex items-center justify-between h-12 bg-white border-b border-gray-100 px-4">
       {/* Left Section - Menu & Section */}
@@ -93,15 +149,42 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
       </div>
 
       {/* Center Section - Search */}
-      <div className="flex-1 mx-8 max-w-[420px]">
+      <div id="search-bar-container" className="flex-1 mx-8 max-w-[420px] relative">
         <div className="flex items-center gap-2 bg-gray-100 rounded-full px-4 py-1.5" style={{ height: '32px' }}>
           <Search size={15} className="text-gray-400 flex-shrink-0" />
           <input
             type="text"
-            placeholder="Buscar proyectos, registros, fotografías..."
+            placeholder="Buscar páginas (proyectos, bitácora, perfil...)"
+            value={searchQuery}
+            onChange={handleSearchChange}
+            onKeyDown={handleKeyDown}
             className="bg-transparent outline-none text-[10px] w-full placeholder:text-[10px] placeholder-gray-400"
           />
         </div>
+
+        {/* Search Suggestions Dropdown */}
+        {showSearchDropdown && (
+          <div className="absolute top-[38px] left-0 w-full bg-white border border-gray-100 rounded-lg shadow-xl z-50 max-h-[200px] overflow-y-auto">
+            {suggestions.length > 0 ? (
+              <div className="py-1">
+                {suggestions.map((route) => (
+                  <button
+                    key={route.path}
+                    onClick={() => handleSuggestionClick(route.path)}
+                    className="w-full text-left px-4 py-2 hover:bg-gray-50 transition-colors text-[10px] text-gray-700 flex items-center justify-between"
+                  >
+                    <span className="font-medium">{route.name}</span>
+                    <span className="text-gray-400 text-[8px]">{route.path}</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="px-4 py-3 text-center text-[10px] text-gray-400 font-medium">
+                No se encontraron resultados
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Right Section */}

@@ -2,15 +2,16 @@
 
 import { Mail, Phone, User, CreditCard, Building2, ChevronLeft } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 
 export default function SoportePage() {
   const supportInfo = {
-    name: 'Marco Estrada',
-    phone: '+34 650 123 456',
-    personalEmail: 'marco.estrada@outlook.com',
-    universityEmail: 'marco.estrada@universidad.edu.es',
-    university: 'Universidad Autonoma de Madrid',
-    carneId: 'UAM-2024-87654',
+    name: 'Josue Daniel Figueroa Herrera',
+    phone: '+502 56252922',
+    personalEmail: 'josuedanielf2002@gmail.com',
+    universityEmail: 'jfigueroah4@miumg.edu.gt',
+    university: 'Universidad Mariano Gálvez de Guatemala, Sede Villa Nueva',
+    carneId: '5090-22-36',
   };
 
   const contactItems = [
@@ -76,29 +77,15 @@ export default function SoportePage() {
             </div>
           </div>
 
-          <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-            <h2 className="mb-3 text-sm font-bold text-gray-900">Canales de Soporte</h2>
-            <div className="space-y-3">
-              <a
-                href={`mailto:${supportInfo.personalEmail}`}
-                className="group flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 transition-all hover:border-red-600 hover:bg-red-50"
-              >
-                <Mail size={18} className="text-gray-400 group-hover:text-red-700" />
-                <div className="min-w-0">
-                  <p className="text-xs font-semibold text-gray-700 group-hover:text-red-700">Enviar correo</p>
-                  <p className="truncate text-xs text-gray-500">{supportInfo.personalEmail}</p>
-                </div>
-              </a>
-              <a
-                href={`tel:${supportInfo.phone}`}
-                className="group flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 transition-all hover:border-blue-600 hover:bg-blue-50"
-              >
-                <Phone size={18} className="text-gray-400 group-hover:text-blue-700" />
-                <div>
-                  <p className="text-xs font-semibold text-gray-700 group-hover:text-blue-700">Llamar</p>
-                  <p className="text-xs text-gray-500">{supportInfo.phone}</p>
-                </div>
-              </a>
+          <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm flex flex-col items-center justify-center min-h-[250px]">
+            <div className="relative w-48 h-48">
+              <Image
+                src="/logoumg.png"
+                alt="Logo UMG"
+                fill
+                style={{ objectFit: 'contain' }}
+                priority
+              />
             </div>
           </div>
         </div>

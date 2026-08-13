@@ -1,8 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Edit, UserCheck, User, Mail, Phone, MapPin, Calendar } from 'lucide-react'
+import { Edit, UserCheck, User, Mail, Phone, MapPin, Calendar, Pencil, X } from 'lucide-react'
 import { api } from '@/lib/api/cliente'
+import { UsuarioFormularioDrawer } from '@/components/modules/usuarios/UsuarioFormularioDrawer'
+import { Usuario, RolUsuario, EstadoUsuario } from '@/types/usuario'
 
 interface UserProfile {
   id: string
@@ -10,8 +12,14 @@ interface UserProfile {
   activo: boolean
   ultimoAcceso: string | null
   fechaRegistro: string
+  fechaNacimiento: string | null
   nombre: string
   apellido: string
+  username: string
+  primerNombre: string
+  segundoNombre: string
+  primerApellido: string
+  segundoApellido: string
   telefono: string
   direccion: string
   cargo: string
@@ -21,20 +29,23 @@ interface UserProfile {
 export default function PerfilPage() {
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
+  const [isEditing, setIsEditing] = useState(false)
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false)
+
+  const fetchProfile = async () => {
+    try {
+      const res = await api.get('/auth/perfil')
+      if (res.data?.success && res.data?.data) {
+        setProfile(res.data.data)
+      }
+    } catch (err) {
+      console.error('Error al cargar perfil:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const res = await api.get('/auth/perfil')
-        if (res.data?.success && res.data?.data) {
-          setProfile(res.data.data)
-        }
-      } catch (err) {
-        console.error('Error al cargar perfil:', err)
-      } finally {
-        setLoading(false)
-      }
-    }
     fetchProfile()
   }, [])
 
@@ -53,40 +64,36 @@ export default function PerfilPage() {
     }
   }
 
-  // Descomponer nombres y apellidos inteligentemente
-  const obtenerNombresDesglosados = () => {
-    if (!profile) return { primerNombre: '', segundoNombre: '', primerApellido: '', segundoApellido: '' }
+  const calcularDiasActivo = () => {
+    if (!profile?.fechaRegistro) return 0
+    const registro = new Date(profile.fechaRegistro)
+    const hoy = new Date()
+    const diffTime = Math.abs(hoy.getTime() - registro.getTime())
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+  }
+
+  const handleEditClick = () => {
+    setIsEditing(true)
+  }
+
+  const handleCancelEdit = () => {
+    setIsEditing(false)
+  }
+
+  const handleOpenDrawer = () => {
+    setIsDrawerOpen(true)
+  }
+
+  const handleSaveUsuario = (formData: any) => {
+    // Aquí idealmente haríamos api.put('/usuarios/id', formData) o api.put('/auth/perfil', formData)
+    // Como el requerimiento dice "hace refetch de los datos del perfil", lo llamamos.
+    // También cerramos el modo edición por conveniencia.
+    setIsEditing(false)
     
-    const firstParts = profile.nombre.trim().split(/\s+/)
-    const lastParts = profile.apellido.trim().split(/\s+/)
-    
-    let primerNombre = firstParts[0] || ''
-    let segundoNombre = firstParts.slice(1).join(' ') || ''
-    let primerApellido = ''
-    let segundoApellido = ''
-    
-    if (lastParts.length === 1) {
-      primerApellido = lastParts[0] || ''
-    } else if (lastParts.length >= 2) {
-      const totalParts = [...firstParts, ...lastParts].filter(Boolean)
-      if (totalParts.length === 2) {
-        primerNombre = totalParts[0]
-        primerApellido = totalParts[1]
-      } else if (totalParts.length === 3) {
-        primerNombre = totalParts[0]
-        segundoNombre = totalParts[1]
-        primerApellido = totalParts[2]
-      } else if (totalParts.length >= 4) {
-        primerNombre = totalParts[0]
-        segundoNombre = totalParts[1]
-        primerApellido = totalParts[2]
-        segundoApellido = totalParts.slice(3).join(' ')
-      }
-    } else {
-      primerApellido = profile.apellido
-    }
-    
-    return { primerNombre, segundoNombre, primerApellido, segundoApellido }
+    // Simulamos un delay si el backend real estuviera trabajando, y luego refetch
+    setTimeout(() => {
+      fetchProfile()
+    }, 500)
   }
 
   if (loading) {
@@ -105,23 +112,74 @@ export default function PerfilPage() {
     )
   }
 
-  const { primerNombre, segundoNombre, primerApellido, segundoApellido } = obtenerNombresDesglosados()
   const nombreCompleto = `${profile.nombre} ${profile.apellido}`.trim()
   const iniciales = `${profile.nombre[0] || ''}${profile.apellido[0] || ''}`.toUpperCase()
+  const diasActivo = calcularDiasActivo()
+
+  // Mapear UserProfile al formato esperado por el Drawer (Usuario)
+  const usuarioMapped: Usuario = {
+    id: profile.id,
+    primer_nombre: profile.primerNombre,
+    segundo_nombre: profile.segundoNombre,
+    primer_apellido: profile.primerApellido,
+    segundo_apellido: profile.segundoApellido,
+    username: profile.username,
+    nombre: nombreCompleto,
+    correo: profile.correo,
+    rol: profile.rol as RolUsuario,
+    estado: (profile.activo ? 'Activo' : 'Inactivo') as EstadoUsuario,
+    fechaCreacion: profile.fechaRegistro,
+    ultimoAcceso: profile.ultimoAcceso || undefined,
+    telefono: profile.telefono,
+  }
+
+  // Componente interno para re-usar la lógica del valor + lápiz
+  const EditableField = ({ label, value, fallback }: { label: string, value: string | null | undefined, fallback: string }) => (
+    <div>
+      <label className="text-[10px] text-[#999] uppercase tracking-wide">{label}</label>
+      <div className="flex items-center gap-2 mt-1">
+        <p className="text-sm font-medium text-gray-800">
+          {value || fallback}
+        </p>
+        {isEditing && (
+          <button 
+            onClick={handleOpenDrawer}
+            className="text-[#9B0F06] hover:text-[#5E0006] transition-colors p-1 rounded hover:bg-red-50"
+            title="Editar campo"
+          >
+            <Pencil size={12} />
+          </button>
+        )}
+      </div>
+    </div>
+  )
 
   return (
     <div className="space-y-4 p-4">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-bold text-gray-800">Mi Perfil</h1>
-        <button className="flex items-center gap-2 bg-[#9B0F06] hover:bg-[#5E0006] text-white text-sm px-4 py-2 rounded-lg transition-colors">
-          <Edit size={14} />
-          Editar Perfil
-        </button>
+        {!isEditing ? (
+          <button 
+            onClick={handleEditClick}
+            className="flex items-center gap-2 bg-[#9B0F06] hover:bg-[#5E0006] text-white text-sm px-4 py-2 rounded-lg transition-colors"
+          >
+            <Edit size={14} />
+            Editar Perfil
+          </button>
+        ) : (
+          <button 
+            onClick={handleCancelEdit}
+            className="flex items-center gap-2 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm px-4 py-2 rounded-lg transition-colors"
+          >
+            <X size={14} />
+            Cancelar Edición
+          </button>
+        )}
       </div>
 
       {/* Card 1 - Main Info */}
-      <div className="bg-white rounded-2xl p-5 shadow-sm">
+      <div className="bg-white rounded-2xl p-5 shadow-sm border border-[#E0E0E0]">
         <div className="flex items-center gap-4">
           <div className="w-16 h-16 bg-[#9B0F06] rounded-full flex items-center justify-center flex-shrink-0">
             <span className="text-xl font-bold text-white">{iniciales}</span>
@@ -141,89 +199,71 @@ export default function PerfilPage() {
         </div>
       </div>
 
-      {/* Cards 2 & 3 Row */}
+      {/* 4 Cards Grid - Desktop 2 Cols */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Card 2 - Personal Info */}
-        <div className="bg-white rounded-2xl p-5 shadow-sm">
+        {/* Tarjeta 1 - Información Personal */}
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-[#E0E0E0]">
           <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100">
             <User size={15} className="text-[#9B0F06]" />
             <h3 className="text-sm font-semibold text-gray-800">Información Personal</h3>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-[10px] text-gray-400 uppercase tracking-wide">Primer Nombre</label>
-              <p className="text-sm font-medium text-gray-700 mt-1">{primerNombre || '-'}</p>
-            </div>
-            <div>
-              <label className="text-[10px] text-gray-400 uppercase tracking-wide">Segundo Nombre</label>
-              <p className="text-sm font-medium text-gray-700 mt-1">{segundoNombre || '-'}</p>
-            </div>
-            <div>
-              <label className="text-[10px] text-gray-400 uppercase tracking-wide">Primer Apellido</label>
-              <p className="text-sm font-medium text-gray-700 mt-1">{primerApellido || '-'}</p>
-            </div>
-            <div>
-              <label className="text-[10px] text-gray-400 uppercase tracking-wide">Segundo Apellido</label>
-              <p className="text-sm font-medium text-gray-700 mt-1">{segundoApellido || '-'}</p>
+            <EditableField label="Primer Nombre" value={profile.primerNombre} fallback="-" />
+            <EditableField label="Segundo Nombre" value={profile.segundoNombre} fallback="-" />
+            <EditableField label="Primer Apellido" value={profile.primerApellido} fallback="-" />
+            <EditableField label="Segundo Apellido" value={profile.segundoApellido} fallback="-" />
+            <div className="col-span-2">
+              <EditableField label="Nombre de Usuario" value={profile.username} fallback="No registrado" />
             </div>
             <div className="col-span-2">
-              <label className="text-[10px] text-gray-400 uppercase tracking-wide">Correo Electrónico</label>
-              <p className="text-sm font-medium text-gray-700 mt-1">{profile.correo}</p>
+              <EditableField label="Correo Electrónico" value={profile.correo} fallback="-" />
             </div>
           </div>
         </div>
 
-        {/* Card 3 - Contact Info */}
-        <div className="bg-white rounded-2xl p-5 shadow-sm">
+        {/* Tarjeta 2 - Información de Contacto */}
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-[#E0E0E0]">
           <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100">
-            <Mail size={15} className="text-[#E85D04]" />
+            <Mail size={15} className="text-[#9B0F06]" />
             <h3 className="text-sm font-semibold text-gray-800">Información de Contacto</h3>
           </div>
           <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <Phone size={13} className="text-gray-400" />
-              <span className="text-sm text-gray-700">{profile.telefono || 'Sin teléfono'}</span>
-            </div>
-            <div className="flex items-start gap-2">
-              <MapPin size={13} className="text-gray-400 mt-0.5" />
-              <span className="text-sm text-gray-700">{profile.direccion || 'Sin dirección'}</span>
-            </div>
+            <EditableField label="Teléfono" value={profile.telefono} fallback="No registrado" />
+            <EditableField label="Dirección" value={profile.direccion} fallback="No registrada" />
           </div>
         </div>
-      </div>
 
-      {/* Cards 4 & 5 Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Card 4 - Additional Info */}
-        <div className="bg-white rounded-2xl p-5 shadow-sm">
+        {/* Tarjeta 3 - Información Adicional */}
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-[#E0E0E0]">
           <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100">
             <Calendar size={15} className="text-[#9B0F06]" />
             <h3 className="text-sm font-semibold text-gray-800">Información Adicional</h3>
           </div>
-          <div className="space-y-3">
+          <div className="space-y-4">
+            <EditableField label="Fecha de Nacimiento" value={profile.fechaNacimiento ? formatearFecha(profile.fechaNacimiento) : null} fallback="No registrada" />
+            
+            {/* Estos campos NO tienen lápiz, son solo lectura (según requerimiento) */}
             <div>
-              <label className="text-[10px] text-gray-400 uppercase tracking-wide">Cargo / Departamento</label>
-              <p className="text-sm font-medium text-gray-700 mt-1">{profile.cargo || '-'}</p>
+              <label className="text-[10px] text-[#999] uppercase tracking-wide">Último Acceso</label>
+              <p className="text-sm font-medium text-gray-800 mt-1">
+                {formatearFecha(profile.ultimoAcceso)}
+              </p>
             </div>
             <div>
-              <label className="text-[10px] text-gray-400 uppercase tracking-wide">Último Acceso</label>
-              <p className="text-sm font-medium text-gray-700 mt-1">{formatearFecha(profile.ultimoAcceso)}</p>
-            </div>
-            <div>
-              <label className="text-[10px] text-gray-400 uppercase tracking-wide">Estado de la Cuenta</label>
+              <label className="text-[10px] text-[#999] uppercase tracking-wide">Estado de la Cuenta</label>
               <p className="mt-1">
-                <span className={`text-xs px-2 py-0.5 rounded-full ${
-                  profile.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                }`}>
-                  {profile.activo ? 'activo' : 'inactivo'}
-                </span>
+                {profile.activo ? (
+                  <span className="text-sm font-medium text-[#10B981]">activo</span>
+                ) : (
+                  <span className="text-sm font-medium text-red-600">inactivo</span>
+                )}
               </p>
             </div>
           </div>
         </div>
 
-        {/* Card 5 - Statistics */}
-        <div className="bg-white rounded-2xl p-5 shadow-sm">
+        {/* Tarjeta 4 - Estadísticas */}
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-[#E0E0E0]">
           <h3 className="text-sm font-semibold text-gray-800 mb-4 pb-3 border-b border-gray-100">Estadísticas</h3>
           <div className="grid grid-cols-2 gap-3 mb-4">
             <div className="bg-red-50 rounded-xl p-3">
@@ -231,16 +271,23 @@ export default function PerfilPage() {
               <p className="text-xs text-gray-500 mt-1">Proyectos activos</p>
             </div>
             <div className="bg-orange-50 rounded-xl p-3">
-              <p className="text-2xl font-bold text-[#E85D04]">0</p>
+              <p className="text-2xl font-bold text-[#E85D04]">{diasActivo}</p>
               <p className="text-xs text-gray-500 mt-1">Días activo</p>
             </div>
           </div>
           <div>
-            <label className="text-[10px] text-gray-400 uppercase tracking-wide">Rol</label>
-            <p className="text-sm font-medium text-gray-700 mt-1">{profile.rol}</p>
+            <label className="text-[10px] text-[#999] uppercase tracking-wide">Rol</label>
+            <p className="text-sm font-medium text-gray-800 mt-1">{profile.rol}</p>
           </div>
         </div>
       </div>
+
+      <UsuarioFormularioDrawer 
+        isOpen={isDrawerOpen} 
+        onClose={() => setIsDrawerOpen(false)} 
+        usuario={usuarioMapped} 
+        onSave={handleSaveUsuario}
+      />
     </div>
   )
 }

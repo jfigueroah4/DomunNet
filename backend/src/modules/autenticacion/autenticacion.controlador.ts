@@ -77,7 +77,7 @@ export async function obtenerPerfilControlador(req: SolicitudAutenticada, res: R
   try {
     const { data: usuario, error } = await clienteSupabase
       .from('usuario')
-      .select('id, correo, rol_id, activo, ultimo_acceso, fecha_registro, dato_usuario(nombre, apellido, telefono, direccion, cargo)')
+      .select('id, correo, rol_id, activo, ultimo_acceso, fecha_registro, dato_usuario(primer_nombre, segundo_nombre, primer_apellido, segundo_apellido, username, telefono, direccion, fecha_nacimiento)')
       .eq('id', req.usuario.sub)
       .maybeSingle()
 
@@ -98,6 +98,9 @@ export async function obtenerPerfilControlador(req: SolicitudAutenticada, res: R
 
     const dato = Array.isArray(usuario.dato_usuario) ? usuario.dato_usuario[0] : usuario.dato_usuario
 
+    const nombreCompleto = [dato?.primer_nombre, dato?.segundo_nombre].filter(Boolean).join(' ') || req.usuario.nombre
+    const apellidoCompleto = [dato?.primer_apellido, dato?.segundo_apellido].filter(Boolean).join(' ') || ''
+
     return sendResponse(
       res,
       200,
@@ -107,11 +110,17 @@ export async function obtenerPerfilControlador(req: SolicitudAutenticada, res: R
         activo: usuario.activo,
         ultimoAcceso: usuario.ultimo_acceso,
         fechaRegistro: usuario.fecha_registro,
-        nombre: dato?.nombre || '',
-        apellido: dato?.apellido || '',
+        fechaNacimiento: dato?.fecha_nacimiento || null,
+        nombre: nombreCompleto,
+        apellido: apellidoCompleto,
+        username: dato?.username || '',
+        primerNombre: dato?.primer_nombre || '',
+        segundoNombre: dato?.segundo_nombre || '',
+        primerApellido: dato?.primer_apellido || '',
+        segundoApellido: dato?.segundo_apellido || '',
         telefono: dato?.telefono || '',
         direccion: dato?.direccion || '',
-        cargo: dato?.cargo || '',
+        cargo: '',
         rol: req.usuario.rol,
         permisos: req.usuario.permisos,
       },

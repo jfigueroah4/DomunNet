@@ -8,5 +8,15 @@ export const api = axios.create({
   },
 })
 
-// NOTE: Session management and refresh tokens are delegated to Supabase Auth.
-// No auto-refresh interceptor is needed since Supabase handles token refresh on the client side.
+// Interceptor para manejar errores globales (ej. JWT expirado)
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+        window.location.href = '/login';
+      }
+    }
+    return Promise.reject(error);
+  }
+)

@@ -19,7 +19,21 @@ export default function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <Toaster position="top-center" richColors closeButton />
+      <Toaster 
+        position="top-center" 
+        visibleToasts={1} 
+        duration={4500} 
+        toastOptions={{
+          style: {
+            top: '24px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: 'max-content',
+            margin: 0,
+            transition: 'all 0.4s ease-in-out'
+          }
+        }}
+      />
       {children}
     </QueryClientProvider>
   )

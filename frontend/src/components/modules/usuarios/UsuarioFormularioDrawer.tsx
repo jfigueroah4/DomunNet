@@ -8,12 +8,14 @@ interface UsuarioFormularioDrawerProps {
   isOpen: boolean
   onClose: () => void
   usuario?: Usuario
+  onSave?: (data: any) => void
 }
 
 export function UsuarioFormularioDrawer({
   isOpen,
   onClose,
   usuario,
+  onSave,
 }: UsuarioFormularioDrawerProps) {
   const [formData, setFormData] = useState({
     primer_nombre: usuario?.primer_nombre || '',
@@ -36,6 +38,9 @@ export function UsuarioFormularioDrawer({
 
   const handleGuardar = () => {
     console.log('Guardar usuario:', formData)
+    if (onSave) {
+      onSave(formData)
+    }
     onClose()
   }
 
