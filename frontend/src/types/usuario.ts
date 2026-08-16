@@ -22,5 +22,6 @@ export interface Usuario {
   fechaCreacion: string
   ultimoAcceso?: string
   telefono?: string
+  fecha_nacimiento?: string | null
   avatar?: string
 }

@@ -11,16 +11,44 @@ const AIAssistant = dynamic(() => import('./AIAssistant'), { ssr: false })
 import { useRouter } from 'next/navigation'
 
 const systemRoutes = [
-  { name: 'Inicio', path: '/dashboard' },
-  { name: 'Proyectos', path: '/dashboard/proyectos' },
-  { name: 'Bitácora', path: '/dashboard/bitacora' },
-  { name: 'Fotografías', path: '/dashboard/fotografias' },
-  { name: 'Reportes', path: '/dashboard/reportes' },
-  { name: 'Usuarios', path: '/dashboard/usuarios' },
-  { name: 'Roles', path: '/dashboard/roles' },
-  { name: 'Configuración', path: '/dashboard/configuracion' },
-  { name: 'Mi Perfil', path: '/dashboard/perfil' },
-  { name: 'Soporte', path: '/dashboard/soporte' }
+  // General
+  { name: 'Inicio', path: '/dashboard', category: 'General', keywords: ['dashboard', 'resumen', 'métricas', 'estadísticas'] },
+  
+  // Operaciones - Proyectos
+  { name: 'Proyectos', path: '/dashboard/proyectos', category: 'Operaciones', keywords: ['obras', 'construcción', 'listado'] },
+  { name: 'Nuevo Proyecto', path: '/dashboard/proyectos/nuevo', category: 'Operaciones', keywords: ['crear proyecto', 'agregar obra'] },
+  { name: 'Hoja Sábana (Supervisión)', path: '/dashboard/proyectos/supervision', category: 'Operaciones', keywords: ['supervisión', 'matriz', 'seguimiento'] },
+  { name: 'Recursos de Proyecto', path: '/dashboard/proyectos/recursos', category: 'Operaciones', keywords: ['materiales', 'equipos', 'insumos'] },
+  
+  // Operaciones - Bitácora
+  { name: 'Bitácora', path: '/dashboard/bitacora', category: 'Operaciones', keywords: ['diario', 'eventos', 'registros', 'libro de obra'] },
+  { name: 'Nuevo Registro de Bitácora', path: '/dashboard/bitacora/nuevo', category: 'Operaciones', keywords: ['nueva bitácora', 'crear registro'] },
+  { name: 'Bitácora - Laboratorio', path: '/dashboard/bitacora?tab=laboratorio', category: 'Operaciones', keywords: ['pruebas', 'ensayos', 'muestras'] },
+  { name: 'Bitácora - Campo de Trabajo', path: '/dashboard/bitacora?tab=campo', category: 'Operaciones', keywords: ['avance diario', 'frente de trabajo'] },
+  
+  // Operaciones - Fotografías
+  { name: 'Fotografías', path: '/dashboard/fotografias', category: 'Operaciones', keywords: ['galería', 'evidencias', 'fotos', 'inspección'] },
+  { name: 'Nueva Fotografía', path: '/dashboard/fotografias/nueva', category: 'Operaciones', keywords: ['subir foto', 'adjuntar evidencia'] },
+  
+  // Operaciones - Reportes
+  { name: 'Reportes', path: '/dashboard/reportes', category: 'Operaciones', keywords: ['documentos', 'informes', 'pdf', 'exportar'] },
+  { name: 'Nuevo Reporte', path: '/dashboard/reportes/nuevo', category: 'Operaciones', keywords: ['generar reporte', 'crear informe'] },
+  
+  // Administración
+  { name: 'Usuarios', path: '/dashboard/usuarios', category: 'Administración', keywords: ['personal', 'cuentas', 'empleados', 'accesos'] },
+  { name: 'Roles y Permisos', path: '/dashboard/roles', category: 'Administración', keywords: ['seguridad', 'niveles', 'privilegios'] },
+  
+  // Ajustes & Configuración
+  { name: 'Configuración General', path: '/dashboard/configuracion', category: 'Ajustes', keywords: ['ajustes', 'preferencias', 'sistema'] },
+  { name: 'Mantenimiento de Tablas', path: '/dashboard/configuracion/tablas', category: 'Ajustes', keywords: ['catálogos', 'estados', 'listas base'] },
+  { name: 'Backup', path: '/dashboard/configuracion/backup', category: 'Ajustes', keywords: ['respaldo', 'copia de seguridad'] },
+  { name: 'Restauración', path: '/dashboard/configuracion/restauracion', category: 'Ajustes', keywords: ['recuperar', 'restaurar'] },
+  { name: 'Notificaciones', path: '/dashboard/configuracion/notificaciones', category: 'Ajustes', keywords: ['alertas', 'mensajes'] },
+  
+  // Cuenta y Soporte
+  { name: 'Mi Perfil', path: '/dashboard/perfil', category: 'Cuenta', keywords: ['datos personales', 'clave', 'perfil de usuario'] },
+  { name: 'Soporte', path: '/dashboard/soporte', category: 'Ayuda', keywords: ['ayuda', 'asistencia', 'contacto'] },
+  { name: 'Tickets de Soporte', path: '/dashboard/tickets', category: 'Ayuda', keywords: ['incidencias', 'solicitudes', 'atención'] },
 ]
 
 interface TopBarProps {
@@ -110,9 +138,12 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
       return
     }
 
+    const lowerQuery = query.toLowerCase()
     const filtered = systemRoutes.filter(route =>
-      route.name.toLowerCase().includes(query.toLowerCase()) ||
-      route.path.toLowerCase().includes(query.toLowerCase())
+      route.name.toLowerCase().includes(lowerQuery) ||
+      route.path.toLowerCase().includes(lowerQuery) ||
+      route.category?.toLowerCase().includes(lowerQuery) ||
+      route.keywords?.some(k => k.toLowerCase().includes(lowerQuery))
     )
     setSuggestions(filtered)
     setShowSearchDropdown(true)

@@ -7,7 +7,7 @@ import { api } from '@/lib/api/cliente'
 import { Usuario, RolUsuario, EstadoUsuario } from '@/types/usuario'
 import { UsuarioTabla } from '@/components/modules/usuarios/UsuarioTabla'
 import { type UsuarioDrawerMode } from '@/components/modules/usuarios/UsuarioDrawer'
-import { toast } from 'sonner'
+import { showSuccessToast, showErrorToast } from '@/hooks/useCustomToast'
 import dynamic from 'next/dynamic'
 
 const UsuarioDrawer = dynamic(() => import('@/components/modules/usuarios/UsuarioDrawer').then(m => m.UsuarioDrawer), { ssr: false })
@@ -134,17 +134,17 @@ export default function UsuariosPage() {
 
       if (drawerMode === 'edit' && usuarioActivo) {
         await api.put(`/usuarios/${usuarioActivo.id}`, payloadApi)
-        toast.success('Usuario actualizado exitosamente')
+        showSuccessToast('Usuario actualizado exitosamente')
       } else {
         await api.post('/usuarios', payloadApi)
-        toast.success('Usuario creado exitosamente')
+        showSuccessToast('Usuario creado exitosamente')
       }
 
       await cargarUsuarios()
       handleCerrarDrawer()
     } catch (error) {
       console.error('Error al guardar usuario:', error)
-      toast.error('Error al guardar el usuario. Por favor verifica los datos.')
+      showErrorToast('Error al guardar el usuario. Por favor verifica los datos.')
     }
   }
 
@@ -167,15 +167,15 @@ export default function UsuariosPage() {
           rol: usuarioEliminar.rol,
           estado: 'Inactivo', // El backend solo acepta 'Activo' | 'Inactivo'
         })
-        toast.success('Usuario suspendido exitosamente')
+        showSuccessToast('Usuario suspendido exitosamente')
       } else {
         await api.delete(`/usuarios/${usuarioEliminar.id}`)
-        toast.success('Usuario eliminado exitosamente')
+        showSuccessToast('Usuario eliminado exitosamente')
       }
       await cargarUsuarios()
     } catch (error) {
       console.error(`Error al ${accion} usuario:`, error)
-      toast.error(`No se pudo ${accion} el usuario.`)
+      showErrorToast(`No se pudo ${accion} el usuario.`)
     } finally {
       setDeleteOpen(false)
       setUsuarioEliminar(undefined)

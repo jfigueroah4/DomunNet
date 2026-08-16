@@ -3,11 +3,11 @@
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { Eye, PencilLine, Plus, Shield, Trash2, Users, UserPlus, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Plus, Shield, UserPlus, ChevronLeft, ChevronRight } from 'lucide-react'
 import { DEMO_ROLES, Role } from '@/data/roles'
 import { USUARIOS_MOCK } from '@/data/usuarios.mock'
 import { type RoleDrawerMode } from '@/components/modules/roles/RoleDrawer'
-import { toast } from 'sonner'
+import { showSuccessToast, showErrorToast } from '@/hooks/useCustomToast'
 import dynamic from 'next/dynamic'
 import { useEffect } from 'react'
 import { Search } from 'lucide-react'
@@ -120,7 +120,7 @@ export default function RolesPage() {
               : role
           )
         )
-        toast.success('Rol actualizado exitosamente')
+        showSuccessToast('Rol actualizado exitosamente')
         return
       }
 
@@ -136,7 +136,7 @@ export default function RolesPage() {
       }
 
       setRoles((actuales) => [nuevoRol, ...actuales])
-      toast.success('Rol creado exitosamente')
+      showSuccessToast('Rol creado exitosamente')
     }
 
     if (payload.estado === 'Inactivo' && payload.usuariosAsignados.length > 0) {
@@ -304,7 +304,7 @@ export default function RolesPage() {
         onConfirm={() => {
           if (roleEliminar) {
             setRoles((actuales) => actuales.filter((role) => role.id !== roleEliminar.id))
-            toast.success('Rol eliminado exitosamente')
+            showSuccessToast('Rol eliminado exitosamente')
           }
           setDeleteOpen(false)
           setRoleEliminar(undefined)
@@ -314,3 +314,5 @@ export default function RolesPage() {
     </div>
   )
 }
+
+

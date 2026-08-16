@@ -11,8 +11,6 @@ import PasswordRecoveryModal from '@/components/modals/PasswordRecoveryModal';
 import SupportModal from '@/components/modals/SupportModal';
 import { api } from '@/lib/api/cliente';
 
-const esDesarrollo = process.env.NODE_ENV !== 'production'
-
 type AccesoRapido = {
   id: string
   name: string
@@ -126,23 +124,23 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="relative min-h-screen w-full overflow-hidden bg-gray-900">
-      <style>{`
-        [data-sonner-toast] {
-          background: transparent !important;
-          border: none !important;
-          box-shadow: none !important;
-          padding: 0 !important;
-          width: auto !important;
-        }
-      `}</style>
+    <div 
+      className="relative min-h-screen w-full overflow-hidden bg-[#1a0000]"
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        fontFamily: "'Poppins', sans-serif",
+      }}
+    >
       {/* Fondo con ilustración de camiones */}
       <div
         className="absolute inset-x-0 bottom-[-80px] w-full h-[120vh] overflow-hidden pointer-events-none"
         style={{
           backgroundImage: 'url(/fondo_carretas.png)',
           backgroundSize: 'cover',
-          backgroundPosition: 'center bottom',
+          backgroundPosition: 'center 40%',
           backgroundAttachment: 'fixed',
         }}
       >
@@ -156,8 +154,46 @@ export default function LoginPage() {
         <div className="absolute inset-0 bg-black/10" />
       </div>
 
+      {/* TOP NAVBAR */}
+      <div className="absolute top-0 left-0 right-0 h-[64px] z-20 flex items-center justify-end pr-6 pointer-events-auto">
+        <button
+          type="button"
+          onClick={() => setIsQuickAccessOpen(true)}
+          style={{
+            width: "40px",
+            height: "40px",
+            borderRadius: "8px",
+            background: "rgba(255, 255, 255, 0.08)",
+            border: "1px solid rgba(255, 255, 255, 0.15)",
+            color: "rgba(255, 255, 255, 0.7)",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            transition: "all 0.2s",
+            fontSize: "18px",
+          }}
+          onMouseOver={(e) => {
+            e.currentTarget.style.background = "rgba(255, 255, 255, 0.15)";
+            e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.3)";
+            e.currentTarget.style.color = "rgba(255, 255, 255, 0.9)";
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)";
+            e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.15)";
+            e.currentTarget.style.color = "rgba(255, 255, 255, 0.7)";
+          }}
+          title="Ayuda y acceso rápido"
+        >
+          ?
+        </button>
+      </div>
+
       {/* Contenedor principal centrado */}
-      <div className="relative z-10 flex min-h-screen flex-col items-center justify-center px-4 py-6">
+      <div 
+        className="relative z-10 flex flex-col items-center w-[90%] max-w-[300px]"
+        style={{ transform: 'translateY(-12%)' }}
+      >
 
         {/* Logo DOMUN */}
         <div className="mb-3 animate-fadeIn">
@@ -165,23 +201,23 @@ export default function LoginPage() {
             src="/white_logo.png"
             alt="DOMUN Logo"
             width={50}
-            height={50}
+            height={48}
             priority
-            style={{ width: 'auto', height: '50px' }}
+            style={{ width: 'auto', height: '48px' }}
             className="drop-shadow-lg"
           />
         </div>
 
         {/* Título */}
         <div className="mb-1 text-center animate-fadeIn" style={{ animationDelay: '0.02s' }}>
-          <h1 className="text-xl font-bold text-white" style={{ fontFamily: 'Poppins, sans-serif' }}>
+          <h1 className="text-[22px] font-bold text-white leading-tight" style={{ fontFamily: 'Poppins, sans-serif', textShadow: "0 2px 12px rgba(0,0,0,0.4)" }}>
             Bienvenido a DOMUN
           </h1>
         </div>
 
         {/* Subtítulo */}
-        <div className="mb-4 text-center animate-fadeIn" style={{ animationDelay: '0.04s' }}>
-          <p className="text-xs font-light text-white/80" style={{ fontFamily: 'Poppins, sans-serif' }}>
+        <div className="mb-6 text-center animate-fadeIn" style={{ animationDelay: '0.04s' }}>
+          <p className="text-[12px] font-light text-white/70" style={{ fontFamily: 'Poppins, sans-serif', letterSpacing: "0.02em" }}>
             Gestión inteligente de transporte
           </p>
         </div>
@@ -189,28 +225,28 @@ export default function LoginPage() {
         {/* Formulario de Login */}
         <form
           onSubmit={handleLogin}
-          className="w-full max-w-xs animate-fadeIn"
+          className="w-full animate-fadeIn"
           style={{ animationDelay: '0.06s' }}
         >
           {/* Input Usuario */}
-          <div className="mb-4">
+          <div className="mb-[14px]">
             <LoginInput
-              icon={<User size={20} />}
-              type="text"
-              placeholder="Correo o usuario"
+              icon={<User size={16} strokeWidth={1.5} />}
+              placeholder="Correo o Usuario"
               value={username}
               error={emailError}
               onChange={(e) => {
                 setUsername(e.target.value);
                 if (emailError) setEmailError(false);
               }}
+              required
             />
           </div>
 
           {/* Input Contraseña */}
-          <div className="mb-4">
+          <div className="mb-[10px]">
             <LoginInput
-              icon={<Lock size={20} />}
+              icon={<Lock size={16} strokeWidth={1.5} />}
               type={showPassword ? 'text' : 'password'}
               placeholder="Contraseña"
               value={password}
@@ -219,21 +255,22 @@ export default function LoginPage() {
                 setPassword(e.target.value);
                 if (passwordError) setPasswordError(false);
               }}
+              required
               rightIcon={
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="text-white/70 hover:text-white transition-colors"
-                  tabIndex={-1}
+                  className="text-white/60 hover:text-white transition-colors"
+                  aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                 >
-                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  {showPassword ? <EyeOff size={16} strokeWidth={1.5} /> : <Eye size={16} strokeWidth={1.5} />}
                 </button>
               }
             />
           </div>
 
-          {/* Checkbox y Forgot Password */}
-          <div className="mb-4 flex items-center justify-between">
+          {/* Opciones extra: Recordarme y Olvidaste tu contraseña */}
+          <div className="mt-[8px] mb-[22px] flex items-center justify-between">
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
@@ -259,93 +296,197 @@ export default function LoginPage() {
             {isSubmitting ? 'Ingresando...' : 'Iniciar sesión'}
           </LoginButton>
         </form>
-
-        {/* Support Link */}
-        <div className="mt-6 text-center animate-fadeIn" style={{ animationDelay: '0.08s' }}>
-          <button
-            type="button"
-            onClick={() => setIsSupportOpen(true)}
-            className="text-xs text-white hover:text-white/80 transition-colors flex items-center justify-center gap-2 mx-auto group"
-            style={{ fontFamily: 'Poppins, sans-serif' }}
-          >
-            ¿Necesitas ayuda?{' '}
-            <span className="text-red-400 group-hover:text-red-300 transition-colors">
-              Contactar soporte
-            </span>
-          </button>
-        </div>
-
-        {/* Quick Access Link — solo en desarrollo */}
-        {esDesarrollo && (
-          <div className="mt-2 text-center animate-fadeIn" style={{ animationDelay: '0.1s' }}>
-            <button
-              type="button"
-              onClick={() => setIsQuickAccessOpen(true)}
-              className="text-xs text-white hover:text-white/80 transition-colors flex items-center justify-center gap-2 mx-auto group"
-              style={{ fontFamily: 'Poppins, sans-serif' }}
-            >
-              <Info size={13} />
-              <span>Acceso Rápido</span>
-            </button>
-          </div>
-        )}
       </div>
 
-      {/* Quick Access Modal — solo en desarrollo */}
-      {esDesarrollo && isQuickAccessOpen && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-[9999] px-4">
-          <div className="bg-gray-900/95 border border-gray-700 rounded-2xl p-5 w-full max-w-sm shadow-2xl animate-in">
-            {/* Header */}
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex items-start gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-[#9B0F06]/20 border border-[#9B0F06]/40 flex items-center justify-center flex-shrink-0">
-                  <Info size={14} className="text-[#cc1111]" />
-                </div>
-                <div>
-                  <h2 className="text-white font-bold text-base leading-tight">Acceso Rápido - Demo</h2>
-                  <p className="text-gray-400 text-[11px] mt-0.5">Selecciona una cuenta para acceder</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsQuickAccessOpen(false)}
-                className="text-gray-400 hover:text-white transition-colors p-0.5"
-                aria-label="Cerrar acceso rápido"
-              >
-                <X size={16} />
-              </button>
-            </div>
+      {/* Quick Access Modal */}
+      {isQuickAccessOpen && (
+        <>
+          {/* Backdrop */}
+          <div
+            onClick={() => setIsQuickAccessOpen(false)}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0, 0, 0, 0.5)',
+              zIndex: 9998,
+              backdropFilter: 'blur(4px)',
+            }}
+          />
 
-            {/* Roles Grid */}
-            <div className="grid grid-cols-2 gap-2.5 mb-3">
-              {ACCESOS_RAPIDOS.map((cuenta) => (
-                <button
-                  key={cuenta.id}
-                  type="button"
-                  onClick={() => {
-                    setUsername(cuenta.email);
-                    setPassword(cuenta.password);
-                    setIsQuickAccessOpen(false);
-                  }}
-                  className="px-2.5 py-2.5 rounded-xl border border-gray-700 hover:border-[#9B0F06] hover:bg-[#9B0F06]/10 transition-all cursor-pointer text-center"
-                >
-                  <div className="text-white font-semibold text-xs leading-tight">
-                    {cuenta.roleLabel ?? cuenta.role}
+          {/* Modal */}
+          <div
+            style={{
+              position: 'fixed',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              zIndex: 9999,
+              width: '90%',
+              maxWidth: '420px',
+            }}
+          >
+            <div
+              style={{
+                background: 'rgba(26, 0, 0, 0.95)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '12px',
+                padding: '24px',
+                backdropFilter: 'blur(20px)',
+                boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+              }}
+            >
+              {/* Header */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
+                  <div
+                    style={{
+                      padding: '8px',
+                      background: 'rgba(155, 15, 6, 0.15)',
+                      border: '1px solid rgba(155, 15, 6, 0.3)',
+                      borderRadius: '8px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Info size={16} color="#ef4444" />
                   </div>
-                  <div className="text-gray-400 text-[10px] mt-1 truncate">{cuenta.email}</div>
+                  <div>
+                    <h2
+                      style={{
+                        margin: '0',
+                        fontSize: '15px',
+                        fontWeight: 700,
+                        color: 'rgba(255, 255, 255, 0.9)',
+                        fontFamily: "'Poppins', sans-serif",
+                      }}
+                    >
+                      Acceso Rápido - Demo
+                    </h2>
+                    <p
+                      style={{
+                        margin: '2px 0 0',
+                        fontSize: '12px',
+                        color: 'rgba(255, 255, 255, 0.6)',
+                        fontFamily: "'Poppins', sans-serif",
+                      }}
+                    >
+                      Selecciona una cuenta para acceder
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsQuickAccessOpen(false)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: 'rgba(255, 255, 255, 0.6)',
+                    padding: '0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'color 0.2s',
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.color = 'white'
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.color = 'rgba(255, 255, 255, 0.6)'
+                  }}
+                >
+                  <X size={18} />
                 </button>
-              ))}
-            </div>
+              </div>
 
-            {/* Nota */}
-            <div className="text-xs p-2.5 bg-[#9B0F06]/15 rounded-lg border border-[#9B0F06]/30 text-gray-300">
-              <p>
-                <span className="font-semibold text-white">Nota:</span>{' '}
-                Estas son cuentas de prueba sembradas en el sistema para validar cada rol.
-              </p>
+              {/* Accounts Grid */}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: '12px',
+                  marginBottom: '16px',
+                }}
+              >
+                {ACCESOS_RAPIDOS.map((cuenta) => (
+                  <button
+                    key={cuenta.id}
+                    type="button"
+                    onClick={() => {
+                      setUsername(cuenta.email);
+                      setPassword(cuenta.password);
+                      setIsQuickAccessOpen(false);
+                    }}
+                    style={{
+                      padding: '12px',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '8px',
+                      background: 'transparent',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      fontFamily: "'Poppins', sans-serif",
+                      minWidth: '0',
+                      textAlign: 'center',
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
+                      e.currentTarget.style.borderColor = 'rgba(155, 15, 6, 0.3)'
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = 'transparent'
+                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)'
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        color: 'rgba(255, 255, 255, 0.9)',
+                        marginBottom: '4px',
+                      }}
+                    >
+                      {cuenta.roleLabel ?? cuenta.role}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: '11px',
+                        color: 'rgba(255, 255, 255, 0.6)',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {cuenta.email}
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+              {/* Info Box */}
+              <div
+                style={{
+                  padding: '12px',
+                  background: 'rgba(155, 15, 6, 0.15)',
+                  border: '1px solid rgba(155, 15, 6, 0.3)',
+                  borderRadius: '8px',
+                }}
+              >
+                <p
+                  style={{
+                    margin: '0',
+                    fontSize: '12px',
+                    color: 'rgba(255, 255, 255, 0.8)',
+                    fontFamily: "'Poppins', sans-serif",
+                    lineHeight: '1.4',
+                  }}
+                >
+                  <strong className="text-white font-semibold">Nota:</strong> Estas son cuentas de prueba sembradas en el sistema para validar cada rol.
+                </p>
+              </div>
             </div>
           </div>
-        </div>
+        </>
       )}
 
       {/* Modales */}

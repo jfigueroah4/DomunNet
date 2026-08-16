@@ -26,6 +26,7 @@ export function UsuarioFormularioDrawer({
     telefono: usuario?.telefono || '',
     rol: (usuario?.rol as RolUsuario) || ('IngenieroResidente' as RolUsuario),
     estado: usuario?.estado || 'Activo',
+    fecha_nacimiento: usuario?.fecha_nacimiento || '',
     password: '',
   })
 
@@ -49,21 +50,21 @@ export function UsuarioFormularioDrawer({
       {/* Overlay */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-40 transition-opacity"
+          className="fixed inset-0 bg-black/40 backdrop-blur-[1px] z-40 transition-opacity"
           onClick={onClose}
         />
       )}
 
       {/* Drawer */}
       <div
-        className={`fixed right-0 top-0 h-full w-96 bg-white shadow-2xl z-50 transform transition-transform duration-300 overflow-y-auto ${
+        className={`fixed right-0 top-0 h-full w-full max-w-[480px] bg-white shadow-2xl z-50 transform transition-transform duration-300 flex flex-col ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-gray-100 sticky top-0 bg-white">
+        <div className="flex-shrink-0 flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-white">
           <div>
-            <h2 className="text-sm font-bold text-gray-800">
+            <h2 className="text-base font-bold text-gray-800">
               {usuario ? 'Editar Usuario' : 'Nuevo Usuario'}
             </h2>
             <p className="text-[10px] text-gray-400 mt-0.5">
@@ -79,12 +80,12 @@ export function UsuarioFormularioDrawer({
         </div>
 
         {/* Contenido */}
-        <div className="p-5 space-y-4">
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
           {/* Nombres */}
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-[10px] font-semibold text-gray-700 block mb-1.5">
-                Primer Nombre
+              <label className="text-[10px] font-semibold text-gray-700 block mb-1 uppercase tracking-wide">
+                Primer Nombre *
               </label>
               <input
                 type="text"
@@ -92,11 +93,11 @@ export function UsuarioFormularioDrawer({
                 value={formData.primer_nombre}
                 onChange={handleChange}
                 placeholder="Ej: Juan"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-[10px] text-gray-700 bg-white focus:outline-none focus:border-[#9B0F06] placeholder:text-gray-400"
+                className="w-full h-9 border border-gray-200 rounded-lg px-2.5 text-xs text-gray-700 bg-white focus:outline-none focus:border-[#9B0F06] placeholder:text-gray-400 transition-colors"
               />
             </div>
             <div>
-              <label className="text-[10px] font-semibold text-gray-700 block mb-1.5">
+              <label className="text-[10px] font-semibold text-gray-700 block mb-1 uppercase tracking-wide">
                 Segundo Nombre
               </label>
               <input
@@ -104,16 +105,16 @@ export function UsuarioFormularioDrawer({
                 name="segundo_nombre"
                 value={formData.segundo_nombre}
                 onChange={handleChange}
-                placeholder="Ej: Carlos"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-[10px] text-gray-700 bg-white focus:outline-none focus:border-[#9B0F06] placeholder:text-gray-400"
+                placeholder="Opcional"
+                className="w-full h-9 border border-gray-200 rounded-lg px-2.5 text-xs text-gray-700 bg-white focus:outline-none focus:border-[#9B0F06] placeholder:text-gray-400 transition-colors"
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-[10px] font-semibold text-gray-700 block mb-1.5">
-                Primer Apellido
+              <label className="text-[10px] font-semibold text-gray-700 block mb-1 uppercase tracking-wide">
+                Primer Apellido *
               </label>
               <input
                 type="text"
@@ -121,11 +122,11 @@ export function UsuarioFormularioDrawer({
                 value={formData.primer_apellido}
                 onChange={handleChange}
                 placeholder="Ej: Pérez"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-[10px] text-gray-700 bg-white focus:outline-none focus:border-[#9B0F06] placeholder:text-gray-400"
+                className="w-full h-9 border border-gray-200 rounded-lg px-2.5 text-xs text-gray-700 bg-white focus:outline-none focus:border-[#9B0F06] placeholder:text-gray-400 transition-colors"
               />
             </div>
             <div>
-              <label className="text-[10px] font-semibold text-gray-700 block mb-1.5">
+              <label className="text-[10px] font-semibold text-gray-700 block mb-1 uppercase tracking-wide">
                 Segundo Apellido
               </label>
               <input
@@ -133,16 +134,16 @@ export function UsuarioFormularioDrawer({
                 name="segundo_apellido"
                 value={formData.segundo_apellido}
                 onChange={handleChange}
-                placeholder="Ej: García"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-[10px] text-gray-700 bg-white focus:outline-none focus:border-[#9B0F06] placeholder:text-gray-400"
+                placeholder="Opcional"
+                className="w-full h-9 border border-gray-200 rounded-lg px-2.5 text-xs text-gray-700 bg-white focus:outline-none focus:border-[#9B0F06] placeholder:text-gray-400 transition-colors"
               />
             </div>
           </div>
 
           {/* Correo */}
           <div>
-            <label className="text-[10px] font-semibold text-gray-700 block mb-1.5">
-              Correo Electrónico
+            <label className="text-[10px] font-semibold text-gray-700 block mb-1 uppercase tracking-wide">
+              Correo Electrónico *
             </label>
             <input
               type="email"
@@ -150,66 +151,81 @@ export function UsuarioFormularioDrawer({
               value={formData.correo}
               onChange={handleChange}
               placeholder="usuario@domun.gt"
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-[10px] text-gray-700 bg-white focus:outline-none focus:border-[#9B0F06] placeholder:text-gray-400"
+              className="w-full h-9 border border-gray-200 rounded-lg px-2.5 text-xs text-gray-700 bg-white focus:outline-none focus:border-[#9B0F06] placeholder:text-gray-400 transition-colors"
             />
           </div>
 
-          {/* Teléfono */}
-          <div>
-            <label className="text-[10px] font-semibold text-gray-700 block mb-1.5">
-              Teléfono
-            </label>
-            <input
-              type="tel"
-              name="telefono"
-              value={formData.telefono}
-              onChange={handleChange}
-              placeholder="+502 7xxx xxxx"
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-[10px] text-gray-700 bg-white focus:outline-none focus:border-[#9B0F06] placeholder:text-gray-400"
-            />
+          {/* Teléfono y Fecha de Nacimiento en 2 columnas */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[10px] font-semibold text-gray-700 block mb-1 uppercase tracking-wide">
+                Teléfono *
+              </label>
+              <input
+                type="tel"
+                name="telefono"
+                value={formData.telefono}
+                onChange={handleChange}
+                placeholder="+502 7xxx xxxx"
+                className="w-full h-9 border border-gray-200 rounded-lg px-2.5 text-xs text-gray-700 bg-white focus:outline-none focus:border-[#9B0F06] placeholder:text-gray-400 transition-colors"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-semibold text-gray-700 block mb-1 uppercase tracking-wide">
+                Fecha Nacimiento *
+              </label>
+              <input
+                type="date"
+                name="fecha_nacimiento"
+                value={formData.fecha_nacimiento ? formData.fecha_nacimiento.split('T')[0] : ''}
+                onChange={handleChange}
+                className="w-full h-9 border border-gray-200 rounded-lg px-2.5 text-xs text-gray-700 bg-white focus:outline-none focus:border-[#9B0F06] transition-colors"
+              />
+            </div>
           </div>
 
-          {/* Rol */}
-          <div>
-            <label className="text-[10px] font-semibold text-gray-700 block mb-1.5">
-              Rol
-            </label>
-            <select
-              name="rol"
-              value={formData.rol}
-              onChange={handleChange}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-[10px] text-gray-700 bg-white focus:outline-none focus:border-[#9B0F06]"
-            >
-              <option value="Administrador">Administrador</option>
-              <option value="Gerencia">Gerencia</option>
-              <option value="IngenieroResidente">Ingeniero Residente</option>
-              <option value="Laboratorista">Laboratorista</option>
-              <option value="AuxiliarDeCampo">Auxiliar de Campo</option>
-              <option value="Contratante">Contratante</option>
-            </select>
-          </div>
+          {/* Rol y Estado en 2 columnas */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[10px] font-semibold text-gray-700 block mb-1 uppercase tracking-wide">
+                Rol *
+              </label>
+              <select
+                name="rol"
+                value={formData.rol}
+                onChange={handleChange}
+                className="w-full h-9 border border-gray-200 rounded-lg px-2.5 text-xs text-gray-700 bg-white focus:outline-none focus:border-[#9B0F06] transition-colors"
+              >
+                <option value="Administrador">Administrador</option>
+                <option value="Gerencia">Gerencia</option>
+                <option value="IngenieroResidente">Ingeniero Residente</option>
+                <option value="Laboratorista">Laboratorista</option>
+                <option value="AuxiliarDeCampo">Auxiliar de Campo</option>
+                <option value="Contratante">Contratante</option>
+              </select>
+            </div>
 
-          {/* Estado */}
-          <div>
-            <label className="text-[10px] font-semibold text-gray-700 block mb-1.5">
-              Estado
-            </label>
-            <select
-              name="estado"
-              value={formData.estado}
-              onChange={handleChange}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-[10px] text-gray-700 bg-white focus:outline-none focus:border-[#9B0F06]"
-            >
-              <option value="Activo">Activo</option>
-              <option value="Inactivo">Inactivo</option>
-              <option value="Suspendido">Suspendido</option>
-            </select>
+            <div>
+              <label className="text-[10px] font-semibold text-gray-700 block mb-1 uppercase tracking-wide">
+                Estado *
+              </label>
+              <select
+                name="estado"
+                value={formData.estado}
+                onChange={handleChange}
+                className="w-full h-9 border border-gray-200 rounded-lg px-2.5 text-xs text-gray-700 bg-white focus:outline-none focus:border-[#9B0F06] transition-colors"
+              >
+                <option value="Activo">Activo</option>
+                <option value="Inactivo">Inactivo</option>
+                <option value="Suspendido">Suspendido</option>
+              </select>
+            </div>
           </div>
 
           {/* Contraseña */}
           {!usuario && (
             <div>
-              <label className="text-[10px] font-semibold text-gray-700 block mb-1.5">
+              <label className="text-[10px] font-semibold text-gray-700 block mb-1 uppercase tracking-wide">
                 Contraseña Temporal
               </label>
               <input
@@ -218,9 +234,9 @@ export function UsuarioFormularioDrawer({
                 value={formData.password}
                 onChange={handleChange}
                 placeholder="••••••••"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-[10px] text-gray-700 bg-white focus:outline-none focus:border-[#9B0F06] placeholder:text-gray-400"
+                className="w-full h-9 border border-gray-200 rounded-lg px-2.5 text-xs text-gray-700 bg-white focus:outline-none focus:border-[#9B0F06] placeholder:text-gray-400 transition-colors"
               />
-              <p className="text-[9px] text-gray-400 mt-1">
+              <p className="text-[11px] text-gray-400 mt-1">
                 Se enviará un correo con instrucciones
               </p>
             </div>
@@ -228,16 +244,16 @@ export function UsuarioFormularioDrawer({
         </div>
 
         {/* Footer */}
-        <div className="p-5 border-t border-gray-100 bg-gray-50 sticky bottom-0 flex gap-2">
+        <div className="flex-shrink-0 px-5 py-4 border-t border-gray-100 bg-gray-50 flex gap-3">
           <button
             onClick={onClose}
-            className="flex-1 border border-gray-200 text-gray-700 text-[10px] font-medium py-2 rounded-lg hover:bg-gray-100 transition-colors"
+            className="flex-1 border border-gray-200 bg-white text-gray-700 text-xs font-semibold h-9 rounded-lg hover:bg-gray-50 transition-colors"
           >
             Cancelar
           </button>
           <button
             onClick={handleGuardar}
-            className="flex-1 bg-[#9B0F06] text-white text-[10px] font-medium py-2 rounded-lg hover:bg-[#5E0006] transition-colors"
+            className="flex-1 bg-[#9B0F06] text-white text-xs font-semibold h-9 rounded-lg hover:bg-[#5E0006] transition-colors"
           >
             {usuario ? 'Guardar Cambios' : 'Crear Usuario'}
           </button>

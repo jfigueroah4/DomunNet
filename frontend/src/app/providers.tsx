@@ -19,19 +19,48 @@ export default function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <Toaster 
-        position="top-center" 
-        visibleToasts={1} 
-        duration={4500} 
+      <style dangerouslySetInnerHTML={{ __html: `
+        /* Estilos de animación fade suave para Sonner toast */
+        [data-sonner-toaster] {
+          top: 24px !important;
+        }
+
+        [data-sonner-toast] {
+          background: transparent !important;
+          border: none !important;
+          box-shadow: none !important;
+          padding: 0 !important;
+          width: auto !important;
+          max-width: none !important;
+          transition: transform 280ms cubic-bezier(0.16, 1, 0.3, 1), opacity 280ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+        }
+
+        [data-sonner-toast][data-mounted='true'] {
+          opacity: 1 !important;
+          transform: translateY(0) scale(1) !important;
+        }
+
+        [data-sonner-toast][data-mounted='false'] {
+          opacity: 0 !important;
+          transform: translateY(-8px) scale(0.96) !important;
+        }
+
+        [data-sonner-toast][data-removed='true'] {
+          opacity: 0 !important;
+          transform: translateY(-8px) scale(0.96) !important;
+        }
+      `}} />
+      <Toaster
+        position="top-center"
+        maxToasts={3}
         toastOptions={{
+          duration: 3500,
           style: {
-            top: '24px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            width: 'max-content',
-            margin: 0,
-            transition: 'all 0.4s ease-in-out'
-          }
+            background: "transparent",
+            boxShadow: "none",
+            border: "none",
+            padding: 0,
+          },
         }}
       />
       {children}
