@@ -2,6 +2,7 @@
 
 import { ChevronLeft, Download, RefreshCw, Share2 } from 'lucide-react'
 import { useRouter, useParams } from 'next/navigation'
+import { toast } from 'sonner'
 import { REPORTES_MOCK } from '@/data/reportes.mock'
 import { ReporteVistaPrevia } from '@/components/modules/reportes/ReporteVistaPrevia'
 import { ReporteEstadoBadge } from '@/components/modules/reportes/ReporteEstadoBadge'
@@ -22,18 +23,15 @@ export default function ReporteDetallePage() {
   }
 
   const handleDescargar = () => {
-    console.log('Descargar reporte:', reporteId)
-    alert('Descargando reporte como PDF...')
+    toast.info('Descargando reporte como PDF...')
   }
 
   const handleRegenerar = () => {
-    console.log('Regenerar reporte:', reporteId)
-    alert('Regenerando reporte...')
+    toast.info('Regenerando reporte...')
   }
 
   const handleCompartir = () => {
-    console.log('Compartir reporte:', reporteId)
-    alert('Compartiendo reporte...')
+    toast.info('Compartiendo reporte...')
   }
 
   return (

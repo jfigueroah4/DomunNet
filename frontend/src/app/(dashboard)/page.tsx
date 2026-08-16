@@ -1,6 +1,5 @@
 'use client'
 
-import { useState } from 'react'
 import Link from 'next/link'
 import {
   FolderOpen,
@@ -8,228 +7,111 @@ import {
   Camera,
   BarChart2,
   ChevronRight,
-  TrendingUp,
-  FileText,
   Users,
   Settings2,
-  Search,
-  Filter,
-  MessageCircle,
 } from 'lucide-react'
 
 export default function DashboardPage() {
-  const [chatHovered, setChatHovered] = useState(false)
-
   const modules = [
     {
       name: 'Proyectos',
       icon: FolderOpen,
-      bgColor: 'bg-gradient-to-br from-[#9B0F06] to-[#E57373]',
-      href: '/proyectos',
+      bgColor: 'bg-gradient-to-br from-[#B91C1C] to-[#E57373]',
+      href: '/dashboard/proyectos',
+      description: 'Gestión y control integral de obras viales',
     },
     {
       name: 'Bitácora',
       icon: ClipboardList,
-      bgColor: 'bg-gradient-to-br from-[#D53E0F] to-[#e87070]',
-      href: '/bitacora',
+      bgColor: 'bg-gradient-to-br from-[#E2542F] to-[#E87070]',
+      href: '/dashboard/bitacora',
+      description: 'Registro diario de avances de campo y eventos',
     },
     {
       name: 'Fotografías',
       icon: Camera,
-      bgColor: 'bg-gradient-to-br from-[#D53E0F] to-[#f4a460]',
-      href: '/fotografias',
+      bgColor: 'bg-gradient-to-br from-[#E86B2A] to-[#F4A460]',
+      href: '/dashboard/fotografias',
+      description: 'Galería técnica y evidencia fotográfica',
     },
     {
       name: 'Reportes',
       icon: BarChart2,
-      bgColor: 'bg-gradient-to-br from-[#D53E0F] to-[#E8A000]',
-      href: '/reportes',
+      bgColor: 'bg-gradient-to-br from-[#E26B00] to-[#E8A000]',
+      href: '/dashboard/reportes',
+      description: 'Generación de informes y hojas de liquidación',
     },
     {
       name: 'Usuarios',
       icon: Users,
-      bgColor: 'bg-gradient-to-br from-[#e87070] to-[#EED9B9]',
-      textColor: 'text-white',
-      href: '/usuarios',
+      bgColor: 'bg-gradient-to-br from-[#F08A86] to-[#F3D7B2]',
+      href: '/dashboard/usuarios',
+      description: 'Administración de personal y permisos',
     },
     {
       name: 'Configuración',
       icon: Settings2,
-      bgColor: 'bg-stone-500',
-      href: '/configuracion',
-    },
-  ]
-
-  const stats = [
-    {
-      label: 'PROYECTOS ACTIVOS',
-      value: 0,
-      icon: TrendingUp,
-      borderColor: 'border-[#9B0F06]',
-      iconColor: '#9B0F06',
-    },
-    {
-      label: 'REGISTROS HOY',
-      value: 0,
-      icon: ClipboardList,
-      borderColor: 'border-[#E85D04]',
-      iconColor: '#E85D04',
-    },
-    {
-      label: 'FOTOS SUBIDAS',
-      value: 0,
-      icon: Camera,
-      borderColor: 'border-amber-600',
-      iconColor: '#b45309',
-    },
-    {
-      label: 'REPORTES GEN.',
-      value: 0,
-      icon: FileText,
-      borderColor: 'border-stone-500',
-      iconColor: '#78716c',
+      bgColor: 'bg-gradient-to-br from-[#7B736F] to-[#6D6661]',
+      href: '/dashboard/configuracion',
+      description: 'Ajustes del sistema y tablas de mantenimiento',
     },
   ]
 
   return (
-    <div className="space-y-3 p-3">
-      {/* Page Header */}
+    <div className="space-y-4 p-2 md:p-3">
+      <style>{`
+        .dashboard-module-card {
+          transition: transform 0.28s ease, box-shadow 0.28s ease, filter 0.28s ease;
+        }
+        .dashboard-module-card:hover {
+          transform: translateY(-4px) scale(1.01);
+          box-shadow: 0 16px 32px rgba(155, 15, 6, 0.18);
+          filter: saturate(1.02);
+        }
+        .dashboard-module-card:hover .dashboard-module-icon {
+          transform: scale(1.08) rotate(-4deg);
+          opacity: 0.28;
+        }
+        .dashboard-module-card:hover .dashboard-module-link {
+          transform: translateX(3px);
+          opacity: 1;
+        }
+      `}</style>
+
       <div className="mb-2">
-        <h1 className="text-base font-bold text-gray-800">Panel Principal</h1>
-        <p className="text-[10px] text-gray-400 mt-1">Acceso rápido y estado general del sistema</p>
+        <h1 className="text-[24px] font-bold tracking-tight text-gray-900">Panel Principal</h1>
+        <p className="mt-1 text-[11px] text-gray-500">Acceso rápido y estado general del sistema DomunNet</p>
       </div>
 
-      {/* Section A - Module Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-        {modules.map((module: any) => {
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {modules.map((module) => {
           const Icon = module.icon
-          const textColorClass = module.textColor || 'text-white'
+
           return (
             <Link
               key={module.name}
               href={module.href}
-              className={`${module.bgColor} min-h-[100px] rounded-2xl p-3 cursor-pointer transition-all duration-300 ease-out hover:brightness-95 hover:scale-[1.02] relative overflow-hidden flex flex-col justify-between group`}
+              className={`${module.bgColor} dashboard-module-card relative flex min-h-[164px] flex-col justify-between overflow-hidden rounded-[20px] p-5 text-white`}
             >
-              {/* Decorative background icon */}
-              <div className="absolute bottom-0 right-0 opacity-20">
-                <Icon size={70} color={module.textColor === 'text-white' ? 'white' : '#5E0006'} />
+              <div className="dashboard-module-icon absolute -bottom-2 -right-2 opacity-20 transition-transform duration-300">
+                <Icon size={104} color="white" />
               </div>
 
-              {/* Content */}
-              <div className="relative z-10 flex-1 flex flex-col justify-end">
-                <div className={`flex items-center gap-1 ${textColorClass}`}>
-                  <h3 className="text-xs font-bold">{module.name}</h3>
+              <div className="relative z-10 flex items-center justify-between">
+                <Icon size={24} color="white" className="drop-shadow-[0_2px_4px_rgba(0,0,0,0.15)]" />
+                <div className="dashboard-module-link flex items-center gap-1 text-[11px] font-bold tracking-wide opacity-90 transition-all duration-200">
+                  <span>Ir a módulo</span>
                   <ChevronRight size={12} className="opacity-80" />
                 </div>
+              </div>
+
+              <div className="relative z-10">
+                <h3 className="text-[20px] font-bold leading-tight">{module.name}</h3>
+                <p className="mt-1 text-[13px] leading-snug text-white/90">{module.description}</p>
               </div>
             </Link>
           )
         })}
-      </div>
-
-      {/* Section B - Metrics Cards */}
-      <div className="grid grid-cols-4 gap-3">
-        {stats.map((stat) => {
-          const Icon = stat.icon
-          return (
-            <div
-              key={stat.label}
-              className={`bg-white rounded-xl shadow-sm p-2.5 border-l-[3px] ${stat.borderColor}`}
-            >
-              <div className="flex items-start justify-between mb-2">
-                <h4 className="text-[9px] text-gray-400 uppercase tracking-widest font-semibold">
-                  {stat.label}
-                </h4>
-                <Icon size={12} color={stat.iconColor} className="opacity-60" />
-              </div>
-
-              <p className="text-xl font-bold text-gray-800 mb-1">{stat.value}</p>
-
-              <div className="flex items-center gap-1">
-                <TrendingUp size={12} className="text-green-500" />
-                <span className="text-[9px] text-green-500">+0% vs ayer</span>
-              </div>
-            </div>
-          )
-        })}
-      </div>
-
-      {/* Section C - Bottom Row */}
-      <div className="grid grid-cols-3 gap-3">
-        {/* Recent Activity - 2/3 width */}
-        <div className="col-span-2 bg-white rounded-2xl shadow-sm p-4 max-h-[220px]">
-          <div className="flex items-start justify-between mb-6">
-            <div>
-              <h2 className="text-xs font-semibold text-gray-800">Actividad Reciente</h2>
-              <p className="text-[9px] text-gray-400 mt-1">Últimos registros del sistema</p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <div className="flex items-center bg-gray-100 rounded-full px-3 py-1">
-                <Search size={14} className="text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Buscar registros..."
-                  className="bg-transparent outline-none text-[9px] ml-2 w-32 placeholder-gray-400"
-                />
-              </div>
-              <button className="flex items-center gap-1 bg-gray-100 text-gray-600 px-3 py-1 rounded-lg text-[9px] hover:bg-gray-200 transition-colors">
-                <Filter size={12} />
-                <span>Filtrar</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Empty State */}
-          <div className="flex flex-col items-center justify-center py-12">
-            <div className="bg-red-50 rounded-full p-3 mb-3">
-              <ClipboardList size={20} className="text-[#9B0F06]" />
-            </div>
-            <p className="text-xs font-medium text-gray-600">No hay registros recientes</p>
-            <p className="text-[9px] text-gray-400 mt-1">Los registros de bitácora aparecerán aquí</p>
-          </div>
-        </div>
-
-        {/* Active Projects - 1/3 width */}
-        <div className="bg-white rounded-2xl shadow-sm p-4 max-h-[220px] overflow-auto">
-          <div>
-            <h2 className="text-xs font-semibold text-gray-800">Proyectos Más Activos</h2>
-            <p className="text-[9px] text-gray-400 mt-1">Por actividad reciente</p>
-          </div>
-
-          {/* Empty State */}
-          <div className="flex flex-col items-center justify-center py-12">
-            <div className="bg-red-50 rounded-full p-3 mb-3">
-              <FolderOpen size={20} className="text-[#9B0F06]" />
-            </div>
-            <p className="text-xs font-medium text-gray-600">No hay proyectos recientes</p>
-            <p className="text-[9px] text-gray-400 mt-1">Los proyectos activos aparecerán aquí</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Section D - Floating Chatbot Button */}
-      <div className="fixed bottom-6 right-6 z-50">
-        {/* Notification Badge */}
-        <div className="absolute -top-2 -right-2 w-5 h-5 bg-red-600 rounded-full flex items-center justify-center text-white text-[8px] font-bold">
-          1
-        </div>
-
-        {/* Tooltip */}
-        {chatHovered && (
-          <div className="absolute bottom-14 right-0 bg-gray-800 text-white text-[8px] rounded-lg px-3 py-1 whitespace-nowrap mb-2">
-            Asistente IA
-          </div>
-        )}
-
-        {/* Button */}
-        <button
-          onMouseEnter={() => setChatHovered(true)}
-          onMouseLeave={() => setChatHovered(false)}
-          className="w-11 h-11 bg-[#E85D04] rounded-full flex items-center justify-center shadow-lg hover:bg-[#C94E03] transition-all duration-200 hover:scale-110"
-        >
-          <MessageCircle size={18} className="text-white" />
-        </button>
       </div>
     </div>
   )

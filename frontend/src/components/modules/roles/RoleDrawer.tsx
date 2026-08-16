@@ -1,9 +1,11 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Save, X, Eye, PencilLine, Users, Shield, Mail, Palette, Check } from 'lucide-react'
+import { Save, X, Eye, PencilLine, Users, Shield, UserPlus, FileText, CheckCircle2 } from 'lucide-react'
 import { Role } from '@/data/roles'
 import { Usuario } from '@/types/usuario'
+import { USUARIOS_MOCK } from '@/data/usuarios.mock'
+import { toast } from 'sonner'
 
 export type RoleDrawerMode = 'create' | 'edit' | 'view' | 'users'
 
@@ -15,6 +17,8 @@ interface RoleDrawerProps {
     email: string
     descripcion: string
     color: string
+    estado?: 'Activo' | 'Inactivo'
+    nivelJerarquico?: string
     permisos: string[]
     usuariosAsignados: string[]
   }) => void
@@ -25,9 +29,11 @@ interface RoleDrawerProps {
 
 const defaultForm = (role?: Role) => ({
   name: role?.name || '',
-  email: role?.email || '',
+  email: role?.email || 'rol@domun.gt',
   descripcion: role?.descripcion || '',
   color: role?.color || '#9B0F06',
+  estado: role?.estado || 'Activo',
+  nivelJerarquico: role?.nivelJerarquico || 'Operativo',
   permisos: role?.permisos || ['Dashboard limitado'],
 })
 
@@ -41,50 +47,58 @@ export function RoleDrawer({
 }: RoleDrawerProps) {
   const [formData, setFormData] = useState(defaultForm(role))
   const [selectedUsuarios, setSelectedUsuarios] = useState<string[]>([])
+  const [nuevoPermiso, setNuevoPermiso] = useState('')
+
+  // We allow changing mode internally from edit to users
+  const [currentMode, setCurrentMode] = useState<RoleDrawerMode>(mode)
 
   useEffect(() => {
     if (isOpen) {
       setFormData(defaultForm(role))
       setSelectedUsuarios(usuariosAsignados.map((usuario) => usuario.id))
+      setCurrentMode(mode)
     }
   }, [isOpen, role, usuariosAsignados, mode])
 
-  const isViewMode = mode === 'view'
-  const isUsersMode = mode === 'users'
+  const isViewMode = currentMode === 'view'
+  const isUsersMode = currentMode === 'users'
 
   const title = useMemo(() => {
-    if (mode === 'create') return 'Nuevo Rol'
-    if (mode === 'edit') return 'Editar Rol'
-    if (mode === 'users') return 'Usuarios Asignados'
+    if (currentMode === 'create') return 'Nuevo Rol'
+    if (currentMode === 'edit') return 'Editar Rol'
+    if (currentMode === 'users') return 'Asignar Usuarios'
     return 'Detalle de Rol'
-  }, [mode])
+  }, [currentMode])
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
     const { name, value } = e.target
     setFormData((prev) => ({ ...prev, [name]: value }))
   }
 
-  const handlePermisoChange = (index: number, value: string) => {
+  const handleRemoverPermiso = (index: number) => {
     setFormData((prev) => ({
       ...prev,
-      permisos: prev.permisos.map((permiso, permisoIndex) =>
-        permisoIndex === index ? value : permiso
-      ),
+      permisos: prev.permisos.filter((_, i) => i !== index),
     }))
   }
 
-  const agregarPermiso = () => {
-    setFormData((prev) => ({
-      ...prev,
-      permisos: [...prev.permisos, 'Nuevo permiso'],
-    }))
+  const handleAgregarPermiso = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && nuevoPermiso.trim()) {
+      e.preventDefault()
+      setFormData((prev) => ({
+        ...prev,
+        permisos: [...prev.permisos, nuevoPermiso.trim()],
+      }))
+      setNuevoPermiso('')
+    }
   }
 
   const handleGuardar = () => {
     onSave?.({
       ...formData,
+      estado: formData.estado as 'Activo' | 'Inactivo',
       usuariosAsignados: selectedUsuarios,
     })
     onClose()
@@ -100,204 +114,247 @@ export function RoleDrawer({
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex justify-end overflow-hidden">
-        <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px]" onClick={onClose} />
-        <aside className="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-right">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-gray-50">
-          <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-red-50 text-[#9B0F06]">
-              {isUsersMode ? <Users size={18} /> : isViewMode ? <Eye size={18} /> : <PencilLine size={18} />}
-            </div>
-            <div>
-              <h2 className="text-[15px] font-bold text-gray-800">{title}</h2>
-              <p className="text-[10px] text-gray-400">
-                {isUsersMode
-                  ? 'Gestiona los usuarios vinculados a este rol'
-                  : isViewMode
-                    ? 'Consulta los permisos configurados'
-                    : role
-                      ? 'Actualiza la configuración del rol'
-                      : 'Crea un rol nuevo en el sistema'}
-              </p>
-            </div>
-          </div>
-
-          <button
-            onClick={onClose}
-            className="rounded-lg p-1.5 transition-colors hover:bg-gray-100"
-          >
-            <X size={16} className="text-gray-600" />
-          </button>
-            </div>
-            
-            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-              <div className="bg-gray-50 p-3 rounded-xl border border-gray-100">
-            <div className="flex items-center gap-3">
-              <div
-                className="flex h-14 w-14 items-center justify-center rounded-2xl text-sm font-bold text-white"
-                style={{ backgroundColor: formData.color }}
-              >
-                {formData.name
-                  .split(' ')
-                  .map((part) => part[0])
-                  .join('')
-                  .slice(0, 2)
-                  .toUpperCase() || 'RL'}
+      <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[1px]" onClick={onClose} />
+      <div className="fixed inset-0 z-50 flex justify-end overflow-hidden pointer-events-none">
+        <aside className="pointer-events-auto relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-right">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-gray-50">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-red-50 text-[#9B0F06]">
+                {isUsersMode ? <Users size={18} /> : isViewMode ? <Eye size={18} /> : <PencilLine size={18} />}
               </div>
-              <div className="min-w-0">
-                <p className="truncate text-[15px] font-semibold text-gray-800">
-                  {formData.name || 'Sin nombre'}
+              <div>
+                <h2 className="text-[15px] font-bold text-gray-800">{title}</h2>
+                <p className="text-[10px] text-gray-400">
+                  {isUsersMode
+                    ? 'Gestiona los usuarios vinculados a este rol'
+                    : isViewMode
+                      ? 'Consulta los datos y permisos'
+                      : role
+                        ? 'Actualiza la configuración del rol'
+                        : 'Crea un rol nuevo en el sistema'}
                 </p>
-                <p className="truncate text-[12px] text-gray-400">{formData.email || 'rol@domun.gt'}</p>
               </div>
             </div>
+
+            <button
+              onClick={onClose}
+              className="rounded-lg p-1.5 transition-colors hover:bg-gray-100"
+            >
+              <X size={16} className="text-gray-600" />
+            </button>
           </div>
+            
+          <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+            {!isUsersMode && (
+              <div className="space-y-4">
+                
+                <p className="text-[9px] uppercase tracking-widest font-semibold text-gray-500 border-b border-gray-100 pb-1">
+                  Información Principal
+                </p>
+                
+                <div className="grid grid-cols-1 gap-3">
+                  <div>
+                    <label className="mb-1 block text-[10px] font-medium text-gray-600">Nombre del rol *</label>
+                    <input
+                      name="name"
+                      value={formData.name}
+                      onChange={handleChange}
+                      disabled={isViewMode}
+                      className="w-full h-8 px-2.5 py-1.5 text-[10px] border border-gray-200 rounded-lg focus:outline-none focus:border-[#9B0F06] transition-colors disabled:bg-gray-50 text-gray-700"
+                      placeholder="Ej: Supervisor"
+                    />
+                  </div>
 
-          {!isUsersMode && (
-            <div className="space-y-4">
-              <div>
-                <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-widest text-gray-500">
-                  Nombre del rol
-                </label>
-                <input
-                  name="name"
-                  value={formData.name}
-                  onChange={handleChange}
-                  disabled={isViewMode}
-                  className="h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-[13px] text-gray-700 focus:border-[#9B0F06] focus:outline-none disabled:bg-gray-50"
-                  placeholder="Ej: Supervisor"
-                />
-              </div>
+                  <div>
+                    <label className="mb-1 block text-[10px] font-medium text-gray-600">Descripción *</label>
+                    <textarea
+                      name="descripcion"
+                      value={formData.descripcion}
+                      onChange={handleChange}
+                      disabled={isViewMode}
+                      rows={3}
+                      className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-[10px] focus:outline-none focus:border-[#9B0F06] transition-colors disabled:bg-gray-50 text-gray-700 resize-none"
+                      placeholder="Describe el alcance del rol..."
+                    />
+                  </div>
+                </div>
 
-              <div>
-                <label className="mb-1.5 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-widest text-gray-500">
-                  <Mail size={11} />
-                  Correo o referencia
-                </label>
-                <input
-                  name="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  disabled={isViewMode}
-                  className="h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-[13px] text-gray-700 focus:border-[#9B0F06] focus:outline-none disabled:bg-gray-50"
-                  placeholder="rol@domun.gt"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-widest text-gray-500">
-                  Descripción
-                </label>
-                <textarea
-                  name="descripcion"
-                  value={formData.descripcion}
-                  onChange={handleChange}
-                  disabled={isViewMode}
-                  rows={4}
-                  className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-[13px] text-gray-700 focus:border-[#9B0F06] focus:outline-none disabled:bg-gray-50"
-                  placeholder="Describe el alcance del rol"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1.5 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-widest text-gray-500">
-                  <Palette size={11} />
-                  Color representativo
-                </label>
-                <input
-                  name="color"
-                  value={formData.color}
-                  onChange={handleChange}
-                  disabled={isViewMode}
-                  className="h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-[13px] text-gray-700 focus:border-[#9B0F06] focus:outline-none disabled:bg-gray-50"
-                />
-              </div>
-
-              <div>
-                <div className="mb-2 flex items-center justify-between">
-                  <label className="block text-[10px] font-semibold uppercase tracking-widest text-gray-500">
-                    Permisos
-                  </label>
-                  {!isViewMode && (
-                    <button
-                      onClick={agregarPermiso}
-                      className="text-[10px] font-medium text-[#9B0F06] transition-colors hover:text-[#5E0006]"
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="mb-1 block text-[10px] font-medium text-gray-600">Nivel Jerárquico *</label>
+                    <select
+                      name="nivelJerarquico"
+                      value={formData.nivelJerarquico}
+                      onChange={handleChange}
+                      disabled={isViewMode}
+                      className="w-full h-8 px-2.5 py-1.5 text-[10px] border border-gray-200 rounded-lg focus:outline-none focus:border-[#9B0F06] transition-colors disabled:bg-gray-50 text-gray-700"
                     >
-                      + Agregar
+                      <option value="Alta Gerencia">Alta Gerencia</option>
+                      <option value="Mando Medio">Mando Medio</option>
+                      <option value="Operativo">Operativo</option>
+                      <option value="Externo">Externo</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[10px] font-medium text-gray-600">Estado *</label>
+                    <select
+                      name="estado"
+                      value={formData.estado}
+                      onChange={handleChange}
+                      disabled={isViewMode}
+                      className="w-full h-8 px-2.5 py-1.5 text-[10px] border border-gray-200 rounded-lg focus:outline-none focus:border-[#9B0F06] transition-colors disabled:bg-gray-50 text-gray-700"
+                    >
+                      <option value="Activo">Activo</option>
+                      <option value="Inactivo">Inactivo</option>
+                    </select>
+                  </div>
+                </div>
+
+                <p className="text-[9px] uppercase tracking-widest font-semibold text-gray-500 mt-4 border-b border-gray-100 pb-1">
+                  Permisos Asignados
+                </p>
+
+                <div className="bg-gray-50 p-3 rounded-xl border border-gray-100">
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {formData.permisos.map((permiso, idx) => (
+                      <div key={idx} className="flex items-center gap-1 bg-white border border-gray-200 text-gray-700 px-2 py-1 rounded-md text-[9px] font-medium">
+                        {permiso}
+                        {!isViewMode && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoverPermiso(idx)}
+                            className="text-gray-400 hover:text-red-500 transition-colors ml-1"
+                          >
+                            <X size={10} />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    {formData.permisos.length === 0 && (
+                      <span className="text-[9px] text-gray-400 italic">No hay permisos asignados</span>
+                    )}
+                  </div>
+                  
+                  {!isViewMode && (
+                    <div className="mt-2">
+                      <input
+                        type="text"
+                        placeholder="Escribe un permiso y presiona Enter..."
+                        value={nuevoPermiso}
+                        onChange={(e) => setNuevoPermiso(e.target.value)}
+                        onKeyDown={handleAgregarPermiso}
+                        className="w-full h-7 px-2.5 py-1 text-[9px] border border-gray-200 rounded-md focus:outline-none focus:border-[#9B0F06] transition-colors text-gray-700"
+                      />
+                    </div>
+                  )}
+
+                  <div className="mt-3 text-right">
+                    <button type="button" className="text-[9px] font-semibold text-[#9B0F06] hover:text-[#5E0006] transition-colors inline-flex items-center gap-1">
+                      <Shield size={10} /> Ver más / Configurar permisos
                     </button>
+                  </div>
+                </div>
+
+                {role && !isViewMode && (
+                  <div className="mt-4 border-t border-gray-100 pt-3">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentMode('users')}
+                      className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-gray-50 border border-gray-200 hover:bg-gray-100 text-gray-700 text-[10px] font-semibold rounded-lg transition-colors"
+                    >
+                      <UserPlus size={12} />
+                      Agregar usuarios al rol
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {isUsersMode && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[10px] font-medium text-gray-600">
+                    Asigna usuarios al rol <span className="font-bold">{formData.name}</span>.
+                  </p>
+                </div>
+
+                <div className="mb-4">
+                  <label className="text-[10px] font-medium text-gray-600 block mb-1">Agregar usuario</label>
+                  <select
+                    className="w-full h-8 px-2.5 py-1.5 text-[10px] border border-gray-200 rounded-lg focus:outline-none focus:border-[#9B0F06] transition-colors bg-white text-gray-700"
+                    onChange={(e) => {
+                      if (e.target.value) {
+                         const userHierarchy = 2; // Mocking current user hierarchy
+                         const targetHierarchy = 3; // Mocking target hierarchy
+                         if (userHierarchy < targetHierarchy) {
+                            toast.error('Jerarquía insuficiente', {
+                              description: 'Tu nivel de permisos no permite esta acción',
+                              duration: 4000,
+                            });
+                            e.target.value = '';
+                            return;
+                         }
+                         toggleUsuario(e.target.value);
+                         e.target.value = '';
+                      }
+                    }}
+                    defaultValue=""
+                  >
+                    <option value="" disabled>Seleccione un usuario...</option>
+                    {USUARIOS_MOCK.filter(u => !selectedUsuarios.includes(u.id)).map(u => (
+                       <option key={u.id} value={u.id}>
+                         {u.nombre} - {u.rol ? `(Cambiar rol: ${u.rol})` : '(Sin rol)'}
+                       </option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div className="space-y-2">
+                  {selectedUsuarios.map((userId) => {
+                    const usuario = USUARIOS_MOCK.find(u => u.id === userId) || usuariosAsignados.find(u => u.id === userId);
+                    if (!usuario) return null;
+                    return (
+                      <div key={usuario.id} className="flex items-center justify-between rounded-xl border border-gray-100 bg-white px-3 py-2.5 shadow-2xs">
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[11px] font-semibold text-gray-800">{usuario.nombre}</p>
+                          <p className="truncate text-[9px] text-gray-400">{usuario.correo}</p>
+                        </div>
+                        <button onClick={() => toggleUsuario(usuario.id)} className="text-gray-400 hover:text-red-500">
+                           <X size={14} />
+                        </button>
+                      </div>
+                    )
+                  })}
+                  {selectedUsuarios.length === 0 && (
+                    <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-8 text-center flex flex-col items-center">
+                      <Users size={24} className="text-gray-300 mb-2" />
+                      <p className="text-[11px] font-medium text-gray-500">No hay usuarios asignados a este rol.</p>
+                    </div>
                   )}
                 </div>
-                <div className="space-y-2">
-                  {formData.permisos.map((permiso, index) => (
-                    <div key={`${permiso}-${index}`} className="flex items-center gap-2">
-                      <input
-                        value={permiso}
-                        onChange={(e) => handlePermisoChange(index, e.target.value)}
-                        disabled={isViewMode}
-                        className="h-10 flex-1 rounded-xl border border-gray-200 bg-white px-3 text-[12px] text-gray-700 focus:border-[#9B0F06] focus:outline-none disabled:bg-gray-50"
-                      />
-                      {index === 0 ? (
-                        <Shield size={14} className="text-gray-300" />
-                      ) : (
-                        <Check size={14} className="text-green-500" />
-                      )}
-                    </div>
-                  ))}
-                </div>
               </div>
-            </div>
-          )}
-
-          {isUsersMode && (
-            <div className="space-y-3">
-              {usuariosAsignados.length > 0 ? (
-                usuariosAsignados.map((usuario) => (
-                  <label
-                    key={usuario.id}
-                    className="flex items-center gap-3 rounded-2xl border border-gray-100 bg-white px-4 py-3"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedUsuarios.includes(usuario.id)}
-                      onChange={() => toggleUsuario(usuario.id)}
-                      className="h-4 w-4 accent-[#9B0F06]"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-[13px] font-semibold text-gray-800">{usuario.nombre}</p>
-                      <p className="truncate text-[11px] text-gray-400">{usuario.correo}</p>
-                    </div>
-                    <span className="rounded-full bg-gray-100 px-2.5 py-1 text-[10px] font-medium text-gray-500">
-                      {usuario.rol}
-                    </span>
-                  </label>
-                ))
-              ) : (
-                <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-6 text-center text-[12px] text-gray-400">
-                  No hay usuarios asignados a este rol.
-                </div>
-              )}
-            </div>
-          )}
+            )}
           </div>
+          
           <div className="px-5 py-4 border-t border-gray-100 flex justify-end gap-2 bg-white">
+            <button
+              onClick={() => isUsersMode && currentMode !== mode ? setCurrentMode('edit') : onClose()}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-[10px] font-semibold rounded-lg transition-colors shadow-2xs"
+            >
+              {isViewMode ? 'Cerrar' : isUsersMode && currentMode !== mode ? 'Volver al formulario' : 'Cancelar'}
+            </button>
+            {!isViewMode && (
               <button
-                onClick={onClose}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-[11px] font-semibold rounded-lg transition-colors shadow-2xs"
+                onClick={handleGuardar}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#9B0F06] hover:bg-[#5E0006] text-white text-[10px] font-bold rounded-lg transition-colors shadow-sm"
               >
-                {isViewMode ? 'Cerrar' : 'Cancelar'}
+                <Save size={12} />
+                {currentMode === 'create' ? 'Crear Rol' : 'Guardar Cambios'}
               </button>
-              {!isViewMode && (
-                <button
-                  onClick={handleGuardar}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-[#9B0F06] hover:bg-[#5E0006] text-white text-[11px] font-bold rounded-lg transition-colors shadow-sm"
-                >
-                  <Save size={14} />
-                  {mode === 'create' ? 'Crear Rol' : 'Guardar Cambios'}
-                </button>
-              )}
-            </div>
-          </aside>
-        </div>
+            )}
+          </div>
+        </aside>
+      </div>
     </>
   )
 }

@@ -22,6 +22,8 @@ export default function ProyectosPage() {
   const [busqueda, setBusqueda] = useState('')
   const [estadoFiltro, setEstadoFiltro] = useState<EstadoProyecto | 'todos'>('todos')
   const [vista, setVista] = useState<'grid' | 'lista'>('lista')
+  const [pagina, setPagina] = useState(1)
+  const porPagina = 6
 
   const conteos = useMemo(
     () => ({
@@ -50,6 +52,17 @@ export default function ProyectosPage() {
     })
   }, [busqueda, estadoFiltro])
 
+  const totalPaginas = Math.max(1, Math.ceil(proyectosFiltrados.length / porPagina))
+  const proyectosPaginados = useMemo(() => {
+    const inicio = (pagina - 1) * porPagina
+    return proyectosFiltrados.slice(inicio, inicio + porPagina)
+  }, [pagina, proyectosFiltrados])
+
+  const irAPagina = (nuevaPagina: number) => {
+    const segura = Math.min(Math.max(1, nuevaPagina), totalPaginas)
+    setPagina(segura)
+  }
+
   return (
     <div className="space-y-4 text-[#07152B]">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -60,7 +73,7 @@ export default function ProyectosPage() {
           </p>
         </div>
 
-        <Link href="/proyectos/nuevo">
+        <Link href="/dashboard/proyectos/nuevo">
           <span className="inline-flex items-center gap-2 rounded-lg bg-[#A80F08] px-4 py-2 text-[11px] font-semibold text-white shadow-sm transition-colors hover:bg-[#8F0C06]">
             <Plus size={17} strokeWidth={2.4} />
             Nuevo Proyecto
@@ -94,9 +107,15 @@ export default function ProyectosPage() {
       <div className="flex flex-wrap items-center gap-3">
         <ProyectoFiltros
           busqueda={busqueda}
-          setBusqueda={setBusqueda}
+          setBusqueda={(valor) => {
+            setBusqueda(valor)
+            setPagina(1)
+          }}
           estadoFiltro={estadoFiltro}
-          setEstadoFiltro={setEstadoFiltro}
+          setEstadoFiltro={(valor) => {
+            setEstadoFiltro(valor)
+            setPagina(1)
+          }}
           resultados={proyectosFiltrados.length}
         />
 
@@ -122,7 +141,7 @@ export default function ProyectosPage() {
         <>
           {vista === 'grid' && (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {proyectosFiltrados.map((proyecto) => (
+              {proyectosPaginados.map((proyecto) => (
                 <ProyectoCard key={proyecto.id} proyecto={proyecto} />
               ))}
             </div>
@@ -130,11 +149,11 @@ export default function ProyectosPage() {
 
           {vista === 'lista' && (
             <div className="flex flex-col gap-2.5">
-              {proyectosFiltrados.map((proyecto) => (
+              {proyectosPaginados.map((proyecto) => (
                 <div
                   key={proyecto.id}
                   className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 rounded-2xl border border-gray-100 bg-white p-3.5 sm:px-4 sm:py-2.5 shadow-sm transition-all duration-300 ease-out hover:shadow-md hover:-translate-y-0.5 cursor-pointer"
-                  onClick={() => router.push(`/proyectos/${proyecto.id}`)}
+                  onClick={() => router.push(`/dashboard/proyectos/${proyecto.id}`)}
                 >
                   <div
                     className="hidden sm:block w-1 flex-shrink-0 self-stretch rounded-full"
@@ -200,6 +219,44 @@ export default function ProyectosPage() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {totalPaginas > 1 && (
+            <div className="flex items-center justify-between rounded-2xl border border-gray-100 bg-white px-3 py-2 shadow-sm">
+              <p className="text-[11px] text-[#8E96AE]">
+                Mostrando {(pagina - 1) * porPagina + 1}-{Math.min(pagina * porPagina, proyectosFiltrados.length)} de {proyectosFiltrados.length}
+              </p>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => irAPagina(pagina - 1)}
+                  disabled={pagina === 1}
+                  className="rounded-lg border border-gray-200 px-3 py-1.5 text-[11px] font-semibold text-[#344057] transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Anterior
+                </button>
+                {Array.from({ length: totalPaginas }).map((_, index) => {
+                  const numero = index + 1
+                  return (
+                    <button
+                      key={numero}
+                      onClick={() => irAPagina(numero)}
+                      className={`h-8 w-8 rounded-lg text-[11px] font-semibold transition-colors ${
+                        pagina === numero ? 'bg-[#A80F08] text-white' : 'border border-gray-200 text-[#344057]'
+                      }`}
+                    >
+                      {numero}
+                    </button>
+                  )
+                })}
+                <button
+                  onClick={() => irAPagina(pagina + 1)}
+                  disabled={pagina === totalPaginas}
+                  className="rounded-lg border border-gray-200 px-3 py-1.5 text-[11px] font-semibold text-[#344057] transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Siguiente
+                </button>
+              </div>
             </div>
           )}
         </>

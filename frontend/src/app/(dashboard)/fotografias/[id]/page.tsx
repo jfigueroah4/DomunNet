@@ -183,7 +183,7 @@ export default function FotografiaDetallePage({
                   Proyecto
                 </div>
                 <Link
-                  href={`/proyectos/${foto.proyectoId}`}
+                  href={`/dashboard/proyectos/${foto.proyectoId}`}
                   className="text-[10px] text-[#9B0F06] font-medium hover:underline"
                 >
                   {foto.proyectoNombre}
@@ -233,7 +233,7 @@ export default function FotografiaDetallePage({
               </Link>
 
               <Link
-                href={`/proyectos/${foto.proyectoId}`}
+                href={`/dashboard/proyectos/${foto.proyectoId}`}
                 className="w-full text-[10px] px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:border-[#9B0F06] hover:text-[#9B0F06] transition-colors flex items-center justify-center gap-1.5"
               >
                 <FolderOpen size={12} />

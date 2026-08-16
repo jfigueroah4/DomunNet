@@ -11,16 +11,16 @@ const AIAssistant = dynamic(() => import('./AIAssistant'), { ssr: false })
 import { useRouter } from 'next/navigation'
 
 const systemRoutes = [
-  { name: 'Inicio', path: '/inicio' },
-  { name: 'Proyectos', path: '/proyectos' },
-  { name: 'Bitácora', path: '/bitacora' },
-  { name: 'Fotografías', path: '/fotografias' },
-  { name: 'Reportes', path: '/reportes' },
-  { name: 'Usuarios', path: '/usuarios' },
-  { name: 'Roles', path: '/roles' },
-  { name: 'Configuración', path: '/configuracion' },
-  { name: 'Mi Perfil', path: '/perfil' },
-  { name: 'Soporte', path: '/soporte' }
+  { name: 'Inicio', path: '/dashboard' },
+  { name: 'Proyectos', path: '/dashboard/proyectos' },
+  { name: 'Bitácora', path: '/dashboard/bitacora' },
+  { name: 'Fotografías', path: '/dashboard/fotografias' },
+  { name: 'Reportes', path: '/dashboard/reportes' },
+  { name: 'Usuarios', path: '/dashboard/usuarios' },
+  { name: 'Roles', path: '/dashboard/roles' },
+  { name: 'Configuración', path: '/dashboard/configuracion' },
+  { name: 'Mi Perfil', path: '/dashboard/perfil' },
+  { name: 'Soporte', path: '/dashboard/soporte' }
 ]
 
 interface TopBarProps {
@@ -294,7 +294,7 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
               <div className="py-1">
 
                 <Link
-                  href="/perfil"
+                  href="/dashboard/perfil"
                   onClick={closeMenu}
                   className="flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition-colors text-[11px] text-gray-600">
                   <User size={13} className="text-gray-400" />
@@ -302,7 +302,7 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
                 </Link>
 
                 <Link
-                  href="/soporte"
+                  href="/dashboard/soporte"
                   onClick={closeMenu}
                   className="flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition-colors text-[11px] text-gray-600">
                   <User size={13} className="text-gray-400" />

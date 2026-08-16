@@ -19,8 +19,10 @@ export function RoleDeleteModal({
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
-      <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
+    <>
+      <div className="fixed inset-0 z-40 bg-black/45 backdrop-blur-[1px]" onClick={onClose} />
+      <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none p-4">
+        <div className="pointer-events-auto w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
         <div className="mb-5 flex items-start justify-between">
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-50 text-[#D53E0F]">
             <Trash2 size={20} />
@@ -59,7 +61,8 @@ export function RoleDeleteModal({
             Eliminar Rol
           </button>
         </div>
+        </div>
       </div>
-    </div>
+    </>
   )
 }

@@ -141,15 +141,16 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
     return edad
   }
 
-  const handleFechaChange = (tipo: 'dia' | 'mes' | 'año', valor: string) => {
+  const handleFechaChange = (tipo: 'dia' | 'mes' | 'ano', valor: string) => {
     const nuevoForm = { ...formData, [`${tipo}Nacimiento`]: valor }
     setFormData(nuevoForm)
-    
-    if (nuevoForm.diaNacimiento && nuevoForm.mesNacimiento && nuevoForm.anoNacimiento.length === 4) {
-      const edad = calcularEdad(nuevoForm.diaNacimiento, nuevoForm.mesNacimiento, nuevoForm.anoNacimiento)
-      setErrors({ ...errors, fechaNacimiento: edad < 18 })
-    } else {
-      setErrors({ ...errors, fechaNacimiento: false })
+    setErrors({ ...errors, fechaNacimiento: false })
+  }
+
+  const handleFechaBlur = () => {
+    if (formData.diaNacimiento && formData.mesNacimiento && formData.anoNacimiento.length === 4) {
+      const edad = calcularEdad(formData.diaNacimiento, formData.mesNacimiento, formData.anoNacimiento)
+      setErrors((prev) => ({ ...prev, fechaNacimiento: edad < 18 }))
     }
   }
 
@@ -256,9 +257,10 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end overflow-hidden">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px]" onClick={onClose} />
-      <aside className={`relative w-full ${isViewMode ? 'max-w-md' : 'max-w-lg'} bg-white h-full shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-right`}>
+    <>
+      <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[1px]" onClick={onClose} />
+      <div className="fixed inset-0 z-50 flex justify-end overflow-hidden pointer-events-none">
+        <aside className={`pointer-events-auto relative w-full ${isViewMode ? 'max-w-md' : 'max-w-lg'} bg-white h-full shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-right`}>
         
         <div className="px-5 py-3 border-b border-gray-100 bg-gray-50">
           <div className="mb-3">
@@ -370,51 +372,48 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
               <label className="text-[10px] font-medium text-gray-600 mb-1 block">Fecha de nacimiento *</label>
               <div className="flex items-center gap-1">
                 <input
-                  type="number"
-                  min="1"
-                  max="31"
+                  type="text"
                   placeholder="DD"
                   value={formData.diaNacimiento}
                   disabled={isViewMode}
                   onChange={(e) => {
-                    let val = e.target.value.replace(/\D/g, '').slice(0, 2)
-                    if (val && parseInt(val) > 31) val = '31'
-                    handleFechaChange('dia', val)
+                    const val = e.target.value
+                    if (/^\d{0,2}$/.test(val)) {
+                      handleFechaChange('dia', val)
+                    }
                   }}
-                  className={`w-10 h-8 px-1 py-1.5 text-center text-[10px] border rounded-lg focus:outline-none disabled:bg-gray-50 ${
-                    errors.fechaNacimiento ? 'border-[#FF4D4F] bg-red-50/20' : 'border-gray-200 focus:border-[#9B0F06]'
-                  }`}
+                  onBlur={handleFechaBlur}
+                  className="w-10 h-8 px-1 py-1.5 text-center text-[10px] border rounded-lg focus:outline-none disabled:bg-gray-50 border-gray-200 focus:border-[#9B0F06]"
                 />
                 <span className="text-gray-400">/</span>
                 <input
-                  type="number"
-                  min="1"
-                  max="12"
+                  type="text"
                   placeholder="MM"
                   value={formData.mesNacimiento}
                   disabled={isViewMode}
                   onChange={(e) => {
-                    let val = e.target.value.replace(/\D/g, '').slice(0, 2)
-                    if (val && parseInt(val) > 12) val = '12'
-                    handleFechaChange('mes', val)
+                    const val = e.target.value
+                    if (/^\d{0,2}$/.test(val)) {
+                      handleFechaChange('mes', val)
+                    }
                   }}
-                  className={`w-10 h-8 px-1 py-1.5 text-center text-[10px] border rounded-lg focus:outline-none disabled:bg-gray-50 ${
-                    errors.fechaNacimiento ? 'border-[#FF4D4F] bg-red-50/20' : 'border-gray-200 focus:border-[#9B0F06]'
-                  }`}
+                  onBlur={handleFechaBlur}
+                  className="w-10 h-8 px-1 py-1.5 text-center text-[10px] border rounded-lg focus:outline-none disabled:bg-gray-50 border-gray-200 focus:border-[#9B0F06]"
                 />
                 <span className="text-gray-400">/</span>
                 <input
-                  type="number"
+                  type="text"
                   placeholder="YYYY"
                   value={formData.anoNacimiento}
                   disabled={isViewMode}
                   onChange={(e) => {
-                    let val = e.target.value.replace(/\D/g, '').slice(0, 4)
-                    handleFechaChange('año', val)
+                    const val = e.target.value
+                    if (/^\d{0,4}$/.test(val)) {
+                      handleFechaChange('ano', val)
+                    }
                   }}
-                  className={`w-14 h-8 px-1 py-1.5 text-center text-[10px] border rounded-lg focus:outline-none disabled:bg-gray-50 ${
-                    errors.fechaNacimiento ? 'border-[#FF4D4F] bg-red-50/20' : 'border-gray-200 focus:border-[#9B0F06]'
-                  }`}
+                  onBlur={handleFechaBlur}
+                  className="w-14 h-8 px-1 py-1.5 text-center text-[10px] border rounded-lg focus:outline-none disabled:bg-gray-50 border-gray-200 focus:border-[#9B0F06]"
                 />
               </div>
               {errors.fechaNacimiento && <p className="text-[9px] text-[#FF4D4F] mt-1">El usuario debe ser mayor de 18 años</p>}
@@ -627,11 +626,14 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
         </div>
       </aside>
 
+      </div>
+
       {drawerProyectosAbierto && (
-        <div className="fixed inset-0 z-50 flex justify-end overflow-hidden">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px]" onClick={() => setDrawerProyectosAbierto(false)} />
-          <div className="relative w-full max-w-lg bg-white h-full shadow-2xl flex flex-col overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-gray-50">
+        <>
+          <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[1px]" onClick={() => setDrawerProyectosAbierto(false)} />
+          <div className="fixed inset-0 z-50 flex justify-end overflow-hidden pointer-events-none">
+            <div className="pointer-events-auto relative w-full max-w-lg bg-white h-full shadow-2xl flex flex-col overflow-hidden">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-gray-50">
               <div>
                 <h2 className="text-sm font-bold text-gray-800">Proyectos Asignados</h2>
                 <p className="text-[10px] text-gray-400">{usuario?.proyectosAsignados?.length || 0} proyectos</p>
@@ -663,9 +665,10 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
                 Cerrar
               </button>
             </div>
+            </div>
           </div>
-        </div>
+        </>
       )}
-    </div>
+    </>
   )
 }

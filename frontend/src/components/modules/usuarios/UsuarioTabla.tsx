@@ -1,5 +1,6 @@
 'use client'
 
+import React from 'react'
 import { Trash2, Edit2, Eye } from 'lucide-react'
 import { Usuario } from '@/types/usuario'
 import { UsuarioEstadoBadge } from './UsuarioEstadoBadge'
@@ -12,7 +13,7 @@ interface UsuarioTablaProps {
   onEliminar: (id: string) => void
 }
 
-export function UsuarioTabla({
+export const UsuarioTabla = React.memo(function UsuarioTabla({
   usuarios,
   onVer,
   onEditar,
@@ -125,4 +126,5 @@ export function UsuarioTabla({
       </div>
     </div>
   )
-}
+})
+

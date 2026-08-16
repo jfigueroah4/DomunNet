@@ -6,19 +6,23 @@ import { Plus, Users, Shield, Search, Loader2, ChevronLeft, ChevronRight } from 
 import { api } from '@/lib/api/cliente'
 import { Usuario, RolUsuario, EstadoUsuario } from '@/types/usuario'
 import { UsuarioTabla } from '@/components/modules/usuarios/UsuarioTabla'
-import { UsuarioDrawer, UsuarioDrawerMode } from '@/components/modules/usuarios/UsuarioDrawer'
-import { UsuarioDeleteModal } from '@/components/modules/usuarios/UsuarioDeleteModal'
+import { type UsuarioDrawerMode } from '@/components/modules/usuarios/UsuarioDrawer'
 import { toast } from 'sonner'
+import dynamic from 'next/dynamic'
+
+const UsuarioDrawer = dynamic(() => import('@/components/modules/usuarios/UsuarioDrawer').then(m => m.UsuarioDrawer), { ssr: false })
+const UsuarioDeleteModal = dynamic(() => import('@/components/modules/usuarios/UsuarioDeleteModal').then(m => m.UsuarioDeleteModal), { ssr: false })
 
 export default function UsuariosPage() {
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
   const [loading, setLoading] = useState(true)
   const [busqueda, setBusqueda] = useState('')
+  const [debouncedBusqueda, setDebouncedBusqueda] = useState('')
   const [filtroRol, setFiltroRol] = useState<RolUsuario | 'Todos'>('Todos')
   const [filtroEstado, setFiltroEstado] = useState<EstadoUsuario | 'Todos'>('Todos')
   
   const [paginaActual, setPaginaActual] = useState(1)
-  const [registrosPorPagina, setRegistrosPorPagina] = useState(10)
+  const [registrosPorPagina, setRegistrosPorPagina] = useState(5)
 
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [drawerMode, setDrawerMode] = useState<UsuarioDrawerMode>('create')
@@ -44,13 +48,20 @@ export default function UsuariosPage() {
     cargarUsuarios()
   }, [cargarUsuarios])
 
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedBusqueda(busqueda)
+    }, 300)
+    return () => clearTimeout(handler)
+  }, [busqueda])
+
   // Map "Desactivado" UI to "Suspendido" internal state and vice versa for filtering
   const usuariosFiltrados = useMemo(() => {
     return usuarios.filter((usuario) => {
       const nombreCompleto = `${usuario.primer_nombre} ${usuario.segundo_nombre || ''} ${usuario.primer_apellido} ${usuario.segundo_apellido || ''}`.replace(/\s+/g, ' ').trim()
       const cumpleBusqueda =
-        nombreCompleto.toLowerCase().includes(busqueda.toLowerCase()) ||
-        usuario.correo.toLowerCase().includes(busqueda.toLowerCase())
+        nombreCompleto.toLowerCase().includes(debouncedBusqueda.toLowerCase()) ||
+        usuario.correo.toLowerCase().includes(debouncedBusqueda.toLowerCase())
 
       const cumpleRol = filtroRol === 'Todos' || usuario.rol === filtroRol
       
@@ -62,7 +73,7 @@ export default function UsuariosPage() {
 
       return cumpleBusqueda && cumpleRol && cumpleEstado
     })
-  }, [usuarios, busqueda, filtroRol, filtroEstado])
+  }, [usuarios, debouncedBusqueda, filtroRol, filtroEstado])
 
   const totalPaginas = Math.ceil(usuariosFiltrados.length / registrosPorPagina)
   
@@ -73,7 +84,7 @@ export default function UsuariosPage() {
   
   useEffect(() => {
     setPaginaActual(1)
-  }, [busqueda, filtroRol, filtroEstado, registrosPorPagina])
+  }, [debouncedBusqueda, filtroRol, filtroEstado, registrosPorPagina])
 
   const rolesUnicos = useMemo(() => {
     const roles = new Set(usuarios.map(u => u.rol));

@@ -6,9 +6,16 @@ import type { LucideIcon } from 'lucide-react'
 import { Eye, PencilLine, Plus, Shield, Trash2, Users, UserPlus, ChevronLeft, ChevronRight } from 'lucide-react'
 import { DEMO_ROLES, Role } from '@/data/roles'
 import { USUARIOS_MOCK } from '@/data/usuarios.mock'
-import { RoleDrawer, RoleDrawerMode } from '@/components/modules/roles/RoleDrawer'
-import { RoleDeleteModal } from '@/components/modules/roles/RoleDeleteModal'
+import { type RoleDrawerMode } from '@/components/modules/roles/RoleDrawer'
 import { toast } from 'sonner'
+import dynamic from 'next/dynamic'
+import { useEffect } from 'react'
+import { Search } from 'lucide-react'
+import { RolTabla } from '@/components/modules/roles/RolTabla'
+
+const RoleDrawer = dynamic(() => import('@/components/modules/roles/RoleDrawer').then(m => m.RoleDrawer), { ssr: false })
+const RoleDeleteModal = dynamic(() => import('@/components/modules/roles/RoleDeleteModal').then(m => m.RoleDeleteModal), { ssr: false })
+
 
 const iconPorRol: Record<string, LucideIcon> = {
   Administrador: Shield,
@@ -30,13 +37,32 @@ export default function RolesPage() {
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [roleEliminar, setRoleEliminar] = useState<Role | undefined>()
   
+  const [busqueda, setBusqueda] = useState('')
+  const [debouncedBusqueda, setDebouncedBusqueda] = useState('')
+  const [filtroEstado, setFiltroEstado] = useState<'Todos' | 'Activo' | 'Inactivo'>('Todos')
+  
   // Pagination state
   const [paginaActual, setPaginaActual] = useState(1)
-  const [registrosPorPagina, setRegistrosPorPagina] = useState(10)
+  const [registrosPorPagina, setRegistrosPorPagina] = useState(5)
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedBusqueda(busqueda)
+    }, 300)
+    return () => clearTimeout(handler)
+  }, [busqueda])
 
   const rolesConUsuarios = useMemo(
     () =>
-      roles.map((role) => {
+      roles.filter((role) => {
+        const cumpleBusqueda =
+          role.name.toLowerCase().includes(debouncedBusqueda.toLowerCase()) ||
+          role.descripcion.toLowerCase().includes(debouncedBusqueda.toLowerCase())
+          
+        const cumpleEstado = filtroEstado === 'Todos' || role.estado === filtroEstado
+        
+        return cumpleBusqueda && cumpleEstado
+      }).map((role) => {
         const usuariosAsignados = USUARIOS_MOCK.filter(
           (usuario) => usuario.rol.toLowerCase() === role.name.toLowerCase()
         )
@@ -46,7 +72,7 @@ export default function RolesPage() {
           usuariosAsignados,
         }
       }),
-    [roles]
+    [roles, debouncedBusqueda, filtroEstado]
   )
 
   const totalPaginas = Math.ceil(rolesConUsuarios.length / registrosPorPagina)
@@ -55,6 +81,10 @@ export default function RolesPage() {
     const inicio = (paginaActual - 1) * registrosPorPagina
     return rolesConUsuarios.slice(inicio, inicio + registrosPorPagina)
   }, [rolesConUsuarios, paginaActual, registrosPorPagina])
+
+  useEffect(() => {
+    setPaginaActual(1)
+  }, [debouncedBusqueda, filtroEstado, registrosPorPagina])
 
   const abrirDrawer = (mode: RoleDrawerMode, role?: Role) => {
     setRoleActivo(role)
@@ -67,39 +97,65 @@ export default function RolesPage() {
     email: string
     descripcion: string
     color: string
+    estado?: 'Activo' | 'Inactivo'
+    nivelJerarquico?: string
     permisos: string[]
     usuariosAsignados: string[]
   }) => {
-    if (drawerMode === 'edit' && roleActivo) {
-      setRoles((actuales) =>
-        actuales.map((role) =>
-          role.id === roleActivo.id
-            ? {
-                ...role,
-                name: payload.name,
-                email: payload.email,
-                descripcion: payload.descripcion,
-                color: payload.color,
-                permisos: payload.permisos,
-              }
-            : role
+    const ejecutarGuardado = () => {
+      if (drawerMode === 'edit' && roleActivo) {
+        setRoles((actuales) =>
+          actuales.map((role) =>
+            role.id === roleActivo.id
+              ? {
+                  ...role,
+                  name: payload.name,
+                  email: payload.email,
+                  descripcion: payload.descripcion,
+                  color: payload.color,
+                  estado: payload.estado,
+                  nivelJerarquico: payload.nivelJerarquico,
+                  permisos: payload.permisos,
+                }
+              : role
+          )
         )
-      )
-      toast.success('Rol actualizado exitosamente')
-      return
+        toast.success('Rol actualizado exitosamente')
+        return
+      }
+
+      const nuevoRol: Role = {
+        id: `role-${Date.now()}`,
+        name: payload.name || 'Nuevo Rol',
+        email: payload.email,
+        descripcion: payload.descripcion,
+        color: payload.color,
+        estado: payload.estado,
+        nivelJerarquico: payload.nivelJerarquico,
+        permisos: payload.permisos,
+      }
+
+      setRoles((actuales) => [nuevoRol, ...actuales])
+      toast.success('Rol creado exitosamente')
     }
 
-    const nuevoRol: Role = {
-      id: `role-${Date.now()}`,
-      name: payload.name || 'Nuevo Rol',
-      email: payload.email,
-      descripcion: payload.descripcion,
-      color: payload.color,
-      permisos: payload.permisos,
+    if (payload.estado === 'Inactivo' && payload.usuariosAsignados.length > 0) {
+      toast('Confirmación requerida', {
+        description: `Se inhabilitarán ${payload.usuariosAsignados.length} usuarios asociados a este rol. ¿Deseas continuar?`,
+        duration: 10000,
+        action: {
+          label: 'Continuar',
+          onClick: () => ejecutarGuardado(),
+        },
+        cancel: {
+          label: 'Cancelar',
+          onClick: () => {},
+        },
+      });
+      return;
     }
 
-    setRoles((actuales) => [nuevoRol, ...actuales])
-    toast.success('Rol creado exitosamente')
+    ejecutarGuardado()
   }
 
   const handleDelete = (role: Role) => {
@@ -139,104 +195,48 @@ export default function RolesPage() {
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-2xs">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[900px]">
-            <thead className="bg-gray-50 border-b border-gray-100">
-              <tr>
-                <th className="px-4 py-3 text-[9px] text-gray-400 uppercase tracking-wide font-semibold">Rol</th>
-                <th className="px-4 py-3 text-[9px] text-gray-400 uppercase tracking-wide font-semibold">Descripción</th>
-                <th className="px-4 py-3 text-[9px] text-gray-400 uppercase tracking-wide font-semibold">Permisos</th>
-                <th className="px-4 py-3 text-[9px] text-gray-400 uppercase tracking-wide font-semibold">Usuarios</th>
-                <th className="px-4 py-3 text-[9px] text-gray-400 uppercase tracking-wide font-semibold text-right">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rolesPaginados.map((role) => {
-                const Icon = iconPorRol[role.name] ?? Shield
+      <div className="flex flex-wrap items-center justify-between gap-2.5 bg-white p-2.5 rounded-xl border border-gray-100 shadow-2xs">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative md:w-48 w-full">
+            <Search size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Buscar rol..."
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              className="w-full pl-8 pr-3 py-1.5 border border-gray-200 rounded-lg text-[10px] text-gray-700 focus:outline-none focus:border-[#9B0F06] transition-colors"
+            />
+          </div>
 
-                return (
-                  <tr key={role.id} className="hover:bg-gray-50 border-t border-gray-50 transition-colors">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2.5">
-                        <div
-                          className="w-8 h-8 rounded-full flex items-center justify-center text-white shrink-0"
-                          style={{ backgroundColor: role.color }}
-                        >
-                          <Icon size={12} />
-                        </div>
-                        <div>
-                          <p className="font-semibold text-[10px] text-gray-800 leading-tight">{role.name}</p>
-                          <p className="text-[8px] text-gray-400 mt-0.5">{role.email}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-[9px] text-gray-600 font-medium">{role.descripcion}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-1.5">
-                        {role.permisos.slice(0, 3).map((permiso) => (
-                          <span
-                            key={permiso}
-                            className="rounded-md bg-gray-100 px-2 py-0.5 text-[9px] text-gray-600 font-medium"
-                          >
-                            {permiso}
-                          </span>
-                        ))}
-                        {role.permisos.length > 3 && (
-                          <span className="rounded-md bg-gray-100 px-2 py-0.5 text-[9px] text-gray-600 font-medium">
-                            +{role.permisos.length - 3}
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <button
-                        onClick={() => abrirDrawer('users', role)}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-2.5 py-1 text-[9px] font-semibold text-gray-700 transition-colors hover:border-[#9B0F06] hover:text-[#9B0F06]"
-                      >
-                        <Users size={11} />
-                        {role.usuariosAsignados.length} usuarios
-                      </button>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-1">
-                        <button
-                          onClick={() => abrirDrawer('view', role)}
-                          className="p-1 text-gray-400 transition-colors hover:text-[#9B0F06]"
-                          title="Ver"
-                        >
-                          <Eye size={12} />
-                        </button>
-                        <button
-                          onClick={() => abrirDrawer('edit', role)}
-                          className="p-1 text-gray-400 transition-colors hover:text-[#9B0F06]"
-                          title="Editar"
-                        >
-                          <PencilLine size={12} />
-                        </button>
-                        <button
-                          onClick={() => abrirDrawer('users', role)}
-                          className="p-1 text-gray-400 transition-colors hover:text-[#9B0F06]"
-                          title="Asignar usuarios"
-                        >
-                          <UserPlus size={12} />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(role)}
-                          className="p-1 text-gray-400 transition-colors hover:text-red-600"
-                          title="Eliminar"
-                        >
-                          <Trash2 size={12} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+          <div className="flex items-center gap-0.5 bg-gray-100 p-0.5 rounded-lg">
+            {['Todos', 'Activo', 'Inactivo'].map((estado) => (
+              <button
+                key={estado}
+                onClick={() => setFiltroEstado(estado as 'Todos' | 'Activo' | 'Inactivo')}
+                className={`px-3 py-1 text-[10px] transition-colors rounded-md ${
+                  filtroEstado === estado
+                    ? 'bg-white text-gray-800 shadow-2xs font-semibold'
+                    : 'text-gray-500 hover:text-gray-700 font-medium'
+                }`}
+              >
+                {estado}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="text-[10px] text-gray-400 font-medium mr-1">
+          {rolesConUsuarios.length} rol{rolesConUsuarios.length !== 1 ? 'es' : ''}
         </div>
       </div>
+
+      <RolTabla
+        roles={rolesPaginados as any}
+        onVer={(role) => abrirDrawer('view', role)}
+        onEditar={(role) => abrirDrawer('edit', role)}
+        onAsignarUsuarios={(role) => abrirDrawer('users', role)}
+        onEliminar={handleDelete}
+      />
       
       {/* Pagination Controls */}
       <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-xl border border-gray-100 shadow-2xs">

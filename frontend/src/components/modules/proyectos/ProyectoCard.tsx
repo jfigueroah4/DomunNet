@@ -22,7 +22,7 @@ export default function ProyectoCard({ proyecto }: ProyectoCardProps) {
   const equipoExcedente = Math.max(0, proyecto.equipo.length - 3)
 
   return (
-    <Link href={`/proyectos/${proyecto.id}`}>
+    <Link href={`/dashboard/proyectos/${proyecto.id}`}>
       <div className="cursor-pointer rounded-2xl border border-gray-100 bg-white p-3 shadow-sm transition-all duration-300 ease-out hover:shadow-md hover:-translate-y-0.5">
         <div className="mb-2 flex items-center justify-between">
           <ProyectoEstadoBadge estado={proyecto.estado} />

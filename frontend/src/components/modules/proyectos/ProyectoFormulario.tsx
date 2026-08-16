@@ -113,7 +113,7 @@ export default function ProyectoFormulario({ modo = 'crear', proyectoInicial }: 
       rolesProyecto,
     }
     console.log(`Proyecto ${modo === 'crear' ? 'creado' : 'actualizado'}:`, proyectoData)
-    router.push(modo === 'crear' ? '/proyectos' : `/proyectos/${proyectoInicial?.id}`)
+    router.push(modo === 'crear' ? '/dashboard/proyectos' : `/dashboard/proyectos/${proyectoInicial?.id}`)
   }
 
   return (

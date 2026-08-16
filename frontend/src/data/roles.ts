@@ -5,6 +5,8 @@ export interface Role {
   descripcion: string
   permisos: string[]
   color: string
+  estado?: 'Activo' | 'Inactivo'
+  nivelJerarquico?: string
 }
 
 export const DEMO_ROLES: Role[] = [
@@ -15,6 +17,8 @@ export const DEMO_ROLES: Role[] = [
     descripcion: 'Acceso total al sistema y configuración general.',
     permisos: ['Dashboard completo', 'Gestionar usuarios', 'Gestionar roles', 'Reportes avanzados'],
     color: '#9B0F06',
+    estado: 'Activo',
+    nivelJerarquico: 'Alta Gerencia',
   },
   {
     id: 'residente',
@@ -23,6 +27,8 @@ export const DEMO_ROLES: Role[] = [
     descripcion: 'Responsable técnico con control de avance diario.',
     permisos: ['Proyectos asignados', 'Crear bitácoras', 'Subir fotografías', 'Ver reportes'],
     color: '#1D4ED8',
+    estado: 'Activo',
+    nivelJerarquico: 'Mando Medio',
   },
   {
     id: 'supervisor',
@@ -31,6 +37,8 @@ export const DEMO_ROLES: Role[] = [
     descripcion: 'Supervisión operativa y seguimiento de campo.',
     permisos: ['Ver proyectos asignados', 'Editar avances', 'Crear bitácoras', 'Revisar fotos'],
     color: '#7C3AED',
+    estado: 'Activo',
+    nivelJerarquico: 'Operativo',
   },
   {
     id: 'inspector',
@@ -39,6 +47,8 @@ export const DEMO_ROLES: Role[] = [
     descripcion: 'Inspección técnica, evidencias y validaciones.',
     permisos: ['Crear inspecciones', 'Subir evidencias', 'Ver bitácoras', 'Consultar reportes'],
     color: '#D97706',
+    estado: 'Activo',
+    nivelJerarquico: 'Operativo',
   },
   {
     id: 'contratante',
@@ -47,6 +57,8 @@ export const DEMO_ROLES: Role[] = [
     descripcion: 'Consulta de avances, autorizaciones y seguimiento.',
     permisos: ['Dashboard limitado', 'Proyectos asignados', 'Reportes autorizados'],
     color: '#0F766E',
+    estado: 'Activo',
+    nivelJerarquico: 'Externo',
   },
   {
     id: 'contratista',
@@ -55,6 +67,8 @@ export const DEMO_ROLES: Role[] = [
     descripcion: 'Ejecución operativa y soporte de recursos.',
     permisos: ['Proyectos asignados', 'Recursos operativos', 'Reportes asignados'],
     color: '#0891B2',
+    estado: 'Activo',
+    nivelJerarquico: 'Externo',
   },
   {
     id: 'gerencia',
@@ -63,6 +77,8 @@ export const DEMO_ROLES: Role[] = [
     descripcion: 'Visión ejecutiva de proyectos y reportes.',
     permisos: ['Dashboard ejecutivo', 'Reportes', 'Supervisión'],
     color: '#4F46E5',
+    estado: 'Activo',
+    nivelJerarquico: 'Alta Gerencia',
   },
   {
     id: 'campo',
@@ -71,6 +87,8 @@ export const DEMO_ROLES: Role[] = [
     descripcion: 'Registro operativo en campo y fotografías.',
     permisos: ['Bitácora asignada', 'Fotografías', 'Crear tickets'],
     color: '#16A34A',
+    estado: 'Activo',
+    nivelJerarquico: 'Operativo',
   },
   {
     id: 'proveedor',
@@ -79,5 +97,7 @@ export const DEMO_ROLES: Role[] = [
     descripcion: 'Consulta de suministros, entregas y solicitudes.',
     permisos: ['Recursos asignados', 'Crear tickets', 'Ver órdenes'],
     color: '#EA580C',
+    estado: 'Inactivo',
+    nivelJerarquico: 'Externo',
   },
 ]
