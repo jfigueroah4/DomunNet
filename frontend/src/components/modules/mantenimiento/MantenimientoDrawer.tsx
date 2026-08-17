@@ -1,7 +1,7 @@
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { X, Check } from 'lucide-react'
 import { api } from '@/lib/api/cliente'
 
@@ -423,12 +423,39 @@ interface Props {
   table: string
   record?: any
   onSave: (data: any) => void
+  dataKeys?: string[]
 }
 
-export default function MantenimientoDrawer({ isOpen, onClose, mode, table, record, onSave }: Props) {
+export default function MantenimientoDrawer({ isOpen, onClose, mode, table, record, onSave, dataKeys = [] }: Props) {
   const [formData, setFormData] = useState<any>({})
   const [optionsMap, setOptionsMap] = useState<Record<string, any[]>>({})
-  const schema = TABLES_SCHEMA[table] || []
+  
+  const schema = useMemo(() => {
+    const baseSchema = TABLES_SCHEMA[table] || []
+    let newSchema = [...baseSchema]
+    
+    dataKeys.forEach(key => {
+      if (!newSchema.find(f => f.name === key)) {
+        newSchema.push({
+          name: key,
+          label: key.replace(/_/g, ' '),
+          type: key.includes('fecha') ? 'date' : typeof record?.[key] === 'boolean' ? 'boolean' : 'text',
+          required: false,
+          readOnly: key.endsWith('_id')
+        })
+      }
+    })
+    
+    // Always enforce _id fields to be readOnly dynamically
+    newSchema = newSchema.map(f => {
+      if (f.name.endsWith('_id')) {
+        return { ...f, readOnly: true }
+      }
+      return f
+    })
+    
+    return newSchema
+  }, [table, dataKeys, record])
 
   // Cargar opciones dinámicas para selects
   useEffect(() => {
@@ -452,7 +479,7 @@ export default function MantenimientoDrawer({ isOpen, onClose, mode, table, reco
       }
       loadOptions()
     }
-  }, [isOpen, table])
+  }, [isOpen, table, schema])
 
   useEffect(() => {
     if (isOpen) {
@@ -467,7 +494,7 @@ export default function MantenimientoDrawer({ isOpen, onClose, mode, table, reco
         setFormData({ ...record })
       }
     }
-  }, [isOpen, mode, record, table])
+  }, [isOpen, mode, record, table, schema])
 
   if (!isOpen) return null
 
@@ -492,60 +519,72 @@ export default function MantenimientoDrawer({ isOpen, onClose, mode, table, reco
 
   return (
     <>
-      <div className="fixed top-0 left-0 right-0 bottom-0 z-[9990] bg-black/40 backdrop-blur-[1px]" onClick={onClose} />
-      <div className="fixed top-0 left-0 right-0 bottom-0 z-[9991] flex justify-end overflow-hidden pointer-events-none">
-        <aside className="pointer-events-auto relative w-[420px] max-w-[100vw] box-border bg-white h-[100dvh] shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-right">
-          
-          <div className="flex-shrink-0 px-5 py-5 border-b border-gray-100 bg-white">
-            <div className="mb-5">
-              <button 
-                onClick={onClose}
-                className="absolute top-5 right-5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded-full transition-colors"
-              >
-                <X size={20} />
-              </button>
-            </div>
-            <h2 className="text-xl font-bold text-[#07152B]">{title}</h2>
-            <p className="text-sm text-gray-500 mt-1">
+      <div className="fixed inset-0 bg-black/40 backdrop-blur-[1px] z-40 transition-opacity" onClick={onClose} />
+      <div className="fixed right-0 top-0 h-full w-full max-w-[420px] bg-white shadow-2xl z-50 flex flex-col overflow-hidden animate-in slide-in-from-right">
+        
+        <div className="flex-shrink-0 flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-white">
+          <div>
+            <h2 className="text-base font-bold text-gray-800">{title}</h2>
+            <p className="text-[10px] text-gray-400 mt-0.5">
               {mode === 'view' ? 'Visualizando datos del registro' : 'Complete la información solicitada'}
             </p>
           </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+          >
+            <X size={16} className="text-gray-500" />
+          </button>
+        </div>
 
-          <div className="flex-1 overflow-y-auto px-5 py-6">
-            <form id="mantenimiento-form" onSubmit={handleSubmit} className="space-y-4">
-              {schema.length === 0 ? (
-                <p className="text-sm text-gray-500">No hay esquema definido para esta tabla.</p>
-              ) : (
-                <>
-                  {!isReadOnly && mode !== 'create' && record?.id && (
-                    <div className="space-y-1.5 opacity-60 pointer-events-none mb-4 bg-gray-50 p-3 rounded-lg border border-gray-100">
-                      <label className="block text-[10px] font-semibold text-gray-700 uppercase tracking-wide">ID de Registro</label>
-                      <input type="text" value={record.id} disabled className="w-full text-sm bg-transparent border-none focus:outline-none" />
-                    </div>
-                  )}
-                  {schema.map(field => (
-                    <div key={field.name} className="space-y-1.5">
+        <div className="flex-1 overflow-y-auto px-5 py-3">
+          <form id="mantenimiento-form" onSubmit={handleSubmit} className="space-y-0">
+            {schema.length === 0 ? (
+              <p className="text-xs text-gray-500">No hay esquema definido para esta tabla.</p>
+            ) : (
+              <>
+                {!isReadOnly && mode !== 'create' && record?.id && (
+                  <div className="mb-3 space-y-1">
+                    <label className="block text-[10px] font-semibold text-gray-700 uppercase tracking-wide">ID de Registro (No editable - Referencia)</label>
+                    <input type="text" value={record.id} disabled className="w-full h-8 px-2.5 text-[11px] bg-gray-50 text-gray-500 border border-gray-200 rounded-lg focus:outline-none cursor-not-allowed" />
+                  </div>
+                )}
+                {!isReadOnly && mode !== 'create' && record?.created_at && (
+                  <div className="mb-3 space-y-1">
+                    <label className="block text-[10px] font-semibold text-gray-700 uppercase tracking-wide">Fecha de Creación (No editable - Referencia)</label>
+                    <input type="text" value={new Date(record.created_at).toLocaleString()} disabled className="w-full h-8 px-2.5 text-[11px] bg-gray-50 text-gray-500 border border-gray-200 rounded-lg focus:outline-none cursor-not-allowed" />
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+                  {schema.map(field => {
+                    const isDisabled = isReadOnly || field.readOnly;
+                    const disableClass = isDisabled ? 'bg-gray-50 border-gray-200 text-gray-500 cursor-not-allowed' : 'bg-white border-gray-300 focus:border-[#9B0F06]';
+                    
+                    return (
+                    <div key={field.name} className={`space-y-1 ${field.type === 'textarea' ? 'col-span-2' : 'col-span-1'}`}>
                       <label className="block text-[10px] font-semibold text-gray-700 uppercase tracking-wide">
-                        {field.label} {field.required && '*'}
+                        {field.label} {field.required && '*'} 
+                        {field.readOnly && <span className="text-[9px] text-gray-400 normal-case ml-1 tracking-normal">(No editable)</span>}
                       </label>
 
                       {field.type === 'boolean' ? (
-                        <div className="flex items-center gap-2 mt-2">
+                        <div className="flex items-center gap-2 mt-1.5 h-8">
                           <button
                             type="button"
-                            onClick={() => !isReadOnly && handleChange(field.name, !formData[field.name])}
-                            disabled={isReadOnly}
-                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${
+                            onClick={() => !isDisabled && handleChange(field.name, !formData[field.name])}
+                            disabled={isDisabled}
+                            className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors focus:outline-none ${
                               formData[field.name] ? 'bg-[#9B0F06]' : 'bg-gray-200'
-                            } ${isReadOnly ? 'opacity-70 cursor-not-allowed' : ''}`}
+                            } ${isDisabled ? 'opacity-70 cursor-not-allowed' : ''}`}
                           >
                             <span
-                              className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
-                                formData[field.name] ? 'translate-x-4' : 'translate-x-1'
+                              className={`inline-block h-2.5 w-2.5 transform rounded-full bg-white transition-transform ${
+                                formData[field.name] ? 'translate-x-3.5' : 'translate-x-1'
                               }`}
                             />
                           </button>
-                          <span className="text-sm text-gray-600">
+                          <span className="text-[11px] text-gray-600 font-medium">
                             {formData[field.name] ? 'Activo' : 'Inactivo'}
                           </span>
                         </div>
@@ -553,11 +592,9 @@ export default function MantenimientoDrawer({ isOpen, onClose, mode, table, reco
                         <select
                           value={formData[field.name] || ''}
                           onChange={(e) => handleChange(field.name, e.target.value)}
-                          disabled={isReadOnly}
+                          disabled={isDisabled}
                           required={field.required}
-                          className={`w-full h-10 px-3 text-sm border rounded-lg focus:outline-none transition-colors ${
-                            isReadOnly ? 'bg-gray-50 border-gray-200 text-gray-500' : 'bg-white border-gray-300 focus:border-[#9B0F06]'
-                          }`}
+                          className={`w-full h-8 px-2.5 text-[11px] border rounded-lg focus:outline-none transition-colors ${disableClass}`}
                         >
                           <option value="">Seleccione una opción</option>
                           {optionsMap[field.name]?.map((opt: any) => (
@@ -570,12 +607,10 @@ export default function MantenimientoDrawer({ isOpen, onClose, mode, table, reco
                         <textarea
                           value={formData[field.name] || ''}
                           onChange={(e) => handleChange(field.name, e.target.value)}
-                          disabled={isReadOnly}
+                          disabled={isDisabled}
                           required={field.required}
-                          rows={3}
-                          className={`w-full p-3 text-sm border rounded-lg focus:outline-none transition-colors resize-none ${
-                            isReadOnly ? 'bg-gray-50 border-gray-200 text-gray-500' : 'bg-white border-gray-300 focus:border-[#9B0F06]'
-                          }`}
+                          rows={2}
+                          className={`w-full p-2.5 text-[11px] border rounded-lg focus:outline-none transition-colors resize-none ${disableClass}`}
                           placeholder={`Ingrese ${field.label.toLowerCase()}`}
                         />
                       ) : (
@@ -583,42 +618,38 @@ export default function MantenimientoDrawer({ isOpen, onClose, mode, table, reco
                           type={field.type}
                           value={formData[field.name] || ''}
                           onChange={(e) => handleChange(field.name, e.target.value)}
-                          disabled={isReadOnly}
+                          disabled={isDisabled}
                           required={field.required}
-                          className={`w-full h-10 px-3 text-sm border rounded-lg focus:outline-none transition-colors ${
-                            isReadOnly ? 'bg-gray-50 border-gray-200 text-gray-500' : 'bg-white border-gray-300 focus:border-[#9B0F06]'
-                          }`}
+                          className={`w-full h-8 px-2.5 text-[11px] border rounded-lg focus:outline-none transition-colors ${disableClass}`}
                           placeholder={`Ingrese ${field.label.toLowerCase()}`}
                         />
                       )}
                     </div>
-                  ))}
-                </>
-              )}
-            </form>
-          </div>
+                  )})}
+                </div>
+              </>
+            )}
+          </form>
+        </div>
 
+        <div className="flex-shrink-0 px-5 py-3 border-t border-gray-100 bg-gray-50 flex gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 border border-gray-200 bg-white text-gray-700 text-xs font-semibold h-8 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            {isReadOnly ? 'Cerrar' : 'Cancelar'}
+          </button>
           {!isReadOnly && (
-            <div className="flex-shrink-0 px-5 py-4 border-t border-gray-100 bg-white">
-              <div className="flex justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  form="mantenimiento-form"
-                  className="px-4 py-2 text-sm font-medium text-white bg-[#9B0F06] hover:bg-[#7a0c05] rounded-lg transition-colors shadow-sm"
-                >
-                  Guardar Cambios
-                </button>
-              </div>
-            </div>
+            <button
+              type="submit"
+              form="mantenimiento-form"
+              className="flex-1 bg-[#9B0F06] text-white text-xs font-semibold h-8 rounded-lg hover:bg-[#7a0c05] transition-colors flex items-center justify-center gap-2"
+            >
+              {mode === 'create' ? 'Crear' : 'Guardar Cambios'}
+            </button>
           )}
-        </aside>
+        </div>
       </div>
     </>
   )

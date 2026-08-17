@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Plus, Search, Eye, Edit2, Trash2, ArrowLeft, FilterX } from 'lucide-react'
+import React, { useState, useEffect, useMemo } from 'react'
+import { Plus, Search, Eye, Edit2, Trash2, ArrowLeft, FilterX, X, ChevronUp, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
 import Link from 'next/link'
 import { api } from '@/lib/api/cliente'
 import { useCustomToast } from '@/hooks/useCustomToast'
@@ -78,12 +78,18 @@ export default function MantenimientoTablas() {
   const [filters, setFilters] = useState<Record<string, any>>({})
   const [optionsMap, setOptionsMap] = useState<Record<string, any[]>>({})
   
+  // Paginación y Ordenamiento
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(10)
+  const [sortConfig, setSortConfig] = useState<{key: string, direction: 'asc'|'desc'} | null>(null)
+
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const [drawerMode, setDrawerMode] = useState<'create' | 'edit' | 'view'>('create')
   const [selectedRecord, setSelectedRecord] = useState<any>(null)
 
   const { showSuccessToast, showErrorToast } = useCustomToast()
 
+  const dataKeys = data.length > 0 ? Object.keys(data[0]).filter(k => k !== 'id' && k !== 'created_at' && k !== 'updated_at') : []
   const schema = TABLES_SCHEMA[selectedTable.id] || []
   const filterableFields = schema.filter(f => f.type === 'boolean' || f.type === 'select')
 
@@ -107,7 +113,14 @@ export default function MantenimientoTablas() {
   useEffect(() => {
     fetchData()
     setFilters({})
+    setSearchTerm('')
+    setCurrentPage(1)
+    setSortConfig(null)
   }, [selectedTable])
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, filters, itemsPerPage])
 
   useEffect(() => {
     const loadOptions = async () => {
@@ -178,31 +191,66 @@ export default function MantenimientoTablas() {
     }
   }
 
-  const filteredData = data.filter((item) => {
-    // Search filter
-    const matchesSearch = Object.values(item).some(
-      (val) => String(val).toLowerCase().includes(searchTerm.toLowerCase())
-    )
-    if (!matchesSearch) return false
+  const handleSort = (key: string) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    } else if (sortConfig && sortConfig.key === key && sortConfig.direction === 'desc') {
+      setSortConfig(null);
+      return;
+    }
+    setSortConfig({ key, direction });
+  }
 
-    // Dynamic filters
-    for (const key in filters) {
-      if (filters[key] !== '' && filters[key] !== undefined) {
-        const fieldSchema = schema.find(f => f.name === key)
-        if (fieldSchema?.type === 'boolean') {
-          const expectedBool = filters[key] === 'true'
-          if (Boolean(item[key]) !== expectedBool) return false
-        } else {
-          if (String(item[key]) !== String(filters[key])) return false
+  const filteredData = useMemo(() => {
+    return data.filter((item) => {
+      // Search filter
+      const matchesSearch = Object.values(item).some(
+        (val) => String(val).toLowerCase().includes(searchTerm.toLowerCase())
+      )
+      if (!matchesSearch) return false
+
+      // Dynamic filters
+      for (const key in filters) {
+        if (filters[key] !== '' && filters[key] !== undefined) {
+          const fieldSchema = schema.find(f => f.name === key)
+          if (fieldSchema?.type === 'boolean' || typeof item[key] === 'boolean') {
+            const expectedBool = filters[key] === 'true'
+            if (Boolean(item[key]) !== expectedBool) return false
+          } else {
+            // Comparación exacta para select dropdowns
+            if (String(item[key]) !== String(filters[key])) return false
+          }
         }
       }
+
+      return true
+    })
+  }, [data, searchTerm, filters, schema])
+
+  const sortedData = useMemo(() => {
+    let sortableItems = [...filteredData];
+    if (sortConfig !== null) {
+      sortableItems.sort((a, b) => {
+        let valA = a[sortConfig.key];
+        let valB = b[sortConfig.key];
+        
+        if (valA === null || valA === undefined) valA = '';
+        if (valB === null || valB === undefined) valB = '';
+
+        if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
     }
+    return sortableItems;
+  }, [filteredData, sortConfig])
 
-    return true
-  })
+  const totalPages = Math.ceil(sortedData.length / itemsPerPage)
+  const paginatedData = sortedData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
 
-  // Obtener columnas dinámicamente de la data
-  const columns = data.length > 0 ? Object.keys(data[0]).filter(k => k !== 'id' && !k.endsWith('_id') && k !== 'created_at' && k !== 'updated_at') : []
+  // Obtener columnas dinámicamente de la data (máximo 8 visibles)
+  const columns = dataKeys.slice(0, 8)
 
   // Agrupar tablas
   const grupos = [...new Set(TABLAS_MANTENIMIENTO.map(t => t.grupo))]
@@ -251,111 +299,158 @@ export default function MantenimientoTablas() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden w-full relative">
-        <div className="p-4 border-b border-gray-100 bg-gray-50 flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-          <div className="relative w-full sm:w-64 flex-shrink-0">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden w-full relative flex flex-col h-[calc(100vh-200px)]">
+        <div className="p-3 border-b border-gray-100 bg-gray-50 flex items-center gap-4 flex-shrink-0">
+          <div className="relative w-64 flex-shrink-0">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
             <input
               type="text"
-              placeholder="Buscar registro..."
+              placeholder="Búsqueda global..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9B0F06]"
+              className="w-full pl-8 pr-3 h-8 border border-gray-300 rounded-md text-[11px] focus:outline-none focus:ring-1 focus:ring-[#9B0F06]"
             />
           </div>
+          
+          <div className="w-px h-6 bg-gray-200"></div>
+          <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Filtros de Columna:</span>
+          
+          <div className="flex-1 flex overflow-x-auto items-center gap-2 pb-1 no-scrollbar">
+            {columns.map(col => {
+              const fieldSchema = schema.find(f => f.name === col)
+              const type = fieldSchema?.type
+              
+              // Extract unique values from raw data if not boolean or schema-driven select
+              let uniqueValues: any[] = [];
+              if (type !== 'boolean' && type !== 'select') {
+                uniqueValues = Array.from(new Set(data.map(item => item[col])))
+                  .filter(val => val !== null && val !== undefined && val !== '')
+                  .sort();
+              }
 
-          {filterableFields.length > 0 && (
-            <div className="flex flex-wrap items-center gap-3 flex-1 overflow-x-auto">
-              {filterableFields.map(field => (
-                <div key={field.name} className="flex items-center flex-shrink-0">
-                  {field.type === 'boolean' ? (
+              return (
+                <div key={`filter-${col}`} className="flex items-center flex-shrink-0 relative">
+                  {type === 'boolean' ? (
                     <select
-                      value={filters[field.name] || ''}
-                      onChange={(e) => setFilters(prev => ({ ...prev, [field.name]: e.target.value }))}
-                      className="h-9 px-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9B0F06] bg-white"
+                      value={filters[col] || ''}
+                      onChange={(e) => setFilters(prev => ({ ...prev, [col]: e.target.value }))}
+                      className="h-7 px-2 pr-6 border border-gray-300 rounded-md text-[10px] bg-white text-gray-700 min-w-[90px] focus:outline-none focus:ring-1 focus:ring-[#9B0F06]"
                     >
-                      <option value="">{field.label} (Todos)</option>
-                      <option value="true">Sí / Activo</option>
-                      <option value="false">No / Inactivo</option>
+                      <option value="">{col.replace(/_/g, ' ')}</option>
+                      <option value="true">Sí</option>
+                      <option value="false">No</option>
                     </select>
-                  ) : field.type === 'select' ? (
+                  ) : type === 'select' ? (
                     <select
-                      value={filters[field.name] || ''}
-                      onChange={(e) => setFilters(prev => ({ ...prev, [field.name]: e.target.value }))}
-                      className="h-9 px-3 border border-gray-300 rounded-lg text-sm max-w-[200px] truncate focus:outline-none focus:ring-2 focus:ring-[#9B0F06] bg-white"
+                      value={filters[col] || ''}
+                      onChange={(e) => setFilters(prev => ({ ...prev, [col]: e.target.value }))}
+                      className="h-7 px-2 pr-6 border border-gray-300 rounded-md text-[10px] bg-white text-gray-700 max-w-[140px] truncate focus:outline-none focus:ring-1 focus:ring-[#9B0F06]"
                     >
-                      <option value="">{field.label} (Todos)</option>
-                      {optionsMap[field.name]?.map((opt: any) => (
-                        <option key={opt[field.valueKey || 'id']} value={opt[field.valueKey || 'id']}>
-                          {opt[field.labelKey || 'nombre']}
+                      <option value="">{fieldSchema?.label || col.replace(/_/g, ' ')}</option>
+                      {optionsMap[col]?.map((opt: any) => (
+                        <option key={opt[fieldSchema?.valueKey || 'id']} value={opt[fieldSchema?.valueKey || 'id']}>
+                          {opt[fieldSchema?.labelKey || 'nombre']}
                         </option>
                       ))}
                     </select>
-                  ) : null}
+                  ) : (
+                    <select
+                      value={filters[col] || ''}
+                      onChange={(e) => setFilters(prev => ({ ...prev, [col]: e.target.value }))}
+                      className="h-7 px-2 pr-6 border border-gray-300 rounded-md text-[10px] bg-white text-gray-700 max-w-[140px] truncate focus:outline-none focus:ring-1 focus:ring-[#9B0F06]"
+                    >
+                      <option value="">{col.replace(/_/g, ' ')}</option>
+                      {uniqueValues.map((val, i) => (
+                        <option key={i} value={val}>{String(val)}</option>
+                      ))}
+                    </select>
+                  )}
+                  {filters[col] && (
+                    <button 
+                      onClick={() => setFilters(prev => { const newF = {...prev}; delete newF[col]; return newF; })} 
+                      className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500" 
+                      title="Limpiar filtro"
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
                 </div>
-              ))}
-              {Object.values(filters).some(v => v !== '') && (
-                <button 
-                  onClick={() => setFilters({})} 
-                  className="p-1.5 text-gray-400 hover:text-red-500 rounded-md hover:bg-red-50 transition-colors" 
-                  title="Limpiar filtros"
-                >
-                  <FilterX size={18} />
-                </button>
-              )}
-            </div>
-          )}
+              )
+            })}
+            
+            {Object.keys(filters).length > 0 && (
+              <button 
+                onClick={() => setFilters({})} 
+                className="ml-1 h-7 px-2 text-[10px] font-semibold text-red-600 bg-red-50 hover:bg-red-100 rounded-md transition-colors whitespace-nowrap"
+              >
+                Limpiar Todos
+              </button>
+            )}
+          </div>
         </div>
 
-        <div className="w-full overflow-x-auto relative">
-          <table className="w-full text-left text-sm text-gray-600 border-collapse min-w-[800px]">
-            <thead className="text-xs text-gray-700 uppercase bg-gray-50 border-b border-gray-200">
+        <div className="w-full overflow-x-auto relative flex-1">
+          <table className="w-full text-left text-[10px] text-gray-700 border-collapse min-w-[800px]">
+            <thead className="text-[9px] text-gray-500 uppercase bg-gray-100 border-b border-gray-200 sticky top-0 z-20">
               <tr>
                 {columns.map(col => (
-                  <th key={col} className="px-6 py-3 font-semibold whitespace-nowrap">{col.replace(/_/g, ' ')}</th>
+                  <th 
+                    key={col} 
+                    className="px-3 py-2 font-bold whitespace-nowrap border-r border-gray-200 tracking-wider group cursor-pointer hover:bg-gray-200 transition-colors"
+                    onClick={() => handleSort(col)}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span>{col.replace(/_/g, ' ')}</span>
+                      {sortConfig?.key === col ? (
+                        sortConfig.direction === 'asc' ? <ChevronUp size={12} className="text-[#9B0F06]" /> : <ChevronDown size={12} className="text-[#9B0F06]" />
+                      ) : (
+                        <ChevronUp size={12} className="opacity-0 group-hover:opacity-40 transition-opacity" />
+                      )}
+                    </div>
+                  </th>
                 ))}
-                <th className="px-6 py-3 font-semibold text-right sticky right-0 bg-gray-50 z-10 border-l border-gray-200 shadow-[-4px_0_10px_rgba(0,0,0,0.03)] whitespace-nowrap">Acciones</th>
+                <th className="px-3 py-2 font-bold text-center sticky right-0 bg-gray-100 z-30 border-l border-gray-200 shadow-[-4px_0_10px_rgba(0,0,0,0.03)] whitespace-nowrap w-24">
+                  Acciones
+                </th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
                   <td colSpan={columns.length + 1} className="px-6 py-8 text-center text-gray-500">
-                    <div className="animate-pulse flex flex-col items-center">
-                      <div className="h-6 w-6 border-2 border-[#9B0F06] border-t-transparent rounded-full animate-spin mb-2"></div>
-                      Cargando datos...
+                    <div className="flex flex-col items-center">
+                      <div className="h-5 w-5 border-2 border-[#9B0F06] border-t-transparent rounded-full animate-spin mb-2"></div>
+                      <span className="text-xs">Cargando datos...</span>
                     </div>
                   </td>
                 </tr>
-              ) : filteredData.length === 0 ? (
+              ) : paginatedData.length === 0 ? (
                 <tr>
-                  <td colSpan={columns.length + 1} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={columns.length + 1} className="px-6 py-8 text-center text-gray-500 text-xs">
                     No hay registros encontrados.
                   </td>
                 </tr>
               ) : (
-                filteredData.map((row, idx) => (
-                  <tr key={row.id || idx} className="border-b border-gray-100 hover:bg-gray-50 transition-colors group">
+                paginatedData.map((row, idx) => (
+                  <tr key={row.id || idx} className="border-b border-gray-100 hover:bg-yellow-50/50 transition-colors group h-8">
                     {columns.map(col => (
-                      <td key={col} className="px-6 py-4 whitespace-nowrap">
+                      <td key={col} className="px-3 py-1.5 whitespace-nowrap border-r border-gray-50">
                         {typeof row[col] === 'boolean' 
-                          ? (row[col] ? 'Sí' : 'No')
+                          ? (row[col] ? <span className="bg-green-100 text-green-700 px-1.5 py-0.5 rounded-sm font-semibold text-[9px]">SÍ</span> : <span className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-sm font-semibold text-[9px]">NO</span>)
                           : row[col] === null || row[col] === undefined
-                            ? '-' 
-                            : String(row[col]).length > 60 
-                              ? String(row[col]).substring(0, 60) + '...'
-                              : String(row[col])}
+                            ? <span className="text-gray-300">-</span> 
+                            : <span className="truncate block max-w-[280px]" title={String(row[col])}>{String(row[col])}</span>}
                       </td>
                     ))}
-                    <td className="px-6 py-4 whitespace-nowrap text-right space-x-2 sticky right-0 bg-white z-10 border-l border-gray-100 shadow-[-4px_0_10px_rgba(0,0,0,0.03)] group-hover:bg-gray-50 transition-colors">
-                      <button onClick={() => handleView(row)} className="text-gray-400 hover:text-blue-600 p-1">
-                        <Eye size={16} />
+                    <td className="px-3 py-1.5 whitespace-nowrap text-center space-x-1 sticky right-0 bg-white z-10 border-l border-gray-100 shadow-[-4px_0_10px_rgba(0,0,0,0.03)] group-hover:bg-yellow-50/50 transition-colors">
+                      <button onClick={() => handleView(row)} className="text-gray-400 hover:text-blue-600 p-1 rounded hover:bg-blue-50 transition-colors">
+                        <Eye size={14} />
                       </button>
-                      <button onClick={() => handleEdit(row)} className="text-gray-400 hover:text-green-600 p-1">
-                        <Edit2 size={16} />
+                      <button onClick={() => handleEdit(row)} className="text-gray-400 hover:text-green-600 p-1 rounded hover:bg-green-50 transition-colors">
+                        <Edit2 size={14} />
                       </button>
-                      <button onClick={() => handleDelete(row.id)} className="text-gray-400 hover:text-red-600 p-1">
-                        <Trash2 size={16} />
+                      <button onClick={() => handleDelete(row.id)} className="text-gray-400 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors">
+                        <Trash2 size={14} />
                       </button>
                     </td>
                   </tr>
@@ -364,6 +459,48 @@ export default function MantenimientoTablas() {
             </tbody>
           </table>
         </div>
+
+        {/* Paginación Footer */}
+        <div className="p-3 border-t border-gray-100 bg-white flex flex-col sm:flex-row items-center justify-between gap-4 flex-shrink-0 z-20">
+          <div className="flex items-center gap-2 text-[11px] text-gray-500">
+            <span>Mostrar</span>
+            <select 
+              value={itemsPerPage} 
+              onChange={(e) => setItemsPerPage(Number(e.target.value))}
+              className="border border-gray-300 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-[#9B0F06] bg-white text-gray-700"
+            >
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+            </select>
+            <span>registros por página</span>
+          </div>
+
+          <div className="text-[11px] text-gray-500">
+            Mostrando {sortedData.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1} a {Math.min(currentPage * itemsPerPage, sortedData.length)} de {sortedData.length} registros
+          </div>
+
+          <div className="flex items-center gap-1">
+            <button 
+              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+              className="p-1 rounded border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <span className="text-[11px] text-gray-600 font-medium px-2">
+              Página {currentPage} de {totalPages || 1}
+            </span>
+            <button 
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+              disabled={currentPage === totalPages || totalPages === 0}
+              className="p-1 rounded border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+
       </div>
 
       <MantenimientoDrawer
@@ -373,6 +510,7 @@ export default function MantenimientoTablas() {
         table={selectedTable.id}
         record={selectedRecord}
         onSave={handleSave}
+        dataKeys={dataKeys}
       />
     </div>
   )
