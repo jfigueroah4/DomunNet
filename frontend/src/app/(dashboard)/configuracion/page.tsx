@@ -22,7 +22,7 @@ const CONFIG_MODULES = [
     desc: 'Catálogos del sistema',
     icon: Database,
     gradient: 'linear-gradient(135deg, #B45309 0%, #F59E0B 100%)',
-    path: '/dashboard/configuracion/tablas',
+    path: '/dashboard/configuracion/mantenimiento-tablas',
   },
   {
     key: 'backup',

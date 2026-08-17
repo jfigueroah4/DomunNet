@@ -7,6 +7,7 @@ import { UsuarioFormularioDrawer } from '@/components/modules/usuarios/UsuarioFo
 import { Usuario, RolUsuario, EstadoUsuario } from '@/types/usuario'
 import { useCustomToast } from '@/hooks/useCustomToast'
 import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 
 interface UserProfile {
   id: string
@@ -99,21 +100,62 @@ export default function PerfilPage() {
       return
     }
     
-    processSave()
+    processSave(formData)
   }
 
-  const processSave = () => {
+  const processSave = async (formData: any) => {
     setIsEditing(false)
-    // Aquí iría el api.put
-    showSuccessToast('Perfil actualizado correctamente')
+    setIsDrawerOpen(false)
     
-    setTimeout(() => {
-      fetchProfile()
-    }, 500)
+    try {
+      if (!profile?.id) return;
+      const payloadApi: Record<string, unknown> = {
+        primer_nombre: formData.primer_nombre,
+        segundo_nombre: formData.segundo_nombre || null,
+        primer_apellido: formData.primer_apellido,
+        segundo_apellido: formData.segundo_apellido || null,
+        correo: formData.correo,
+        telefono: formData.telefono || '',
+        rol: formData.rol,
+        estado: formData.estado,
+        fecha_nacimiento: formData.fecha_nacimiento,
+      }
+      
+      const res = await api.put(`/usuarios/${profile.id}`, payloadApi)
+      
+      if (res.status === 200 || res.data?.success) {
+         showSuccessToast('Perfil actualizado correctamente');
+         fetchProfile();
+      } else {
+         toast.error('Error al actualizar el perfil');
+      }
+    } catch (error) {
+      console.error('Error al actualizar perfil:', error);
+      toast.error('Error al guardar los cambios en el perfil.');
+    }
   }
 
-  const handleConfirmDeactivation = () => {
+  const handleConfirmDeactivation = async () => {
     setShowDeactivationModal(false)
+    if (pendingData) {
+      try {
+        if (!profile?.id) return;
+        const payloadApi: Record<string, unknown> = {
+          primer_nombre: pendingData.primer_nombre,
+          segundo_nombre: pendingData.segundo_nombre || null,
+          primer_apellido: pendingData.primer_apellido,
+          segundo_apellido: pendingData.segundo_apellido || null,
+          correo: pendingData.correo,
+          telefono: pendingData.telefono || '',
+          rol: pendingData.rol,
+          estado: pendingData.estado,
+          fecha_nacimiento: pendingData.fecha_nacimiento,
+        }
+        await api.put(`/usuarios/${profile.id}`, payloadApi)
+      } catch (e) {
+        console.error(e)
+      }
+    }
     showSuccessToast('Cuenta desactivada. Cerrando sesión...')
     // En un sistema real aquí haríamos logout y limpiaríamos tokens
     setTimeout(() => {
@@ -160,14 +202,14 @@ export default function PerfilPage() {
   }
 
   // Componente interno para re-usar la lógica del valor + lápiz
-  const EditableField = ({ label, value, fallback }: { label: string, value: string | null | undefined, fallback: string }) => (
+  const EditableField = ({ label, value, fallback, editable = true }: { label: string, value: string | null | undefined, fallback: string, editable?: boolean }) => (
     <div>
       <label className="text-[10px] text-[#999] uppercase tracking-wide">{label}</label>
       <div className="flex items-center gap-2 mt-1">
         <p className="text-sm font-medium text-gray-800">
           {value || fallback}
         </p>
-        {isEditing && (
+        {isEditing && editable && (
           <button 
             onClick={handleOpenDrawer}
             className="text-[#9B0F06] hover:text-[#5E0006] transition-colors p-1 rounded hover:bg-red-50"
@@ -239,7 +281,7 @@ export default function PerfilPage() {
             <EditableField label="Primer Apellido" value={profile.primerApellido} fallback="-" />
             <EditableField label="Segundo Apellido" value={profile.segundoApellido} fallback="-" />
             <div className="col-span-2">
-              <EditableField label="Nombre de Usuario" value={profile.username} fallback="No registrado" />
+              <EditableField label="Nombre de Usuario" value={profile.username} fallback="No registrado" editable={false} />
             </div>
             <div className="col-span-2">
               <EditableField label="Correo Electrónico" value={profile.correo} fallback="-" />

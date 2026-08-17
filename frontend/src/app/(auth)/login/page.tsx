@@ -239,7 +239,6 @@ export default function LoginPage() {
                 setUsername(e.target.value);
                 if (emailError) setEmailError(false);
               }}
-              required
             />
           </div>
 
@@ -255,7 +254,6 @@ export default function LoginPage() {
                 setPassword(e.target.value);
                 if (passwordError) setPasswordError(false);
               }}
-              required
               rightIcon={
                 <button
                   type="button"

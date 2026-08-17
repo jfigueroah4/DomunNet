@@ -8,12 +8,7 @@ export default function LoadingScreen() {
   const [fade, setFade] = useState(false)
 
   useEffect(() => {
-    // Verificar si ya se mostró en esta sesión
-    const yaCargado = sessionStorage.getItem('domun_cargado')
-    if (yaCargado) {
-      return
-    }
-
+    // Eliminado el check de sessionStorage para que aparezca siempre al recargar
     setShow(true)
 
     const fadeTimer = setTimeout(() => {
@@ -22,7 +17,6 @@ export default function LoadingScreen() {
 
     const unmountTimer = setTimeout(() => {
       setShow(false)
-      sessionStorage.setItem('domun_cargado', 'true')
     }, 1300)
 
     return () => {

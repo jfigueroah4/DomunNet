@@ -62,6 +62,13 @@ interface UserProfile {
   rol: string
 }
 
+const getShortName = (profile: UserProfile | null) => {
+  if (!profile) return 'Usuario'
+  const pNombre = profile.nombre ? profile.nombre.split(' ')[0] : ''
+  const pApellido = profile.apellido ? profile.apellido.split(' ')[0] : ''
+  return `${pNombre} ${pApellido}`.trim() || 'Usuario'
+}
+
 export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
   const router = useRouter()
   const [profileOpen, setProfileOpen] = useState(false)
@@ -185,7 +192,7 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
           <Search size={15} className="text-gray-400 flex-shrink-0" />
           <input
             type="text"
-            placeholder="Buscar páginas (proyectos, bitácora, perfil...)"
+            placeholder="Buscar páginas (configuración/mantenimiento, proyectos...)"
             value={searchQuery}
             onChange={handleSearchChange}
             onKeyDown={handleKeyDown}
@@ -298,7 +305,7 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
             <div className="flex items-baseline gap-1">
               <span className="text-[10px] text-gray-500">Hola,</span>
               <span className="text-[10px] font-semibold text-gray-800">
-                {profile ? profile.nombre : 'Usuario'}
+                {getShortName(profile)}
               </span>
             </div>
           </button>
@@ -314,7 +321,7 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
               {/* Header usuario */}
               <div className="px-4 py-3 border-b border-gray-100">
                 <p className="text-[11px] font-bold text-gray-800 leading-tight">
-                  {profile ? `${profile.nombre} ${profile.apellido}`.trim() : 'Usuario'}
+                  {getShortName(profile)}
                 </p>
                 <p className="text-[10px] text-gray-500 mt-0.5">
                   {profile ? profile.rol : 'Usuario'}

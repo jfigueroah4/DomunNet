@@ -18,6 +18,8 @@ export interface DatosUsuario {
   contrasena?: string
   proyectosAsignados?: string[]
   username?: string | null
+  fecha_nacimiento?: string | null
+  direccion?: string | null
 }
 
 export type FilaUsuarioJoin = {
@@ -37,6 +39,8 @@ export type FilaUsuarioJoin = {
     telefono: string | null
     avatar_url?: string | null
     username?: string | null
+    fecha_nacimiento?: string | null
+    direccion?: string | null
   } | {
     primer_nombre: string
     segundo_nombre?: string | null
@@ -45,6 +49,8 @@ export type FilaUsuarioJoin = {
     telefono: string | null
     avatar_url?: string | null
     username?: string | null
+    fecha_nacimiento?: string | null
+    direccion?: string | null
   }[] | null
 }
 
@@ -82,6 +88,8 @@ export function mapearUsuario(fila: FilaUsuarioJoin, nombreRol: string | null) {
     nombre: nombreCompleto,
     correo: fila.correo,
     telefono: dato?.telefono || '',
+    direccion: dato?.direccion || '',
+    fecha_nacimiento: dato?.fecha_nacimiento || null,
     rol: nombreRol || 'Sin asignar',
     estado: fila.activo ? 'Activo' : 'Inactivo',
     proyectosAsignados: [],
@@ -110,7 +118,7 @@ async function obtenerRolesPorId() {
 async function obtenerUsuariosBase() {
   const { data, error } = await clienteSupabase
     .from('usuario')
-    .select('id, auth_user_id, correo, rol_id, activo, ultimo_acceso, fecha_registro, updated_at, dato_usuario(primer_nombre, segundo_nombre, primer_apellido, segundo_apellido, telefono, avatar_url, username)')
+    .select('id, auth_user_id, correo, rol_id, activo, ultimo_acceso, fecha_registro, updated_at, dato_usuario(primer_nombre, segundo_nombre, primer_apellido, segundo_apellido, telefono, avatar_url, username, fecha_nacimiento, direccion)')
     .order('fecha_registro', { ascending: false })
 
   if (error) throw new Error(error.message)
@@ -143,7 +151,7 @@ export async function listarUsuarios(filtros: FiltrosUsuarios = {}) {
 export async function obtenerUsuarioPorId(id: string) {
   const { data, error } = await clienteSupabase
     .from('usuario')
-    .select('id, correo, rol_id, activo, ultimo_acceso, fecha_registro, updated_at, dato_usuario(primer_nombre, segundo_nombre, primer_apellido, segundo_apellido, telefono, avatar_url, username)')
+    .select('id, correo, rol_id, activo, ultimo_acceso, fecha_registro, updated_at, dato_usuario(primer_nombre, segundo_nombre, primer_apellido, segundo_apellido, telefono, avatar_url, username, fecha_nacimiento, direccion)')
     .eq('id', id)
     .maybeSingle()
 
@@ -296,6 +304,8 @@ export async function crearUsuario(datos: DatosUsuario) {
       email: datos.correo,
       username: usernameUnico,
       password_hash: null, // explicit NULL
+      fecha_nacimiento: datos.fecha_nacimiento || null,
+      direccion: datos.direccion || null,
     })
 
   if (errorDato) {
@@ -407,6 +417,8 @@ export async function actualizarUsuario(id: string, datos: DatosUsuario) {
       email: datos.correo,
       username: usernameFinal,
       password_hash: null, // explicit NULL
+      fecha_nacimiento: datos.fecha_nacimiento || null,
+      direccion: datos.direccion || null,
       updated_at: new Date().toISOString()
     }, { onConflict: 'usuario_id' })
 

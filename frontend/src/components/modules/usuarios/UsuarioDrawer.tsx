@@ -280,6 +280,8 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
       estado: formData.estado,
       password: formData.contrasena ? formData.contrasena : undefined,
       username: formData.username,
+      fecha_nacimiento: formData.anoNacimiento ? `${formData.anoNacimiento}-${formData.mesNacimiento.padStart(2, '0')}-${formData.diaNacimiento.padStart(2, '0')}T00:00:00.000Z` : undefined,
+      direccion: formData.direccion || undefined,
     })
     onClose()
   }
@@ -293,7 +295,7 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
     <>
       <div className="fixed top-0 left-0 right-0 bottom-0 z-[9990] bg-black/40 backdrop-blur-[1px]" onClick={onClose} />
       <div className="fixed top-0 left-0 right-0 bottom-0 z-[9991] flex justify-end overflow-hidden pointer-events-none">
-        <aside className={`pointer-events-auto relative w-[500px] max-w-[100vw] box-border bg-white h-[100dvh] shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-right`}>
+        <aside className={`pointer-events-auto relative w-[420px] max-w-[100vw] box-border bg-white h-[100dvh] shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-right`}>
         
         <div className="flex-shrink-0 px-5 py-5 border-b border-gray-100 bg-white">
           <div className="mb-5">
@@ -637,7 +639,7 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
         <>
           <div className="fixed top-0 left-0 right-0 bottom-0 z-[9992] bg-black/40 backdrop-blur-[1px]" onClick={() => setDrawerProyectosAbierto(false)} />
           <div className="fixed top-0 left-0 right-0 bottom-0 z-[9993] flex justify-end overflow-hidden pointer-events-none">
-            <div className="pointer-events-auto relative w-[500px] max-w-[100vw] box-border bg-white h-[100dvh] shadow-2xl flex flex-col overflow-hidden">
+            <div className="pointer-events-auto relative w-[420px] max-w-[100vw] box-border bg-white h-[100dvh] shadow-2xl flex flex-col overflow-hidden">
               <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 bg-gray-50">
               <div>
                 <h2 className="text-sm font-bold text-gray-800">Proyectos Asignados</h2>

@@ -22,6 +22,8 @@ export const esquemaUsuario = z.object({
   contrasena: z.string().min(6).optional(),
   proyectosAsignados: z.array(z.string()).optional(),
   username: z.string().regex(/^[a-zA-Z0-9_.-]+$/, 'Nombre de usuario inválido (sin espacios ni @)').min(3).max(30).optional().nullable().or(z.literal('')),
+  fecha_nacimiento: z.string().optional().nullable(),
+  direccion: z.string().optional().nullable(),
 })
 
 export async function listarUsuariosControlador(req: Request, res: Response) {

@@ -16,9 +16,7 @@ export function middleware(request: NextRequest) {
 
   if (!token) {
     // No hay token - redirigir a login
-    const loginUrl = new URL('/login', request.url)
-    loginUrl.searchParams.set('redirectTo', pathname)
-    return NextResponse.redirect(loginUrl)
+    return NextResponse.redirect(new URL('/login', request.url))
   }
 
   // Decodificar y verificar expiración manualmente (Edge friendly, sin validación de firma que falla sin el secret correcto)
@@ -28,22 +26,21 @@ export function middleware(request: NextRequest) {
     
     if (payload.exp && payload.exp < now) {
       // Token expirado
-      const loginUrl = new URL('/login', request.url)
-      loginUrl.searchParams.set('redirectTo', pathname)
-      const response = NextResponse.redirect(loginUrl)
+      const response = NextResponse.redirect(new URL('/login', request.url))
       response.cookies.delete('token')
       return response
     }
   } catch (error) {
     // Error al decodificar - considerar inválido
-    const loginUrl = new URL('/login', request.url)
-    loginUrl.searchParams.set('redirectTo', pathname)
-    const response = NextResponse.redirect(loginUrl)
+    const response = NextResponse.redirect(new URL('/login', request.url))
     response.cookies.delete('token')
     return response
   }
 
   // Token válido - permitir acceso
+  if (pathname === '/') {
+    return NextResponse.redirect(new URL('/dashboard', request.url))
+  }
   return NextResponse.next()
 }
 
