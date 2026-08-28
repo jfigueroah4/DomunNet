@@ -1,10 +1,10 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useState } from 'react'
-import { Save, X, Eye, PencilLine, UserPlus, Mail, Phone, FolderOpen, Edit2, Loader2, KeyRound } from 'lucide-react'
+import { Save, X, Eye, PencilLine, UserPlus, Mail, Phone, FolderOpen, Edit2, Loader2} from 'lucide-react'
 import { Usuario, RolUsuario, EstadoUsuario } from '@/types/usuario'
 import { api } from '@/lib/api/cliente'
-import { showSuccessToast, showErrorToast } from '@/hooks/useCustomToast'
+import { showErrorToast } from '@/hooks/useCustomToast'
 
 export type UsuarioDrawerMode = 'create' | 'edit' | 'view'
 
@@ -44,8 +44,7 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
   const [correoCargando, setCorreoCargando] = useState(false)
   const [drawerProyectosAbierto, setDrawerProyectosAbierto] = useState(false)
   const [isEditingPassword, setIsEditingPassword] = useState(false)
-  const [passwordCargando, setPasswordCargando] = useState(false)
-  
+    
   const [errors, setErrors] = useState({
     primerNombre: false,
     primerApellido: false,
@@ -119,10 +118,10 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
     }
   }
 
-  const calcularEdad = (dia: string, mes: string, año: string): number => {
-    if (!dia || !mes || !año || dia.length < 1 || mes.length < 1 || año.length < 4) return 0
+  const calcularEdad = (dia: string, mes: string, anio: string): number => {
+    if (!dia || !mes || !anio || dia.length < 1 || mes.length < 1 || anio.length < 4) return 0
     const hoy = new Date()
-    const nacimiento = new Date(parseInt(año), parseInt(mes) - 1, parseInt(dia))
+    const nacimiento = new Date(parseInt(anio), parseInt(mes) - 1, parseInt(dia))
     let edad = hoy.getFullYear() - nacimiento.getFullYear()
     const mesActual = hoy.getMonth() + 1
     if (mesActual < parseInt(mes) || (mesActual === parseInt(mes) && hoy.getDate() < parseInt(dia))) {
@@ -198,17 +197,13 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
     setErrors({ ...errors, contrasena: !esValida })
   }
   
-  const handleContrasenaAnteriorChange = (valor: string) => {
-    setFormData({ ...formData, contrasenaAnterior: valor })
-  }
-
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
     let { name, value } = e.target
     
     if (['primerNombre', 'segundoNombre', 'primerApellido', 'segundoApellido'].includes(name)) {
-      if (/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/.test(value)) return;
+      if (/[^a-zA-ZÃ¡Ã©Ã­Ã³ÃºÃÃ‰ÃÃ“ÃšÃ±Ã‘\s]/.test(value)) return;
     }
     
     if (name === 'telefono') {
@@ -222,31 +217,6 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
     setFormData((prev) => ({ ...prev, [name]: value }))
   }
   
-  const handleGuardarContrasena = async () => {
-    if (!usuario?.id) return;
-    
-    if (!formData.contrasenaAnterior || formData.contrasena.length < 8) {
-      showErrorToast("Ingresa la contraseña actual y una nueva de al menos 8 caracteres")
-      return;
-    }
-    
-    setPasswordCargando(true)
-    try {
-      await api.post(`/usuarios/${usuario.id}/cambiar-contraseña`, {
-        contrasenaAnterior: formData.contrasenaAnterior,
-        nuevaContrasena: formData.contrasena
-      })
-      showSuccessToast('Contraseña cambiada exitosamente')
-      setIsEditingPassword(false)
-      setFormData(prev => ({...prev, contrasenaAnterior: '', contrasena: ''}))
-    } catch (error) {
-      console.error('Error al cambiar contraseña:', error)
-      showErrorToast('Error al cambiar la contraseña. Verifica la contraseña actual.')
-    } finally {
-      setPasswordCargando(false)
-    }
-  }
-
   const handleGuardarUsuario = () => {
     const edad = calcularEdad(formData.diaNacimiento, formData.mesNacimiento, formData.anoNacimiento)
     const faltaFecha = !formData.diaNacimiento || !formData.mesNacimiento || formData.anoNacimiento.length < 4
@@ -304,7 +274,7 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
               <h2 className="text-sm font-bold text-gray-800">{title}</h2>
             </div>
             <p className="text-[10px] text-gray-400 mt-0.5">
-              {isViewMode ? 'Consulta rápida de información del usuario' : mode === 'edit' ? 'Modifica los datos del usuario' : 'Ingresa la información del nuevo usuario'}
+              {isViewMode ? 'Consulta rÃ¡pida de informaciÃ³n del usuario' : mode === 'edit' ? 'Modifica los datos del usuario' : 'Ingresa la informaciÃ³n del nuevo usuario'}
             </p>
           </div>
 
@@ -327,7 +297,7 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
         
         <div className="flex-1 overflow-y-auto px-5 py-3 space-y-1.5">
           <p className="text-[10px] uppercase tracking-widest font-semibold text-gray-500 mb-2 mt-2 border-b border-gray-100 pb-1">
-            Información Personal
+            InformaciÃ³n Personal
           </p>
 
           <div className="grid grid-cols-2 gap-3 mb-2">
@@ -368,7 +338,7 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
                 className={`w-full h-8 px-3 text-xs border rounded-lg focus:outline-none transition-colors disabled:bg-gray-50 text-gray-700 ${
                   errors.primerApellido ? 'border-[#FF4D4F] bg-red-50/20' : 'border-gray-200 focus:border-[#9B0F06]'
                 }`}
-                placeholder="Ej: Pérez"
+                placeholder="Ej: PÃ©rez"
               />
             </div>
             <div>
@@ -386,7 +356,7 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
 
           <div className="grid grid-cols-2 gap-3 mb-2">
             <div>
-              <label className="mb-1 block text-[10px] font-semibold text-gray-700 uppercase tracking-wide">Teléfono *</label>
+              <label className="mb-1 block text-[10px] font-semibold text-gray-700 uppercase tracking-wide">TelÃ©fono *</label>
               <div className="relative">
                 <Phone size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
@@ -441,19 +411,19 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
                   }`}
                 />
               </div>
-              {errors.fechaNacimiento && <p className="text-[10px] text-[#FF4D4F] mt-1">Debe ser mayor de 18 años</p>}
+              {errors.fechaNacimiento && <p className="text-[10px] text-[#FF4D4F] mt-1">Debe ser mayor de 18 anios</p>}
             </div>
           </div>
           
           <div className="mb-2">
-            <label className="mb-1 block text-[10px] font-semibold text-gray-700 uppercase tracking-wide">Dirección *</label>
+            <label className="mb-1 block text-[10px] font-semibold text-gray-700 uppercase tracking-wide">DirecciÃ³n *</label>
             <input
               name="direccion"
               value={formData.direccion}
               onChange={handleChange}
               disabled={isViewMode}
               className={`w-full h-8 px-3 text-xs border border-gray-200 rounded-lg focus:outline-none focus:border-[#9B0F06] transition-colors disabled:bg-gray-50 text-gray-700`}
-              placeholder="Dirección completa"
+              placeholder="DirecciÃ³n completa"
             />
           </div>
 
@@ -482,12 +452,12 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
                   <Loader2 size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 animate-spin" />
                 )}
               </div>
-              {usernameDisponible === false && <p className="text-[10px] text-[#FF4D4F] mt-1">El usuario ya está en uso</p>}
+              {usernameDisponible === false && <p className="text-[10px] text-[#FF4D4F] mt-1">El usuario ya estÃ¡ en uso</p>}
               {usernameDisponible === true && <p className="text-[10px] text-green-600 mt-1">Usuario disponible</p>}
             </div>
             
             <div>
-              <label className="mb-1 block text-[10px] font-semibold text-gray-700 uppercase tracking-wide">Correo electrónico *</label>
+              <label className="mb-1 block text-[10px] font-semibold text-gray-700 uppercase tracking-wide">Correo electrÃ³nico *</label>
               <div className="relative">
                 <Mail size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
@@ -508,15 +478,15 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
                   <Loader2 size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 animate-spin" />
                 )}
               </div>
-              {correoDisponible === false && <p className="text-[10px] text-[#FF4D4F] mt-1">Este correo ya está registrado</p>}
-              {errors.correo && <p className="text-[10px] text-[#FF4D4F] mt-1">Correo electrónico no válido</p>}
+              {correoDisponible === false && <p className="text-[10px] text-[#FF4D4F] mt-1">Este correo ya estÃ¡ registrado</p>}
+              {errors.correo && <p className="text-[10px] text-[#FF4D4F] mt-1">Correo electrÃ³nico no vÃ¡lido</p>}
             </div>
           </div>
 
           <div className="grid grid-cols-1 gap-3 mb-2">
             <div>
               <div className="flex items-center justify-between mb-1">
-                <label className="block text-[10px] font-semibold text-gray-700 uppercase tracking-wide">Contraseña {mode === 'create' && '*'}</label>
+                <label className="block text-[10px] font-semibold text-gray-700 uppercase tracking-wide">ContraseÃ±a {mode === 'create' && '*'}</label>
                 {mode === 'edit' && usuario?.id && !isEditingPassword && (
                   <button type="button" onClick={() => setIsEditingPassword(true)} className="text-[10px] text-[#9B0F06] font-semibold flex items-center gap-1 hover:underline">
                     <Edit2 size={12} /> Cambiar
@@ -532,7 +502,7 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
               <div className="flex items-center gap-2">
                 <input
                   type="password"
-                  placeholder={(mode === 'create' || isEditingPassword) ? "Escriba la nueva contraseña" : "••••••••"}
+                  placeholder={(mode === 'create' || isEditingPassword) ? "Escriba la nueva contraseÃ±a" : "â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"}
                   value={formData.contrasena}
                   onChange={(e) => handlePasswordChange(e.target.value)}
                   disabled={isViewMode || (mode === 'edit' && !isEditingPassword)}
@@ -541,7 +511,7 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
                   }`}
                 />
               </div>
-              {(mode === 'create' || isEditingPassword) && errors.contrasena && <p className="text-[10px] text-[#FF4D4F] mt-1">Mínimo 8 caracteres</p>}
+              {(mode === 'create' || isEditingPassword) && errors.contrasena && <p className="text-[10px] text-[#FF4D4F] mt-1">MÃ­nimo 8 caracteres</p>}
             </div>
             
             <div className="grid grid-cols-2 gap-3">
@@ -589,7 +559,7 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
                 rows={2}
                 disabled={isViewMode}
                 className="w-full rounded-lg border border-amber-300 bg-white px-3 py-2.5 text-xs text-gray-700 focus:border-amber-600 focus:outline-none disabled:bg-gray-50 transition-colors resize-none"
-                placeholder="Razón de la suspensión..."
+                placeholder="RazÃ³n de la suspensiÃ³n..."
               />
             </div>
           )}
@@ -662,7 +632,7 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
                 <div className="py-8 text-center">
                   <FolderOpen size={32} className="text-gray-300 mx-auto mb-2" />
                   <p className="text-[10px] text-gray-500">No hay proyectos asignados</p>
-                  <p className="text-[9px] text-gray-400 mt-1">Este usuario no está asignado a ningún proyecto</p>
+                  <p className="text-[9px] text-gray-400 mt-1">Este usuario no estÃ¡ asignado a ningÃºn proyecto</p>
                 </div>
               )}
             </div>
@@ -679,6 +649,11 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
     </>
   )
 }
+
+
+
+
+
 
 
 

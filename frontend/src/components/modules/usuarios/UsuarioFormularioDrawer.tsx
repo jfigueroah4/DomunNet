@@ -1,9 +1,8 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect } from 'react'
 import { X, Calendar } from 'lucide-react'
 import { Usuario, RolUsuario } from '@/types/usuario'
-import { toast } from 'sonner'
 import { useCustomToast } from '@/hooks/useCustomToast'
 
 interface UsuarioFormularioDrawerProps {
@@ -104,17 +103,17 @@ export function UsuarioFormularioDrawer({
     if (!formData.telefono) newErrors.telefono = true
     
     // Validar formato de nombres
-    const regexLetras = /^[A-Za-zÁ-Úá-úñÑ\s]+$/
+    const regexLetras = /^[A-Za-zÃ-ÃšÃ¡-ÃºÃ±Ã‘\s]+$/
     if (formData.primer_nombre && !regexLetras.test(formData.primer_nombre)) newErrors.primer_nombre_invalido = true
     if (formData.segundo_nombre && !regexLetras.test(formData.segundo_nombre)) newErrors.segundo_nombre_invalido = true
     if (formData.primer_apellido && !regexLetras.test(formData.primer_apellido)) newErrors.primer_apellido_invalido = true
     if (formData.segundo_apellido && !regexLetras.test(formData.segundo_apellido)) newErrors.segundo_apellido_invalido = true
 
-    // Validar teléfono de 4 o 8 dígitos
+    // Validar telÃ©fono de 4 o 8 dÃ­gitos
     const telLimpio = formData.telefono.replace(/\D/g, '')
     if (formData.telefono && telLimpio.length !== 4 && telLimpio.length !== 8) newErrors.telefono_invalido = true
     
-    // Contraseña
+    // ContraseÃ±a
     if (!usuario && formData.password.length < 8) newErrors.password_invalido = true
     if (usuario && formData.password && formData.password.length < 8) newErrors.password_invalido = true
 
@@ -171,7 +170,7 @@ export function UsuarioFormularioDrawer({
               {usuario ? 'Editar Usuario' : 'Nuevo Usuario'}
             </h2>
             <p className="text-[10px] text-gray-400 mt-0.5">
-              {usuario ? 'Actualiza la información' : 'Crea un nuevo usuario del sistema'}
+              {usuario ? 'Actualiza la informaciÃ³n' : 'Crea un nuevo usuario del sistema'}
             </p>
           </div>
           <button
@@ -230,7 +229,7 @@ export function UsuarioFormularioDrawer({
                 name="primer_apellido"
                 value={formData.primer_apellido}
                 onChange={handleChange}
-                placeholder="Ej: Pérez"
+                placeholder="Ej: PÃ©rez"
                 className={`w-full h-9 border rounded-lg px-2.5 text-xs text-gray-700 bg-white focus:outline-none transition-colors ${
                   errors.primer_apellido || errors.primer_apellido_invalido ? 'border-red-500 bg-red-50' : 'border-gray-200 focus:border-[#9B0F06]'
                 }`}
@@ -258,7 +257,7 @@ export function UsuarioFormularioDrawer({
           {/* Correo */}
           <div>
             <label className="text-[10px] font-semibold text-gray-700 block mb-1 uppercase tracking-wide">
-              Correo Electrónico *
+              Correo ElectrÃ³nico *
             </label>
             <input
               type="email"
@@ -271,11 +270,11 @@ export function UsuarioFormularioDrawer({
             />
           </div>
 
-          {/* Teléfono y Fecha de Nacimiento en 2 columnas */}
+          {/* TelÃ©fono y Fecha de Nacimiento en 2 columnas */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-[10px] font-semibold text-gray-700 block mb-1 uppercase tracking-wide">
-                Teléfono *
+                TelÃ©fono *
               </label>
               <input
                 type="tel"
@@ -287,7 +286,7 @@ export function UsuarioFormularioDrawer({
                   errors.telefono || errors.telefono_invalido ? 'border-red-500 bg-red-50' : 'border-gray-200 focus:border-[#9B0F06]'
                 }`}
               />
-              {errors.telefono_invalido && <p className="text-xs text-red-500 mt-1">Debe tener 4 u 8 dígitos</p>}
+              {errors.telefono_invalido && <p className="text-xs text-red-500 mt-1">Debe tener 4 u 8 dÃ­gitos</p>}
             </div>
 
             <div>
@@ -342,7 +341,7 @@ export function UsuarioFormularioDrawer({
               </div>
               {fechaInvalida && (
                 <p className="text-[9px] text-red-600 font-medium mt-1.5">
-                  El usuario debe ser mayor de 18 años
+                  El usuario debe ser mayor de 18 aÃ±os
                 </p>
               )}
             </div>
@@ -386,25 +385,25 @@ export function UsuarioFormularioDrawer({
             </div>
           </div>
 
-          {/* Contraseña */}
+          {/* ContraseÃ±a */}
           <div>
             <label className="text-[10px] font-semibold text-gray-700 block mb-1 uppercase tracking-wide">
-              Contraseña {usuario ? '(Opcional)' : 'Temporal'}
+              ContraseÃ±a {usuario ? '(Opcional)' : 'Temporal'}
             </label>
             <input
               type="password"
               name="password"
               value={formData.password}
               onChange={handleChange}
-              placeholder="••••••••"
+              placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
               className={`w-full h-9 border rounded-lg px-2.5 text-xs text-gray-700 bg-white focus:outline-none transition-colors ${
                 errors.password_invalido ? 'border-red-500 bg-red-50' : 'border-gray-200 focus:border-[#9B0F06]'
               }`}
             />
             {errors.password_invalido ? (
-              <p className="text-xs text-red-500 mt-1">Mínimo 8 caracteres</p>
+              <p className="text-xs text-red-500 mt-1">MÃ­nimo 8 caracteres</p>
             ) : (
-              !usuario && <p className="text-[11px] text-gray-400 mt-1">Se requerirá al iniciar sesión</p>
+              !usuario && <p className="text-[11px] text-gray-400 mt-1">Se requerirÃ¡ al iniciar sesiÃ³n</p>
             )}
           </div>
         </div>
@@ -428,3 +427,4 @@ export function UsuarioFormularioDrawer({
     </>
   )
 }
+

@@ -8,30 +8,13 @@ import { Usuario, RolUsuario, EstadoUsuario } from '@/types/usuario'
 import { useCustomToast } from '@/hooks/useCustomToast'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import { useAuthStore } from '@/stores/useAuthStore'
 
-interface UserProfile {
-  id: string
-  correo: string
-  activo: boolean
-  ultimoAcceso: string | null
-  fechaRegistro: string
-  fechaNacimiento: string | null
-  nombre: string
-  apellido: string
-  username: string
-  primerNombre: string
-  segundoNombre: string
-  primerApellido: string
-  segundoApellido: string
-  telefono: string
-  direccion: string
-  cargo: string
-  rol: string
-}
+
 
 export default function PerfilPage() {
-  const [profile, setProfile] = useState<UserProfile | null>(null)
-  const [loading, setLoading] = useState(true)
+  const { profile, loading, fetchProfile } = useAuthStore()
+  
   const [isEditing, setIsEditing] = useState(false)
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const [showDeactivationModal, setShowDeactivationModal] = useState(false)
@@ -40,22 +23,11 @@ export default function PerfilPage() {
   const { showSuccessToast } = useCustomToast()
   const router = useRouter()
 
-  const fetchProfile = async () => {
-    try {
-      const res = await api.get('/auth/perfil')
-      if (res.data?.success && res.data?.data) {
-        setProfile(res.data.data)
-      }
-    } catch (err) {
-      console.error('Error al cargar perfil:', err)
-    } finally {
-      setLoading(false)
-    }
-  }
+
 
   useEffect(() => {
     fetchProfile()
-  }, [])
+  }, [fetchProfile])
 
   const formatearFecha = (fechaStr?: string | null) => {
     if (!fechaStr) return 'Nunca'

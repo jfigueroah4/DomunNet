@@ -1,11 +1,11 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Save, X, Eye, PencilLine, Users, Shield, UserPlus, FileText, CheckCircle2 } from 'lucide-react'
+import { X, Eye, PencilLine, Users, Shield, UserPlus } from 'lucide-react'
 import { Role } from '@/data/roles'
 import { Usuario } from '@/types/usuario'
 import { USUARIOS_MOCK } from '@/data/usuarios.mock'
-import { showSuccessToast, showErrorToast } from '@/hooks/useCustomToast'
+import { showErrorToast } from '@/hooks/useCustomToast'
 
 export type RoleDrawerMode = 'create' | 'edit' | 'view' | 'users'
 
@@ -75,7 +75,7 @@ export function RoleDrawer({
   ) => {
     const { name, value } = e.target
     if (name === 'name') {
-      if (/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/.test(value)) return;
+      if (/[^a-zA-ZáéíóúÃÉÍÓÚñÑ\s]/.test(value)) return;
     }
     setFormData((prev) => ({ ...prev, [name]: value }))
   }
@@ -357,6 +357,12 @@ export function RoleDrawer({
     </>
   )
 }
+
+
+
+
+
+
 
 
 

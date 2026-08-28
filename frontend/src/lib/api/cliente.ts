@@ -1,8 +1,8 @@
-import axios from 'axios'
+﻿import axios from 'axios'
 
 export const api = axios.create({
   baseURL: '/api/v1',
-  withCredentials: true, // Requerido para enviar cookies httpOnly automáticamente
+  withCredentials: true, // Requerido para enviar cookies httpOnly automÃ¡ticamente
   headers: {
     'Content-Type': 'application/json',
   },
@@ -20,3 +20,4 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 )
+

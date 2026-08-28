@@ -153,7 +153,7 @@ export default function UsuariosPage() {
     setDeleteOpen(true)
   }
 
-  const handleConfirmarEliminar = async (accion: 'eliminar' | 'suspender') => {
+  const handleConfirmarEliminar = async (accion: 'eliminar' | 'suspender' | 'activar') => {
     if (!usuarioEliminar) return
     try {
       if (accion === 'suspender') {
@@ -344,3 +344,4 @@ export default function UsuariosPage() {
     </div>
   )
 }
+

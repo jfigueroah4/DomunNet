@@ -1,10 +1,11 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { Search, Bell, Menu, User, LogOut, Ticket, Bot } from 'lucide-react'
 import { api } from '@/lib/api/cliente'
+import { useAuthStore } from '@/stores/useAuthStore'
 
 const AIAssistant = dynamic(() => import('./AIAssistant'), { ssr: false })
 
@@ -56,13 +57,9 @@ interface TopBarProps {
   onToggle?: () => void
 }
 
-interface UserProfile {
-  nombre: string
-  apellido: string
-  rol: string
-}
 
-const getShortName = (profile: UserProfile | null) => {
+
+const getShortName = (profile: any) => {
   if (!profile) return 'Usuario'
   const pNombre = profile.nombre ? profile.nombre.split(' ')[0] : ''
   const pApellido = profile.apellido ? profile.apellido.split(' ')[0] : ''
@@ -77,26 +74,14 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [notificationsVisible, setNotificationsVisible] = useState(false)
   const [unreadCount] = useState(0) // Default 0 to match empty state
-  const [profile, setProfile] = useState<UserProfile | null>(null)
+  const { profile, fetchProfile } = useAuthStore()
   
   // Search suggestion state
   const [searchQuery, setSearchQuery] = useState('')
   const [suggestions, setSuggestions] = useState<typeof systemRoutes>([])
   const [showSearchDropdown, setShowSearchDropdown] = useState(false)
 
-  useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const res = await api.get('/auth/perfil')
-        if (res.data?.success && res.data?.data) {
-          setProfile(res.data.data)
-        }
-      } catch (err) {
-        console.error('Error al cargar perfil en TopBar:', err)
-      }
-    }
-    fetchProfile()
-  }, [])
+  useEffect(() => { fetchProfile() }, [])
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -375,3 +360,6 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
     </header>
   )
 }
+
+
+

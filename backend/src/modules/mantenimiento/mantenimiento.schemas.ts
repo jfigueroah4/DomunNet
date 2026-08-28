@@ -1,4 +1,4 @@
-import { z } from 'zod'
+﻿import { z } from 'zod'
 
 // ============================================================================
 // 1. ACCESO E IDENTIDAD
@@ -9,7 +9,7 @@ const rolSchema = z.object({
   permisos: z.any().optional(), // JSONB
   activo: z.boolean().optional().default(true),
   descripcion: z.string().max(255).optional().nullable().or(z.literal(''))
-})
+}).strict()
 
 const usuarioSchema = z.object({
   auth_user_id: z.string().uuid().optional().nullable().or(z.literal('')),
@@ -17,7 +17,7 @@ const usuarioSchema = z.object({
   rol_id: z.string().uuid(),
   activo: z.boolean().optional().default(true),
   ultimo_acceso: z.string().optional().nullable().or(z.literal(''))
-})
+}).strict()
 
 const datoUsuarioSchema = z.object({
   usuario_id: z.string().uuid(),
@@ -32,17 +32,17 @@ const datoUsuarioSchema = z.object({
   fecha_nacimiento: z.string().optional().nullable().or(z.literal('')),
   avatar_url: z.string().max(500).optional().nullable().or(z.literal('')),
   estado: z.string().max(50).optional().nullable().or(z.literal(''))
-})
+}).strict()
 
 const estadoUsuarioSchema = z.object({
   usuario_id: z.string().uuid(),
   estado: z.string().max(50),
   motivo_bloqueo: z.string().max(255).optional().nullable().or(z.literal('')),
   cambiado_por: z.string().uuid().optional().nullable().or(z.literal(''))
-})
+}).strict()
 
 // ============================================================================
-// 2. INFRAESTRUCTURA Y CONFIGURACIÓN GLOBAL
+// 2. INFRAESTRUCTURA Y CONFIGURACIÃ“N GLOBAL
 // ============================================================================
 const empresaSchema = z.object({
   nombre: z.string().min(2).max(150),
@@ -52,14 +52,14 @@ const empresaSchema = z.object({
   correo: z.string().email().max(255).optional().nullable().or(z.literal('')),
   logo_url: z.string().url().max(500).optional().nullable().or(z.literal('')),
   marca_agua_url: z.string().url().max(500).optional().nullable().or(z.literal(''))
-})
+}).strict()
 
 const catalogoSchema = z.object({
   codigo: z.string().max(100),
   nombre: z.string().max(150),
   descripcion: z.string().max(255).optional().nullable().or(z.literal('')),
   activo: z.boolean().optional().default(true)
-})
+}).strict()
 
 const catalogoItemSchema = z.object({
   catalogo_id: z.string().uuid(),
@@ -69,14 +69,14 @@ const catalogoItemSchema = z.object({
   color: z.string().max(20).optional().nullable().or(z.literal('')),
   orden: z.coerce.number().optional().default(0),
   activo: z.boolean().optional().default(true)
-})
+}).strict()
 
 const configuracionGeneralSchema = z.object({
   clave: z.string().max(100),
   valor: z.string().optional().nullable().or(z.literal('')),
   categoria: z.string().max(100),
   cambiado_por: z.string().uuid().optional().nullable().or(z.literal(''))
-})
+}).strict()
 
 const backupSistemaSchema = z.object({
   generado_por: z.string().uuid().optional().nullable().or(z.literal('')),
@@ -85,26 +85,26 @@ const backupSistemaSchema = z.object({
   tamanio: z.string().max(50).optional().nullable().or(z.literal('')),
   formato: z.string().max(10),
   estado: z.string().max(50)
-})
+}).strict()
 
 const restauracionSistemaSchema = z.object({
   restaurado_por: z.string().uuid().optional().nullable().or(z.literal('')),
   archivo_origen: z.string().max(255),
   estado: z.string().max(50),
   observaciones: z.string().optional().nullable().or(z.literal(''))
-})
+}).strict()
 
 // ============================================================================
-// 3. UBICACIÓN Y ENTIDADES EXTERNAS
+// 3. UBICACIÃ“N Y ENTIDADES EXTERNAS
 // ============================================================================
 const departamentoSchema = z.object({
   nombre: z.string().max(100)
-})
+}).strict()
 
 const municipioSchema = z.object({
   departamento_id: z.string().uuid(),
   nombre: z.string().max(100)
-})
+}).strict()
 
 const empresaContratanteSchema = z.object({
   nombre: z.string().max(200),
@@ -112,7 +112,7 @@ const empresaContratanteSchema = z.object({
   direccion: z.string().max(255).optional().nullable().or(z.literal('')),
   telefono: z.string().max(50).optional().nullable().or(z.literal('')),
   correo_institucional: z.string().email().max(255).optional().nullable().or(z.literal(''))
-})
+}).strict()
 
 const contactoContratanteSchema = z.object({
   empresa_contratante_id: z.string().uuid(),
@@ -120,10 +120,10 @@ const contactoContratanteSchema = z.object({
   cargo: z.string().max(150).optional().nullable().or(z.literal('')),
   telefono: z.string().max(50).optional().nullable().or(z.literal('')),
   correo: z.string().max(255).optional().nullable().or(z.literal(''))
-})
+}).strict()
 
 // ============================================================================
-// 4. PROYECTOS Y PLANIFICACIÓN
+// 4. PROYECTOS Y PLANIFICACIÃ“N
 // ============================================================================
 const proyectoSchema = z.object({
   empresa_id: z.string().uuid(),
@@ -135,7 +135,7 @@ const proyectoSchema = z.object({
   fecha_fin_estimada: z.string(),
   estado_id: z.string().uuid().optional().nullable().or(z.literal('')),
   responsable_id: z.string().uuid().optional().nullable().or(z.literal(''))
-})
+}).strict()
 
 const proyectoUsuarioSchema = z.object({
   proyecto_id: z.string().uuid(),
@@ -143,7 +143,7 @@ const proyectoUsuarioSchema = z.object({
   rol_proyecto: z.string().max(100),
   fecha_asignacion: z.string().optional().nullable().or(z.literal('')),
   activo: z.boolean().optional().default(true)
-})
+}).strict()
 
 const proyectoDetalleSchema = z.object({
   proyecto_id: z.string().uuid(),
@@ -169,7 +169,7 @@ const proyectoDetalleSchema = z.object({
   empresa_contratante_id: z.string().uuid().optional().nullable().or(z.literal('')),
   contacto_contratante_id: z.string().uuid().optional().nullable().or(z.literal('')),
   empresa_contratista_ejecutora: z.string().max(200).optional().nullable().or(z.literal(''))
-})
+}).strict()
 
 const faseProyectoSchema = z.object({
   proyecto_id: z.string().uuid(),
@@ -182,7 +182,7 @@ const faseProyectoSchema = z.object({
   porcentaje_avance: z.coerce.number().optional().default(0),
   fecha_corte: z.string().optional().nullable().or(z.literal('')),
   estado: z.string().max(50).optional().default('Pendiente')
-})
+}).strict()
 
 const documentoProyectoSchema = z.object({
   proyecto_id: z.string().uuid(),
@@ -191,17 +191,17 @@ const documentoProyectoSchema = z.object({
   tipo: z.string().max(100).optional().nullable().or(z.literal('')),
   url_storage: z.string().url().max(500),
   version: z.string().max(20).optional().default('1.0')
-})
+}).strict()
 
 // ============================================================================
-// 5. CATÁLOGOS TÉCNICOS
+// 5. CATÃLOGOS TÃ‰CNICOS
 // ============================================================================
 const categoriaActividadSchema = z.object({
   nombre: z.string().max(150),
   descripcion: z.string().max(255).optional().nullable().or(z.literal('')),
   tipo_obra: z.string().max(100).optional().nullable().or(z.literal('')),
   activo: z.boolean().optional().default(true)
-})
+}).strict()
 
 const especificacionTecnicaSchema = z.object({
   codigo: z.string().max(100),
@@ -213,18 +213,18 @@ const especificacionTecnicaSchema = z.object({
   tolerancia_minima: z.coerce.number().optional().nullable().or(z.literal('')),
   tolerancia_maxima: z.coerce.number().optional().nullable().or(z.literal('')),
   norma_referencia: z.string().max(150).optional().nullable().or(z.literal(''))
-})
+}).strict()
 
 const capituloSabanaSchema = z.object({
   numero_capitulo: z.coerce.number().min(1).max(9),
   nombre_capitulo: z.string().max(150),
   descripcion: z.string().optional().nullable().or(z.literal(''))
-})
+}).strict()
 
 const unidadMedidaSchema = z.object({
   nombre: z.string().max(100),
   abreviatura: z.string().max(20)
-})
+}).strict()
 
 const renglonTrabajoSchema = z.object({
   proyecto_id: z.string().uuid(),
@@ -241,7 +241,7 @@ const renglonTrabajoSchema = z.object({
   cantidad_ajustada: z.coerce.number().optional().default(0),
   precio_unitario_directo: z.coerce.number().optional().default(0),
   fecha_ultimo_avance: z.string().optional().nullable().or(z.literal(''))
-})
+}).strict()
 
 const modificativoRenglonSchema = z.object({
   renglon_id: z.string().uuid(),
@@ -249,10 +249,10 @@ const modificativoRenglonSchema = z.object({
   documento_referencia: z.string().max(150).optional().nullable().or(z.literal('')),
   motivo: z.string().optional().nullable().or(z.literal('')),
   aprobado_por: z.string().uuid().optional().nullable().or(z.literal(''))
-})
+}).strict()
 
 // ============================================================================
-// 6. BITÁCORAS Y AVANCES
+// 6. BITÃCORAS Y AVANCES
 // ============================================================================
 const bitacoraEntradaSchema = z.object({
   proyecto_id: z.string().uuid(),
@@ -270,7 +270,7 @@ const bitacoraEntradaSchema = z.object({
   firma_url: z.string().url().max(500).optional().nullable().or(z.literal('')),
   publicada: z.boolean().optional().default(false),
   bloqueada: z.boolean().optional().default(false)
-})
+}).strict()
 
 const condicionClimaticaSchema = z.object({
   bitacora_entrada_id: z.string().uuid(),
@@ -279,7 +279,7 @@ const condicionClimaticaSchema = z.object({
   viento: z.string().max(100).optional().nullable().or(z.literal('')),
   visibilidad: z.string().max(100).optional().nullable().or(z.literal('')),
   estado_general: z.string().max(100).optional().nullable().or(z.literal(''))
-})
+}).strict()
 
 const estacionKilometricaSchema = z.object({
   bitacora_entrada_id: z.string().uuid(),
@@ -288,7 +288,7 @@ const estacionKilometricaSchema = z.object({
   estacion_inicial: z.coerce.number(),
   estacion_final: z.coerce.number(),
   observacion: z.string().max(255).optional().nullable().or(z.literal(''))
-})
+}).strict()
 
 const bitacoraAvanceSchema = z.object({
   bitacora_entrada_id: z.string().uuid(),
@@ -304,7 +304,7 @@ const bitacoraAvanceSchema = z.object({
   estacion_fin: z.string().max(50).optional().nullable().or(z.literal('')),
   observaciones: z.string().optional().nullable().or(z.literal('')),
   fecha_corte: z.string().optional().nullable().or(z.literal(''))
-})
+}).strict()
 
 const cronogramaPlanificadoSchema = z.object({
   proyecto_id: z.string().uuid(),
@@ -315,12 +315,12 @@ const cronogramaPlanificadoSchema = z.object({
   porcentaje_esperado: z.coerce.number(),
   responsable_id: z.string().uuid().optional().nullable().or(z.literal('')),
   linea_base: z.boolean().optional().default(false)
-})
+}).strict()
 
 const catalogoDescuentoTecnicoSchema = z.object({
   descripcion: z.string().max(200),
   factor_seccion_transversal: z.coerce.number()
-})
+}).strict()
 
 const bitacoraPendienteSchema = z.object({
   renglon_id: z.string().uuid(),
@@ -339,7 +339,7 @@ const bitacoraPendienteSchema = z.object({
   es_derrumbre: z.boolean().optional().default(false),
   estado_conciliacion: z.enum(['Pendiente', 'Aprobado', 'Trasladado']).optional().default('Pendiente'),
   observaciones: z.string().optional().nullable().or(z.literal(''))
-})
+}).strict()
 
 const bitacoraPendienteAjusteSchema = z.object({
   bitacora_pendiente_id: z.string().uuid(),
@@ -347,7 +347,7 @@ const bitacoraPendienteAjusteSchema = z.object({
   formula_descuento: z.string().optional().nullable().or(z.literal('')),
   descripcion: z.string().max(255).optional().nullable().or(z.literal('')),
   registrado_por: z.string().uuid().optional().nullable().or(z.literal(''))
-})
+}).strict()
 
 // ============================================================================
 // 7. CONTROL FINANCIERO Y PLAZOS
@@ -360,21 +360,21 @@ const parametroProyectoSchema = z.object({
   monto_etapa_construccion: z.coerce.number().optional().nullable().or(z.literal('')),
   monto_anticipo_total: z.coerce.number().optional().nullable().or(z.literal('')),
   anticipo_total_recibido: z.coerce.number().optional().nullable().or(z.literal(''))
-})
+}).strict()
 
 const controlAnticipoSchema = z.object({
   proyecto_id: z.string().uuid(),
   numero_estimacion: z.coerce.number(),
   monto_anticipo_total: z.coerce.number(),
   valor_estimacion_periodo: z.coerce.number().optional().default(0)
-})
+}).strict()
 
 const controlPlazoSchema = z.object({
   proyecto_id: z.string().uuid(),
   fecha_inicio_referencia: z.string(),
   dias_contractuales: z.coerce.number(),
   fecha_corte_estimacion: z.string().optional().nullable().or(z.literal(''))
-})
+}).strict()
 
 const suspensionPlazoSchema = z.object({
   proyecto_id: z.string().uuid(),
@@ -383,7 +383,7 @@ const suspensionPlazoSchema = z.object({
   motivo: z.string().optional().nullable().or(z.literal('')),
   tipo_suspension: z.string().max(100).optional().nullable().or(z.literal('')),
   numero_acta_resolucion: z.string().max(150)
-})
+}).strict()
 
 // ============================================================================
 // 8. INCIDENTES Y LABORATORIOS
@@ -401,7 +401,7 @@ const incidenteObraSchema = z.object({
   estado_resolucion: z.string().max(50).optional().default('Abierto'),
   cerrado_por: z.string().uuid().optional().nullable().or(z.literal('')),
   fecha_cierre: z.string().optional().nullable().or(z.literal(''))
-})
+}).strict()
 
 const incidenteEvidenciaSchema = z.object({
   incidente_id: z.string().uuid(),
@@ -410,7 +410,7 @@ const incidenteEvidenciaSchema = z.object({
   tipo: z.string().max(100).optional().nullable().or(z.literal('')),
   url_storage: z.string().url().max(500),
   descripcion: z.string().optional().nullable().or(z.literal(''))
-})
+}).strict()
 
 const evidenciaFotograficaSchema = z.object({
   bitacora_entrada_id: z.string().uuid(),
@@ -422,14 +422,14 @@ const evidenciaFotograficaSchema = z.object({
   descripcion: z.string().max(255).optional().nullable().or(z.literal('')),
   categoria: z.string().max(100).optional().nullable().or(z.literal('')),
   url_storage: z.string().url().max(500)
-})
+}).strict()
 
 const tipoEnsayoSchema = z.object({
   nombre: z.string().max(150),
   descripcion: z.string().max(255).optional().nullable().or(z.literal('')),
   unidad_resultado: z.string().max(50).optional().nullable().or(z.literal('')),
   activo: z.boolean().optional().default(true)
-})
+}).strict()
 
 const ensayoLaboratorioSchema = z.object({
   bitacora_entrada_id: z.string().uuid(),
@@ -440,10 +440,10 @@ const ensayoLaboratorioSchema = z.object({
   valor_minimo: z.coerce.number().optional().nullable().or(z.literal('')),
   aprobado: z.boolean().optional().default(false),
   observaciones: z.string().optional().nullable().or(z.literal(''))
-})
+}).strict()
 
 // ============================================================================
-// 9. REPORTES Y AUDITORÍA
+// 9. REPORTES Y AUDITORÃA
 // ============================================================================
 const reporteSchema = z.object({
   proyecto_id: z.string().uuid(),
@@ -461,7 +461,7 @@ const reporteSchema = z.object({
   estructura: z.any().optional(),
   campos_incluidos: z.any().optional(),
   url_storage: z.string().url().max(500).optional().nullable().or(z.literal(''))
-})
+}).strict()
 
 const auditoriaOperativaSchema = z.object({
   usuario_id: z.string().uuid().optional().nullable().or(z.literal('')),
@@ -471,7 +471,7 @@ const auditoriaOperativaSchema = z.object({
   tabla_afectada: z.string().max(100).optional().nullable().or(z.literal('')),
   registro_afectado: z.string().uuid().optional().nullable().or(z.literal('')),
   detalles: z.any().optional()
-})
+}).strict()
 
 const seguridadLogSchema = z.object({
   usuario_id: z.string().uuid().optional().nullable().or(z.literal('')),
@@ -480,7 +480,7 @@ const seguridadLogSchema = z.object({
   user_agent: z.string().optional().nullable().or(z.literal('')),
   exitoso: z.boolean().optional().default(true),
   detalles: z.any().optional()
-})
+}).strict()
 
 // Exportar todos los esquemas bajo la clave esperada por el endpoint
 export const mantenimientoSchemas: Record<string, z.ZodObject<any, any>> = {
@@ -530,3 +530,4 @@ export const mantenimientoSchemas: Record<string, z.ZodObject<any, any>> = {
   auditoria_operativa: auditoriaOperativaSchema,
   seguridad_log: seguridadLogSchema,
 }
+

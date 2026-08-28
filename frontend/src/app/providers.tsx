@@ -52,7 +52,6 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       `}} />
       <Toaster
         position="top-center"
-        maxToasts={3}
         toastOptions={{
           duration: 3500,
           style: {
@@ -67,3 +66,4 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     </QueryClientProvider>
   )
 }
+

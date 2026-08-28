@@ -2,12 +2,12 @@
 
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
-import type { LucideIcon } from 'lucide-react'
-import { Plus, Shield, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Plus, ChevronLeft, ChevronRight } from 'lucide-react'
 import { DEMO_ROLES, Role } from '@/data/roles'
 import { USUARIOS_MOCK } from '@/data/usuarios.mock'
 import { type RoleDrawerMode } from '@/components/modules/roles/RoleDrawer'
 import { showSuccessToast } from '@/hooks/useCustomToast'
+import { toast } from 'sonner'
 import dynamic from 'next/dynamic'
 import { useEffect } from 'react'
 import { Search } from 'lucide-react'
@@ -16,18 +16,6 @@ import { RolTabla } from '@/components/modules/roles/RolTabla'
 const RoleDrawer = dynamic(() => import('@/components/modules/roles/RoleDrawer').then(m => m.RoleDrawer), { ssr: false })
 const RoleDeleteModal = dynamic(() => import('@/components/modules/roles/RoleDeleteModal').then(m => m.RoleDeleteModal), { ssr: false })
 
-
-const iconPorRol: Record<string, LucideIcon> = {
-  Administrador: Shield,
-  Residente: Shield,
-  Supervisor: Shield,
-  Inspector: Shield,
-  Contratante: Shield,
-  Contratista: Shield,
-  Gerencia: Shield,
-  Campo: Shield,
-  Proveedor: Shield,
-}
 
 export default function RolesPage() {
   const [roles, setRoles] = useState(DEMO_ROLES)
@@ -314,5 +302,9 @@ export default function RolesPage() {
     </div>
   )
 }
+
+
+
+
 
 
