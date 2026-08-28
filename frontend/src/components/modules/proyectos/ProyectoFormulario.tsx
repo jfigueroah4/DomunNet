@@ -200,7 +200,7 @@ export default function ProyectoFormulario({ modo = 'crear', proyectoInicial }: 
           />
           <button
             onClick={agregarCategoria}
-            className="flex h-[34px] items-center justify-center gap-2 rounded-lg border border-[#A80F08] px-5 text-[12px] font-extrabold text-[#A80F08] transition-colors hover:bg-red-50"
+            className="flex h-[34px] items-center justify-center gap-2 rounded-lg border border-[#9B0F06] px-5 text-[12px] font-extrabold text-[#9B0F06] transition-colors hover:bg-red-50"
           >
             <Plus size={14} />
             Agregar
@@ -238,7 +238,7 @@ export default function ProyectoFormulario({ modo = 'crear', proyectoInicial }: 
         </div>
         <button
           onClick={agregarMiembro}
-          className="mt-3 flex h-[34px] w-full items-center justify-center gap-2 rounded-lg border border-[#A80F08] text-[12px] font-extrabold text-[#A80F08] transition-colors hover:bg-red-50"
+          className="mt-3 flex h-[34px] w-full items-center justify-center gap-2 rounded-lg border border-[#9B0F06] text-[12px] font-extrabold text-[#9B0F06] transition-colors hover:bg-red-50"
         >
           <UserPlus size={14} />
           Agregar
@@ -251,7 +251,7 @@ export default function ProyectoFormulario({ modo = 'crear', proyectoInicial }: 
                   <p className="text-[12px] font-bold text-[#07152B]">{miembro.nombre}</p>
                   <p className="text-[11px] font-medium text-[#8E96AE]">{miembro.rol}</p>
                 </div>
-                <button onClick={() => setEquipo(equipo.filter((m) => m.id !== miembro.id))} className="text-[#8E96AE] hover:text-[#A80F08]">
+                <button onClick={() => setEquipo(equipo.filter((m) => m.id !== miembro.id))} className="text-[#8E96AE] hover:text-[#9B0F06]">
                   <X size={14} />
                 </button>
               </div>
@@ -269,7 +269,7 @@ export default function ProyectoFormulario({ modo = 'crear', proyectoInicial }: 
         </div>
         <button
           onClick={agregarFase}
-          className="mt-3 flex h-[34px] w-full items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 text-[12px] font-bold text-[#617089] transition-colors hover:border-[#A80F08] hover:text-[#A80F08]"
+          className="mt-3 flex h-[34px] w-full items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 text-[12px] font-bold text-[#617089] transition-colors hover:border-[#9B0F06] hover:text-[#9B0F06]"
         >
           <Plus size={14} />
           Agregar Fase
@@ -304,7 +304,7 @@ export default function ProyectoFormulario({ modo = 'crear', proyectoInicial }: 
         </div>
         <button
           onClick={agregarRol}
-          className="mt-3 flex h-[34px] w-full items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 text-[12px] font-bold text-[#617089] transition-colors hover:border-[#A80F08] hover:text-[#A80F08]"
+          className="mt-3 flex h-[34px] w-full items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 text-[12px] font-bold text-[#617089] transition-colors hover:border-[#9B0F06] hover:text-[#9B0F06]"
         >
           <UserPlus size={14} />
           Agregar rol por proyecto
@@ -323,7 +323,7 @@ export default function ProyectoFormulario({ modo = 'crear', proyectoInicial }: 
         </button>
         <button
           onClick={handleGuardar}
-          className="flex items-center gap-2 rounded-lg bg-[#A80F08] px-5 py-2 text-[12px] font-extrabold text-white transition-colors hover:bg-[#8F0C06]"
+          className="flex items-center gap-2 rounded-lg bg-[#9B0F06] px-5 py-2 text-[12px] font-extrabold text-white transition-colors hover:bg-[#8F0C06]"
         >
           <Save size={14} />
           {modo === 'crear' ? 'Crear Proyecto' : 'Guardar Cambios'}

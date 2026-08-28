@@ -40,7 +40,7 @@ export default function ProyectoDocumentos({ documentos }: ProyectoDocumentosPro
           <h3 className="text-[15px] font-extrabold text-[#07152B]">Documentos del Proyecto</h3>
           <p className="mt-0.5 text-[11px] text-[#9AA2B5]">Archivos oficiales y respaldos del proyecto</p>
         </div>
-        <button className="flex items-center gap-2 rounded-lg bg-[#A80F08] px-3 py-2 text-[11px] font-semibold text-white transition-colors hover:bg-[#8F0C06]">
+        <button className="flex items-center gap-2 rounded-lg bg-[#9B0F06] px-3 py-2 text-[11px] font-semibold text-white transition-colors hover:bg-[#8F0C06]">
           <FileText size={13} />
           Subir Documento
         </button>
