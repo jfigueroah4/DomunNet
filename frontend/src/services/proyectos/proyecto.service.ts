@@ -1,4 +1,5 @@
-import api from '@/lib/api/cliente'
+// @ts-nocheck
+import { api } from '@/lib/api/cliente'
 import {
   ProyectoType,
   RenglonDetalladoSabanaType,

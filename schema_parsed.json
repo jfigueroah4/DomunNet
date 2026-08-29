@@ -1,0 +1,643 @@
+{
+  "rol": {
+    "columns": [
+      "id",
+      "nombre_rol",
+      "nivel_permisos",
+      "permisos",
+      "activo",
+      "created_at",
+      "descripcion"
+    ],
+    "fks_to_me": []
+  },
+  "usuario": {
+    "columns": [
+      "id",
+      "auth_user_id",
+      "correo",
+      "rol_id",
+      "activo",
+      "ultimo_acceso",
+      "fecha_registro",
+      "updated_at"
+    ],
+    "fks_to_me": []
+  },
+  "dato_usuario": {
+    "columns": [
+      "id",
+      "usuario_id",
+      "email",
+      "password_hash",
+      "username",
+      "primer_nombre",
+      "segundo_nombre",
+      "primer_apellido",
+      "segundo_apellido",
+      "telefono",
+      "direccion",
+      "fecha_nacimiento",
+      "avatar_url",
+      "estado",
+      "fecha_registro",
+      "ultimo_acceso",
+      "updated_at"
+    ],
+    "fks_to_me": []
+  },
+  "estado_usuario": {
+    "columns": [
+      "id",
+      "usuario_id",
+      "estado",
+      "motivo_bloqueo",
+      "cambiado_por",
+      "fecha_cambio"
+    ],
+    "fks_to_me": []
+  },
+  "empresa": {
+    "columns": [
+      "id",
+      "nombre",
+      "nit",
+      "direccion",
+      "telefono",
+      "correo",
+      "logo_url",
+      "marca_agua_url",
+      "updated_at"
+    ],
+    "fks_to_me": []
+  },
+  "catalogo": {
+    "columns": [
+      "id",
+      "codigo",
+      "nombre",
+      "descripcion",
+      "activo",
+      "created_at"
+    ],
+    "fks_to_me": []
+  },
+  "catalogo_item": {
+    "columns": [
+      "id",
+      "catalogo_id",
+      "codigo",
+      "nombre",
+      "descripcion",
+      "color",
+      "orden",
+      "activo",
+      "created_at",
+      "updated_at"
+    ],
+    "fks_to_me": []
+  },
+  "configuracion_general": {
+    "columns": [
+      "id",
+      "clave",
+      "valor",
+      "categoria",
+      "updated_at",
+      "cambiado_por"
+    ],
+    "fks_to_me": []
+  },
+  "backup_sistema": {
+    "columns": [
+      "id",
+      "generado_por",
+      "nombre_archivo",
+      "url_storage",
+      "tamanio",
+      "formato",
+      "estado",
+      "fecha_generacion"
+    ],
+    "fks_to_me": []
+  },
+  "restauracion_sistema": {
+    "columns": [
+      "id",
+      "restaurado_por",
+      "archivo_origen",
+      "estado",
+      "observaciones",
+      "fecha_restauracion"
+    ],
+    "fks_to_me": []
+  },
+  "departamento": {
+    "columns": [
+      "id",
+      "nombre"
+    ],
+    "fks_to_me": []
+  },
+  "municipio": {
+    "columns": [
+      "id",
+      "departamento_id",
+      "nombre"
+    ],
+    "fks_to_me": []
+  },
+  "empresa_contratante": {
+    "columns": [
+      "id",
+      "nombre",
+      "nit",
+      "direccion",
+      "telefono",
+      "correo_institucional",
+      "created_at"
+    ],
+    "fks_to_me": []
+  },
+  "contacto_contratante": {
+    "columns": [
+      "id",
+      "empresa_contratante_id",
+      "nombre",
+      "cargo",
+      "telefono",
+      "correo"
+    ],
+    "fks_to_me": []
+  },
+  "proyecto": {
+    "columns": [
+      "id",
+      "empresa_id",
+      "codigo",
+      "nombre",
+      "descripcion",
+      "ubicacion",
+      "fecha_inicio",
+      "fecha_fin_estimada",
+      "estado_id",
+      "responsable_id",
+      "created_at",
+      "updated_at"
+    ],
+    "fks_to_me": []
+  },
+  "proyecto_usuario": {
+    "columns": [
+      "id",
+      "proyecto_id",
+      "usuario_id",
+      "rol_proyecto",
+      "fecha_asignacion",
+      "activo"
+    ],
+    "fks_to_me": []
+  },
+  "proyecto_detalle": {
+    "columns": [
+      "id",
+      "proyecto_id",
+      "tipo_obra",
+      "nombre_oficial",
+      "descripcion_proyecto",
+      "municipio_id",
+      "tramo",
+      "kilometro_inicio",
+      "kilometro_fin",
+      "numero_contrato_original",
+      "fecha_firma_contrato_original",
+      "numero_contrato_modificatorio",
+      "fecha_firma_contrato_modificatorio",
+      "acuerdo_ministerial_original",
+      "acuerdo_ministerial_modificatorio",
+      "numero_escritura_publica",
+      "fecha_adjudicacion",
+      "fecha_inicio_contractual",
+      "fecha_finalizacion_real",
+      "monto_original",
+      "monto_ajustado",
+      "empresa_contratante_id",
+      "contacto_contratante_id",
+      "empresa_contratista_ejecutora",
+      "updated_at"
+    ],
+    "fks_to_me": []
+  },
+  "fase_proyecto": {
+    "columns": [
+      "id",
+      "proyecto_id",
+      "nombre",
+      "orden",
+      "fecha_inicio",
+      "fecha_fin",
+      "porcentaje_planificado",
+      "porcentaje_real",
+      "porcentaje_avance",
+      "fecha_corte",
+      "estado"
+    ],
+    "fks_to_me": []
+  },
+  "documento_proyecto": {
+    "columns": [
+      "id",
+      "proyecto_id",
+      "subido_por",
+      "nombre",
+      "tipo",
+      "url_storage",
+      "version",
+      "fecha_subida"
+    ],
+    "fks_to_me": []
+  },
+  "categoria_actividad": {
+    "columns": [
+      "id",
+      "nombre",
+      "descripcion",
+      "tipo_obra",
+      "activo",
+      "created_at"
+    ],
+    "fks_to_me": []
+  },
+  "especificacion_tecnica": {
+    "columns": [
+      "id",
+      "codigo",
+      "descripcion",
+      "unidad",
+      "parametros_obligatorios",
+      "referencia_normativa",
+      "edicion",
+      "tolerancia_minima",
+      "tolerancia_maxima",
+      "norma_referencia"
+    ],
+    "fks_to_me": []
+  },
+  "tipo_ensayo": {
+    "columns": [
+      "id",
+      "nombre",
+      "descripcion",
+      "unidad_resultado",
+      "activo"
+    ],
+    "fks_to_me": []
+  },
+  "capitulo_sabana": {
+    "columns": [
+      "id",
+      "numero_capitulo",
+      "nombre_capitulo",
+      "descripcion",
+      "created_at"
+    ],
+    "fks_to_me": []
+  },
+  "unidad_medida": {
+    "columns": [
+      "id",
+      "nombre",
+      "abreviatura"
+    ],
+    "fks_to_me": []
+  },
+  "renglon_trabajo": {
+    "columns": [
+      "id",
+      "proyecto_id",
+      "categoria_id",
+      "especificacion_id",
+      "capitulo_id",
+      "unidad_id",
+      "aplica_indirectos",
+      "aplica_iva",
+      "descripcion",
+      "cantidad_contractual",
+      "cantidad_ejecutada",
+      "cantidad_ajustada",
+      "precio_unitario_directo",
+      "costo_total_directo_ajustado",
+      "GENERATED",
+      "fecha_ultimo_avance"
+    ],
+    "fks_to_me": []
+  },
+  "modificativo_renglon": {
+    "columns": [
+      "id",
+      "renglon_id",
+      "cantidad_delta",
+      "documento_referencia",
+      "motivo",
+      "aprobado_por",
+      "fecha_registro"
+    ],
+    "fks_to_me": []
+  },
+  "bitacora_entrada": {
+    "columns": [
+      "id",
+      "proyecto_id",
+      "usuario_id",
+      "tipo_bitacora_id",
+      "categoria_actividad_id",
+      "titulo",
+      "fecha",
+      "hora",
+      "turno",
+      "ubicacion",
+      "descripcion",
+      "estado_general_id",
+      "comentarios",
+      "firma_url",
+      "publicada",
+      "bloqueada",
+      "created_at",
+      "updated_at"
+    ],
+    "fks_to_me": []
+  },
+  "ensayo_laboratorio": {
+    "columns": [
+      "id",
+      "bitacora_entrada_id",
+      "tipo_ensayo_id",
+      "tecnico_id",
+      "especificacion_id",
+      "resultado_obtenido",
+      "valor_minimo",
+      "aprobado",
+      "observaciones",
+      "fecha_hora"
+    ],
+    "fks_to_me": []
+  },
+  "condicion_climatica": {
+    "columns": [
+      "id",
+      "bitacora_entrada_id",
+      "temperatura",
+      "precipitacion",
+      "viento",
+      "visibilidad",
+      "estado_general"
+    ],
+    "fks_to_me": []
+  },
+  "estacion_kilometrica": {
+    "columns": [
+      "id",
+      "bitacora_entrada_id",
+      "renglon_trabajo_id",
+      "numero_eje",
+      "estacion_inicial",
+      "estacion_final",
+      "observacion"
+    ],
+    "fks_to_me": []
+  },
+  "bitacora_avance": {
+    "columns": [
+      "id",
+      "bitacora_entrada_id",
+      "proyecto_id",
+      "fase_id",
+      "renglon_id",
+      "cantidad_periodo",
+      "longitud",
+      "ancho",
+      "altura_espesor",
+      "cantidad_unidades",
+      "cantidad_calculada",
+      "GENERATED",
+      "estacion_inicio",
+      "estacion_fin",
+      "observaciones",
+      "fecha_corte"
+    ],
+    "fks_to_me": []
+  },
+  "cronograma_planificado": {
+    "columns": [
+      "id",
+      "proyecto_id",
+      "fase_id",
+      "renglon_id",
+      "fecha_inicio_plan",
+      "fecha_fin_plan",
+      "porcentaje_esperado",
+      "responsable_id",
+      "linea_base"
+    ],
+    "fks_to_me": []
+  },
+  "catalogo_descuento_tecnico": {
+    "columns": [
+      "id",
+      "descripcion",
+      "factor_seccion_transversal",
+      "created_at"
+    ],
+    "fks_to_me": []
+  },
+  "bitacora_pendiente": {
+    "columns": [
+      "id",
+      "renglon_id",
+      "proyecto_id",
+      "registrado_por",
+      "fecha_medicion",
+      "estimacion_origen",
+      "lado_via",
+      "ubicacion_especifica",
+      "estacion_inicial",
+      "estacion_final",
+      "longitud_medida",
+      "ancho",
+      "altura_espesor",
+      "volumen_area_bruto",
+      "GENERATED",
+      "descuento_aplicado_id",
+      "cantidad_neta_cobrar",
+      "es_derrumbre",
+      "observaciones",
+      "created_at",
+      "updated_at"
+    ],
+    "fks_to_me": []
+  },
+  "bitacora_pendiente_ajuste": {
+    "columns": [
+      "id",
+      "bitacora_pendiente_id",
+      "valor_descuento",
+      "formula_descuento",
+      "descripcion",
+      "registrado_por",
+      "created_at"
+    ],
+    "fks_to_me": []
+  },
+  "parametro_proyecto": {
+    "columns": [
+      "id",
+      "proyecto_id",
+      "porcentaje_indirectos",
+      "porcentaje_iva",
+      "porcentaje_amortizacion_anticipo",
+      "monto_etapa_construccion",
+      "monto_anticipo_total",
+      "anticipo_total_recibido",
+      "updated_at"
+    ],
+    "fks_to_me": []
+  },
+  "control_anticipo": {
+    "columns": [
+      "id",
+      "proyecto_id",
+      "numero_estimacion",
+      "monto_anticipo_total",
+      "valor_estimacion_periodo",
+      "amortizado_periodo",
+      "GENERATED",
+      "saldo_por_amortizar",
+      "fecha_registro"
+    ],
+    "fks_to_me": []
+  },
+  "control_plazo": {
+    "columns": [
+      "id",
+      "proyecto_id",
+      "fecha_inicio_referencia",
+      "dias_contractuales",
+      "dias_suspendidos_acumulados",
+      "fecha_corte_estimacion",
+      "fecha_finalizacion_actualizada",
+      "GENERATED",
+      "updated_at"
+    ],
+    "fks_to_me": []
+  },
+  "suspension_plazo": {
+    "columns": [
+      "id",
+      "proyecto_id",
+      "fecha_inicio",
+      "fecha_fin",
+      "duracion_dias",
+      "motivo",
+      "tipo_suspension",
+      "numero_acta_resolucion",
+      "created_at"
+    ],
+    "fks_to_me": []
+  },
+  "incidente_obra": {
+    "columns": [
+      "id",
+      "proyecto_id",
+      "bitacora_entrada_id",
+      "reportado_por",
+      "titulo",
+      "ubicacion",
+      "descripcion",
+      "tipo",
+      "nivel_gravedad",
+      "acciones_correctivas",
+      "estado_resolucion",
+      "cerrado_por",
+      "fecha",
+      "fecha_cierre"
+    ],
+    "fks_to_me": []
+  },
+  "incidente_evidencia": {
+    "columns": [
+      "id",
+      "incidente_id",
+      "subido_por",
+      "nombre",
+      "tipo",
+      "url_storage",
+      "descripcion",
+      "fecha_subida"
+    ],
+    "fks_to_me": []
+  },
+  "evidencia_fotografica": {
+    "columns": [
+      "id",
+      "bitacora_entrada_id",
+      "usuario_id",
+      "gps_lat",
+      "gps_lng",
+      "precision_gps",
+      "fecha_hora",
+      "descripcion",
+      "categoria",
+      "url_storage"
+    ],
+    "fks_to_me": []
+  },
+  "reporte": {
+    "columns": [
+      "id",
+      "proyecto_id",
+      "generado_por",
+      "titulo",
+      "tipo",
+      "filtros_aplicados",
+      "formato",
+      "estado",
+      "nombre_archivo",
+      "logo_incluido",
+      "marca_agua_incluida",
+      "logo_url",
+      "marca_agua_url",
+      "estructura",
+      "campos_incluidos",
+      "url_storage",
+      "fecha_generacion"
+    ],
+    "fks_to_me": []
+  },
+  "auditoria_operativa": {
+    "columns": [
+      "id",
+      "usuario_id",
+      "proyecto_id",
+      "accion",
+      "modulo",
+      "tabla_afectada",
+      "registro_afectado",
+      "detalles",
+      "fecha_hora"
+    ],
+    "fks_to_me": []
+  },
+  "seguridad_log": {
+    "columns": [
+      "id",
+      "usuario_id",
+      "accion",
+      "ip",
+      "user_agent",
+      "exitoso",
+      "detalles",
+      "fecha_hora"
+    ],
+    "fks_to_me": []
+  }
+}

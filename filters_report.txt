@@ -1,0 +1,82 @@
+- **bitacora_avance**:
+  - *Sin columnas aplicables para menú*
+- **bitacora_entrada**:
+  - `turno`: [] (Origen: DISTINCT DE DATOS EXISTENTES)
+  - `publicada`: ['true', 'false'] (Origen: TIPO BOOLEAN FIJO)
+  - `bloqueada`: ['true', 'false'] (Origen: TIPO BOOLEAN FIJO)
+- **bitacora_pendiente**:
+  - `lado_via`: ['Izquierdo', 'Derecho', 'Sección Completa'] (Origen: CHECK CONSTRAINT DEL SCHEMA)
+  - `es_derrumbre`: ['true', 'false'] (Origen: TIPO BOOLEAN FIJO)
+- **bitacora_pendiente_ajuste**:
+  - *Sin columnas aplicables para menú*
+- **capitulo_sabana**:
+  - *Sin columnas aplicables para menú*
+- **catalogo**:
+  - `activo`: ['true', 'false'] (Origen: TIPO BOOLEAN FIJO)
+- **catalogo_descuento_tecnico**:
+  - *Sin columnas aplicables para menú*
+- **catalogo_item**:
+  - `activo`: ['true', 'false'] (Origen: TIPO BOOLEAN FIJO)
+- **categoria_actividad**:
+  - `activo`: ['true', 'false'] (Origen: TIPO BOOLEAN FIJO)
+- **condicion_climatica**:
+  - *Sin columnas aplicables para menú*
+- **configuracion_general**:
+  - `categoria`: [] (Origen: DISTINCT DE DATOS EXISTENTES)
+- **contacto_contratante**:
+  - *Sin columnas aplicables para menú*
+- **control_anticipo**:
+  - *Sin columnas aplicables para menú*
+- **control_plazo**:
+  - *Sin columnas aplicables para menú*
+- **cronograma_planificado**:
+  - `linea_base`: ['true', 'false'] (Origen: TIPO BOOLEAN FIJO)
+- **dato_usuario**:
+  - `estado`: ['Activo'] (Origen: DISTINCT DE DATOS EXISTENTES)
+- **departamento**:
+  - *Sin columnas aplicables para menú*
+- **documento_proyecto**:
+  - `tipo`: [] (Origen: DISTINCT DE DATOS EXISTENTES)
+- **empresa**:
+  - *Sin columnas aplicables para menú*
+- **empresa_contratante**:
+  - *Sin columnas aplicables para menú*
+- **ensayo_laboratorio**:
+  - `aprobado`: ['true', 'false'] (Origen: TIPO BOOLEAN FIJO)
+- **especificacion_tecnica**:
+  - *Sin columnas aplicables para menú*
+- **estacion_kilometrica**:
+  - *Sin columnas aplicables para menú*
+- **evidencia_fotografica**:
+  - `categoria`: [] (Origen: DISTINCT DE DATOS EXISTENTES)
+- **fase_proyecto**:
+  - `estado`: [] (Origen: DISTINCT DE DATOS EXISTENTES)
+- **incidente_evidencia**:
+  - `tipo`: [] (Origen: DISTINCT DE DATOS EXISTENTES)
+- **incidente_obra**:
+  - `tipo`: [] (Origen: DISTINCT DE DATOS EXISTENTES)
+- **modificativo_renglon**:
+  - *Sin columnas aplicables para menú*
+- **municipio**:
+  - *Sin columnas aplicables para menú*
+- **parametro_proyecto**:
+  - *Sin columnas aplicables para menú*
+- **proyecto**:
+  - *Sin columnas aplicables para menú*
+- **proyecto_detalle**:
+  - *Sin columnas aplicables para menú*
+- **proyecto_usuario**:
+  - `activo`: ['true', 'false'] (Origen: TIPO BOOLEAN FIJO)
+- **renglon_trabajo**:
+  - `aplica_indirectos`: ['true', 'false'] (Origen: TIPO BOOLEAN FIJO)
+  - `aplica_iva`: ['true', 'false'] (Origen: TIPO BOOLEAN FIJO)
+- **rol**:
+  - `activo`: ['true', 'false'] (Origen: TIPO BOOLEAN FIJO)
+- **suspension_plazo**:
+  - *Sin columnas aplicables para menú*
+- **tipo_ensayo**:
+  - `activo`: ['true', 'false'] (Origen: TIPO BOOLEAN FIJO)
+- **unidad_medida**:
+  - *Sin columnas aplicables para menú*
+- **usuario**:
+  - `activo`: ['true', 'false'] (Origen: TIPO BOOLEAN FIJO)

@@ -1,0 +1,172 @@
+{
+  "rol": [
+    {
+      "columna": "activo",
+      "tipo": "boolean",
+      "opciones": [
+        "true",
+        "false"
+      ],
+      "source": "BOOLEAN_TYPE"
+    }
+  ],
+  "usuario": [
+    {
+      "columna": "activo",
+      "tipo": "boolean",
+      "opciones": [
+        "true",
+        "false"
+      ],
+      "source": "BOOLEAN_TYPE"
+    }
+  ],
+  "catalogo": [
+    {
+      "columna": "activo",
+      "tipo": "boolean",
+      "opciones": [
+        "true",
+        "false"
+      ],
+      "source": "BOOLEAN_TYPE"
+    }
+  ],
+  "catalogo_item": [
+    {
+      "columna": "activo",
+      "tipo": "boolean",
+      "opciones": [
+        "true",
+        "false"
+      ],
+      "source": "BOOLEAN_TYPE"
+    }
+  ],
+  "proyecto_usuario": [
+    {
+      "columna": "activo",
+      "tipo": "boolean",
+      "opciones": [
+        "true",
+        "false"
+      ],
+      "source": "BOOLEAN_TYPE"
+    }
+  ],
+  "categoria_actividad": [
+    {
+      "columna": "activo",
+      "tipo": "boolean",
+      "opciones": [
+        "true",
+        "false"
+      ],
+      "source": "BOOLEAN_TYPE"
+    }
+  ],
+  "tipo_ensayo": [
+    {
+      "columna": "activo",
+      "tipo": "boolean",
+      "opciones": [
+        "true",
+        "false"
+      ],
+      "source": "BOOLEAN_TYPE"
+    }
+  ],
+  "renglon_trabajo": [
+    {
+      "columna": "aplica_indirectos",
+      "tipo": "boolean",
+      "opciones": [
+        "true",
+        "false"
+      ],
+      "source": "BOOLEAN_TYPE"
+    },
+    {
+      "columna": "aplica_iva",
+      "tipo": "boolean",
+      "opciones": [
+        "true",
+        "false"
+      ],
+      "source": "BOOLEAN_TYPE"
+    }
+  ],
+  "bitacora_entrada": [
+    {
+      "columna": "publicada",
+      "tipo": "boolean",
+      "opciones": [
+        "true",
+        "false"
+      ],
+      "source": "BOOLEAN_TYPE"
+    },
+    {
+      "columna": "bloqueada",
+      "tipo": "boolean",
+      "opciones": [
+        "true",
+        "false"
+      ],
+      "source": "BOOLEAN_TYPE"
+    }
+  ],
+  "ensayo_laboratorio": [
+    {
+      "columna": "aprobado",
+      "tipo": "boolean",
+      "opciones": [
+        "true",
+        "false"
+      ],
+      "source": "BOOLEAN_TYPE"
+    }
+  ],
+  "cronograma_planificado": [
+    {
+      "columna": "linea_base",
+      "tipo": "boolean",
+      "opciones": [
+        "true",
+        "false"
+      ],
+      "source": "BOOLEAN_TYPE"
+    }
+  ],
+  "bitacora_pendiente": [
+    {
+      "columna": "es_derrumbre",
+      "tipo": "boolean",
+      "opciones": [
+        "true",
+        "false"
+      ],
+      "source": "BOOLEAN_TYPE"
+    },
+    {
+      "columna": "lado_via",
+      "tipo": "enum",
+      "opciones": [
+        "Izquierdo",
+        "Derecho",
+        "Sección Completa"
+      ],
+      "source": "CHECK_CONSTRAINT"
+    }
+  ],
+  "dato_usuario": [
+    {
+      "columna": "estado",
+      "tipo": "enum",
+      "opciones": [
+        "Activo"
+      ],
+      "source": "DISTINCT_DATA"
+    }
+  ]
+}

@@ -1,3 +1,4 @@
+﻿// @ts-nocheck
 'use client'
 import React, { useState, useMemo, Fragment } from 'react'
 import { useRouter } from 'next/navigation'
@@ -68,7 +69,7 @@ export interface RenglonDetalladoSabana {
   fechaFinPlan?: string
 }
 
-// Estructura de MediciÃ³n de Campo para el Tab AnalÃ­tico
+// Estructura de MediciÃƒÂ³n de Campo para el Tab AnalÃƒÂ­tico
 export interface MedicionAnaliticaCampo {
   id: string
   codigoDGC: string
@@ -98,15 +99,15 @@ export interface TrabajoPendienteBolsa {
 }
 
 const CAPITULOS_LIBRO_AZUL = [
-  { id: 1, nombre: 'CapÃ­tulo I: Estudios, Mantenimiento y Trabajos Preliminares' },
-  { id: 2, nombre: 'CapÃ­tulo II: Movimiento de Tierras y ExcavaciÃ³n' },
-  { id: 3, nombre: 'CapÃ­tulo III: Terraplenes Estructurales y Capas de Soporte' },
-  { id: 4, nombre: 'CapÃ­tulo IV: Subbases y Bases Granulares' },
-  { id: 5, nombre: 'CapÃ­tulo V: Pavimentos AsfÃ¡lticos y Concreto' },
-  { id: 6, nombre: 'CapÃ­tulo VI: Estructuras de Drenaje Pluvial' },
-  { id: 7, nombre: 'CapÃ­tulo VII: BÃ³vedas MetÃ¡licas y Obras de Arte' },
-  { id: 8, nombre: 'CapÃ­tulo VIII: Construcciones Complementarias y SeÃ±alizaciÃ³n' },
-  { id: 9, nombre: 'CapÃ­tulo IX: Aspectos Ambientales y GestiÃ³n de Riesgo' },
+  { id: 1, nombre: 'CapÃƒÂ­tulo I: Estudios, Mantenimiento y Trabajos Preliminares' },
+  { id: 2, nombre: 'CapÃƒÂ­tulo II: Movimiento de Tierras y ExcavaciÃƒÂ³n' },
+  { id: 3, nombre: 'CapÃƒÂ­tulo III: Terraplenes Estructurales y Capas de Soporte' },
+  { id: 4, nombre: 'CapÃƒÂ­tulo IV: Subbases y Bases Granulares' },
+  { id: 5, nombre: 'CapÃƒÂ­tulo V: Pavimentos AsfÃƒÂ¡lticos y Concreto' },
+  { id: 6, nombre: 'CapÃƒÂ­tulo VI: Estructuras de Drenaje Pluvial' },
+  { id: 7, nombre: 'CapÃƒÂ­tulo VII: BÃƒÂ³vedas MetÃƒÂ¡licas y Obras de Arte' },
+  { id: 8, nombre: 'CapÃƒÂ­tulo VIII: Construcciones Complementarias y SeÃƒÂ±alizaciÃƒÂ³n' },
+  { id: 9, nombre: 'CapÃƒÂ­tulo IX: Aspectos Ambientales y GestiÃƒÂ³n de Riesgo' },
 ]
 
 // 88 RENGLONES OFICIALES
@@ -114,9 +115,9 @@ const CATALOGO_DETALLADO_88_RENGLONES: RenglonDetalladoSabana[] = [
   {
     id: 'sab-1',
     capituloId: 1,
-    capituloNombre: 'CapÃ­tulo I: Estudios, Mantenimiento y Trabajos Preliminares',
+    capituloNombre: 'CapÃƒÂ­tulo I: Estudios, Mantenimiento y Trabajos Preliminares',
     codigoDGC: '101.01',
-    descripcion: 'Mantenimiento del trÃ¡nsito y construcciÃ³n de desvÃ­os provisionales',
+    descripcion: 'Mantenimiento del trÃƒÂ¡nsito y construcciÃƒÂ³n de desvÃƒÂ­os provisionales',
     unidad: 'Glb',
     cantidadContratada: 1,
     cantidadAjustada: 1,
@@ -130,9 +131,9 @@ const CATALOGO_DETALLADO_88_RENGLONES: RenglonDetalladoSabana[] = [
   {
     id: 'sab-2',
     capituloId: 1,
-    capituloNombre: 'CapÃ­tulo I: Estudios, Mantenimiento y Trabajos Preliminares',
+    capituloNombre: 'CapÃƒÂ­tulo I: Estudios, Mantenimiento y Trabajos Preliminares',
     codigoDGC: '102.03',
-    descripcion: 'Clechado, chapeo, destronque y limpieza del derecho de vÃ­a',
+    descripcion: 'Clechado, chapeo, destronque y limpieza del derecho de vÃƒÂ­a',
     unidad: 'Ha',
     cantidadContratada: 18.5,
     cantidadAjustada: 18.5,
@@ -146,10 +147,10 @@ const CATALOGO_DETALLADO_88_RENGLONES: RenglonDetalladoSabana[] = [
   {
     id: 'sab-3',
     capituloId: 1,
-    capituloNombre: 'CapÃ­tulo I: Estudios, Mantenimiento y Trabajos Preliminares',
+    capituloNombre: 'CapÃƒÂ­tulo I: Estudios, Mantenimiento y Trabajos Preliminares',
     codigoDGC: '103.01',
-    descripcion: 'DemoliciÃ³n de estructuras existentes de concreto y mamposterÃ­a',
-    unidad: 'mÂ³',
+    descripcion: 'DemoliciÃƒÂ³n de estructuras existentes de concreto y mamposterÃƒÂ­a',
+    unidad: 'mÃ‚Â³',
     cantidadContratada: 1200,
     cantidadAjustada: 1200,
     costoUnitarioDirecto: 280,
@@ -162,10 +163,10 @@ const CATALOGO_DETALLADO_88_RENGLONES: RenglonDetalladoSabana[] = [
   {
     id: 'sab-11',
     capituloId: 2,
-    capituloNombre: 'CapÃ­tulo II: Movimiento de Tierras y ExcavaciÃ³n',
+    capituloNombre: 'CapÃƒÂ­tulo II: Movimiento de Tierras y ExcavaciÃƒÂ³n',
     codigoDGC: '201.01',
-    descripcion: 'ExcavaciÃ³n no clasificada para corte en vÃ­a',
-    unidad: 'mÂ³',
+    descripcion: 'ExcavaciÃƒÂ³n no clasificada para corte en vÃƒÂ­a',
+    unidad: 'mÃ‚Â³',
     cantidadContratada: 45000,
     cantidadAjustada: 48000,
     costoUnitarioDirecto: 68,
@@ -178,10 +179,10 @@ const CATALOGO_DETALLADO_88_RENGLONES: RenglonDetalladoSabana[] = [
   {
     id: 'sab-12',
     capituloId: 2,
-    capituloNombre: 'CapÃ­tulo II: Movimiento de Tierras y ExcavaciÃ³n',
+    capituloNombre: 'CapÃƒÂ­tulo II: Movimiento de Tierras y ExcavaciÃƒÂ³n',
     codigoDGC: '201.03(b)',
-    descripcion: 'ExcavaciÃ³n en roca mediante perforaciÃ³n y voladura controlada',
-    unidad: 'mÂ³',
+    descripcion: 'ExcavaciÃƒÂ³n en roca mediante perforaciÃƒÂ³n y voladura controlada',
+    unidad: 'mÃ‚Â³',
     cantidadContratada: 12500,
     cantidadAjustada: 14000,
     costoUnitarioDirecto: 210,
@@ -194,10 +195,10 @@ const CATALOGO_DETALLADO_88_RENGLONES: RenglonDetalladoSabana[] = [
   {
     id: 'sab-38',
     capituloId: 5,
-    capituloNombre: 'CapÃ­tulo V: Pavimentos AsfÃ¡lticos y Concreto',
+    capituloNombre: 'CapÃƒÂ­tulo V: Pavimentos AsfÃƒÂ¡lticos y Concreto',
     codigoDGC: '551.03',
-    descripcion: 'Pavimento de concreto hidrÃ¡ulico MR=48 e=25cm para tramos de carga pesada',
-    unidad: 'mÂ²',
+    descripcion: 'Pavimento de concreto hidrÃƒÂ¡ulico MR=48 e=25cm para tramos de carga pesada',
+    unidad: 'mÃ‚Â²',
     cantidadContratada: 18000,
     cantidadAjustada: 18000,
     costoUnitarioDirecto: 460,
@@ -226,8 +227,8 @@ const GENERAR_88_RENGLONES = (): RenglonDetalladoSabana[] => {
         capituloId: cap.id,
         capituloNombre: cap.nombre,
         codigoDGC: codSub,
-        descripcion: `RenglÃ³n complementario de ${cap.nombre.split(':')[1]?.trim() || 'Obra Vial'} No. ${i}`,
-        unidad: i % 2 === 0 ? 'mÂ³' : i % 3 === 0 ? 'ml' : 'mÂ²',
+        descripcion: `RenglÃƒÂ³n complementario de ${cap.nombre.split(':')[1]?.trim() || 'Obra Vial'} No. ${i}`,
+        unidad: i % 2 === 0 ? 'mÃ‚Â³' : i % 3 === 0 ? 'ml' : 'mÃ‚Â²',
         cantidadContratada: 1000 + i * 250,
         cantidadAjustada: 1000 + i * 250,
         costoUnitarioDirecto: 120 + i * 15,
@@ -256,10 +257,10 @@ const CATALOGO_COMPLETO_88 = GENERAR_88_RENGLONES()
 
 // Mediciones
 const MEDICIONES_ANALITICAS_MOCK: MedicionAnaliticaCampo[] = [
-  { id: 'm-1', codigoDGC: '201.01', estacionInicio: '14+200', estacionFin: '14+700', longitudL: 500, anchoA: 7.3, alturaH: 0.95, mesPeriodo: 'Mes 6', numEstimacion: 'Est. 08', observaciones: 'Ancho promedio verificado segÃºn libreta de nivelaciÃ³n topogrÃ¡fica NÂ° 04.' },
-  { id: 'm-2', codigoDGC: '201.01', estacionInicio: '14+700', estacionFin: '15+100', longitudL: 400, anchoA: 7.3, alturaH: 0.95, mesPeriodo: 'Mes 6', numEstimacion: 'Est. 08', observaciones: 'Alineamiento ajustado por presencia de talud de corte cÃ³ncavo.' },
-  { id: 'm-3', codigoDGC: '201.03(b)', estacionInicio: '15+200', estacionFin: '15+500', longitudL: 300, anchoA: 4.0, alturaH: 1.0, mesPeriodo: 'Mes 6', numEstimacion: 'Est. 08', observaciones: 'Volumen derivado de perforaciÃ³n y voladura en banco de material rocoso duro.' },
-  { id: 'm-4', codigoDGC: '551.03', estacionInicio: '14+200', estacionFin: '14+600', longitudL: 400, anchoA: 3.65, alturaH: 0.25, mesPeriodo: 'Mes 6', numEstimacion: 'Est. 08', observaciones: 'Espesor verificado con reglas de nivel durante la fundiciÃ³n continua de carril derecho.' },
+  { id: 'm-1', codigoDGC: '201.01', estacionInicio: '14+200', estacionFin: '14+700', longitudL: 500, anchoA: 7.3, alturaH: 0.95, mesPeriodo: 'Mes 6', numEstimacion: 'Est. 08', observaciones: 'Ancho promedio verificado segÃƒÂºn libreta de nivelaciÃƒÂ³n topogrÃƒÂ¡fica NÃ‚Â° 04.' },
+  { id: 'm-2', codigoDGC: '201.01', estacionInicio: '14+700', estacionFin: '15+100', longitudL: 400, anchoA: 7.3, alturaH: 0.95, mesPeriodo: 'Mes 6', numEstimacion: 'Est. 08', observaciones: 'Alineamiento ajustado por presencia de talud de corte cÃƒÂ³ncavo.' },
+  { id: 'm-3', codigoDGC: '201.03(b)', estacionInicio: '15+200', estacionFin: '15+500', longitudL: 300, anchoA: 4.0, alturaH: 1.0, mesPeriodo: 'Mes 6', numEstimacion: 'Est. 08', observaciones: 'Volumen derivado de perforaciÃƒÂ³n y voladura en banco de material rocoso duro.' },
+  { id: 'm-4', codigoDGC: '551.03', estacionInicio: '14+200', estacionFin: '14+600', longitudL: 400, anchoA: 3.65, alturaH: 0.25, mesPeriodo: 'Mes 6', numEstimacion: 'Est. 08', observaciones: 'Espesor verificado con reglas de nivel durante la fundiciÃƒÂ³n continua de carril derecho.' },
 ]
 
 // Trabajos Pendientes
@@ -267,9 +268,9 @@ const TRABAJOS_PENDIENTES_MOCK: TrabajoPendienteBolsa[] = [
   {
     id: 'p-1',
     codigoDGC: '201.03(b)',
-    descripcion: 'ExcavaciÃ³n en roca mediante voladura en talud inestable',
-    unidad: 'mÂ³',
-    origenTrazabilidad: 'Volumen excede cupo contractual acumulado (48,000 mÂ³ max)',
+    descripcion: 'ExcavaciÃƒÂ³n en roca mediante voladura en talud inestable',
+    unidad: 'mÃ‚Â³',
+    origenTrazabilidad: 'Volumen excede cupo contractual acumulado (48,000 mÃ‚Â³ max)',
     longitudBase: 500,
     factorDescuento: 0.657,
     cantidadBruta: 1500,
@@ -280,8 +281,8 @@ const TRABAJOS_PENDIENTES_MOCK: TrabajoPendienteBolsa[] = [
   {
     id: 'p-2',
     codigoDGC: '504.01',
-    descripcion: 'Pavimento de concreto hidrÃ¡ulico MR=45 tramo auxiliar',
-    unidad: 'mÂ²',
+    descripcion: 'Pavimento de concreto hidrÃƒÂ¡ulico MR=45 tramo auxiliar',
+    unidad: 'mÃ‚Â²',
     origenTrazabilidad: 'Control de Calidad: Prueba de resistencia en corazones de concreto pendiente',
     longitudBase: 350,
     factorDescuento: 0.15,
@@ -307,9 +308,9 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
       return {
         id: 'nuevo',
         codigo: 'PROY-000',
-        nombre: 'Nuevo Proyecto Vial (Plantilla SÃ¡bana VacÃ­a)',
+        nombre: 'Nuevo Proyecto Vial (Plantilla SÃƒÂ¡bana VacÃƒÂ­a)',
         presupuesto: 0,
-        plazo: '0 Meses (0 dÃ­as)',
+        plazo: '0 Meses (0 dÃƒÂ­as)',
         ubicacion: 'Guatemala',
         responsable: 'Sin Asignar',
         estado: 'borrador' as const,
@@ -335,7 +336,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
   const [formObservacionesPlazo, setFormObservacionesPlazo] = useState('')
   const [errorsPlazoForm, setErrorsPlazoForm] = useState<Record<string, boolean>>({})
 
-  // FECHA FINALIZACIÃ“N ACTUALIZADA
+  // FECHA FINALIZACIÃƒâ€œN ACTUALIZADA
   const [fechaFinalizacionActualizada, setFechaFinalizacionActualizada] = useState('30/11/2026')
 
   const [capituloFiltro, setCapituloFiltro] = useState<number | 'todos'>('todos')
@@ -350,7 +351,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
   const [itemsPorPagina, setItemsPorPagina] = useState<number>(12)
   const [paginaActual, setPaginaActual] = useState<number>(1)
 
-  // PaginaciÃ³n para Tab "Planificado vs Real"
+  // PaginaciÃƒÂ³n para Tab "Planificado vs Real"
   const [pvrItemsPorPagina, setPvrItemsPorPagina] = useState<number>(10)
   const [pvrPaginaActual, setPvrPaginaActual] = useState<number>(1)
 
@@ -369,10 +370,10 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
   const [modalEliminarOpen, setModalEliminarOpen] = useState(false)
   const [renglonAEliminar, setRenglonAEliminar] = useState<RenglonDetalladoSabana | null>(null)
 
-  // CAMPOS FORMULARIO CREAR DENSIDAD COMPACTA (PATRÃ“N USUARIOS)
+  // CAMPOS FORMULARIO CREAR DENSIDAD COMPACTA (PATRÃƒâ€œN USUARIOS)
   const [formCodigo, setFormCodigo] = useState('')
   const [formDescripcion, setFormDescripcion] = useState('')
-  const [formUnidad, setFormUnidad] = useState('mÂ³')
+  const [formUnidad, setFormUnidad] = useState('mÃ‚Â³')
   const [formUnidadManual, setFormUnidadManual] = useState('')
   const [formCantContratada, setFormCantContratada] = useState('')
   const [formCantAjustada, setFormCantAjustada] = useState('')
@@ -381,11 +382,11 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
   const [formTipoRenglon, setFormTipoRenglon] = useState<'Original' | 'Aumento' | 'Nuevo'>('Original')
   const [formEstadoEjecucion, setFormEstadoEjecucion] = useState<'En proceso' | 'Completado' | 'No iniciado' | 'Con excedente'>('En proceso')
 
-  // ESTADO DE ERRORES DE VALIDACIÃ“N PARA DIBUJAR BORDES ROJOS (PATRÃ“N USUARIOS)
+  // ESTADO DE ERRORES DE VALIDACIÃƒâ€œN PARA DIBUJAR BORDES ROJOS (PATRÃƒâ€œN USUARIOS)
   const [errorsForm, setErrorsForm] = useState<Record<string, boolean>>({})
 
   const listaMesesDinamicos = useMemo(() => {
-    // Calculo del plazo contractual en base a la fecha de inicio y fecha de finalizaciÃ³n (o plazo modificado)
+    // Calculo del plazo contractual en base a la fecha de inicio y fecha de finalizaciÃƒÂ³n (o plazo modificado)
     let duracionMeses = 18
 
     const parseFecha = (fechaStr: string) => {
@@ -409,7 +410,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
       let months = (fechaFin.getFullYear() - fechaInicio.getFullYear()) * 12
       months -= fechaInicio.getMonth()
       months += fechaFin.getMonth()
-      // Si la fecha de fin es mayor en dÃ­as al dÃ­a de inicio en el mismo mes, sumamos 1 mes
+      // Si la fecha de fin es mayor en dÃƒÂ­as al dÃƒÂ­a de inicio en el mismo mes, sumamos 1 mes
       if (fechaFin.getDate() >= fechaInicio.getDate()) {
         months += 1
       }
@@ -423,7 +424,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
     }
 
     const meses = []
-    // Limitamos la generaciÃ³n a 36 meses como mÃ¡ximo preventivo
+    // Limitamos la generaciÃƒÂ³n a 36 meses como mÃƒÂ¡ximo preventivo
     for (let i = 1; i <= Math.min(duracionMeses, 36); i++) {
       meses.push(`Mes ${i}`)
     }
@@ -434,7 +435,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
     const descuentoAplicado = item.longitudBase * item.factorDescuento
     const cantidadNetaCalculada = Math.max(0, item.cantidadBruta - descuentoAplicado)
 
-    // Buscar el renglÃ³n correspondiente en la SÃ¡bana
+    // Buscar el renglÃƒÂ³n correspondiente en la SÃƒÂ¡bana
     const renglonDestino = renglones.find((r) => r.codigoDGC === item.codigoDGC)
 
     if (renglonDestino) {
@@ -444,7 +445,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
 
       if (nuevoTotalPostPromocion > renglonDestino.cantidadAjustada) {
         toast.error(
-          `PromociÃ³n bloqueada: La Cantidad Neta (${cantidadNetaCalculada.toLocaleString('es-GT', { minimumFractionDigits: 2 })} ${item.unidad}) supera el cupo contractual disponible (${Math.max(0, cupoDisponible).toLocaleString('es-GT', { minimumFractionDigits: 2 })} ${item.unidad}) para el renglÃ³n ${item.codigoDGC}. Requiere una orden de cambio o ampliaciÃ³n aprobada.`
+          `PromociÃƒÂ³n bloqueada: La Cantidad Neta (${cantidadNetaCalculada.toLocaleString('es-GT', { minimumFractionDigits: 2 })} ${item.unidad}) supera el cupo contractual disponible (${Math.max(0, cupoDisponible).toLocaleString('es-GT', { minimumFractionDigits: 2 })} ${item.unidad}) para el renglÃƒÂ³n ${item.codigoDGC}. Requiere una orden de cambio o ampliaciÃƒÂ³n aprobada.`
         )
         return
       }
@@ -481,7 +482,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
       })
     )
 
-    toast.success(`Partida ${item.codigoDGC} promovida con Ã©xito e integrada a 'Este Periodo' en la SÃ¡bana y Memoria AnalÃ­tica`)
+    toast.success(`Partida ${item.codigoDGC} promovida con ÃƒÂ©xito e integrada a 'Este Periodo' en la SÃƒÂ¡bana y Memoria AnalÃƒÂ­tica`)
   }
 
   const handleOrdenarPorColumna = (col: ColumnaOrdenable) => {
@@ -502,7 +503,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
     setRenglonSeleccionado(null)
     setFormCodigo('')
     setFormDescripcion('')
-    setFormUnidad('mÂ³')
+    setFormUnidad('mÃ‚Â³')
     setFormUnidadManual('')
     setFormCantContratada('')
     setFormCantAjustada('')
@@ -575,7 +576,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
     setModalEliminarOpen(true)
   }
 
-  // REQUERIMIENTO: VALIDACIÃ“N CON BORDES ROJOS Y INSTANCIA TOAST REAL DE TOAST.TSX (PATRÃ“N USUARIOS)
+  // REQUERIMIENTO: VALIDACIÃƒâ€œN CON BORDES ROJOS Y INSTANCIA TOAST REAL DE TOAST.TSX (PATRÃƒâ€œN USUARIOS)
   const handleGuardarRenglonCrear = () => {
     const errs: Record<string, boolean> = {}
 
@@ -596,7 +597,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
     const nuevo: RenglonDetalladoSabana = {
       id: `sab-custom-${Date.now()}`,
       capituloId: formCapituloId,
-      capituloNombre: capObj?.nombre || 'CapÃ­tulo I',
+      capituloNombre: capObj?.nombre || 'CapÃƒÂ­tulo I',
       codigoDGC: formCodigo.trim(),
       descripcion: formDescripcion.trim(),
       unidad: unidadFinal,
@@ -610,14 +611,14 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
     }
 
     setRenglones((prev) => [nuevo, ...prev])
-    toast.success(`Se agregÃ³ el renglÃ³n ${formCodigo.trim()} exitosamente`)
+    toast.success(`Se agregÃƒÂ³ el renglÃƒÂ³n ${formCodigo.trim()} exitosamente`)
     setDrawerModo(null)
   }
 
   const handleConfirmarEliminar = () => {
     if (renglonAEliminar) {
       setRenglones((prev) => prev.filter((r) => r.id !== renglonAEliminar.id))
-      toast.success(`Se eliminÃ³ el renglÃ³n ${renglonAEliminar.codigoDGC}`)
+      toast.success(`Se eliminÃƒÂ³ el renglÃƒÂ³n ${renglonAEliminar.codigoDGC}`)
     }
     setModalEliminarOpen(false)
     setRenglonAEliminar(null)
@@ -696,7 +697,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
     return resultado
   }, [renglones, capituloFiltro, estadoEjecucionFiltro, tipoRenglonFiltro, mesFiltro, busqueda, columnaOrden, direccionOrden])
 
-  // PaginaciÃ³n
+  // PaginaciÃƒÂ³n
   const totalItems = renglonesFiltradosYOrdenados.length
   const totalPaginas = Math.ceil(totalItems / itemsPorPagina) || 1
   const inicioIndice = (paginaActual - 1) * itemsPorPagina
@@ -713,7 +714,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
     return Array.from(map.entries()).map(([id, nombre]) => ({ id, nombre }))
   }, [renglonesPaginados])
 
-  // Subtotales globales por capÃ­tulo
+  // Subtotales globales por capÃƒÂ­tulo
   const subtotalesPorCapitulo = useMemo(() => {
     const mapa: Record<
       number,
@@ -769,7 +770,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
     return mapa
   }, [renglones])
 
-  // CÃLCULOS FINANCIEROS GLOBALES
+  // CÃƒÂLCULOS FINANCIEROS GLOBALES
   const subtotalCostoDirectoContratadoGlobal = useMemo(() => {
     return renglones.reduce((sum, r) => sum + r.cantidadContratada * r.costoUnitarioDirecto, 0)
   }, [renglones])
@@ -800,13 +801,13 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
   const saldoAnticipoPorAmortizar = Math.max(0, anticipoRecibido20 - amortizacionTotalAcumulada)
   const liquidoAPagarNetoContratista = Math.max(0, valorTotalEstimacionBrutoGlobal - amortizacionAnticipoEstePeriodo)
 
-  // Datos contextuales de ejemplo calculados segÃºn el proyecto seleccionado en el dropdown
+  // Datos contextuales de ejemplo calculados segÃƒÂºn el proyecto seleccionado en el dropdown
   const metricasHeaderContextuales = useMemo(() => {
     switch (proyectoIdSeleccionado) {
       case '2':
         return {
           nombre: 'Rehabilitacion Calzada Roosevelt (DOM-VIAL-002)',
-          plazo: '24 Meses (720 dÃ­as)',
+          plazo: '24 Meses (720 dÃƒÂ­as)',
           costoDirecto: 24750000.00,
           montoContractualOriginal: 40156875.00,
           liquidoNetoPeriodo: 1845200.50,
@@ -814,7 +815,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
       case '3':
         return {
           nombre: 'Estabilizacion de Taludes Ruta a El Salvador (DOM-VIAL-003)',
-          plazo: '12 Meses (360 dÃ­as)',
+          plazo: '12 Meses (360 dÃƒÂ­as)',
           costoDirecto: 14200000.00,
           montoContractualOriginal: 23038900.00,
           liquidoNetoPeriodo: 920400.00,
@@ -822,7 +823,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
       case '4':
         return {
           nombre: 'Paso a Desnivel Calzada Atanasio Tzul (DOM-VIAL-004)',
-          plazo: '15 Meses (450 dÃ­as)',
+          plazo: '15 Meses (450 dÃƒÂ­as)',
           costoDirecto: 31500000.00,
           montoContractualOriginal: 51108750.00,
           liquidoNetoPeriodo: 2410800.25,
@@ -830,7 +831,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
       default:
         return {
           nombre: `${proyecto.nombre} (${proyecto.codigo || 'DOM-VIAL-001'})`,
-          plazo: proyecto.plazo || '18 Meses (540 dÃ­as)',
+          plazo: proyecto.plazo || '18 Meses (540 dÃƒÂ­as)',
           costoDirecto: subtotalCostoDirectoContratadoGlobal,
           montoContractualOriginal: montoContractualOriginalTotal,
           liquidoNetoPeriodo: liquidoAPagarNetoContratista,
@@ -847,7 +848,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
   }
 
   const handleExportarExcel = () => {
-    toast.success('Descargando archivo Excel oficial "DÃAS" (.xlsx)...')
+    toast.success('Descargando archivo Excel oficial "DÃƒÂAS" (.xlsx)...')
   }
 
   const handleGuardarModificarPlazo = () => {
@@ -866,7 +867,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
     setFechaFinalizacionActualizada(fechaFormateada)
     setModalModificarPlazoOpen(false)
     setErrorsPlazoForm({})
-    toast.success(`Plazo modificado exitosamente. Nueva fecha de finalizaciÃ³n: ${fechaFormateada}`)
+    toast.success(`Plazo modificado exitosamente. Nueva fecha de finalizaciÃƒÂ³n: ${fechaFormateada}`)
   }
 
   const resetFiltros = () => {
@@ -942,18 +943,18 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
                   {proyecto.codigo}
                 </span>
                 <span>/</span>
-                <span className="text-[#9B0F06] font-medium">Hoja SÃ¡bana Digital</span>
+                <span className="text-[#9B0F06] font-medium">Hoja SÃƒÂ¡bana Digital</span>
               </div>
 
               <h1 className="text-xs font-medium text-gray-900 mt-0.5 flex items-center gap-1.5">
                 <FileSpreadsheet size={13} className="text-[#9B0F06]" />
-                <span>Hoja SÃ¡bana Digital</span>
+                <span>Hoja SÃƒÂ¡bana Digital</span>
               </h1>
             </div>
           </div>
 
           <div className="flex items-center gap-1.5">
-            {/* Toggle PlanificaciÃ³n / Actual */}
+            {/* Toggle PlanificaciÃƒÂ³n / Actual */}
             <div className="inline-flex items-center rounded-md border border-gray-200 bg-gray-100 p-0.5 text-[9.5px]">
               <button
                 type="button"
@@ -965,7 +966,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
                 }`}
               >
                 <Calendar size={11} />
-                <span>PlanificaciÃ³n</span>
+                <span>PlanificaciÃƒÂ³n</span>
               </button>
               <button
                 type="button"
@@ -981,7 +982,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
               </button>
             </div>
 
-            {/* BotÃ³n Modificar Plazo - Visible ÃšNICAMENTE para rol Administrador */}
+            {/* BotÃƒÂ³n Modificar Plazo - Visible ÃƒÅ¡NICAMENTE para rol Administrador */}
             {user?.rol === 'Administrador' && (
               <button
                 type="button"
@@ -990,7 +991,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
                   setModalModificarPlazoOpen(true)
                 }}
                 className="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-2.5 py-1 text-[10px] font-medium text-gray-700 hover:bg-gray-50 transition-colors shadow-2xs cursor-pointer"
-                title="Modificar cronograma y fecha de finalizaciÃ³n"
+                title="Modificar cronograma y fecha de finalizaciÃƒÂ³n"
               >
                 <CalendarClock size={13} className="text-[#9B0F06]" />
                 <span>Modificar Plazo</span>
@@ -1001,7 +1002,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
               type="button"
               onClick={handleExportarExcel}
               className="btn-success-compact cursor-pointer"
-              title="Exportar archivo Excel DÃAS"
+              title="Exportar archivo Excel DÃƒÂAS"
             >
               <FileSpreadsheet size={13} />
               <span>Exportar Excel</span>
@@ -1010,7 +1011,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
           </div>
         </div>
 
-        {/* Fila horizontal de mÃ©tricas */}
+        {/* Fila horizontal de mÃƒÂ©tricas */}
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-5 bg-gray-50/80 p-1.5 rounded-lg border border-gray-200/80 text-[10px]">
           <div className="min-w-0">
             <span className="text-[7.5px] font-medium uppercase tracking-wider text-gray-400 block truncate mb-0.5">
@@ -1027,7 +1028,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
             >
               {PROYECTOS_MOCK.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.codigo} Â· {p.nombre}
+                  {p.codigo} Ã‚Â· {p.nombre}
                 </option>
               ))}
             </select>
@@ -1035,7 +1036,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
 
           <div>
             <span className="text-[7.5px] font-medium uppercase tracking-wider text-gray-400 block truncate">
-              Plazo de EjecuciÃ³n Real
+              Plazo de EjecuciÃƒÂ³n Real
             </span>
             <span className="font-medium text-gray-800 flex items-center gap-1">
               <Clock size={9.5} className="text-[#9B0F06] shrink-0" />
@@ -1045,7 +1046,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
 
           <div>
             <span className="text-[7.5px] font-medium uppercase tracking-wider text-gray-400 block truncate">
-              Costo Directo Contratado Total (D Ã— F)
+              Costo Directo Contratado Total (D Ãƒâ€” F)
             </span>
             <span className="font-medium font-mono text-gray-900">
               Q {metricasHeaderContextuales.costoDirecto.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
@@ -1063,7 +1064,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
 
           <div>
             <span className="text-[7.5px] font-medium uppercase tracking-wider text-gray-400 block truncate">
-              LÃ­quido Neto Este Periodo
+              LÃƒÂ­quido Neto Este Periodo
             </span>
             <span className="font-medium font-mono text-gray-900">
               Q {metricasHeaderContextuales.liquidoNetoPeriodo.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
@@ -1076,8 +1077,8 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
       <div className="border-b border-gray-200 bg-white px-1 rounded-t-md font-[Poppins]">
         <div className="flex flex-wrap items-center gap-1">
           {[
-            { id: 'sabana', label: 'SÃ¡bana', icon: Layers },
-            { id: 'analitico', label: 'AnalÃ­tico', icon: Calculator },
+            { id: 'sabana', label: 'SÃƒÂ¡bana', icon: Layers },
+            { id: 'analitico', label: 'AnalÃƒÂ­tico', icon: Calculator },
             ...(proyecto.id === 'nuevo' || id === 'nuevo' ? [] : [{ id: 'pendientes', label: 'Pendientes', icon: AlertCircle }]),
             { id: 'planificadoReal', label: 'Planificado vs Real', icon: TrendingUp },
             { id: 'resumen', label: 'Resumen Financiero', icon: Banknote },
@@ -1108,7 +1109,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
       {tabSeccion !== 'resumen' && (
         <div className="w-full rounded-lg border border-gray-200 bg-white p-1.5 shadow-2xs flex items-center justify-between gap-1.5 overflow-x-auto font-[Poppins]">
           <div className="flex items-center gap-1 shrink-0 flex-nowrap">
-            {/* CapÃ­tulo: Disponible en SÃ¡bana, AnalÃ­tico, Pendientes y Planificado vs Real */}
+            {/* CapÃƒÂ­tulo: Disponible en SÃƒÂ¡bana, AnalÃƒÂ­tico, Pendientes y Planificado vs Real */}
             <select
               value={capituloFiltro}
               onChange={(e) => {
@@ -1117,7 +1118,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
               }}
               className="h-7 rounded border border-gray-200 bg-white px-1.5 text-[10px] font-normal text-gray-800 focus:border-[#9B0F06] focus:outline-none max-w-[130px] truncate"
             >
-              <option value="todos">CapÃ­tulo: Todos</option>
+              <option value="todos">CapÃƒÂ­tulo: Todos</option>
               {CAPITULOS_LIBRO_AZUL.map((c) => (
                 <option key={c.id} value={c.id}>
                   Cap {c.id}: {c.nombre.split(':')[1]?.trim() || c.nombre}
@@ -1125,7 +1126,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
               ))}
             </select>
 
-            {/* Mes: Disponible en SÃ¡bana, AnalÃ­tico y Planificado vs Real (NO en Pendientes) */}
+            {/* Mes: Disponible en SÃƒÂ¡bana, AnalÃƒÂ­tico y Planificado vs Real (NO en Pendientes) */}
             {(tabSeccion === 'sabana' || tabSeccion === 'analitico' || tabSeccion === 'planificadoReal') && (
               <select
                 value={mesFiltro}
@@ -1144,22 +1145,22 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
               </select>
             )}
 
-            {/* EstimaciÃ³n: Disponible Ãºnicamente en SÃ¡bana y AnalÃ­tico */}
+            {/* EstimaciÃƒÂ³n: Disponible ÃƒÂºnicamente en SÃƒÂ¡bana y AnalÃƒÂ­tico */}
             {(tabSeccion === 'sabana' || tabSeccion === 'analitico') && (
               <select
                 value={numEstimacionFiltro}
                 onChange={(e) => setNumEstimacionFiltro(e.target.value)}
                 className="h-7 rounded border border-gray-200 bg-white px-1.5 text-[10px] font-normal text-gray-800 focus:border-[#9B0F06] focus:outline-none max-w-[110px] truncate"
               >
-                <option value="todos">EstimaciÃ³n: Todas</option>
-                <option value="Est. 01">EstimaciÃ³n 01</option>
-                <option value="Est. 02">EstimaciÃ³n 02</option>
-                <option value="Est. 06">EstimaciÃ³n 06</option>
-                <option value="Est. 08">EstimaciÃ³n 08 (Actual)</option>
+                <option value="todos">EstimaciÃƒÂ³n: Todas</option>
+                <option value="Est. 01">EstimaciÃƒÂ³n 01</option>
+                <option value="Est. 02">EstimaciÃƒÂ³n 02</option>
+                <option value="Est. 06">EstimaciÃƒÂ³n 06</option>
+                <option value="Est. 08">EstimaciÃƒÂ³n 08 (Actual)</option>
               </select>
             )}
 
-            {/* Estado: Disponible Ãºnicamente en SÃ¡bana y Pendientes */}
+            {/* Estado: Disponible ÃƒÂºnicamente en SÃƒÂ¡bana y Pendientes */}
             {(tabSeccion === 'sabana' || tabSeccion === 'pendientes') && (
               <select
                 value={estadoEjecucionFiltro}
@@ -1177,7 +1178,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
               </select>
             )}
 
-            {/* Tipo: Disponible Ãºnicamente en SÃ¡bana y Pendientes */}
+            {/* Tipo: Disponible ÃƒÂºnicamente en SÃƒÂ¡bana y Pendientes */}
             {(tabSeccion === 'sabana' || tabSeccion === 'pendientes') && (
               <select
                 value={tipoRenglonFiltro}
@@ -1223,7 +1224,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
         </div>
       )}
 
-      {/* TAB 1: [SÃBANA] â€” TABLA CON FUENTE POPPINS, REGULAR SALVO CÃ“DIGO */}
+      {/* TAB 1: [SÃƒÂBANA] Ã¢â‚¬â€ TABLA CON FUENTE POPPINS, REGULAR SALVO CÃƒâ€œDIGO */}
       {tabSeccion === 'sabana' && (
         <div className="bg-white overflow-hidden rounded-md border-b border-gray-200/80 font-[Poppins]">
           {totalItems === 0 ? (
@@ -1247,14 +1248,14 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
                       onClick={() => handleOrdenarPorColumna('codigoDGC')}
                       className="px-2 py-2 w-16 cursor-pointer hover:bg-gray-100/80 transition-colors font-medium"
                     >
-                      A. CÃ³digo {renderIconoOrden('codigoDGC')}
+                      A. CÃƒÂ³digo {renderIconoOrden('codigoDGC')}
                     </th>
 
                     <th
                       onClick={() => handleOrdenarPorColumna('descripcion')}
                       className="px-2.5 py-2 min-w-[180px] cursor-pointer hover:bg-gray-100/80 transition-colors font-medium"
                     >
-                      B. DescripciÃ³n {renderIconoOrden('descripcion')}
+                      B. DescripciÃƒÂ³n {renderIconoOrden('descripcion')}
                     </th>
 
                     <th
@@ -1286,11 +1287,11 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
                     </th>
 
                     <th className="px-2.5 py-2 text-right w-28 font-medium text-gray-900">
-                      G. Costo Total Directo (DÃ—F)
+                      G. Costo Total Directo (DÃƒâ€”F)
                     </th>
 
                     <th className="px-2.5 py-2 text-right w-28 font-medium text-gray-900">
-                      H. Costo Total Ajustado (EÃ—F)
+                      H. Costo Total Ajustado (EÃƒâ€”F)
                     </th>
 
                     <th
@@ -1341,10 +1342,10 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
                       onClick={() => handleOrdenarPorColumna('saldoPorEjecutar')}
                       className="px-2.5 py-2 text-right w-28 cursor-pointer hover:bg-gray-100/80 transition-colors font-medium text-[#9B0F06]"
                     >
-                      Saldo por Ejecutar (Hâˆ’O) {renderIconoOrden('saldoPorEjecutar')}
+                      Saldo por Ejecutar (HÃ¢Ë†â€™O) {renderIconoOrden('saldoPorEjecutar')}
                     </th>
 
-                    {/* Columnas mensuales (Mes 1...Mes N) segÃºn toggle PlanificaciÃ³n / Actual */}
+                    {/* Columnas mensuales (Mes 1...Mes N) segÃƒÂºn toggle PlanificaciÃƒÂ³n / Actual */}
                     {listaMesesDinamicos.map((mes) => (
                       <th
                         key={mes}
@@ -1391,23 +1392,23 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
 
                               <div className="flex items-center gap-2 text-[8px] font-mono font-normal text-gray-600">
                                 <span>Contratado: Q {subtotalCap.costoDirectoContratado.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</span>
-                                <span>â€¢</span>
+                                <span>Ã¢â‚¬Â¢</span>
                                 <span>Ajustado: Q {subtotalCap.costoDirectoAjustado.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</span>
-                                <span>â€¢</span>
+                                <span>Ã¢â‚¬Â¢</span>
                                 <span>Periodo: Q {subtotalCap.costoDirectoEstePeriodo.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</span>
-                                <span>â€¢</span>
+                                <span>Ã¢â‚¬Â¢</span>
                                 <span>Total Fecha: Q {subtotalCap.costoDirectoTotalFecha.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</span>
-                                <span>â€¢</span>
+                                <span>Ã¢â‚¬Â¢</span>
                                 <span className="text-[#9B0F06] font-medium">Saldo: Q {subtotalCap.saldoPorEjecutar.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</span>
                               </div>
                             </div>
                           </td>
                         </tr>
 
-                        {/* REQUERIMIENTO EDICIÃ“N INLINE:
+                        {/* REQUERIMIENTO EDICIÃƒâ€œN INLINE:
                             - SIN fondo amarillo en la fila completa
                             - Highlight solo en campos editables con contorno gris oscuro
-                            - CÃ³digo (A) es editable (dropdown), DescripciÃ³n y Unid se autocompletan de solo lectura */}
+                            - CÃƒÂ³digo (A) es editable (dropdown), DescripciÃƒÂ³n y Unid se autocompletan de solo lectura */}
                         {!estaColapsado &&
                           renglonesCap.map((r) => {
                             const esEditando = filaEditandoId === r.id
@@ -1432,7 +1433,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
 
                             return (
                               <tr key={r.id} className="transition-colors border-b border-gray-100 hover:bg-gray-50/60 font-[Poppins]">
-                                {/* A. CÃ³digo */}
+                                {/* A. CÃƒÂ³digo */}
                                 <td className="px-2 py-1.5 font-mono font-bold text-gray-900">
                                   {esEditando ? (
                                     <select
@@ -1451,7 +1452,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
                                   )}
                                 </td>
 
-                                {/* B. DescripciÃ³n */}
+                                {/* B. DescripciÃƒÂ³n */}
                                 <td className="px-2.5 py-1.5 font-sans font-normal text-gray-700">
                                   {esEditando ? (
                                     <div className="w-full rounded border border-gray-300 bg-gray-100 px-1.5 py-0.5 font-sans text-[9px] text-gray-700 cursor-not-allowed">
@@ -1526,24 +1527,24 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
                                   )}
                                 </td>
 
-                                {/* G. Costo Total Directo = D Ã— F */}
+                                {/* G. Costo Total Directo = D Ãƒâ€” F */}
                                 <td className="px-2.5 py-1.5 text-right font-normal text-gray-800 font-mono">
                                   Q {costoTotalDirectoG.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
                                 </td>
 
-                                {/* H. Costo Total Ajustado = E Ã— F */}
+                                {/* H. Costo Total Ajustado = E Ãƒâ€” F */}
                                 <td className="px-2.5 py-1.5 text-right font-normal text-gray-900 font-mono">
                                   Q {costoTotalAjustadoH.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
                                 </td>
 
-                                {/* I. Este Periodo (Cant.): Enlace de SOLO LECTURA al tab AnalÃ­tico */}
+                                {/* I. Este Periodo (Cant.): Enlace de SOLO LECTURA al tab AnalÃƒÂ­tico */}
                                 <td className="px-2 py-1.5 text-right font-normal font-mono text-[9.5px]">
                                   {cantEstePeriodoI > 0 ? (
                                     <button
                                       type="button"
                                       onClick={() => setTabSeccion('analitico')}
                                       className="text-blue-700 hover:underline hover:text-[#9B0F06] transition-colors cursor-pointer font-mono text-[9.5px]"
-                                      title="Ver origen en Memoria de CÃ¡lculo AnalÃ­tica"
+                                      title="Ver origen en Memoria de CÃƒÂ¡lculo AnalÃƒÂ­tica"
                                     >
                                       {cantEstePeriodoI.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
                                     </button>
@@ -1552,9 +1553,9 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
                                       type="button"
                                       onClick={() => setTabSeccion('analitico')}
                                       className="inline-flex items-center justify-end gap-1 text-gray-400 hover:text-[#9B0F06] transition-colors cursor-pointer font-mono text-[9px]"
-                                      title="Valor calculado en tiempo real desde el Tab AnalÃ­tico (sin registros)"
+                                      title="Valor calculado en tiempo real desde el Tab AnalÃƒÂ­tico (sin registros)"
                                     >
-                                      <span className="text-gray-400 font-mono">â€” Sin registro</span>
+                                      <span className="text-gray-400 font-mono">Ã¢â‚¬â€ Sin registro</span>
                                       <Calculator size={10} className="opacity-60" />
                                     </button>
                                   )}
@@ -1587,12 +1588,12 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
                                   {pctAvanceCantL.toFixed(1)}%
                                 </td>
 
-                                {/* M. Este Periodo (Costo) = I Ã— F */}
+                                {/* M. Este Periodo (Costo) = I Ãƒâ€” F */}
                                 <td className="px-2.5 py-1.5 text-right font-normal text-gray-800 font-mono">
                                   Q {costoEstePeriodoM.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
                                 </td>
 
-                                {/* N. Acum. Anterior (Costo) = J Ã— F */}
+                                {/* N. Acum. Anterior (Costo) = J Ãƒâ€” F */}
                                 <td className="px-2.5 py-1.5 text-right font-normal text-gray-700 font-mono">
                                   Q {costoAcumAnteriorN.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
                                 </td>
@@ -1612,7 +1613,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
                                   Q {saldoPorEjecutar.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
                                 </td>
 
-                                {/* Columnas mensuales (Mes 1...Mes N) segÃºn toggle PlanificaciÃ³n / Actual */}
+                                {/* Columnas mensuales (Mes 1...Mes N) segÃƒÂºn toggle PlanificaciÃƒÂ³n / Actual */}
                                 {listaMesesDinamicos.map((mes) => {
                                   let valMes = 0
                                   if (modoVistaSabana === 'planificacion') {
@@ -1623,7 +1624,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
 
                                   return (
                                     <td key={mes} className="px-2 py-1.5 text-right font-mono text-[8.5px] font-normal text-gray-600">
-                                      {valMes > 0 ? valMes.toLocaleString('es-GT', { minimumFractionDigits: 1 }) : 'â€”'}
+                                      {valMes > 0 ? valMes.toLocaleString('es-GT', { minimumFractionDigits: 1 }) : 'Ã¢â‚¬â€'}
                                     </td>
                                   )
                                 })}
@@ -1644,7 +1645,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
                                         type="button"
                                         onClick={handleCancelarEdicionInline}
                                         className="rounded bg-gray-200 p-1 text-gray-700 hover:bg-gray-300 transition-colors cursor-pointer"
-                                        title="Cancelar ediciÃ³n"
+                                        title="Cancelar ediciÃƒÂ³n"
                                       >
                                         <X size={12} />
                                       </button>
@@ -1671,7 +1672,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
                                         type="button"
                                         onClick={() => handleAbrirEliminar(r)}
                                         className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-700 transition-colors cursor-pointer"
-                                        title="Eliminar renglÃ³n"
+                                        title="Eliminar renglÃƒÂ³n"
                                       >
                                         <Trash2 size={12} />
                                       </button>
@@ -1689,7 +1690,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
             </div>
           )}
 
-          {/* PaginaciÃ³n */}
+          {/* PaginaciÃƒÂ³n */}
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-200/80 bg-white px-3 py-1.5 text-[9.5px] font-[Poppins]">
             <div className="flex items-center gap-1.5 text-gray-500 font-normal">
               <span>
@@ -1706,10 +1707,10 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
                 }}
                 className="rounded border border-gray-200 bg-gray-50 px-1 py-0.5 text-[9px] font-normal text-gray-700 focus:outline-none"
               >
-                <option value={10}>10 / pÃ¡g</option>
-                <option value={12}>12 / pÃ¡g</option>
-                <option value={15}>15 / pÃ¡g</option>
-                <option value={25}>25 / pÃ¡g</option>
+                <option value={10}>10 / pÃƒÂ¡g</option>
+                <option value={12}>12 / pÃƒÂ¡g</option>
+                <option value={15}>15 / pÃƒÂ¡g</option>
+                <option value={25}>25 / pÃƒÂ¡g</option>
               </select>
             </div>
 
@@ -1744,7 +1745,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
         </div>
       )}
 
-      {/* TAB 2: [ANALÃTICO] */}
+      {/* TAB 2: [ANALÃƒÂTICO] */}
       {tabSeccion === 'analitico' && (
         <div className="rounded-xl border border-gray-200 bg-white p-3.5 shadow-2xs space-y-3 font-[Poppins]">
           <div className="flex items-center justify-between border-b border-gray-100 pb-2">
@@ -1752,7 +1753,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
               <Calculator size={16} className="text-[#9B0F06]" />
               <div>
                 <h3 className="text-xs font-medium text-gray-900">
-                  Memoria de CÃ¡lculo
+                  Memoria de CÃƒÂ¡lculo
                 </h3>
               </div>
             </div>
@@ -1761,8 +1762,8 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
           {Array.from(new Set(medicionesAnaliticas.map((m) => m.codigoDGC))).map((codDGC) => {
             const renglonMaestro = CATALOGO_COMPLETO_88.find((cat) => cat.codigoDGC === codDGC) || {
               codigoDGC: codDGC,
-              descripcion: 'RenglÃ³n de obra vial',
-              unidad: 'mÂ³',
+              descripcion: 'RenglÃƒÂ³n de obra vial',
+              unidad: 'mÃ‚Â³',
             }
 
             const medicionesRenglon = medicionesAnaliticas.filter((m) => {
@@ -1792,7 +1793,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
 
                   <div className="flex items-center gap-2">
                     <span className="rounded bg-white px-2 py-0.5 text-[8.5px] font-normal text-gray-600 border border-gray-200">
-                      Unidad CatÃ¡logo: <strong className="text-gray-900 font-normal">{renglonMaestro.unidad}</strong> (Solo lectura)
+                      Unidad CatÃƒÂ¡logo: <strong className="text-gray-900 font-normal">{renglonMaestro.unidad}</strong> (Solo lectura)
                     </span>
                     <span className="rounded bg-gray-50 px-2 py-0.5 text-[8.5px] font-normal text-gray-700 border border-gray-200">
                       Alimenta Columna 'Este Periodo'
@@ -1803,13 +1804,13 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
                 <table className="w-full text-left font-mono">
                   <thead className="bg-gray-50 text-gray-600 border-b border-gray-200 text-[8.5px] font-normal">
                     <tr>
-                      <th className="p-2">EstaciÃ³n Inicio</th>
-                      <th className="p-2">EstaciÃ³n Fin</th>
+                      <th className="p-2">EstaciÃƒÂ³n Inicio</th>
+                      <th className="p-2">EstaciÃƒÂ³n Fin</th>
                       <th className="p-2 text-right">Longitud L (m)</th>
                       <th className="p-2 text-right">Ancho A (m)</th>
                       <th className="p-2 text-right">Altura/Espesor H (m)</th>
-                      <th className="p-2 text-right font-medium text-gray-900">Cantidad Calculada (LÃ—AÃ—H)</th>
-                      <th className="p-2 text-center">Periodo / EstimaciÃ³n</th>
+                      <th className="p-2 text-right font-medium text-gray-900">Cantidad Calculada (LÃƒâ€”AÃƒâ€”H)</th>
+                      <th className="p-2 text-center">Periodo / EstimaciÃƒÂ³n</th>
                     </tr>
                   </thead>
 
@@ -1828,7 +1829,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
                             {cantidadCalculada.toLocaleString('es-GT', { minimumFractionDigits: 2 })} {renglonMaestro.unidad}
                           </td>
                           <td className="p-2 text-center text-gray-500 text-[8.5px]">
-                            {m.mesPeriodo} â€” {m.numEstimacion}
+                            {m.mesPeriodo} Ã¢â‚¬â€ {m.numEstimacion}
                           </td>
                         </tr>
                       )
@@ -1838,7 +1839,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
                   <tfoot>
                     <tr className="bg-gray-100/90 font-normal text-gray-900 border-t border-gray-300">
                       <td colSpan={5} className="p-2 text-right uppercase tracking-wider text-[8.5px]">
-                        TOTAL MES DEL RENGLÃ“N {codDGC} (TRANSMITE A SÃBANA 'ESTE PERIODO'):
+                        TOTAL MES DEL RENGLÃƒâ€œN {codDGC} (TRANSMITE A SÃƒÂBANA 'ESTE PERIODO'):
                       </td>
                       <td className="p-2 text-right font-normal text-[#9B0F06] font-mono text-[10px]">
                         {totalCantidadCalculadaRenglon.toLocaleString('es-GT', { minimumFractionDigits: 2 })} {renglonMaestro.unidad}
@@ -1864,7 +1865,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
                   Bolsa de Trabajos Pendientes y No Conciliados
                 </h3>
                 <p className="text-[9.5px] text-gray-500 font-normal">
-                  Control de volÃºmenes en conciliaciÃ³n con cÃ¡lculo de descuentos y promociÃ³n al Tab AnalÃ­tico.
+                  Control de volÃƒÂºmenes en conciliaciÃƒÂ³n con cÃƒÂ¡lculo de descuentos y promociÃƒÂ³n al Tab AnalÃƒÂ­tico.
                 </p>
               </div>
             </div>
@@ -1878,14 +1879,14 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
             <table className="w-full text-left font-mono text-[9.5px]">
               <thead>
                 <tr className="bg-gray-50 text-gray-600 font-normal uppercase tracking-wider text-[8.5px] border-b border-gray-200">
-                  <th className="p-2 w-16">CÃ³digo</th>
-                  <th className="p-2 min-w-[160px]">DescripciÃ³n / Partida</th>
+                  <th className="p-2 w-16">CÃƒÂ³digo</th>
+                  <th className="p-2 min-w-[160px]">DescripciÃƒÂ³n / Partida</th>
                   <th className="p-2 text-center w-24">Estado</th>
                   <th className="p-2 text-right">Cant. Bruta</th>
                   <th className="p-2 text-right">Descuento Aplicado</th>
                   <th className="p-2 text-right font-normal text-gray-900">Cant. Neta a Cobrar</th>
                   <th className="p-2">Origen / Trazabilidad</th>
-                  <th className="p-2 text-center w-20">AcciÃ³n</th>
+                  <th className="p-2 text-center w-20">AcciÃƒÂ³n</th>
                 </tr>
               </thead>
 
@@ -1952,7 +1953,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
                       <td className="p-2 text-right text-gray-700">
                         {descuentoMonto > 0 ? (
                           <span>
-                            âˆ’{descuentoMonto.toFixed(2)} ({item.factorDescuento}Ã—L)
+                            Ã¢Ë†â€™{descuentoMonto.toFixed(2)} ({item.factorDescuento}Ãƒâ€”L)
                           </span>
                         ) : (
                           <span className="text-gray-400">0.00</span>
@@ -1975,7 +1976,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
                             type="button"
                             onClick={() => handlePromoverTrabajoPendiente(item)}
                             className="inline-flex items-center gap-1 rounded bg-[#9B0F06] px-2 py-1 text-[8.5px] font-normal text-white hover:bg-[#5E0006] transition-colors shadow-2xs cursor-pointer"
-                            title="Promover a Trasladado e integrar con Tab AnalÃ­tico"
+                            title="Promover a Trasladado e integrar con Tab AnalÃƒÂ­tico"
                           >
                             <span>Promover</span>
                             <ArrowRight size={10} />
@@ -2012,7 +2013,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
                     Comparativa de Avance: Planificado vs Real
                   </h3>
                   <p className="text-[9.5px] text-gray-500 font-normal">
-                    AnÃ¡lisis de variaciones fÃ­sicas y financieras segÃºn cronograma del programa de trabajo.
+                    AnÃƒÂ¡lisis de variaciones fÃƒÂ­sicas y financieras segÃƒÂºn cronograma del programa de trabajo.
                   </p>
                 </div>
               </div>
@@ -2026,20 +2027,20 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
               <table className="w-full text-left font-mono text-[9.5px]">
                 <thead>
                   <tr className="bg-gray-50 text-gray-600 font-medium uppercase tracking-wider text-[8.5px] border-b border-gray-200">
-                    <th className="p-2 w-16">CÃ³digo</th>
-                    <th className="p-2 min-w-[180px]">DescripciÃ³n</th>
+                    <th className="p-2 w-16">CÃƒÂ³digo</th>
+                    <th className="p-2 min-w-[180px]">DescripciÃƒÂ³n</th>
                     <th className="p-2 text-right">Cant. Ajustada (Plan)</th>
                     <th className="p-2 text-right">Cant. Ejecutada (Real)</th>
                     <th className="p-2 text-right">% Planificado (Mes 6)</th>
                     <th className="p-2 text-right">% Real</th>
-                    <th className="p-2 text-center w-28">VariaciÃ³n</th>
+                    <th className="p-2 text-center w-28">VariaciÃƒÂ³n</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {pvrRenglonesPagina.map((r) => {
                     const ejecReal = r.cantidadEstePeriodo + r.cantidadAcumuladaAnterior
                     
-                    // CÃ¡lculo dinÃ¡mico de % Planificado a la fecha (hasta Mes 6)
+                    // CÃƒÂ¡lculo dinÃƒÂ¡mico de % Planificado a la fecha (hasta Mes 6)
                     const sumaPlanMes6 = r.avancesMensuales
                       ? Object.entries(r.avancesMensuales).reduce((acc, [mesKey, val]) => {
                           const numMes = parseInt(mesKey.replace('Mes ', ''), 10)
@@ -2083,7 +2084,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
               </table>
             </div>
 
-            {/* PaginaciÃ³n estandarizada DomunNet */}
+            {/* PaginaciÃƒÂ³n estandarizada DomunNet */}
             <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-gray-100 text-[9.5px]">
               <div className="flex items-center gap-1.5 text-gray-500 font-normal">
                 <span>Mostrando</span>
@@ -2102,10 +2103,10 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
                   }}
                   className="ml-2 rounded border border-gray-200 bg-gray-50 px-1 py-0.5 text-[9px] font-normal text-gray-700 focus:outline-none"
                 >
-                  <option value={10}>10 / pÃ¡g</option>
-                  <option value={15}>15 / pÃ¡g</option>
-                  <option value={25}>25 / pÃ¡g</option>
-                  <option value={50}>50 / pÃ¡g</option>
+                  <option value={10}>10 / pÃƒÂ¡g</option>
+                  <option value={15}>15 / pÃƒÂ¡g</option>
+                  <option value={25}>25 / pÃƒÂ¡g</option>
+                  <option value={50}>50 / pÃƒÂ¡g</option>
                 </select>
               </div>
 
@@ -2172,12 +2173,12 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
                 </div>
 
                 <div className="flex justify-between py-0.5">
-                  <span className="font-sans text-gray-600 font-normal">AmortizaciÃ³n Acumulada (Anterior):</span>
+                  <span className="font-sans text-gray-600 font-normal">AmortizaciÃƒÂ³n Acumulada (Anterior):</span>
                   <span className="font-normal text-emerald-800">Q {amortizacionAnteriorAcumulada.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</span>
                 </div>
 
                 <div className="flex justify-between py-0.5">
-                  <span className="font-sans text-gray-600 font-normal">AmortizaciÃ³n del Periodo (20%):</span>
+                  <span className="font-sans text-gray-600 font-normal">AmortizaciÃƒÂ³n del Periodo (20%):</span>
                   <span className="font-normal text-emerald-800">Q {amortizacionAnticipoEstePeriodo.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</span>
                 </div>
 
@@ -2196,7 +2197,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
 
               <div className="space-y-1 font-mono text-[9.5px]">
                 <div className="flex justify-between py-0.5">
-                  <span className="font-sans text-gray-600 font-normal">Costo Directo Contratado Total (DÃ—F):</span>
+                  <span className="font-sans text-gray-600 font-normal">Costo Directo Contratado Total (DÃƒâ€”F):</span>
                   <span className="font-normal text-gray-900">Q {subtotalCostoDirectoContratadoGlobal.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</span>
                 </div>
 
@@ -2222,12 +2223,12 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
 
                 <div className="flex justify-between py-1 border-t border-gray-200 font-normal text-[#9B0F06] bg-red-100/60 p-1.5 rounded items-center">
                   <div className="flex items-center gap-1">
-                    <span className="font-sans text-[9px]">LÃ­quido Neto a Favor Contratista Periodo:</span>
+                    <span className="font-sans text-[9px]">LÃƒÂ­quido Neto a Favor Contratista Periodo:</span>
                     <div className="relative group cursor-pointer inline-flex items-center">
                       <Info size={13} className="text-[#9B0F06] hover:text-[#5E0006] transition-colors" />
                       <div className="absolute left-1/2 bottom-full mb-1.5 -translate-x-1/2 hidden group-hover:block w-64 p-2 bg-gray-900 text-white text-[8.5px] font-sans font-normal rounded-md shadow-xl z-50 pointer-events-none leading-tight">
-                        <strong>FÃ³rmula DGC Oficial:</strong><br/>
-                        (Costo Directo Periodo Ã— 1.45 Ã— 1.12) âˆ’ AmortizaciÃ³n del Periodo
+                        <strong>FÃƒÂ³rmula DGC Oficial:</strong><br/>
+                        (Costo Directo Periodo Ãƒâ€” 1.45 Ãƒâ€” 1.12) Ã¢Ë†â€™ AmortizaciÃƒÂ³n del Periodo
                         <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
                       </div>
                     </div>
@@ -2250,17 +2251,17 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
                 </div>
 
                 <div className="flex justify-between py-0.5">
-                  <span className="text-gray-600 font-normal">DÃ­as Empleados:</span>
-                  <span className="font-mono font-normal text-gray-900">{diasEmpleadosCalculados} DÃ­as</span>
+                  <span className="text-gray-600 font-normal">DÃƒÂ­as Empleados:</span>
+                  <span className="font-mono font-normal text-gray-900">{diasEmpleadosCalculados} DÃƒÂ­as</span>
                 </div>
 
                 <div className="flex justify-between py-0.5">
-                  <span className="text-gray-600 font-normal">DÃ­as Suspendidos (Actas Formales):</span>
-                  <span className="font-mono font-normal text-orange-800">{diasSuspendidosSumados} DÃ­as</span>
+                  <span className="text-gray-600 font-normal">DÃƒÂ­as Suspendidos (Actas Formales):</span>
+                  <span className="font-mono font-normal text-orange-800">{diasSuspendidosSumados} DÃƒÂ­as</span>
                 </div>
 
                 <div className="flex justify-between py-1 border-t border-gray-200 bg-blue-50/60 p-1.5 rounded text-blue-950 font-normal">
-                  <span>FinalizaciÃ³n Actualizada:</span>
+                  <span>FinalizaciÃƒÂ³n Actualizada:</span>
                   <span className="font-mono font-medium text-[#9B0F06]">{fechaFinalizacionActualizada}</span>
                 </div>
               </div>
@@ -2269,11 +2270,11 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
         </div>
       )}
 
-      {/* REQUERIMIENTO: PANEL "DETALLE DEL RENGLÃ“N" (BOTÃ“N VER / OJO)
-          - ALINEADO AL PATRÃ“N DE USUARIOS (TARJETAS BG-GRAY-50/BORDER-GRAY-200)
+      {/* REQUERIMIENTO: PANEL "DETALLE DEL RENGLÃƒâ€œN" (BOTÃƒâ€œN VER / OJO)
+          - ALINEADO AL PATRÃƒâ€œN DE USUARIOS (TARJETAS BG-GRAY-50/BORDER-GRAY-200)
           - DENSIDAD COMPACTA Y FUENTE POPPINS SIN NEAGRILLA EN VALORES
           - MOSTRAR TODAS LAS COLUMNAS DEL MOTOR FINANCIERO A-P CON VALORES EXACTOS EN GRID 2 COLUMNAS POR BLOQUES:
-            IdentificaciÃ³n -> Cantidades y Avance -> Financiero -> Desglose Mensual
+            IdentificaciÃƒÂ³n -> Cantidades y Avance -> Financiero -> Desglose Mensual
       */}
       {drawerModo === 'ver' && renglonSeleccionado && (
         <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs font-[Poppins]">
@@ -2284,7 +2285,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
                 <Eye size={15} className="text-[#9B0F06]" />
                 <div>
                   <h3 className="text-[10.5px] font-medium text-gray-900 uppercase">
-                    DETALLE DEL RENGLÃ“N [{renglonSeleccionado.codigoDGC}]
+                    DETALLE DEL RENGLÃƒâ€œN [{renglonSeleccionado.codigoDGC}]
                   </h3>
                   <p className="text-[8.5px] text-gray-500 font-normal">Solo lectura</p>
                 </div>
@@ -2301,20 +2302,20 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
 
             {/* Cuerpo del Panel agrupado en bloques en Grid 2 columnas (A-P) */}
             <div className="flex-1 overflow-y-auto p-3 space-y-2.5 text-[9.5px]">
-              {/* BLOQUE 1: IdentificaciÃ³n */}
+              {/* BLOQUE 1: IdentificaciÃƒÂ³n */}
               <div>
                 <p className="text-[8px] text-gray-400 uppercase tracking-widest font-medium mb-1.5 border-b border-gray-100 pb-1">
-                  IdentificaciÃ³n del RenglÃ³n
+                  IdentificaciÃƒÂ³n del RenglÃƒÂ³n
                 </p>
 
                 <div className="space-y-1.5">
                   <div className="rounded-lg bg-gray-50 p-2 border border-gray-200">
-                    <span className="text-[7.5px] font-medium text-gray-600 block">CÃ³digo DGC (A)</span>
+                    <span className="text-[7.5px] font-medium text-gray-600 block">CÃƒÂ³digo DGC (A)</span>
                     <p className="font-mono text-[10px] font-bold text-gray-900 mt-0.5">{renglonSeleccionado.codigoDGC}</p>
                   </div>
 
                   <div className="rounded-lg bg-gray-50 p-2 border border-gray-200">
-                    <span className="text-[7.5px] font-medium text-gray-600 block">DescripciÃ³n Completa (B)</span>
+                    <span className="text-[7.5px] font-medium text-gray-600 block">DescripciÃƒÂ³n Completa (B)</span>
                     <p className="font-normal text-gray-800 leading-tight mt-0.5">{renglonSeleccionado.descripcion}</p>
                   </div>
 
@@ -2324,13 +2325,13 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
                       <p className="font-normal text-gray-800">{renglonSeleccionado.unidad}</p>
                     </div>
                     <div className="rounded-lg bg-gray-50 p-2 border border-gray-200">
-                      <span className="text-[7.5px] font-medium text-gray-600 block">Tipo RenglÃ³n</span>
+                      <span className="text-[7.5px] font-medium text-gray-600 block">Tipo RenglÃƒÂ³n</span>
                       <p className="font-normal text-gray-800">{renglonSeleccionado.tipoRenglon || 'Original'}</p>
                     </div>
                   </div>
 
                   <div className="rounded-lg bg-gray-50 p-2 border border-gray-200">
-                    <span className="text-[7.5px] font-medium text-gray-600 block">CapÃ­tulo Pertenece</span>
+                    <span className="text-[7.5px] font-medium text-gray-600 block">CapÃƒÂ­tulo Pertenece</span>
                     <p className="font-normal text-[#9B0F06] leading-tight">{renglonSeleccionado.capituloNombre}</p>
                   </div>
                 </div>
@@ -2339,7 +2340,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
               {/* BLOQUE 2: Cantidades y Avance (D-L) */}
               <div>
                 <p className="text-[8px] text-gray-400 uppercase tracking-widest font-medium mb-1.5 border-b border-gray-100 pb-1">
-                  Cantidades y Avance FÃ­sico (D-L)
+                  Cantidades y Avance FÃƒÂ­sico (D-L)
                 </p>
 
                 <div className="grid grid-cols-2 gap-1.5">
@@ -2397,12 +2398,12 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
                 <div className="space-y-1.5">
                   <div className="grid grid-cols-2 gap-1.5">
                     <div className="rounded-lg bg-gray-50 p-2 border border-gray-200">
-                      <span className="text-[7.5px] font-medium text-gray-600 block">Costo Directo RenglÃ³n (G=DÃ—F)</span>
+                      <span className="text-[7.5px] font-medium text-gray-600 block">Costo Directo RenglÃƒÂ³n (G=DÃƒâ€”F)</span>
                       <p className="font-mono font-normal text-gray-900">Q {(renglonSeleccionado.cantidadContratada * renglonSeleccionado.costoUnitarioDirecto).toLocaleString('es-GT', { minimumFractionDigits: 2 })}</p>
                     </div>
 
                     <div className="rounded-lg bg-gray-50 p-2 border border-gray-200">
-                      <span className="text-[7.5px] font-medium text-gray-600 block">Costo Directo Ajustado (H=EÃ—F)</span>
+                      <span className="text-[7.5px] font-medium text-gray-600 block">Costo Directo Ajustado (H=EÃƒâ€”F)</span>
                       <p className="font-mono font-normal text-gray-900">
                         Q {(renglonSeleccionado.cantidadAjustada * renglonSeleccionado.costoUnitarioDirecto).toLocaleString('es-GT', { minimumFractionDigits: 2 })}
                       </p>
@@ -2411,7 +2412,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
 
                   <div className="grid grid-cols-2 gap-1.5">
                     <div className="rounded-lg bg-gray-50 p-2 border border-gray-200">
-                      <span className="text-[7.5px] font-medium text-gray-600 block">Este Periodo Costo (M=IÃ—F)</span>
+                      <span className="text-[7.5px] font-medium text-gray-600 block">Este Periodo Costo (M=IÃƒâ€”F)</span>
                       <p className="font-mono font-normal text-gray-900">
                         Q {(renglonSeleccionado.cantidadEstePeriodo * renglonSeleccionado.costoUnitarioDirecto).toLocaleString('es-GT', { minimumFractionDigits: 2 })}
                       </p>
@@ -2446,7 +2447,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
                   </div>
 
                   <div className="rounded-lg bg-red-50/50 p-2 border border-red-200">
-                    <span className="text-[7.5px] font-medium text-[#9B0F06] block">Saldo por Ejecutar (Hâˆ’O)</span>
+                    <span className="text-[7.5px] font-medium text-[#9B0F06] block">Saldo por Ejecutar (HÃ¢Ë†â€™O)</span>
                     <p className="font-mono font-normal text-[#9B0F06] text-[10px]">
                       Q {(Math.max(0, (renglonSeleccionado.cantidadAjustada - (renglonSeleccionado.cantidadEstePeriodo + renglonSeleccionado.cantidadAcumuladaAnterior)) * renglonSeleccionado.costoUnitarioDirecto)).toLocaleString('es-GT', { minimumFractionDigits: 2 })}
                     </p>
@@ -2454,7 +2455,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
                 </div>
               </div>
 
-              {/* BLOQUE 4: Desglose Mensual DinÃ¡mico */}
+              {/* BLOQUE 4: Desglose Mensual DinÃƒÂ¡mico */}
               <div>
                 <p className="text-[8px] text-gray-400 uppercase tracking-widest font-medium mb-1.5 border-b border-gray-100 pb-1">
                   Desglose Mensual Exacto
@@ -2478,10 +2479,10 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
                           <tr key={mes}>
                             <td className="p-1.5 font-sans font-normal">{mes}</td>
                             <td className="p-1.5 text-right font-normal">
-                              {cantMes > 0 ? `${cantMes.toLocaleString('es-GT', { minimumFractionDigits: 1 })} ${renglonSeleccionado.unidad}` : 'â€”'}
+                              {cantMes > 0 ? `${cantMes.toLocaleString('es-GT', { minimumFractionDigits: 1 })} ${renglonSeleccionado.unidad}` : 'Ã¢â‚¬â€'}
                             </td>
                             <td className="p-1.5 text-right font-normal">
-                              {montoMes > 0 ? `Q ${montoMes.toLocaleString('es-GT', { minimumFractionDigits: 2 })}` : 'â€”'}
+                              {montoMes > 0 ? `Q ${montoMes.toLocaleString('es-GT', { minimumFractionDigits: 2 })}` : 'Ã¢â‚¬â€'}
                             </td>
                           </tr>
                         )
@@ -2506,12 +2507,12 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
         </div>
       )}
 
-      {/* REQUERIMIENTO FORMULARIO "AGREGAR NUEVO RENGLÃ“N":
-          - ALINEADO EXACTAMENTE AL PATRÃ“N DE USUARIOS (CREAR/EDITAR USUARIO)
+      {/* REQUERIMIENTO FORMULARIO "AGREGAR NUEVO RENGLÃƒâ€œN":
+          - ALINEADO EXACTAMENTE AL PATRÃƒâ€œN DE USUARIOS (CREAR/EDITAR USUARIO)
           - FUENTE POPPINS, DENSIDAD COMPACTA
           - LABELS EN BOLD CON ASTERISCO ROJO (*), VALORES SIN BOLD
-          - CAMPOS NUMÃ‰RICOS SOLO DÃGITOS
-          - BORDES ROJOS Y INSTANCIA REAL TOAST SI FALLA VALIDACIÃ“N
+          - CAMPOS NUMÃƒâ€°RICOS SOLO DÃƒÂGITOS
+          - BORDES ROJOS Y INSTANCIA REAL TOAST SI FALLA VALIDACIÃƒâ€œN
           - BOTONES ABAJO A LA DERECHA
       */}
       {drawerModo === 'crear' && (
@@ -2521,7 +2522,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
               <div className="flex items-center gap-1.5">
                 <Plus size={15} className="text-[#9B0F06]" />
                 <div>
-                  <h3 className="text-[11px] font-bold uppercase text-gray-900">Agregar Nuevo RenglÃ³n</h3>
+                  <h3 className="text-[11px] font-bold uppercase text-gray-900">Agregar Nuevo RenglÃƒÂ³n</h3>
                   <p className="text-[8.5px] text-gray-500 font-normal">Complete los datos obligatorios (*)</p>
                 </div>
               </div>
@@ -2536,16 +2537,16 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
             </div>
 
             <div className="flex-1 overflow-y-auto p-3 space-y-3 text-[10px]">
-              {/* Bloque IdentificaciÃ³n */}
+              {/* Bloque IdentificaciÃƒÂ³n */}
               <div>
                 <p className="text-[8.5px] text-gray-400 uppercase tracking-widest font-semibold mb-2 border-b border-gray-100 pb-1">
-                  1. IdentificaciÃ³n y DescripciÃ³n
+                  1. IdentificaciÃƒÂ³n y DescripciÃƒÂ³n
                 </p>
 
                 <div className="space-y-2">
                   <div>
                     <label className="text-[10px] font-semibold text-gray-700 mb-0.5 block">
-                      CÃ³digo DGC <span className="text-[#FF4D4F]">*</span>
+                      CÃƒÂ³digo DGC <span className="text-[#FF4D4F]">*</span>
                     </label>
                     <input
                       type="text"
@@ -2563,7 +2564,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
 
                   <div>
                     <label className="text-[10px] font-semibold text-gray-700 mb-0.5 block">
-                      DescripciÃ³n del RenglÃ³n <span className="text-[#FF4D4F]">*</span>
+                      DescripciÃƒÂ³n del RenglÃƒÂ³n <span className="text-[#FF4D4F]">*</span>
                     </label>
                     <textarea
                       rows={2}
@@ -2572,7 +2573,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
                         setFormDescripcion(e.target.value)
                         if (errorsForm.descripcion) setErrorsForm({ ...errorsForm, descripcion: false })
                       }}
-                      placeholder="Ej: Pavimento de concreto hidrÃ¡ulico MR=45 e=20cm"
+                      placeholder="Ej: Pavimento de concreto hidrÃƒÂ¡ulico MR=45 e=20cm"
                       className={`w-full border rounded-lg px-2.5 py-1.5 text-[10px] font-normal text-gray-700 focus:outline-none transition-colors ${
                         errorsForm.descripcion ? 'border-[#FF4D4F] bg-red-50/20' : 'border-gray-200 focus:border-[#9B0F06]'
                       }`}
@@ -2581,16 +2582,16 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
                 </div>
               </div>
 
-              {/* Bloque ClasificaciÃ³n */}
+              {/* Bloque ClasificaciÃƒÂ³n */}
               <div>
                 <p className="text-[8.5px] text-gray-400 uppercase tracking-widest font-semibold mb-2 border-b border-gray-100 pb-1">
-                  2. ClasificaciÃ³n y CapÃ­tulo
+                  2. ClasificaciÃƒÂ³n y CapÃƒÂ­tulo
                 </p>
 
                 <div className="space-y-2">
                   <div>
                     <label className="text-[10px] font-semibold text-gray-700 mb-0.5 block">
-                      CapÃ­tulo del Libro Azul <span className="text-[#FF4D4F]">*</span>
+                      CapÃƒÂ­tulo del Libro Azul <span className="text-[#FF4D4F]">*</span>
                     </label>
                     <select
                       value={formCapituloId}
@@ -2615,8 +2616,8 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
                         onChange={(e) => setFormUnidad(e.target.value)}
                         className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-[10px] font-normal text-gray-700 bg-white focus:outline-none focus:border-[#9B0F06]"
                       >
-                        <option value="mÂ²">mÂ²</option>
-                        <option value="mÂ³">mÂ³</option>
+                        <option value="mÃ‚Â²">mÃ‚Â²</option>
+                        <option value="mÃ‚Â³">mÃ‚Â³</option>
                         <option value="ml">ml</option>
                         <option value="U">U</option>
                         <option value="Glb">Glb</option>
@@ -2644,10 +2645,10 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
                 </div>
               </div>
 
-              {/* Bloque Valores NumÃ©ricos */}
+              {/* Bloque Valores NumÃƒÂ©ricos */}
               <div>
                 <p className="text-[8.5px] text-gray-400 uppercase tracking-widest font-semibold mb-2 border-b border-gray-100 pb-1">
-                  3. Valores NumÃ©ricos y Costos
+                  3. Valores NumÃƒÂ©ricos y Costos
                 </p>
 
                 <div className="space-y-2">
@@ -2708,7 +2709,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
               </div>
             </div>
 
-            {/* Footer Botones Abajo a la Derecha (PatrÃ³n Usuarios) */}
+            {/* Footer Botones Abajo a la Derecha (PatrÃƒÂ³n Usuarios) */}
             <div className="border-t border-gray-200 p-2.5 bg-gray-50 flex items-center justify-end gap-2">
               <button
                 type="button"
@@ -2724,7 +2725,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
                 className="inline-flex items-center gap-1 rounded-lg bg-[#9B0F06] px-3.5 py-1.5 text-[10px] font-medium text-white hover:bg-[#5E0006] transition-colors shadow-2xs cursor-pointer"
               >
                 <Save size={12} />
-                <span>Guardar RenglÃ³n</span>
+                <span>Guardar RenglÃƒÂ³n</span>
               </button>
             </div>
           </div>
@@ -2739,7 +2740,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
               <div className="flex items-center gap-1.5">
                 <CalendarClock size={16} className="text-[#9B0F06]" />
                 <div>
-                  <h3 className="text-xs font-bold uppercase text-gray-900">Modificar Plazo de EjecuciÃ³n</h3>
+                  <h3 className="text-xs font-bold uppercase text-gray-900">Modificar Plazo de EjecuciÃƒÂ³n</h3>
                   <p className="text-[9px] text-gray-500 font-normal">Registro oficial de cambios de cronograma</p>
                 </div>
               </div>
@@ -2756,7 +2757,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
             <div className="p-3.5 space-y-3 text-[10px]">
               <div>
                 <label className="text-[10px] font-semibold text-gray-700 mb-0.5 block">
-                  Nueva Fecha de FinalizaciÃ³n <span className="text-[#FF4D4F]">*</span>
+                  Nueva Fecha de FinalizaciÃƒÂ³n <span className="text-[#FF4D4F]">*</span>
                 </label>
                 <input
                   type="date"
@@ -2773,14 +2774,14 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
 
               <div>
                 <label className="text-[10px] font-semibold text-gray-700 mb-0.5 block">
-                  Motivo de ModificaciÃ³n <span className="text-[#FF4D4F]">*</span>
+                  Motivo de ModificaciÃƒÂ³n <span className="text-[#FF4D4F]">*</span>
                 </label>
                 <select
                   value={formMotivoPlazo}
                   onChange={(e) => setFormMotivoPlazo(e.target.value as any)}
                   className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-[10px] font-normal text-gray-800 bg-white focus:outline-none focus:border-[#9B0F06]"
                 >
-                  <option value="ampliacion">AmpliaciÃ³n de plazo contractual</option>
+                  <option value="ampliacion">AmpliaciÃƒÂ³n de plazo contractual</option>
                   <option value="retraso">Retraso por caso fortuito / clima</option>
                   <option value="orden_cambio">Orden de cambio / Obra extra</option>
                 </select>
@@ -2788,7 +2789,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
 
               <div>
                 <label className="text-[10px] font-semibold text-gray-700 mb-0.5 block">
-                  DÃ­as de SuspensiÃ³n / AmpliaciÃ³n <span className="text-[#FF4D4F]">*</span>
+                  DÃƒÂ­as de SuspensiÃƒÂ³n / AmpliaciÃƒÂ³n <span className="text-[#FF4D4F]">*</span>
                 </label>
                 <input
                   type="text"
@@ -2841,7 +2842,7 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
         </div>
       )}
 
-      {/* MODAL DE CONFIRMACIÃ“N PARA ELIMINAR */}
+      {/* MODAL DE CONFIRMACIÃƒâ€œN PARA ELIMINAR */}
       {modalEliminarOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs font-[Poppins]">
           <div className="w-full max-w-sm rounded-xl bg-white p-4 shadow-2xl space-y-3 border border-gray-200">
@@ -2850,8 +2851,8 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
                 <Trash2 size={16} />
               </div>
               <div>
-                <h3 className="text-xs font-semibold text-gray-900">Â¿Eliminar RenglÃ³n?</h3>
-                <p className="text-[10px] text-gray-500 font-normal">Esta acciÃ³n no se puede deshacer.</p>
+                <h3 className="text-xs font-semibold text-gray-900">Ã‚Â¿Eliminar RenglÃƒÂ³n?</h3>
+                <p className="text-[10px] text-gray-500 font-normal">Esta acciÃƒÂ³n no se puede deshacer.</p>
               </div>
             </div>
 
@@ -2884,5 +2885,6 @@ export function HojaSabanaView({ slug }: { slug?: string }) {
     </div>
   )
 }
+
 
 

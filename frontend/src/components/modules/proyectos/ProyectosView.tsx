@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronLeft, ChevronRight, List, MapPin, Plus, Search, User, LayoutGrid } from 'lucide-react'
+import { ChevronLeft, ChevronRight, List, MapPin, Plus, User, LayoutGrid } from 'lucide-react'
 import { PROYECTOS_MOCK } from '@/data/proyectos.mock'
 import { EstadoProyecto, Proyecto } from '@/types/proyecto'
 import ProyectoCard from '@/components/modules/proyectos/ProyectoCard'

@@ -46,6 +46,21 @@ export interface RolProyecto {
 }
 
 export interface Proyecto {
+  nombreOficial?: string;
+  descripcionProyecto?: string;
+  direccion?: string;
+  coordenadasMapa?: string;
+  entidadContratante?: string;
+  empresaContratista?: string;
+  empresaSupervisora?: string;
+  delegadoResidente?: string;
+  fechaAdjudicacion?: string;
+  numeroEscrituraPublica?: string;
+  fechaInicioContractual?: string;
+  montoContractualOriginal?: number;
+  fechaFinalizacionReal?: string;
+  plazoEjecucionRealAmpliado?: number;
+  montoFinancieroFinalEjecutado?: number;
   id: string
   codigo?: string
   nombre: string
