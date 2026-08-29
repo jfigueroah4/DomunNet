@@ -17,7 +17,7 @@ const C = {
   brand:      '#9B0F06', brandLight: 'rgba(155,15,6,0.07)', brandMid: 'rgba(155,15,6,0.14)',
   orange:     '#E85D04',
   gray900:    '#111827', gray700: '#374151', gray600: '#4B5563',
-  gray500:    '#6B7280', gray400: '#9CA3AF', gray300: '#D1D5DB',
+  gray500:    '#6B7280', gray400: '#9C�AF', gray300: '#D1D5DB',
   gray200:    '#E5E7EB', gray100: '#F3F4F6', gray50:  '#F9FAFB',
   white:      '#ffffff',
   green:      '#059669', greenLight: 'rgba(5,150,105,0.1)',

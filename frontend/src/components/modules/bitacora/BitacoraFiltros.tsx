@@ -42,7 +42,7 @@ export function BitacoraFiltros({
           <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
-            placeholder="Buscar registros de bitácora..."
+            placeholder="Buscar registros de bit�cora..."
             value={busqueda}
             onChange={(e) => onBusquedaChange(e.target.value)}
             className="w-full bg-gray-50 border border-gray-200 rounded-md pl-8 pr-2.5 py-1.5 text-[11px] text-gray-800 placeholder-gray-400 focus:outline-none focus:border-[#9B0F06] focus:bg-white"
@@ -59,9 +59,9 @@ export function BitacoraFiltros({
           <option value="actividad">Actividad</option>
           <option value="incidente">Incidente</option>
           <option value="visita">Visita</option>
-          <option value="inspeccion">Inspección</option>
+          <option value="inspeccion">Inspecci�n</option>
           <option value="material">Material</option>
-          <option value="observacion">Observación</option>
+          <option value="observacion">Observaci�n</option>
         </select>
 
         {/* Proyecto */}
@@ -108,7 +108,7 @@ export function BitacoraFiltros({
         >
           <option value="todos">Estado: Todos</option>
           <option value="pendiente">Pendiente</option>
-          <option value="en_revision">En Revisión</option>
+          <option value="en_revision">En Revisi�n</option>
           <option value="aprobado">Aprobado</option>
           <option value="archivado">Archivado</option>
         </select>

@@ -1,334 +1,1198 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Save, UserPlus, X } from 'lucide-react'
-import { EstadoProyecto, FaseTimeline, MiembroEquipo, Proyecto, RolProyecto } from '@/types/proyecto'
+import type {
+  EstadoProyecto,
+  FaseTimeline,
+  MiembroEquipo,
+  Proyecto,
+  ProyectoPermisos,
+  ProyectoRolAsignado,
+} from '@/types/proyecto'
+import {
+  ArrowLeft,
+  ArrowRight,
+  Building2,
+  Calendar,
+  CalendarDays,
+  CheckCircle2,
+  ChevronRight,
+  ExternalLink,
+  FileCheck,
+  FileSignature,
+  FileText,
+  HardHat,
+  Layers,
+  Lock,
+  Map,
+  MapPin,
+  Navigation,
+  Plus,
+  Save,
+  ShieldCheck,
+  Sparkles,
+  Trash2,
+  UserCheck,
+  UserPlus,
+  Users,
+  X,
+  ChevronLeft,
+} from 'lucide-react'
+import { toast } from 'sonner'
+
+import { PROYECTOS_MOCK } from '@/data/proyectos.mock'
+import { USUARIOS_MOCK } from '@/data/usuarios.mock'
+import { ProyectoTimeline } from '@/components/modules/proyectos/ProyectoTimeline'
 
 interface ProyectoFormularioProps {
-  modo?: 'crear' | 'editar'
   proyectoInicial?: Proyecto
+  modo?: 'crear' | 'editar'
+  onGuardar?: (proyecto: Partial<Proyecto>) => void
+  onCancelar?: () => void
+  onNavegarPrograma?: () => void
 }
 
 const inputClass =
-  'h-[34px] w-full rounded-lg border border-gray-200 bg-white px-3 text-[12px] font-medium text-[#07152B] placeholder:text-[#969DB5] focus:border-[#9B0F06] focus:outline-none focus:ring-1 focus:ring-[#9B0F06]'
+  'w-full rounded border border-gray-200 bg-white px-2 py-1 text-[10px] text-gray-800 placeholder-gray-400 focus:border-[#9B0F06] focus:outline-none focus:ring-1 focus:ring-[#9B0F06] transition-colors font-medium'
 
-const sectionTitleClass =
-  'mb-4 border-b border-gray-100 pb-2 text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#9AA2B5]'
+const labelClass = 'mb-0.5 block text-[8px] font-extrabold uppercase tracking-wider text-gray-600'
 
-export default function ProyectoFormulario({ modo = 'crear', proyectoInicial }: ProyectoFormularioProps) {
-  const router = useRouter()
-  const [nombre, setNombre] = useState(proyectoInicial?.nombre || '')
-  const [descripcion, setDescripcion] = useState(proyectoInicial?.descripcion || '')
-  const [ubicacion, setUbicacion] = useState(proyectoInicial?.ubicacion || '')
-  const [responsable, setResponsable] = useState(proyectoInicial?.responsable || '')
-  const [fechaInicio, setFechaInicio] = useState(proyectoInicial?.fechaInicio || '')
-  const [fechaFin, setFechaFin] = useState(proyectoInicial?.fechaFin || '')
-  const [estado, setEstado] = useState<EstadoProyecto>(proyectoInicial?.estado || 'borrador')
-  const [presupuesto, setPresupuesto] = useState(proyectoInicial?.presupuesto.toString() || '')
-  const [equipo, setEquipo] = useState<MiembroEquipo[]>(proyectoInicial?.equipo || [])
-  const [fases, setFases] = useState<FaseTimeline[]>(proyectoInicial?.fases || [])
-  const [categorias, setCategorias] = useState<string[]>(proyectoInicial?.categorias || [])
-  const [rolesProyecto, setRolesProyecto] = useState<RolProyecto[]>(proyectoInicial?.rolesProyecto || [])
+function siguienteCodigoVial() {
+  const max = PROYECTOS_MOCK.reduce((actual, proyecto) => {
+    const numero = Number(proyecto.codigo.match(/DOM-VIAL-(\d+)/)?.[1] ?? 0)
+    return Math.max(actual, numero)
+  }, 0)
+  return `DOM-VIAL-${String(max + 1).padStart(3, '0')}`
+}
 
-  const [categoriaSeleccionada, setCategoriaSeleccionada] = useState('')
-  const [categoriaManual, setCategoriaManual] = useState('')
-  const [nuevoMiembroNombre, setNuevoMiembroNombre] = useState('')
-  const [nuevoMiembroRol, setNuevoMiembroRol] = useState('Ingeniero Civil')
-  const [nuevaFaseNombre, setNuevaFaseNombre] = useState('')
-  const [nuevaFaseInicio, setNuevaFaseInicio] = useState('')
-  const [nuevaFaseFin, setNuevaFaseFin] = useState('')
-  const [nuevoRolNombre, setNuevoRolNombre] = useState('')
-  const [nuevoRolTipo, setNuevoRolTipo] = useState('Supervisor vial')
+function SectionHeader({
+  title,
+  subtitle,
+  icon: Icon,
+  badge,
+}: {
+  title: string
+  subtitle?: string
+  icon?: any
+  badge?: string
+}) {
+  return (
+    <div className="mb-2 border-b border-gray-100 pb-1">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          {Icon && <Icon size={12} className="text-[#9B0F06]" />}
+          <h3 className="text-[10.5px] font-black uppercase tracking-wider text-gray-800">{title}</h3>
+        </div>
+        {badge && (
+          <span className="rounded-full bg-gray-100 px-1.5 py-0.2 text-[8px] font-bold text-gray-600 border border-gray-200">
+            {badge}
+          </span>
+        )}
+      </div>
+      {subtitle && <p className="mt-0.5 text-[8.5px] text-gray-400">{subtitle}</p>}
+    </div>
+  )
+}
 
-  const roles = ['Supervisor vial', 'Ingeniero Civil', 'Residente de obra', 'Laboratorista', 'Cliente']
-  const categoriasDisponibles = [
-    'Excavacion',
-    'Muros de contencion',
-    'Drenaje',
-    'Pavimento rigido',
-    'Senalizacion',
-  ]
+// Componente "Equipo Asignado al Proyecto" con Dropdown y Rol Automático
+function EquipoAsignadoSelector({
+  equipo,
+  setEquipo,
+}: {
+  equipo: MiembroEquipo[]
+  setEquipo: React.Dispatch<React.SetStateAction<MiembroEquipo[]>>
+}) {
+  const [selectedUsuarioId, setSelectedUsuarioId] = useState('')
 
-  const agregarCategoria = () => {
-    const nuevaCategoria = (categoriaManual || categoriaSeleccionada).trim()
-    if (nuevaCategoria && !categorias.includes(nuevaCategoria)) {
-      setCategorias([...categorias, nuevaCategoria])
-      setCategoriaSeleccionada('')
-      setCategoriaManual('')
+  const handleAgregar = () => {
+    if (!selectedUsuarioId) return
+    const userObj = USUARIOS_MOCK.find((u) => u.id === selectedUsuarioId)
+    if (!userObj) return
+
+    if (equipo.some((m) => m.nombre === userObj.nombre)) {
+      toast.info(`${userObj.nombre} ya forma parte del equipo`)
+      return
     }
-  }
 
-  const agregarMiembro = () => {
-    if (!nuevoMiembroNombre.trim()) return
-    setEquipo([...equipo, { id: Date.now().toString(), nombre: nuevoMiembroNombre, rol: nuevoMiembroRol }])
-    setNuevoMiembroNombre('')
-  }
+    const rolFormateado = userObj.cargo || userObj.rol.charAt(0).toUpperCase() + userObj.rol.slice(1)
 
-  const agregarFase = () => {
-    if (!nuevaFaseNombre.trim() || !nuevaFaseInicio || !nuevaFaseFin) return
-    setFases([
-      ...fases,
-      {
-        id: Date.now().toString(),
-        nombre: nuevaFaseNombre,
-        fechaInicio: nuevaFaseInicio,
-        fechaFin: nuevaFaseFin,
-        avance: 0,
-        estado: 'borrador',
-      },
-    ])
-    setNuevaFaseNombre('')
-    setNuevaFaseInicio('')
-    setNuevaFaseFin('')
-  }
-
-  const agregarRol = () => {
-    if (!nuevoRolNombre.trim()) return
-    setRolesProyecto([
-      ...rolesProyecto,
-      {
-        id: Date.now().toString(),
-        nombre: nuevoRolNombre,
-        tipo: nuevoRolTipo,
-        permisos: ['dashboard: Solo lectura', 'bitacora: Edicion', 'reportes: Solo lectura'],
-      },
-    ])
-    setNuevoRolNombre('')
-  }
-
-  const handleGuardar = () => {
-    const proyectoData = {
-      nombre,
-      descripcion,
-      ubicacion,
-      responsable,
-      fechaInicio,
-      fechaFin,
-      estado,
-      presupuesto: Number(presupuesto),
-      equipo,
-      fases,
-      categorias,
-      rolesProyecto,
+    const nuevoMiembro: MiembroEquipo = {
+      id: Date.now().toString(),
+      nombre: userObj.nombre,
+      rol: rolFormateado,
     }
-    console.log(`Proyecto ${modo === 'crear' ? 'creado' : 'actualizado'}:`, proyectoData)
-    router.push(modo === 'crear' ? '/dashboard/proyectos' : `/dashboard/proyectos/${proyectoInicial?.id}`)
+
+    setEquipo((prev) => [...prev, nuevoMiembro])
+    setSelectedUsuarioId('')
+    toast.success(`Se agregó a ${userObj.nombre} (${rolFormateado}) al equipo`)
+  }
+
+  const handleEliminar = (id: string) => {
+    setEquipo((prev) => prev.filter((m) => m.id !== id))
   }
 
   return (
-    <div className="rounded-2xl border border-gray-100 bg-white p-5 text-[#07152B] shadow-sm">
-      <div className="mb-6">
-        <h3 className={sectionTitleClass}>Informacion Basica</h3>
-        <div className="space-y-4">
-          <div>
-            <label className="mb-1 block text-[12px] font-medium text-[#344057]">Nombre del Proyecto</label>
-            <input className={inputClass} value={nombre} onChange={(e) => setNombre(e.target.value)} />
-          </div>
-          <div>
-            <label className="mb-1 block text-[12px] font-medium text-[#344057]">Descripcion</label>
-            <textarea
-              value={descripcion}
-              onChange={(e) => setDescripcion(e.target.value)}
-              rows={3}
-              className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-[12px] font-medium text-[#07152B] placeholder:text-[#969DB5] focus:border-[#9B0F06] focus:outline-none focus:ring-1 focus:ring-[#9B0F06]"
-            />
-          </div>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <input className={inputClass} value={ubicacion} onChange={(e) => setUbicacion(e.target.value)} placeholder="Ubicacion" />
-            <input className={inputClass} value={responsable} onChange={(e) => setResponsable(e.target.value)} placeholder="Responsable" />
-          </div>
-        </div>
+    <div className="space-y-1.5 rounded-lg border border-gray-100 bg-gray-50/60 p-2.5">
+      <label className={labelClass}>
+        Equipo Asignado al Proyecto (Seleccionar del Módulo de Usuarios)
+      </label>
+      <div className="flex flex-wrap gap-1.5">
+        <select
+          value={selectedUsuarioId}
+          onChange={(e) => setSelectedUsuarioId(e.target.value)}
+          className="flex-1 min-w-[200px] rounded border border-gray-200 bg-white px-2 py-1 text-[10px] text-gray-800 font-medium focus:border-[#9B0F06] focus:outline-none"
+        >
+          <option value="">-- Seleccionar profesional del Módulo de Usuarios --</option>
+          {USUARIOS_MOCK.map((usuario) => (
+            <option key={usuario.id} value={usuario.id}>
+              {usuario.nombre} — {usuario.cargo || usuario.rol.toUpperCase()}
+            </option>
+          ))}
+        </select>
+
+        <button
+          type="button"
+          onClick={handleAgregar}
+          disabled={!selectedUsuarioId}
+          className="inline-flex items-center gap-1 rounded bg-[#9B0F06] px-2.5 py-1 text-[10px] font-bold text-white transition-colors hover:bg-[#5E0006] disabled:opacity-50 disabled:cursor-not-allowed shrink-0 shadow-2xs"
+        >
+          <UserPlus size={11} />
+          <span>Agregar al Equipo</span>
+        </button>
       </div>
 
-      <div className="mb-6">
-        <h3 className={sectionTitleClass}>Estado y Fechas</h3>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <div>
-            <label className="mb-1 block text-[12px] font-medium text-[#344057]">Fecha Inicio</label>
-            <input type="date" className={inputClass} value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} />
-          </div>
-          <div>
-            <label className="mb-1 block text-[12px] font-medium text-[#344057]">Fecha Fin Estimada</label>
-            <input type="date" className={inputClass} value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} />
-          </div>
-          <div>
-            <label className="mb-1 block text-[12px] font-medium text-[#344057]">Estado</label>
-            <select className={inputClass} value={estado} onChange={(e) => setEstado(e.target.value as EstadoProyecto)}>
-              <option value="borrador">Borrador</option>
-              <option value="activo">Activo</option>
-              <option value="en_revision">En Revision</option>
-              <option value="completado">Completado</option>
-              <option value="cancelado">Cancelado</option>
-            </select>
-          </div>
+      <p className="text-[8px] text-gray-400">
+        El rol de cada profesional se asigna automáticamente de su perfil configurado en el Módulo de Usuarios.
+      </p>
+
+      {equipo.length > 0 ? (
+        <div className="flex flex-wrap gap-1 pt-0.5">
+          {equipo.map((m) => (
+            <span
+              key={m.id}
+              className="inline-flex items-center gap-1 rounded bg-white px-2 py-0.5 text-[10px] font-medium text-gray-800 border border-gray-200 shadow-2xs"
+            >
+              <span className="font-bold text-gray-900">{m.nombre}</span>
+              <span className="text-[8px] text-gray-500 font-semibold">({m.rol})</span>
+              <button
+                type="button"
+                onClick={() => handleEliminar(m.id)}
+                className="text-gray-400 hover:text-red-600 transition-colors ml-0.5"
+                title="Quitar del equipo"
+              >
+                <X size={10} />
+              </button>
+            </span>
+          ))}
         </div>
+      ) : (
+        <p className="text-[8.5px] text-gray-400 italic">No hay profesionales asignados al equipo.</p>
+      )}
+    </div>
+  )
+}
+
+// Selector de mapa interactivo estilo Google Maps
+function SelectorMapaInteractivo({
+  direccion,
+  setDireccion,
+  coordenadas,
+  setCoordenadas,
+}: {
+  direccion: string
+  setDireccion: (val: string) => void
+  coordenadas: { lat: number; lng: number; puntoTexto?: string }
+  setCoordenadas: (val: { lat: number; lng: number; puntoTexto?: string }) => void
+}) {
+  const [tipoMapa, setTipoMapa] = useState<'mapa' | 'satelite'>('mapa')
+  const [modoSeleccion, setModoSeleccion] = useState<'punto' | 'tramo'>('punto')
+
+  const presets = [
+    { label: 'Km 22.5 CA-9 Sur', lat: 14.5021, lng: -90.5841, desc: 'CA-9 Sur, Tramo Amatitlán-Palín' },
+    { label: 'Blvd. Vista Hermosa', lat: 14.5982, lng: -90.4851, desc: 'Trébol Vista Hermosa, Zona 15' },
+    { label: 'Calzada Roosevelt', lat: 14.6284, lng: -90.5412, desc: 'Km 14.5 Calzada Roosevelt' },
+    { label: 'Ruta a El Salvador', lat: 14.5621, lng: -90.4321, desc: 'Km 18.5 Carretera a El Salvador' },
+  ]
+
+  const handleMapClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    const x = (e.clientX - rect.left) / rect.width
+    const y = (e.clientY - rect.top) / rect.height
+
+    const baseLat = 14.6349
+    const baseLng = -90.5069
+    const newLat = Number((baseLat + (0.5 - y) * 0.15).toFixed(4))
+    const newLng = Number((baseLng + (x - 0.5) * 0.15).toFixed(4))
+
+    setCoordenadas({
+      lat: newLat,
+      lng: newLng,
+      puntoTexto: `Punto seleccionado (${newLat}°, ${newLng}°)`,
+    })
+    toast.info(`Ubicación marcada: ${newLat}°, ${newLng}°`)
+  }
+
+  return (
+    <div className="space-y-2 rounded-lg border border-gray-200 bg-gray-50/50 p-2.5">
+      <div>
+        <label className={labelClass}>Dirección (Texto Corto)</label>
+        <input
+          type="text"
+          value={direccion}
+          onChange={(e) => setDireccion(e.target.value)}
+          className={inputClass}
+          placeholder="Ej: Km 22.5, Carril Izquierdo Norte-Sur"
+        />
+        <p className="mt-0.5 text-[8px] text-gray-400">
+          Dirección física corta de referencia rápida, independiente del punto GPS en el mapa.
+        </p>
       </div>
 
-      <div className="mb-6">
-        <h3 className={sectionTitleClass}>Presupuesto</h3>
-        <div className="flex">
-          <div className="flex h-[34px] items-center rounded-l-lg border border-r-0 border-gray-200 bg-gray-50 px-3 text-[12px] font-medium text-[#9AA2B5]">
-            Q
+      <div>
+        <div className="mb-1 flex flex-wrap items-center justify-between gap-1.5">
+          <label className={labelClass}>Selector de Mapa Interactivo (Punto o Tramo Exacto)</label>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setTipoMapa(tipoMapa === 'mapa' ? 'satelite' : 'mapa')}
+              className="rounded bg-white px-1.5 py-0.2 text-[8px] font-semibold text-gray-600 border border-gray-200 hover:bg-gray-100"
+            >
+              {tipoMapa === 'mapa' ? '🛰️ Vista Satélite' : '🗺️ Vista Mapa'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setModoSeleccion(modoSeleccion === 'punto' ? 'tramo' : 'punto')}
+              className={`rounded px-1.5 py-0.2 text-[8px] font-semibold border ${
+                modoSeleccion === 'tramo'
+                  ? 'bg-[#9B0F06] text-white border-[#9B0F06]'
+                  : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-100'
+              }`}
+            >
+              {modoSeleccion === 'punto' ? '📍 Punto Único' : '🛣️ Tramo Vial'}
+            </button>
           </div>
-          <input
-            type="number"
-            value={presupuesto}
-            onChange={(e) => setPresupuesto(e.target.value)}
-            className="h-[34px] flex-1 rounded-r-lg border border-gray-200 px-3 text-[12px] font-medium text-[#07152B] placeholder:text-[#969DB5] focus:border-[#9B0F06] focus:outline-none focus:ring-1 focus:ring-[#9B0F06]"
-            placeholder="0.00"
-          />
         </div>
-      </div>
 
-      <div className="mb-6">
-        <h3 className={sectionTitleClass}>Categorias por Obra</h3>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(220px,0.7fr)_1fr_auto]">
-          <select className={inputClass} value={categoriaSeleccionada} onChange={(e) => setCategoriaSeleccionada(e.target.value)}>
-            <option value="">Seleccionar categoria vial</option>
-            {categoriasDisponibles.map((categoria) => (
-              <option key={categoria} value={categoria}>
-                {categoria}
-              </option>
-            ))}
-          </select>
-          <input
-            className={inputClass}
-            value={categoriaManual}
-            onChange={(e) => setCategoriaManual(e.target.value)}
-            placeholder="O escribe una categoria manual"
-          />
-          <button
-            onClick={agregarCategoria}
-            className="flex h-[34px] items-center justify-center gap-2 rounded-lg border border-[#9B0F06] px-5 text-[12px] font-extrabold text-[#9B0F06] transition-colors hover:bg-red-50"
-          >
-            <Plus size={14} />
-            Agregar
-          </button>
+        <div className="mb-1.5 flex flex-wrap gap-1">
+          <span className="text-[8px] font-bold text-gray-400 self-center">Ubicaciones Frecuentes:</span>
+          {presets.map((preset) => (
+            <button
+              key={preset.label}
+              type="button"
+              onClick={() => {
+                setCoordenadas({ lat: preset.lat, lng: preset.lng, puntoTexto: preset.desc })
+                if (!direccion) setDireccion(preset.label)
+              }}
+              className="rounded-full bg-white px-2 py-0.2 text-[8px] font-medium text-gray-700 border border-gray-200 hover:border-[#9B0F06] hover:text-[#9B0F06] transition-colors"
+            >
+              {preset.label}
+            </button>
+          ))}
         </div>
-        <div className="mt-3 flex flex-wrap gap-2 text-[12px] font-medium text-[#969DB5]">
-          {categorias.length === 0 ? (
-            <span>No hay categorias configuradas.</span>
+
+        <div
+          onClick={handleMapClick}
+          className={`relative h-28 w-full overflow-hidden rounded border border-gray-300 cursor-crosshair select-none transition-all ${
+            tipoMapa === 'satelite' ? 'bg-slate-800' : 'bg-slate-100'
+          }`}
+        >
+          {tipoMapa === 'satelite' ? (
+            <div className="absolute inset-0 bg-[radial-gradient(#334155_1px,transparent_1px)] [background-size:16px_16px] opacity-60">
+              <svg className="absolute inset-0 h-full w-full stroke-emerald-600/30" strokeWidth="3">
+                <line x1="0" y1="30%" x2="100%" y2="70%" />
+                <line x1="20%" y1="0" x2="80%" y2="100%" />
+                <circle cx="50%" cy="50%" r="80" fill="none" stroke="#059669" strokeWidth="1" strokeDasharray="4" />
+              </svg>
+            </div>
           ) : (
-            categorias.map((categoria) => (
-              <span key={categoria} className="rounded-full bg-[#F2F4F8] px-3 py-1 text-[#344057]">
-                {categoria}
-              </span>
-            ))
+            <div className="absolute inset-0 bg-[linear-gradient(to_right,#e2e8f0_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f0_1px,transparent_1px)] bg-[size:20px_20px]">
+              <svg className="absolute inset-0 h-full w-full stroke-amber-400" strokeWidth="4">
+                <line x1="0" y1="40%" x2="100%" y2="60%" />
+                <line x1="30%" y1="0" x2="70%" y2="100%" stroke="#94a3b8" strokeWidth="3" />
+                {modoSeleccion === 'tramo' && (
+                  <path d="M 50 100 Q 150 50 250 80 T 400 120" fill="none" stroke="#9B0F06" strokeWidth="4" strokeDasharray="6" />
+                )}
+              </svg>
+            </div>
           )}
+
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none flex flex-col items-center">
+            <div className="flex items-center gap-1 rounded-full bg-[#9B0F06] px-1.5 py-0.2 text-[7.5px] font-bold text-white shadow-2xs">
+              <MapPin size={9} className="animate-bounce" />
+              <span>{coordenadas.puntoTexto || 'Punto de Obra Marcado'}</span>
+            </div>
+            <div className="h-2.5 w-0.5 bg-[#9B0F06]" />
+            <div className="h-1 w-2.5 rounded-full bg-black/30 blur-[1px]" />
+          </div>
+
+          <div className="absolute bottom-1.5 left-1.5 flex items-center gap-1 rounded bg-white/90 px-1.5 py-0.5 text-[8px] font-mono font-medium text-gray-700 backdrop-blur border border-gray-200 shadow-2xs">
+            <Navigation size={9} className="text-[#9B0F06]" />
+            <span>
+              Lat: {coordenadas.lat}° | Lng: {coordenadas.lng}°
+            </span>
+          </div>
+
+          <div className="absolute top-1.5 right-1.5 text-[7.5px] bg-black/60 text-white px-1.5 py-0.2 rounded">
+            Haz clic para marcar punto exacto
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// COMPONENTE: Configuración inicial del Plan de Trabajo
+interface RenglonPlanInicial {
+  id: string
+  codigoDGC: string
+  descripcion: string
+  unidad: string
+  cant: string
+  costo: string
+}
+
+function PantallaConfiguracionPlanInicial({
+  onVolver,
+  onGuardar,
+  renglonesIniciales,
+}: {
+  onVolver: () => void
+  onGuardar: (montoTotalCalculado: number) => void
+  renglonesIniciales: RenglonPlanInicial[]
+}) {
+  const [list, setList] = useState<RenglonPlanInicial[]>(renglonesIniciales)
+  const [paginaPlan, setPaginaPlan] = useState(1)
+  const itemsPorPagina = 8
+
+  const updateItem = (id: string, field: keyof RenglonPlanInicial, val: string) => {
+    setList((prev) => prev.map((item) => (item.id === id ? { ...item, [field]: val } : item)))
+  }
+
+  const addItem = () => {
+    const newObj: RenglonPlanInicial = {
+      id: `p-new-${Date.now()}`,
+      codigoDGC: '701.01',
+      descripcion: 'Señalización vertical informativa y defensas',
+      unidad: 'und',
+      cant: '100',
+      costo: '450',
+    }
+    setList((prev) => [...prev, newObj])
+    toast.success('Renglón adicional agregado al plan')
+  }
+
+  const removeItem = (id: string) => {
+    setList((prev) => prev.filter((item) => item.id !== id))
+  }
+
+  const totalCalculado = useMemo(() => {
+    return list.reduce((acc, item) => {
+      const c = parseFloat(item.cant) || 0
+      const p = parseFloat(item.costo) || 0
+      return acc + c * p
+    }, 0)
+  }, [list])
+
+  const totalPaginas = Math.ceil(list.length / itemsPorPagina) || 1
+  const paginadaList = list.slice((paginaPlan - 1) * itemsPorPagina, paginaPlan * itemsPorPagina)
+
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-4 font-[Poppins]">
+      <div className="flex items-center justify-between border-b border-gray-200 pb-3">
+        <button
+          type="button"
+          onClick={onVolver}
+          className="inline-flex items-center gap-1 text-xs font-semibold text-gray-600 hover:text-[#9B0F06]"
+        >
+          <ArrowLeft size={14} /> Volver al formulario
+        </button>
+        <div className="text-right">
+          <span className="text-[9px] text-gray-500 uppercase font-semibold block">Monto Total Calculado</span>
+          <span className="text-sm font-bold text-[#9B0F06] font-mono">
+            Q {totalCalculado.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+          </span>
         </div>
       </div>
 
-      <div className="mb-6">
-        <h3 className={sectionTitleClass}>Equipo</h3>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <input
-            className={inputClass}
-            value={nuevoMiembroNombre}
-            onChange={(e) => setNuevoMiembroNombre(e.target.value)}
-            placeholder="Buscar usuario o escribir nombre"
-          />
-          <select className={inputClass} value={nuevoMiembroRol} onChange={(e) => setNuevoMiembroRol(e.target.value)}>
-            {roles.map((rol) => (
-              <option key={rol} value={rol}>
-                {rol}
-              </option>
-            ))}
-          </select>
+      <div>
+        <h2 className="text-sm font-bold text-gray-900">Configuración Inicial del Plan de Trabajo</h2>
+        <p className="text-[11px] text-gray-500">
+          Precargado con el Catálogo Oficial DGC aplicable. Complete las cantidades y precios unitarios contratados.
+        </p>
+      </div>
+
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
+            <Layers size={14} className="text-[#9B0F06]" /> Renglones del Plan ({list.length})
+          </h3>
         </div>
-        <button
-          onClick={agregarMiembro}
-          className="mt-3 flex h-[34px] w-full items-center justify-center gap-2 rounded-lg border border-[#9B0F06] text-[12px] font-extrabold text-[#9B0F06] transition-colors hover:bg-red-50"
-        >
-          <UserPlus size={14} />
-          Agregar
-        </button>
-        {equipo.length > 0 && (
-          <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
-            {equipo.map((miembro) => (
-              <div key={miembro.id} className="flex items-center justify-between rounded-lg bg-[#F8F9FB] p-2">
-                <div>
-                  <p className="text-[12px] font-bold text-[#07152B]">{miembro.nombre}</p>
-                  <p className="text-[11px] font-medium text-[#8E96AE]">{miembro.rol}</p>
-                </div>
-                <button onClick={() => setEquipo(equipo.filter((m) => m.id !== miembro.id))} className="text-[#8E96AE] hover:text-[#9B0F06]">
-                  <X size={14} />
-                </button>
-              </div>
-            ))}
+
+        <div className="overflow-x-auto rounded-lg border border-gray-200">
+          <table className="w-full text-left font-mono text-[10px]">
+            <thead>
+              <tr className="bg-gray-50 text-gray-600 font-semibold border-b border-gray-200 text-[9px] uppercase">
+                <th className="p-2 w-20">Código</th>
+                <th className="p-2 min-w-[200px]">Descripción DGC</th>
+                <th className="p-2 w-16 text-center">Unidad</th>
+                <th className="p-2 w-28 text-right">Cant. Contratada</th>
+                <th className="p-2 w-28 text-right">Costo Unit. (Q)</th>
+                <th className="p-2 w-32 text-right">Subtotal (Q)</th>
+                <th className="p-2 w-10 text-center"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {paginadaList.map((r) => {
+                const sub = (parseFloat(r.cant) || 0) * (parseFloat(r.costo) || 0)
+                return (
+                  <tr key={r.id} className="hover:bg-gray-50/80">
+                    <td className="p-2 font-bold text-gray-900">{r.codigoDGC}</td>
+                    <td className="p-2 font-sans text-gray-800">{r.descripcion}</td>
+                    <td className="p-2 text-center text-gray-600 font-bold">{r.unidad}</td>
+                    <td className="p-2 text-right">
+                      <input
+                        type="number"
+                        value={r.cant}
+                        onChange={(e) => updateItem(r.id, 'cant', e.target.value)}
+                        className="w-20 rounded border border-gray-300 px-1.5 py-0.5 text-right font-mono text-[10px] focus:border-[#9B0F06] focus:outline-none"
+                      />
+                    </td>
+                    <td className="p-2 text-right">
+                      <input
+                        type="number"
+                        value={r.costo}
+                        onChange={(e) => updateItem(r.id, 'costo', e.target.value)}
+                        className="w-20 rounded border border-gray-300 px-1.5 py-0.5 text-right font-mono text-[10px] focus:border-[#9B0F06] focus:outline-none"
+                      />
+                    </td>
+                    <td className="p-2 text-right font-bold text-gray-900">
+                      Q {sub.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                    </td>
+                    <td className="p-2 text-center">
+                      <button
+                        type="button"
+                        onClick={() => removeItem(r.id)}
+                        className="p-1 text-gray-400 hover:text-red-600 rounded"
+                        title="Eliminar renglón"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {list.length > itemsPorPagina && (
+          <div className="flex items-center justify-between text-[10px] pt-1">
+            <span className="text-gray-500">
+              Mostrando { (paginaPlan - 1) * itemsPorPagina + 1 } - { Math.min(paginaPlan * itemsPorPagina, list.length) } de { list.length } renglones
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                disabled={paginaPlan === 1}
+                onClick={() => setPaginaPlan((p) => Math.max(1, p - 1))}
+                className="px-2 py-0.5 rounded border border-gray-200 bg-white disabled:opacity-40"
+              >
+                <ChevronLeft size={11} />
+              </button>
+              <span className="px-2">{paginaPlan} / {totalPaginas}</span>
+              <button
+                type="button"
+                disabled={paginaPlan >= totalPaginas}
+                onClick={() => setPaginaPlan((p) => Math.min(totalPaginas, p + 1))}
+                className="px-2 py-0.5 rounded border border-gray-200 bg-white disabled:opacity-40"
+              >
+                <ChevronRight size={11} />
+              </button>
+            </div>
           </div>
         )}
+
+        <button
+          type="button"
+          onClick={addItem}
+          className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border border-dashed border-[#9B0F06]/40 bg-red-50/40 text-[#9B0F06] font-semibold text-xs hover:bg-red-50 transition-colors"
+        >
+          <Plus size={14} /> + Agregar renglón
+        </button>
       </div>
 
-      <div className="mb-6">
-        <h3 className={sectionTitleClass}>Fases del Cronograma</h3>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <input className={inputClass} value={nuevaFaseNombre} onChange={(e) => setNuevaFaseNombre(e.target.value)} placeholder="Nombre de la fase" />
-          <input type="date" className={inputClass} value={nuevaFaseInicio} onChange={(e) => setNuevaFaseInicio(e.target.value)} />
-          <input type="date" className={inputClass} value={nuevaFaseFin} onChange={(e) => setNuevaFaseFin(e.target.value)} />
-        </div>
+      <div className="flex justify-end pt-3 border-t border-gray-200">
         <button
-          onClick={agregarFase}
-          className="mt-3 flex h-[34px] w-full items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 text-[12px] font-bold text-[#617089] transition-colors hover:border-[#9B0F06] hover:text-[#9B0F06]"
+          type="button"
+          onClick={() => onGuardar(totalCalculado)}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-[#9B0F06] px-5 py-2 text-xs font-bold text-white hover:bg-[#5E0006] shadow-sm transition-colors"
         >
-          <Plus size={14} />
-          Agregar Fase
-        </button>
-        {fases.length > 0 && (
-          <div className="mt-3 space-y-2">
-            {fases.map((fase) => (
-              <div key={fase.id} className="rounded-lg bg-[#F8F9FB] p-3 text-[12px] font-medium text-[#344057]">
-                {fase.nombre} - {fase.fechaInicio} al {fase.fechaFin}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="mb-6">
-        <h3 className={sectionTitleClass}>Roles por Proyecto</h3>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <input
-            className={inputClass}
-            value={nuevoRolNombre}
-            onChange={(e) => setNuevoRolNombre(e.target.value)}
-            placeholder="Selecciona usuario o escribe nombre"
-          />
-          <select className={inputClass} value={nuevoRolTipo} onChange={(e) => setNuevoRolTipo(e.target.value)}>
-            {roles.map((rol) => (
-              <option key={rol} value={rol}>
-                {rol}
-              </option>
-            ))}
-          </select>
-        </div>
-        <button
-          onClick={agregarRol}
-          className="mt-3 flex h-[34px] w-full items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 text-[12px] font-bold text-[#617089] transition-colors hover:border-[#9B0F06] hover:text-[#9B0F06]"
-        >
-          <UserPlus size={14} />
-          Agregar rol por proyecto
-        </button>
-        <div className="mt-3 text-[12px] font-medium text-[#969DB5]">
-          {rolesProyecto.length === 0 ? 'No hay roles asignados.' : `${rolesProyecto.length} roles asignados.`}
-        </div>
-      </div>
-
-      <div className="flex justify-end gap-3 border-t border-gray-100 pt-4">
-        <button
-          onClick={() => router.back()}
-          className="rounded-lg border border-gray-200 px-6 py-2 text-[12px] font-medium text-[#617089] transition-colors hover:bg-gray-50"
-        >
-          Cancelar
-        </button>
-        <button
-          onClick={handleGuardar}
-          className="flex items-center gap-2 rounded-lg bg-[#9B0F06] px-5 py-2 text-[12px] font-extrabold text-white transition-colors hover:bg-[#8F0C06]"
-        >
-          <Save size={14} />
-          {modo === 'crear' ? 'Crear Proyecto' : 'Guardar Cambios'}
+          <Save size={14} /> Guardar Plan y Finalizar
         </button>
       </div>
     </div>
   )
 }
+
+export function ProyectoFormulario({
+  proyectoInicial,
+  modo = 'crear',
+  onGuardar,
+  onCancelar,
+  onNavegarPrograma,
+}: ProyectoFormularioProps) {
+  const router = useRouter()
+  const esEditar = modo === 'editar'
+
+  // Estado de Pasos para Formulario Paginado (Wizard)
+  const [pasoActual, setPasoActual] = useState<1 | 2 | 3>(1)
+
+  // REQUERIMIENTO ESPECIAL: Modo Captura Vacía de Hoja Sábana para Nuevo Proyecto
+  const [modoCapturaSabanaInicial, setModoCapturaSabanaInicial] = useState(false)
+
+  // Campos Comunes
+  const [nombreOficial, setNombreOficial] = useState(proyectoInicial?.nombreOficial || proyectoInicial?.nombre || '')
+  const [nombre, setNombre] = useState(proyectoInicial?.nombre || '')
+  const [descripcion, setDescripcion] = useState(proyectoInicial?.descripcion || '')
+  const [ubicacionFisica, setUbicacionFisica] = useState(proyectoInicial?.ubicacionFisica || proyectoInicial?.ubicacion || '')
+  const [direccion, setDireccion] = useState(proyectoInicial?.direccion || 'Km 22.5 CA-9 Sur')
+  const [coordenadasMapa, setCoordenadasMapa] = useState(
+    proyectoInicial?.coordenadasMapa || { lat: 14.5021, lng: -90.5841, puntoTexto: 'Tramo Obra Vial CA-9 Sur' }
+  )
+
+  // Entidades e Instituciones
+  const [entidadContratante, setEntidadContratante] = useState(proyectoInicial?.entidadContratante || '')
+  const [empresaContratista, setEmpresaContratista] = useState(proyectoInicial?.empresaContratista || '')
+  const [empresaSupervisora, setEmpresaSupervisora] = useState(proyectoInicial?.empresaSupervisora || '')
+  const [delegadoResidente, setDelegadoResidente] = useState(proyectoInicial?.delegadoResidente || '')
+
+  // Contrato y Fechas Contractuales
+  const [fechaAdjudicacion, setFechaAdjudicacion] = useState(proyectoInicial?.fechaAdjudicacion || '')
+  const [numeroEscrituraPublica, setNumeroEscrituraPublica] = useState(proyectoInicial?.numeroEscrituraPublica || '')
+  const [fechaInicioContractual, setFechaInicioContractual] = useState(
+    proyectoInicial?.fechaInicioContractual || proyectoInicial?.fechaInicio || ''
+  )
+  const [fechaFinContractualPlan, setFechaFinContractualPlan] = useState(
+    proyectoInicial?.fechaFin || ''
+  )
+  const [errorFechaFin, setErrorFechaFin] = useState(false)
+
+  // Cálculo en tiempo real de Plazo de Ejecución Contractual Original (Solo Lectura)
+  const plazoCalculadoOriginal = useMemo(() => {
+    if (!fechaInicioContractual || !fechaFinContractualPlan) {
+      return 'Pendiente de fechas'
+    }
+    const inicio = new Date(fechaInicioContractual)
+    const fin = new Date(fechaFinContractualPlan)
+    if (isNaN(inicio.getTime()) || isNaN(fin.getTime()) || fin <= inicio) {
+      return 'Pendiente de fechas'
+    }
+    const diffTime = Math.abs(fin.getTime() - inicio.getTime())
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+    const diffMonths = Math.round(diffDays / 30)
+    return `${diffMonths} Meses (${diffDays} días)`
+  }, [fechaInicioContractual, fechaFinContractualPlan])
+
+  const [montoContractualOriginal, setMontoContractualOriginal] = useState(
+    proyectoInicial?.montoContractualOriginal?.toString() || proyectoInicial?.presupuesto?.toString() || ''
+  )
+
+  // Responsable General
+  const [responsable, setResponsable] = useState(proyectoInicial?.responsable || '')
+  const [estado, setEstado] = useState<EstadoProyecto>(proyectoInicial?.estado || 'borrador')
+
+  // CAMPOS EXCLUSIVOS DE EDICIÓN
+  const [fechaFinalizacionReal, setFechaFinalizacionReal] = useState(proyectoInicial?.fechaFinalizacionReal || '')
+  const [plazoEjecucionRealAmpliado, setPlazoEjecucionRealAmpliado] = useState(
+    proyectoInicial?.plazoEjecucionRealAmpliado || ''
+  )
+  const [montoFinancieroFinalEjecutado, setMontoFinancieroFinalEjecutado] = useState(
+    proyectoInicial?.montoFinancieroFinalEjecutado?.toString() || ''
+  )
+
+  // Lista de Equipo Asignado (Módulo de Usuarios)
+  const [equipo, setEquipo] = useState<MiembroEquipo[]>(proyectoInicial?.equipo || [])
+  const [fases] = useState<FaseTimeline[]>(proyectoInicial?.fases || [])
+  const [categorias] = useState<string[]>(proyectoInicial?.categorias || [])
+  const [rolesProyecto] = useState<ProyectoRolAsignado[]>(proyectoInicial?.rolesProyecto || [])
+
+  // REQUERIMIENTO ESPECIAL: Comportamiento condicional del botón "Ver"
+  const handleIrAPrograma = () => {
+    const codProy = proyectoInicial?.codigo || 'PROY-001'
+    toast.success(`Ahora estás en el Plan de Trabajo de ${codProy}`)
+    
+    if (esEditar) {
+      const targetId = proyectoInicial?.id || '1'
+      router.push(`/dashboard/proyectos/${targetId}/hoja-sabana`)
+    } else {
+      // En Creación: Navegar a la página completa de HojaSábanaDigital con plantilla
+      router.push('/dashboard/proyectos/nuevo/hoja-sabana')
+    }
+  }
+
+  // Lógica de avance entre pasos
+  const handleAvanzarPaso = (siguientePaso: 1 | 2 | 3) => {
+    if (pasoActual === 1) {
+      if (!nombreOficial.trim() && !nombre.trim()) {
+        toast.error('Ingrese el Nombre Oficial del Proyecto antes de continuar')
+        return
+      }
+    }
+
+    setPasoActual(siguientePaso)
+    toast.success(`Paso ${pasoActual} guardado. Avanzando al Paso ${siguientePaso}`)
+  }
+
+  const validarFechasContractuales = (): boolean => {
+    if (fechaInicioContractual && fechaFinContractualPlan) {
+      const inicio = new Date(fechaInicioContractual)
+      const fin = new Date(fechaFinContractualPlan)
+      if (fin <= inicio) {
+        setErrorFechaFin(true)
+        toast.error('La fecha de finalización debe ser posterior a la fecha de inicio')
+        return false
+      }
+    }
+    setErrorFechaFin(false)
+    return true
+  }
+
+  const handleFinalizarFormulario = () => {
+    if (!nombreOficial.trim() && !nombre.trim()) {
+      toast.error('Ingrese el Nombre Oficial del Proyecto')
+      return
+    }
+
+    if (!validarFechasContractuales()) {
+      return
+    }
+
+    const proyectoData: Partial<Proyecto> = {
+      nombreOficial: nombreOficial || nombre,
+      nombre: nombre || nombreOficial,
+      descripcion,
+      ubicacionFisica: ubicacionFisica || direccion,
+      ubicacion: direccion || ubicacionFisica,
+      direccion,
+      coordenadasMapa,
+      entidadContratante,
+      empresaContratista,
+      empresaSupervisora,
+      delegadoResidente,
+      fechaAdjudicacion,
+      numeroEscrituraPublica,
+      fechaInicioContractual,
+      fechaInicio: fechaInicioContractual,
+      fechaFin: fechaFinContractualPlan || fechaInicioContractual,
+      plazoEjecucionContractualOriginal: plazoCalculadoOriginal,
+      montoContractualOriginal: Number(montoContractualOriginal) || 0,
+      presupuesto: Number(montoContractualOriginal) || 0,
+      responsable,
+      estado,
+      equipo,
+      fases,
+      categorias,
+      rolesProyecto,
+    }
+
+    if (esEditar) {
+      proyectoData.fechaFinalizacionReal = fechaFinalizacionReal
+      proyectoData.plazoEjecucionRealAmpliado = plazoEjecucionRealAmpliado
+      proyectoData.montoFinancieroFinalEjecutado = montoFinancieroFinalEjecutado
+        ? Number(montoFinancieroFinalEjecutado)
+        : undefined
+      toast.success('Proyecto guardado correctamente')
+    } else {
+      toast.success('Proyecto creado correctamente')
+    }
+
+    onGuardar?.(proyectoData)
+  }
+
+  const pasosMeta = [
+    { num: 1, label: 'Identificación y Ubicación' },
+    { num: 2, label: 'Entidades y Equipo' },
+    { num: 3, label: 'Términos y Seguimiento' },
+  ]
+
+  // REQUERIMIENTO ESPECIAL: Si está activo el modo captura sabana inicial para Nuevo Proyecto
+  if (modoCapturaSabanaInicial) {
+    // Renglones precargados por defecto del catálogo DGC
+    const renglonesPrecargadosDGC = [
+      { id: 'p-dgc-1', codigoDGC: '101.01', descripcion: 'Mantenimiento del tránsito y construcción de desvíos provisionales', unidad: 'Glb', cant: '1', costo: '250000' },
+      { id: 'p-dgc-2', codigoDGC: '102.03', descripcion: 'Clechado, chapeo, destronque y limpieza del derecho de vía', unidad: 'Ha', cant: '18.5', costo: '18500' },
+      { id: 'p-dgc-3', codigoDGC: '201.01', descripcion: 'Excavación no clasificada para corte en vía', unidad: 'm³', cant: '45000', costo: '68' },
+      { id: 'p-dgc-4', codigoDGC: '201.03(b)', descripcion: 'Excavación en roca mediante perforación y voladura controlada', unidad: 'm³', cant: '12500', costo: '210' },
+      { id: 'p-dgc-5', codigoDGC: '301.01', descripcion: 'Reacondicionamiento de subrasante existente', unidad: 'm²', cant: '32000', costo: '22' },
+      { id: 'p-dgc-6', codigoDGC: '304.01', descripcion: 'Subbase granular tipo B e=20cm', unidad: 'm³', cant: '14500', costo: '180' },
+      { id: 'p-dgc-7', codigoDGC: '401.01', descripcion: 'Base granular tipo B e=15cm', unidad: 'm³', cant: '11000', costo: '220' },
+      { id: 'p-dgc-8', codigoDGC: '551.03', descripcion: 'Pavimento de concreto hidráulico MR=48 e=25cm', unidad: 'm²', cant: '18000', costo: '460' },
+      { id: 'p-dgc-9', codigoDGC: '601.01', descripcion: 'Alcantarilla tubular de concreto reforzado 36"', unidad: 'ml', cant: '850', costo: '950' },
+      { id: 'p-dgc-10', codigoDGC: '608.01', descripcion: 'Cuneta de concreto revestida triangular', unidad: 'ml', cant: '2400', costo: '310' },
+    ]
+
+    return <PantallaConfiguracionPlanInicial onVolver={() => setModoCapturaSabanaInicial(false)} onGuardar={(montoTotal) => {
+      setMontoContractualOriginal(montoTotal.toString())
+      setModoCapturaSabanaInicial(false)
+      setPasoActual(3)
+      toast.success(`Monto Contractual Original autocompletado con Q ${montoTotal.toLocaleString('es-GT', { minimumFractionDigits: 2 })}`)
+    }} renglonesIniciales={renglonesPrecargadosDGC} />
+  }
+
+  return (
+    <div className="space-y-2.5 text-[11px]">
+      {/* Stepper Indicator */}
+      <div className="rounded-lg border border-gray-200 bg-white p-2 shadow-2xs">
+        <div className="flex items-center justify-between gap-1.5">
+          {pasosMeta.map((p, idx) => {
+            const esActivo = pasoActual === p.num
+            const esCompletado = pasoActual > p.num
+
+            return (
+              <div key={p.num} className="flex flex-1 items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setPasoActual(p.num as 1 | 2 | 3)}
+                  className={`flex flex-1 items-center gap-1.5 rounded-md p-1.5 text-left transition-all ${
+                    esActivo
+                      ? 'bg-red-50/80 border border-red-200 text-[#9B0F06]'
+                      : esCompletado
+                      ? 'bg-gray-50 border border-gray-200 text-gray-800'
+                      : 'bg-white border border-gray-100 text-gray-400'
+                  }`}
+                >
+                  <div
+                    className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
+                      esActivo
+                        ? 'bg-[#9B0F06] text-white'
+                        : esCompletado
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-gray-200 text-gray-600'
+                    }`}
+                  >
+                    {esCompletado ? <CheckCircle2 size={11} /> : p.num}
+                  </div>
+                  <div className="min-w-0 font-extrabold uppercase text-[9.5px] leading-tight truncate">
+                    {p.label}
+                  </div>
+                </button>
+                {idx < pasosMeta.length - 1 && <ChevronRight size={12} className="text-gray-300 shrink-0" />}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* PASOS DEL FORMULARIO */}
+      <div className="rounded-lg bg-white p-3 shadow-2xs border border-gray-200 space-y-3">
+        {/* PASO 1: Identificación y Ubicación */}
+        {pasoActual === 1 && (
+          <div className="space-y-3">
+            <div>
+              <SectionHeader
+                title="Sección 1: Identificación Oficial del Proyecto"
+                subtitle="Nombre oficial, descripción detallada del alcance y especificaciones"
+                icon={Building2}
+              />
+              <div className="space-y-2">
+                <div>
+                  <label className={labelClass}>
+                    Nombre Oficial del Proyecto <span className="text-[#9B0F06]">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={nombreOficial}
+                    onChange={(e) => setNombreOficial(e.target.value)}
+                    className={inputClass}
+                    placeholder="Ej: Construcción del Paso a Desnivel e Intersección Vial CA-9 Sur Km 22.5"
+                  />
+                </div>
+
+                <div>
+                  <label className={labelClass}>Descripción del Proyecto (Detalle de Alcance Vial)</label>
+                  <textarea
+                    value={descripcion}
+                    onChange={(e) => setDescripcion(e.target.value)}
+                    rows={2}
+                    className={inputClass}
+                    placeholder="Describe a detalle el alcance físico: longitud en kilómetros, número de carriles, estructura de pavimento..."
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <SectionHeader
+                title="Sección 2: Ubicación Física y Tramo Vial Exacto"
+                subtitle="Coordenadas GPS interactivas y dirección corta de referencia"
+                icon={MapPin}
+              />
+              <div className="space-y-2">
+                <div>
+                  <label className={labelClass}>Ubicación Física (Texto Descriptivo)</label>
+                  <input
+                    type="text"
+                    value={ubicacionFisica}
+                    onChange={(e) => setUbicacionFisica(e.target.value)}
+                    className={inputClass}
+                    placeholder="Ej: Municipio de Villa Nueva, Departamento de Guatemala, Tramo CA-9 Sur Km 20 al 25"
+                  />
+                </div>
+
+                <SelectorMapaInteractivo
+                  direccion={direccion}
+                  setDireccion={setDireccion}
+                  coordenadas={coordenadasMapa}
+                  setCoordenadas={setCoordenadasMapa}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* PASO 2: Entidades y Equipo */}
+        {pasoActual === 2 && (
+          <div className="space-y-3">
+            <div>
+              <SectionHeader
+                title="Sección 3: Entidades y Empresas Intervinientes"
+                subtitle="Propietario, Contratista Ejecutor, Empresa Supervisora y Delegado Residente"
+                icon={Users}
+              />
+              <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                <div>
+                  <label className={labelClass}>
+                    Entidad Contratante / Propietaria <span className="text-[#9B0F06]">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={entidadContratante}
+                    onChange={(e) => setEntidadContratante(e.target.value)}
+                    className={inputClass}
+                    placeholder="Ej: Ministerio de Comunicaciones, Infraestructura y Vivienda (CIV)"
+                  />
+                </div>
+
+                <div>
+                  <label className={labelClass}>Empresa Contratista Ejecutora</label>
+                  <input
+                    type="text"
+                    value={empresaContratista}
+                    onChange={(e) => setEmpresaContratista(e.target.value)}
+                    className={inputClass}
+                    placeholder="Ej: Constructora Nacional de Pavimentos S.A."
+                  />
+                </div>
+
+                <div>
+                  <label className={labelClass}>Empresa Supervisora de Obra</label>
+                  <input
+                    type="text"
+                    value={empresaSupervisora}
+                    onChange={(e) => setEmpresaSupervisora(e.target.value)}
+                    className={inputClass}
+                    placeholder="Ej: Consorcio de Ingeniería y Supervisión Vial R.L."
+                  />
+                </div>
+
+                <div>
+                  <label className={labelClass}>Delegado Residente de Proyecto</label>
+                  <input
+                    type="text"
+                    value={delegadoResidente}
+                    onChange={(e) => setDelegadoResidente(e.target.value)}
+                    className={inputClass}
+                    placeholder="Ej: Ing. Carlos Mendoza (Colegiado 14,890)"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Componente Equipo Asignado al Proyecto */}
+            <EquipoAsignadoSelector equipo={equipo} setEquipo={setEquipo} />
+          </div>
+        )}
+
+        {/* PASO 3: Términos Contractuales y Seguimiento */}
+        {pasoActual === 3 && (
+          <div className="space-y-3">
+            <div>
+              <SectionHeader
+                title="Sección 4: Datos Contractuales y Financieros Originales"
+                subtitle="Fechas de adjudicación, número de escritura, plazo y monto original"
+                icon={FileSignature}
+              />
+              <div className="space-y-2">
+                <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                  <div>
+                    <label className={labelClass}>Fecha de Adjudicación / Contrato</label>
+                    <input
+                      type="date"
+                      value={fechaAdjudicacion}
+                      onChange={(e) => setFechaAdjudicacion(e.target.value)}
+                      className={inputClass}
+                    />
+                  </div>
+
+                  <div>
+                    <label className={labelClass}>Número de Escritura Pública (Campo Anexo)</label>
+                    <input
+                      type="text"
+                      value={numeroEscrituraPublica}
+                      onChange={(e) => setNumeroEscrituraPublica(e.target.value)}
+                      className={inputClass}
+                      placeholder="Ej: Escritura No. 142-2024 Notaría de Gobierno"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-2 md:grid-cols-4">
+                  <div>
+                    <label className={labelClass}>Fecha de Inicio Contractual</label>
+                    <input
+                      type="date"
+                      value={fechaInicioContractual}
+                      onChange={(e) => {
+                        setFechaInicioContractual(e.target.value)
+                        if (errorFechaFin) setErrorFechaFin(false)
+                      }}
+                      className={inputClass}
+                    />
+                  </div>
+
+                  <div>
+                    <label className={labelClass}>Fecha Final Contractual</label>
+                    <input
+                      type="date"
+                      value={fechaFinContractualPlan}
+                      onChange={(e) => {
+                        const nuevaFin = e.target.value
+                        setFechaFinContractualPlan(nuevaFin)
+                        if (fechaInicioContractual && nuevaFin) {
+                          const inicio = new Date(fechaInicioContractual)
+                          const fin = new Date(nuevaFin)
+                          if (fin <= inicio) {
+                            setErrorFechaFin(true)
+                            toast.error('La fecha de finalización debe ser posterior a la fecha de inicio')
+                          } else {
+                            setErrorFechaFin(false)
+                          }
+                        } else {
+                          setErrorFechaFin(false)
+                        }
+                      }}
+                      className={`${inputClass} ${errorFechaFin ? 'border-danger border-[#FF4D4F] bg-red-50/20' : ''}`}
+                    />
+                  </div>
+
+                  <div>
+                    <label className={labelClass}>
+                      Plazo de Ejecución Contractual Original
+                    </label>
+                    <div className="flex items-center rounded border border-gray-200 bg-gray-100 px-2 py-1 text-[10px] font-bold text-gray-700">
+                      <span>{plazoCalculadoOriginal}</span>
+                    </div>
+                  </div>
+
+                  {/* REQUERIMIENTO ESPECIAL: Campo "Monto Contractual Original *" de Solo Lectura con Botón "Ver" */}
+                  <div>
+                    <label className={labelClass}>
+                      Monto Contractual Original <span className="text-[#9B0F06]">*</span> <span className="text-[8px] font-normal text-gray-400">(SOLO LECTURA)</span>
+                    </label>
+                    <div className="flex gap-1">
+                      <div className="flex flex-1">
+                        <div className="flex items-center rounded-l border border-r-0 border-gray-200 bg-gray-100 px-2 py-1 text-[10px] font-bold text-gray-600">
+                          Q
+                        </div>
+                        <div className="flex-1 rounded-r border border-gray-200 bg-gray-100 px-2 py-1 text-[10px] text-gray-800 font-bold flex items-center justify-between">
+                          <span>
+                            {montoContractualOriginal && Number(montoContractualOriginal) > 0
+                              ? Number(montoContractualOriginal).toLocaleString('es-GT', { minimumFractionDigits: 2 })
+                              : '0.00'}
+                          </span>
+                          {(!montoContractualOriginal || Number(montoContractualOriginal) <= 0) && (
+                            <span className="text-[9px] font-normal text-gray-400">
+                              Pendiente
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleIrAPrograma}
+                        className="inline-flex items-center gap-1 rounded bg-[#9B0F06] px-2.5 py-1 text-[10px] font-bold text-white transition-colors hover:bg-[#5E0006] shrink-0 cursor-pointer"
+                        title={
+                          esEditar
+                            ? 'Ver Programa de Trabajo del Proyecto'
+                            : 'Capturar Renglones de la Hoja Sábana para autocompletar el Monto'
+                        }
+                      >
+                        <CalendarDays size={10} />
+                        <span>Ver</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                  <div className="relative">
+                    <label className={labelClass}>Ingeniero Responsable / Director</label>
+                    <select
+                      value={responsable}
+                      onChange={(e) => setResponsable(e.target.value)}
+                      className={`${inputClass} appearance-none cursor-pointer pr-7 max-h-36 overflow-y-auto`}
+                      size={1}
+                    >
+                      <option value="">Selecciona el responsable de obra...</option>
+                      {USUARIOS_MOCK.map((usuario) => (
+                        <option
+                          key={usuario.id}
+                          value={usuario.nombre}
+                          className="py-1 px-1.5 hover:bg-blue-50 checked:bg-blue-100 checked:text-blue-900"
+                        >
+                          {usuario.nombre} — @{usuario.username || usuario.email.split('@')[0]} ({usuario.rol})
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronRight size={12} className="absolute right-2 top-6 rotate-90 text-gray-400 pointer-events-none" />
+                  </div>
+
+                  <div>
+                    <label className={labelClass}>Estado Inicial del Proyecto</label>
+                    <select
+                      value={estado}
+                      onChange={(e) => setEstado(e.target.value as EstadoProyecto)}
+                      className={inputClass}
+                    >
+                      <option value="borrador">Borrador</option>
+                      <option value="activo">Activo</option>
+                      <option value="en_revision">En Revisión</option>
+                      <option value="completado">Completado</option>
+                      <option value="cancelado">Cancelado</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Sección 5: Campos de Seguimiento y Cierre (Exclusivos de Edición) */}
+            {esEditar ? (
+              <div className="rounded-lg border border-gray-200 bg-white p-2.5 space-y-2">
+                <SectionHeader
+                  title="Sección 5: Campos de Seguimiento y Cierre (Exclusivos de Edición)"
+                  subtitle="Control de ejecución real, ampliación de plazos y liquidación financiera final"
+                  icon={Sparkles}
+                  badge="EXCLUSIVO DE EDICIÓN"
+                />
+                <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+                  <div>
+                    <label className={labelClass}>Fecha de Finalización Real</label>
+                    <input
+                      type="date"
+                      value={fechaFinalizacionReal}
+                      onChange={(e) => setFechaFinalizacionReal(e.target.value)}
+                      className={inputClass}
+                    />
+                    <p className="mt-0.5 text-[8px] text-gray-400">Fecha de acta de recepción definitiva de obra.</p>
+                  </div>
+
+                  <div>
+                    <label className={labelClass}>Plazo de Ejecución Real Ampliado</label>
+                    <input
+                      type="text"
+                      value={plazoEjecucionRealAmpliado}
+                      onChange={(e) => setPlazoEjecucionRealAmpliado(e.target.value)}
+                      className={inputClass}
+                      placeholder="Ej: 24 Meses (+6 meses por orden de cambio #2)"
+                    />
+                    <p className="mt-0.5 text-[8px] text-gray-400">Plazo acumulado autorizados por prórroga.</p>
+                  </div>
+
+                  <div>
+                    <label className={labelClass}>Monto Financiero Final Ejecutado</label>
+                    <div className="flex">
+                      <div className="flex items-center rounded-l border border-r-0 border-gray-200 bg-gray-100 px-2 py-1 text-[10px] font-bold text-gray-600">
+                        <Lock size={9} className="mr-1 text-gray-400" /> Q
+                      </div>
+                      <input
+                        type="number"
+                        value={montoFinancieroFinalEjecutado}
+                        onChange={(e) => setMontoFinancieroFinalEjecutado(e.target.value)}
+                        className="flex-1 rounded-r border border-gray-200 bg-gray-50 px-2 py-1 text-[10px] font-bold text-gray-800 focus:border-[#9B0F06] focus:outline-none"
+                        placeholder="21,240,000.00"
+                      />
+                    </div>
+                    <p className="mt-0.5 text-[8px] text-gray-400">
+                      Monto total liquidado con estimaciones de obra y sobrecostos aprobados.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded border border-dashed border-gray-200 bg-gray-50/80 p-2 text-[9px] text-gray-500">
+                <div className="flex items-center gap-1 font-bold text-gray-700">
+                  <CheckCircle2 size={11} className="text-emerald-600" />
+                  <span>Optimizaciones del Formulario de Creación:</span>
+                </div>
+                <p className="mt-0.5">
+                  • El <strong>Código del Proyecto</strong> se generará automáticamente (ej.{' '}
+                  <span className="font-mono font-bold text-gray-800">{siguienteCodigoVial()}</span>).
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Botones de Navegación de Paso */}
+        <div className="flex items-center justify-between border-t border-gray-100 pt-2.5">
+          <div>
+            {pasoActual > 1 ? (
+              <button
+                type="button"
+                onClick={() => setPasoActual((prev) => (prev - 1) as 1 | 2 | 3)}
+                className="inline-flex items-center gap-1 rounded-md border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                <ArrowLeft size={12} />
+                <span>Anterior</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={onCancelar}
+                className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+              >
+                Cancelar
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            {pasoActual < 3 ? (
+              <button
+                type="button"
+                onClick={() => handleAvanzarPaso((pasoActual + 1) as 1 | 2 | 3)}
+                className="inline-flex items-center gap-1.5 rounded-md bg-[#9B0F06] px-4 py-1.5 text-xs font-bold text-white hover:bg-[#5E0006] transition-colors shadow-2xs"
+              >
+                <span>Continuar</span>
+                <ArrowRight size={12} />
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={errorFechaFin}
+                onClick={handleFinalizarFormulario}
+                className="inline-flex items-center gap-1.5 rounded-md bg-[#9B0F06] px-4 py-1.5 text-xs font-bold text-white hover:bg-[#5E0006] transition-colors shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              >
+                <Save size={12} />
+                <span>{esEditar ? 'Guardar y Finalizar' : 'Guardar y Crear Proyecto'}</span>
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default ProyectoFormulario;

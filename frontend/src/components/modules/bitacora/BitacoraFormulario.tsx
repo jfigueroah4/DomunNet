@@ -34,10 +34,10 @@ const categoriasTrabajo = [
   'Movimiento de tierras',
   'Sub-base',
   'Base granular',
-  'Carpeta asfáltica',
+  'Carpeta asf�ltica',
   'Cunetas',
   'Alcantarillas',
-  'Señalización',
+  'Se�alizaci�n',
 ]
 
 const responsables = [
@@ -46,7 +46,7 @@ const responsables = [
   'Fernando Rodríguez',
   'Alejandra Moreno',
   'Gustavo Reyes',
-  'Héctor Méndez',
+  'H�ctor M�ndez',
   'María García',
 ]
 
@@ -193,20 +193,20 @@ export default function BitacoraFormulario({ modo = 'crear', id }: BitacoraFormu
         return false
       }
       if (!ubicacion.trim()) {
-        setErrorValidacion('Debe ingresar la ubicación / estación del día.')
+        setErrorValidacion('Debe ingresar la ubicaci�n / estaci�n del día.')
         return false
       }
     }
 
     if (paso === 3) {
       if (renglones.length === 0) {
-        setErrorValidacion('Debe agregar al menos un renglón de trabajo.')
+        setErrorValidacion('Debe agregar al menos un rengl�n de trabajo.')
         return false
       }
       for (let i = 0; i < renglones.length; i++) {
         const r = renglones[i]
         if (!r.renglon) {
-          setErrorValidacion(`En la fila ${i + 1}, debe seleccionar el Renglón.`)
+          setErrorValidacion(`En la fila ${i + 1}, debe seleccionar el Rengl�n.`)
           return false
         }
         if (!r.lado) {
@@ -214,11 +214,11 @@ export default function BitacoraFormulario({ modo = 'crear', id }: BitacoraFormu
           return false
         }
         if (!r.estInicio.trim()) {
-          setErrorValidacion(`En la fila ${i + 1}, debe ingresar la Estación de Inicio.`)
+          setErrorValidacion(`En la fila ${i + 1}, debe ingresar la Estaci�n de Inicio.`)
           return false
         }
         if (!r.estFin.trim()) {
-          setErrorValidacion(`En la fila ${i + 1}, debe ingresar la Estación de Fin.`)
+          setErrorValidacion(`En la fila ${i + 1}, debe ingresar la Estaci�n de Fin.`)
           return false
         }
       }
@@ -280,7 +280,7 @@ export default function BitacoraFormulario({ modo = 'crear', id }: BitacoraFormu
         <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
           <div className="mb-5 flex items-center gap-2 pb-3 border-b border-gray-100">
             <ClipboardList size={15} className="text-[#9B0F06]" />
-            <h3 className="text-sm font-semibold text-gray-800">Información General</h3>
+            <h3 className="text-sm font-semibold text-gray-800">Informaci�n General</h3>
           </div>
 
           <div className="grid gap-4 lg:grid-cols-3">
@@ -369,7 +369,7 @@ export default function BitacoraFormulario({ modo = 'crear', id }: BitacoraFormu
             <div>
               <label className="mb-1 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-widest text-gray-500">
                 <MapPin size={11} />
-                Ubicación / estación del día *
+                Ubicaci�n / estaci�n del día *
               </label>
               <input
                 type="text"
@@ -390,7 +390,7 @@ export default function BitacoraFormulario({ modo = 'crear', id }: BitacoraFormu
           <div className="mb-5 flex items-center gap-2 pb-3 border-b border-gray-100">
             <SunMedium size={15} className="text-[#F59E0B]" />
             <h3 className="text-sm font-semibold text-gray-800">
-              Condiciones Climáticas <span className="text-xs font-normal text-gray-400">(Opcional)</span>
+              Condiciones Clim�ticas <span className="text-xs font-normal text-gray-400">(Opcional)</span>
             </h3>
           </div>
 
@@ -428,7 +428,7 @@ export default function BitacoraFormulario({ modo = 'crear', id }: BitacoraFormu
 
           <div className="mb-4">
             <label className="mb-1 block text-[10px] font-semibold uppercase tracking-widest text-gray-500">
-              Observación climática general
+              Observaci�n clim�tica general
             </label>
             <textarea
               value={observacionClimatica}
@@ -475,7 +475,7 @@ export default function BitacoraFormulario({ modo = 'crear', id }: BitacoraFormu
           </div>
 
           <p className="mb-3 text-[12px] text-gray-500">
-            Registra las estaciones kilométricas del tramo trabajado (ej. 0+500 a 1+200). Todos los campos marcados con (*) son obligatorios.
+            Registra las estaciones kilom�tricas del tramo trabajado (ej. 0+500 a 1+200). Todos los campos marcados con (*) son obligatorios.
           </p>
 
           <div className="space-y-3">
@@ -483,7 +483,7 @@ export default function BitacoraFormulario({ modo = 'crear', id }: BitacoraFormu
               <div key={renglon.id} className="grid items-end gap-3 rounded-2xl border border-gray-100 bg-[#FAFAFB] p-3 xl:grid-cols-[1.5fr_0.7fr_0.7fr_0.7fr_1fr_auto]">
                 <div>
                   <label className="mb-1 block text-[10px] font-semibold uppercase tracking-widest text-gray-400">
-                    Renglón *
+                    Rengl�n *
                   </label>
                   <select
                     value={renglon.renglon}
@@ -497,7 +497,7 @@ export default function BitacoraFormulario({ modo = 'crear', id }: BitacoraFormu
                     <option value="Asfalto">Asfalto</option>
                     <option value="Cuneta">Cuneta</option>
                     <option value="Alcantarilla">Alcantarilla</option>
-                    <option value="Señalización">Señalización</option>
+                    <option value="Se�alizaci�n">Se�alizaci�n</option>
                   </select>
                 </div>
 
@@ -558,7 +558,7 @@ export default function BitacoraFormulario({ modo = 'crear', id }: BitacoraFormu
                   type="button"
                   onClick={() => eliminarRenglon(renglon.id)}
                   className="inline-flex h-10 items-center justify-center rounded-xl border border-gray-200 px-3 text-gray-400 transition-colors hover:border-[#9B0F06] hover:text-[#9B0F06]"
-                  title="Eliminar renglón"
+                  title="Eliminar rengl�n"
                 >
                   <Trash2 size={14} />
                 </button>
@@ -572,7 +572,7 @@ export default function BitacoraFormulario({ modo = 'crear', id }: BitacoraFormu
             className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[#E9C8C3] bg-[#FFF7F6] py-3 text-[12px] font-semibold text-[#9B0F06] transition-colors hover:bg-[#FFEDEA]"
           >
             <Plus size={14} />
-            Agregar renglón
+            Agregar rengl�n
           </button>
         </section>
       )
@@ -623,7 +623,7 @@ export default function BitacoraFormulario({ modo = 'crear', id }: BitacoraFormu
                     className="h-11 w-full rounded-xl border border-gray-200 bg-white px-4 text-[13px] text-gray-700 focus:border-[#9B0F06] focus:outline-none"
                   >
                     <option>Concreto fresco</option>
-                    <option>Compactación</option>
+                    <option>Compactaci�n</option>
                     <option>Resistencia</option>
                     <option>Granulometría</option>
                   </select>
@@ -684,7 +684,7 @@ export default function BitacoraFormulario({ modo = 'crear', id }: BitacoraFormu
             <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Renglones</p>
             <p className="mt-1 text-sm font-semibold text-gray-800">{renglones.length} renglones registrados</p>
             <p className="mt-1 text-[11px] text-gray-500 font-medium text-gray-400">
-              {renglones.some((r) => r.renglon) ? 'Con información lista para guardar' : 'Pendiente de completar'}
+              {renglones.some((r) => r.renglon) ? 'Con informaci�n lista para guardar' : 'Pendiente de completar'}
             </p>
           </div>
         </div>
@@ -729,7 +729,7 @@ export default function BitacoraFormulario({ modo = 'crear', id }: BitacoraFormu
         </button>
         <div>
           <h1 className="text-base font-bold text-gray-800">
-            {modo === 'crear' ? 'Nuevo Registro de Bitácora' : 'Editar Registro de Bitácora'}
+            {modo === 'crear' ? 'Nuevo Registro de Bit�cora' : 'Editar Registro de Bit�cora'}
           </h1>
           <p className="mt-1 text-[10px] text-gray-400">Complete todos los campos del registro diario de obra</p>
         </div>
@@ -808,7 +808,7 @@ export default function BitacoraFormulario({ modo = 'crear', id }: BitacoraFormu
           onClick={handleSiguiente}
           className="inline-flex items-center gap-2 rounded-lg bg-[#9B0F06] px-5 py-2.5 text-[12px] font-semibold text-white shadow-sm transition-colors hover:bg-[#5E0006]"
         >
-          {pasoActual < pasoMaximo ? 'Siguiente sección' : modo === 'crear' ? 'Guardar registro' : 'Guardar cambios'}
+          {pasoActual < pasoMaximo ? 'Siguiente secci�n' : modo === 'crear' ? 'Guardar registro' : 'Guardar cambios'}
           {pasoActual < pasoMaximo ? <ChevronRight size={14} /> : <Save size={14} />}
         </button>
       </div>

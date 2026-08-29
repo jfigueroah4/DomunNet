@@ -14,7 +14,7 @@ export function BitacoraCard({ registro, onClick }: BitacoraCardProps) {
       incidente: { bg: '#FEE2E2', color: '#DC2626', indicador: '#DC2626', label: 'Incidente' },
       visita: { bg: '#DBEAFE', color: '#0284C7', indicador: '#0284C7', label: 'Visita' },
       inspeccion: { bg: '#E0E7FF', color: '#6366F1', indicador: '#6366F1', label: 'InspecciÃ³n' },
-      material: { bg: '#DCFCE7', color: '#16A34A', indicador: '#16A34A', label: 'Laboratorio' },
+      material: { bg: '#DCFCE7', color: '#16�4A', indicador: '#16�4A', label: 'Laboratorio' },
       observacion: { bg: '#F3E8FF', color: '#9333EA', indicador: '#9333EA', label: 'ObservaciÃ³n' },
     }
     return config[tipo] || config.actividad
