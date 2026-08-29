@@ -95,7 +95,7 @@ export default function BitacoraPage() {
 
   const formatearFecha = (fecha: string) => {
     const date = new Date(fecha + 'T00:00:00')
-    const dias = ['Domingo', 'Lunes', 'Martes', 'MiÃ©rcoles', 'Jueves', 'Viernes', 'SÃ¡bado']
+    const dias = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
     const meses = [
       'Enero',
       'Febrero',
@@ -131,7 +131,7 @@ export default function BitacoraPage() {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-base font-extrabold text-gray-900">BitÃ¡cora de Obra</h1>
+          <h1 className="text-base font-extrabold text-gray-900">Bitácora de Obra</h1>
           <p className="text-[10px] text-gray-500">Registro diario de actividades de campo y ensayos de laboratorio</p>
         </div>
 
@@ -212,7 +212,7 @@ export default function BitacoraPage() {
         {registrosAgrupados.length === 0 ? (
           <div className="text-center py-12 bg-white rounded-xl border border-gray-200 shadow-2xs">
             <p className="text-xs font-bold text-gray-700">No se encontraron registros</p>
-            <p className="text-[10px] text-gray-400 mt-0.5">Intenta con otros criterios de bÃºsqueda o filtros</p>
+            <p className="text-[10px] text-gray-400 mt-0.5">Intenta con otros criterios de búsqueda o filtros</p>
           </div>
         ) : (
           <div>
@@ -249,7 +249,7 @@ export default function BitacoraPage() {
       {/* REQUERIMIENTO NUEVO: DRAWER LATERAL DESLIZANTE DE DETALLE DE REGISTRO */}
       {drawerRegistro && (
         <div className="fixed inset-0 z-50 overflow-hidden">
-          {/* Overlay semitransparente detrÃ¡s del drawer */}
+          {/* Overlay semitransparente detrás del drawer */}
           <div
             className="absolute inset-0 bg-black/40 backdrop-blur-xs transition-opacity"
             onClick={() => setDrawerRegistro(null)}
@@ -286,7 +286,7 @@ export default function BitacoraPage() {
                 {/* Metadatos Capturados */}
                 <div className="rounded-xl bg-gray-50 p-3 border border-gray-200 space-y-2.5">
                   <p className="text-[9px] font-black uppercase tracking-wider text-gray-400 border-b border-gray-200 pb-1">
-                    InformaciÃ³n del Registro
+                    Información del Registro
                   </p>
                   <div className="grid grid-cols-2 gap-2 text-[10.5px]">
                     <div>
@@ -313,11 +313,11 @@ export default function BitacoraPage() {
                   </div>
                 </div>
 
-                {/* FotografÃ­a(s) Adjuntas con ampliado o Estado VacÃ­o */}
+                {/* Fotografía(s) Adjuntas con ampliado o Estado Vacío */}
                 <div className="space-y-1.5">
                   <p className="text-[10px] font-black uppercase tracking-wider text-gray-700 flex items-center gap-1">
                     <Camera size={12} className="text-[#9B0F06]" />
-                    <span>Evidencia FotogrÃ¡fica</span>
+                    <span>Evidencia Fotográfica</span>
                   </p>
 
                   {drawerRegistro.adjuntos && drawerRegistro.adjuntos.length > 0 ? (
@@ -343,20 +343,20 @@ export default function BitacoraPage() {
                       ))}
                     </div>
                   ) : (
-                    /* Estado VacÃ­o de Fotos per estados-vacio-error-carga skill */
+                    /* Estado Vacío de Fotos per estados-vacio-error-carga skill */
                     <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50/80 p-4 text-center space-y-1">
                       <Camera size={20} className="mx-auto text-gray-300" />
-                      <p className="text-[11px] font-bold text-gray-600">Sin FotografÃ­as Adjuntas</p>
-                      <p className="text-[9px] text-gray-400">No se adjuntaron fotografÃ­as en este registro de obra.</p>
+                      <p className="text-[11px] font-bold text-gray-600">Sin Fotografías Adjuntas</p>
+                      <p className="text-[9px] text-gray-400">No se adjuntaron fotografías en este registro de obra.</p>
                     </div>
                   )}
                 </div>
 
-                {/* UbicaciÃ³n GPS o Estado VacÃ­o */}
+                {/* Ubicación GPS o Estado Vacío */}
                 <div className="space-y-1.5">
                   <p className="text-[10px] font-black uppercase tracking-wider text-gray-700 flex items-center gap-1">
                     <MapPin size={12} className="text-[#9B0F06]" />
-                    <span>UbicaciÃ³n GPS de Campo</span>
+                    <span>Ubicación GPS de Campo</span>
                   </p>
 
                   <div className="rounded-lg border border-gray-200 bg-gray-50 p-2.5 text-xs space-y-1">
@@ -371,7 +371,7 @@ export default function BitacoraPage() {
                 <div className="space-y-1.5">
                   <p className="text-[10px] font-black uppercase tracking-wider text-gray-700 flex items-center gap-1">
                     <MessageSquare size={12} className="text-[#9B0F06]" />
-                    <span>Observaciones TÃ©cnicas</span>
+                    <span>Observaciones Técnicas</span>
                   </p>
                   <p className="rounded-lg border border-gray-200 bg-white p-3 text-xs text-gray-700 leading-relaxed font-sans">
                     {drawerRegistro.descripcion}

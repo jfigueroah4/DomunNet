@@ -1,1 +1,5 @@
-export { default } from '../../../(dashboard)/configuracion/mantenimiento-tablas/page'
+import MantenimientoTablas from '@/components/pages/MantenimientoTablas'
+
+export default function MantenimientoTablasPage() {
+  return <MantenimientoTablas />
+}

@@ -74,14 +74,14 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [notificationsVisible, setNotificationsVisible] = useState(false)
   const [unreadCount] = useState(0) // Default 0 to match empty state
-  const { profile, fetchProfile } = useAuthStore()
+  const { profile } = useAuthStore()
   
   // Search suggestion state
   const [searchQuery, setSearchQuery] = useState('')
   const [suggestions, setSuggestions] = useState<typeof systemRoutes>([])
   const [showSearchDropdown, setShowSearchDropdown] = useState(false)
 
-  useEffect(() => { fetchProfile() }, [])
+  
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -223,7 +223,7 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
 
         {/* Tickets Button */}
         <Link
-          href="/tickets"
+          href="/dashboard/tickets"
           className="p-2 rounded-full hover:bg-gray-100 transition-colors text-gray-600 hover:text-gray-800 relative"
           title="Tickets"
         >

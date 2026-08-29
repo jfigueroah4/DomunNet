@@ -17,9 +17,9 @@ interface BitactoraPanelProps {
 
 export function BitacoraPanel({ resumenHoy, ultimoRegistro }: BitactoraPanelProps) {
   // REQUERIMIENTO:
-  // "Cambia el contador Actividades por Renglones (conteo de Ã­tems de campo)"
+  // "Cambia el contador Actividades por Renglones (conteo de ítems de campo)"
   // "Cambia el contador Incidentes por Ensayos (conteo de pruebas de laboratorio)"
-  // "MantÃ©n los demÃ¡s contadores sin cambios"
+  // "Mantén los demás contadores sin cambios"
   const items = [
     { label: 'Renglones', count: resumenHoy.renglones || 8, color: '#9B0F06', icon: FileCheck },
     { label: 'Ensayos', count: resumenHoy.ensayos || 3, color: '#D53E0F', icon: FlaskConical },
@@ -28,7 +28,7 @@ export function BitacoraPanel({ resumenHoy, ultimoRegistro }: BitactoraPanelProp
   ]
 
   const actividadSemana = [60, 80, 40, 100, 70, 30, 20]
-  const dias = ['Lun', 'Mar', 'MiÃ©', 'Jue', 'Vie', 'SÃ¡b', 'Dom']
+  const dias = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
   const hoyIndex = 4
 
   return (
@@ -72,10 +72,10 @@ export function BitacoraPanel({ resumenHoy, ultimoRegistro }: BitactoraPanelProp
         </div>
       </div>
 
-      {/* Ãšltimo Registro */}
+      {/* Último Registro */}
       {ultimoRegistro && (
         <div>
-          <p className="text-[10px] font-bold text-gray-700 mb-2 uppercase tracking-wider">Ãšltimo Registro</p>
+          <p className="text-[10px] font-bold text-gray-700 mb-2 uppercase tracking-wider">Último Registro</p>
           <div className="bg-red-50/70 rounded-xl p-3 border border-red-100">
             <p className="text-[10px] font-bold text-[#9B0F06]">{ultimoRegistro.titulo}</p>
             <p className="text-[9px] text-gray-600 mt-0.5 font-medium">

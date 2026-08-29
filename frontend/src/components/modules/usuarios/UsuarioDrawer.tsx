@@ -203,7 +203,7 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
     let { name, value } = e.target
     
     if (['primerNombre', 'segundoNombre', 'primerApellido', 'segundoApellido'].includes(name)) {
-      if (/[^a-zA-ZÃ¡Ã©Ã­Ã³ÃºÃÃ‰ÃÃ“ÃšÃ±Ã‘\s]/.test(value)) return;
+      if (/[^a-zA-ZáéíóúÃÉÍÓÚñÑ\s]/.test(value)) return;
     }
     
     if (name === 'telefono') {
@@ -274,7 +274,7 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
               <h2 className="text-sm font-bold text-gray-800">{title}</h2>
             </div>
             <p className="text-[10px] text-gray-400 mt-0.5">
-              {isViewMode ? 'Consulta rÃ¡pida de informaciÃ³n del usuario' : mode === 'edit' ? 'Modifica los datos del usuario' : 'Ingresa la informaciÃ³n del nuevo usuario'}
+              {isViewMode ? 'Consulta rápida de información del usuario' : mode === 'edit' ? 'Modifica los datos del usuario' : 'Ingresa la información del nuevo usuario'}
             </p>
           </div>
 
@@ -297,7 +297,7 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
         
         <div className="flex-1 overflow-y-auto px-5 py-3 space-y-1.5">
           <p className="text-[10px] uppercase tracking-widest font-semibold text-gray-500 mb-2 mt-2 border-b border-gray-100 pb-1">
-            InformaciÃ³n Personal
+            Información Personal
           </p>
 
           <div className="grid grid-cols-2 gap-3 mb-2">
@@ -338,7 +338,7 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
                 className={`w-full h-8 px-3 text-xs border rounded-lg focus:outline-none transition-colors disabled:bg-gray-50 text-gray-700 ${
                   errors.primerApellido ? 'border-[#FF4D4F] bg-red-50/20' : 'border-gray-200 focus:border-[#9B0F06]'
                 }`}
-                placeholder="Ej: PÃ©rez"
+                placeholder="Ej: Pérez"
               />
             </div>
             <div>
@@ -356,7 +356,7 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
 
           <div className="grid grid-cols-2 gap-3 mb-2">
             <div>
-              <label className="mb-1 block text-[10px] font-semibold text-gray-700 uppercase tracking-wide">TelÃ©fono *</label>
+              <label className="mb-1 block text-[10px] font-semibold text-gray-700 uppercase tracking-wide">Teléfono *</label>
               <div className="relative">
                 <Phone size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
@@ -416,14 +416,14 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
           </div>
           
           <div className="mb-2">
-            <label className="mb-1 block text-[10px] font-semibold text-gray-700 uppercase tracking-wide">DirecciÃ³n *</label>
+            <label className="mb-1 block text-[10px] font-semibold text-gray-700 uppercase tracking-wide">Dirección *</label>
             <input
               name="direccion"
               value={formData.direccion}
               onChange={handleChange}
               disabled={isViewMode}
               className={`w-full h-8 px-3 text-xs border border-gray-200 rounded-lg focus:outline-none focus:border-[#9B0F06] transition-colors disabled:bg-gray-50 text-gray-700`}
-              placeholder="DirecciÃ³n completa"
+              placeholder="Dirección completa"
             />
           </div>
 
@@ -452,12 +452,12 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
                   <Loader2 size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 animate-spin" />
                 )}
               </div>
-              {usernameDisponible === false && <p className="text-[10px] text-[#FF4D4F] mt-1">El usuario ya estÃ¡ en uso</p>}
+              {usernameDisponible === false && <p className="text-[10px] text-[#FF4D4F] mt-1">El usuario ya está en uso</p>}
               {usernameDisponible === true && <p className="text-[10px] text-green-600 mt-1">Usuario disponible</p>}
             </div>
             
             <div>
-              <label className="mb-1 block text-[10px] font-semibold text-gray-700 uppercase tracking-wide">Correo electrÃ³nico *</label>
+              <label className="mb-1 block text-[10px] font-semibold text-gray-700 uppercase tracking-wide">Correo electrónico *</label>
               <div className="relative">
                 <Mail size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
@@ -478,15 +478,15 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
                   <Loader2 size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 animate-spin" />
                 )}
               </div>
-              {correoDisponible === false && <p className="text-[10px] text-[#FF4D4F] mt-1">Este correo ya estÃ¡ registrado</p>}
-              {errors.correo && <p className="text-[10px] text-[#FF4D4F] mt-1">Correo electrÃ³nico no vÃ¡lido</p>}
+              {correoDisponible === false && <p className="text-[10px] text-[#FF4D4F] mt-1">Este correo ya está registrado</p>}
+              {errors.correo && <p className="text-[10px] text-[#FF4D4F] mt-1">Correo electrónico no válido</p>}
             </div>
           </div>
 
           <div className="grid grid-cols-1 gap-3 mb-2">
             <div>
               <div className="flex items-center justify-between mb-1">
-                <label className="block text-[10px] font-semibold text-gray-700 uppercase tracking-wide">ContraseÃ±a {mode === 'create' && '*'}</label>
+                <label className="block text-[10px] font-semibold text-gray-700 uppercase tracking-wide">Contraseña {mode === 'create' && '*'}</label>
                 {mode === 'edit' && usuario?.id && !isEditingPassword && (
                   <button type="button" onClick={() => setIsEditingPassword(true)} className="text-[10px] text-[#9B0F06] font-semibold flex items-center gap-1 hover:underline">
                     <Edit2 size={12} /> Cambiar
@@ -502,7 +502,7 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
               <div className="flex items-center gap-2">
                 <input
                   type="password"
-                  placeholder={(mode === 'create' || isEditingPassword) ? "Escriba la nueva contraseÃ±a" : "â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"}
+                  placeholder={(mode === 'create' || isEditingPassword) ? "Escriba la nueva contraseña" : "â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"}
                   value={formData.contrasena}
                   onChange={(e) => handlePasswordChange(e.target.value)}
                   disabled={isViewMode || (mode === 'edit' && !isEditingPassword)}
@@ -511,7 +511,7 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
                   }`}
                 />
               </div>
-              {(mode === 'create' || isEditingPassword) && errors.contrasena && <p className="text-[10px] text-[#FF4D4F] mt-1">MÃ­nimo 8 caracteres</p>}
+              {(mode === 'create' || isEditingPassword) && errors.contrasena && <p className="text-[10px] text-[#FF4D4F] mt-1">Mínimo 8 caracteres</p>}
             </div>
             
             <div className="grid grid-cols-2 gap-3">
@@ -559,7 +559,7 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
                 rows={2}
                 disabled={isViewMode}
                 className="w-full rounded-lg border border-amber-300 bg-white px-3 py-2.5 text-xs text-gray-700 focus:border-amber-600 focus:outline-none disabled:bg-gray-50 transition-colors resize-none"
-                placeholder="RazÃ³n de la suspensiÃ³n..."
+                placeholder="Razón de la suspensión..."
               />
             </div>
           )}
@@ -632,7 +632,7 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
                 <div className="py-8 text-center">
                   <FolderOpen size={32} className="text-gray-300 mx-auto mb-2" />
                   <p className="text-[10px] text-gray-500">No hay proyectos asignados</p>
-                  <p className="text-[9px] text-gray-400 mt-1">Este usuario no estÃ¡ asignado a ningÃºn proyecto</p>
+                  <p className="text-[9px] text-gray-400 mt-1">Este usuario no está asignado a ningún proyecto</p>
                 </div>
               )}
             </div>

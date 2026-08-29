@@ -2,7 +2,7 @@
 
 export const api = axios.create({
   baseURL: '/api/v1',
-  withCredentials: true, // Requerido para enviar cookies httpOnly automÃ¡ticamente
+  withCredentials: true, // Requerido para enviar cookies httpOnly automáticamente
   headers: {
     'Content-Type': 'application/json',
   },

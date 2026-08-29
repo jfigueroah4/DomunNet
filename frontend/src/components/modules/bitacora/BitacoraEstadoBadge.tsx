@@ -12,7 +12,7 @@ export function BitacoraEstadoBadge({ estado }: BitacoraEstadoBadgeProps) {
     { bg: string; text: string; label: string; border: string }
   > = {
     borrador: { bg: 'bg-gray-100', text: 'text-gray-700', border: 'border-gray-200', label: 'Borrador' },
-    en_revision: { bg: 'bg-blue-100/80', text: 'text-blue-800', border: 'border-blue-200', label: 'En RevisiÃ³n' },
+    en_revision: { bg: 'bg-blue-100/80', text: 'text-blue-800', border: 'border-blue-200', label: 'En Revisión' },
     aprobado: { bg: 'bg-[#059669]/10', text: 'text-[#059669]', border: 'border-[#059669]/20', label: 'Aprobado' },
     publicado: { bg: 'bg-purple-100/80', text: 'text-purple-800', border: 'border-purple-200', label: 'Publicado' },
   }

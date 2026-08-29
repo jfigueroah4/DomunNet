@@ -45,20 +45,20 @@ const STEPS = [
 ];
 
 const RENGLONES_PRED: { id: string; desc: string; unidad: string }[] = [
-  { id:'301.1', desc:'ExcavaciÃ³n y corte de material',    unidad:'mÂ³' },
-  { id:'301.2', desc:'Relleno y compactaciÃ³n',             unidad:'mÂ³' },
+  { id:'301.1', desc:'Excavación y corte de material',    unidad:'mÂ³' },
+  { id:'301.2', desc:'Relleno y compactación',             unidad:'mÂ³' },
   { id:'302.1', desc:'Sub-base granular tipo B',           unidad:'mÂ³' },
   { id:'302.2', desc:'Mejoramiento de sub-rasante',        unidad:'mÂ³' },
   { id:'304.1', desc:'Base granular tipo B',               unidad:'mÂ³' },
   { id:'304.2', desc:'Base estabilizada con cemento',      unidad:'mÂ³' },
-  { id:'401.1', desc:'Carpeta asfÃ¡ltica en caliente',      unidad:'ton' },
+  { id:'401.1', desc:'Carpeta asfáltica en caliente',      unidad:'ton' },
   { id:'406.1', desc:'Cuneta de concreto triangular',      unidad:'ml' },
   { id:'407.1', desc:'Alcantarilla tubular 36"',           unidad:'ml' },
-  { id:'501.1', desc:'SeÃ±alizaciÃ³n horizontal',            unidad:'ml' },
-  { id:'502.1', desc:'SeÃ±alizaciÃ³n vertical',              unidad:'und' },
+  { id:'501.1', desc:'Señalización horizontal',            unidad:'ml' },
+  { id:'502.1', desc:'Señalización vertical',              unidad:'und' },
 ];
 
-const ENSAYOS_LIST = ['CompactaciÃ³n relativa','DeflexiÃ³n Benkelman','GranulometrÃ­a','LÃ­mites de Atterberg','CBR','Proctor modificado'];
+const ENSAYOS_LIST = ['Compactación relativa','Deflexión Benkelman','Granulometría','Límites de Atterberg','CBR','Proctor modificado'];
 const RENGLONES_OBRA: { id: string; desc: string; unidad: string }[] = [
   { id:'152', desc:'Replanteo y levantamiento topografico', unidad:'' },
   { id:'153', desc:'Sistema de control de calidad de la empresa ejecutora', unidad:'' },
@@ -152,7 +152,7 @@ export function BitacoraForm({ onBack, onSubmit }: {
     observacionesGenerales: '',
   });
 
-  // PaginaciÃ³n para mÃ¡s de 3 renglones
+  // Paginación para más de 3 renglones
   const [paginaRenglones, setPaginaRenglones] = useState(1);
   const itemsPorPaginaRenglones = 3;
 
@@ -176,18 +176,18 @@ export function BitacoraForm({ onBack, onSubmit }: {
     const errs: Record<string, string> = {};
     if (s === 1) {
       if (!fd.proyectoId) errs.proyectoId = 'Selecciona un proyecto';
-      if (!fd.ubicacion.trim()) errs.ubicacion = 'Ingresa la ubicaciÃ³n o estaciÃ³n del dÃ­a';
+      if (!fd.ubicacion.trim()) errs.ubicacion = 'Ingresa la ubicación o estación del día';
     }
     if (s === 2) {
       if (fd.suspensionClima) {
-        if (!fd.justSuspension.trim()) errs.justSuspension = 'Ingresa la justificaciÃ³n de la suspensiÃ³n';
-        if (!fd.horasSuspension || Number(fd.horasSuspension) <= 0) errs.horasSuspension = 'Ingresa un nÃºmero de horas vÃ¡lido';
+        if (!fd.justSuspension.trim()) errs.justSuspension = 'Ingresa la justificación de la suspensión';
+        if (!fd.horasSuspension || Number(fd.horasSuspension) <= 0) errs.horasSuspension = 'Ingresa un número de horas válido';
       }
     }
     if (s === 3) {
       if (fd.tipoIngreso === 'Campo') {
         const algunRenglon = fd.renglones.some(r => r.renglon !== '');
-        if (!algunRenglon) errs.renglones = 'Debe seleccionar al menos un renglÃ³n de trabajo';
+        if (!algunRenglon) errs.renglones = 'Debe seleccionar al menos un renglón de trabajo';
       } else {
         const algunEnsayo = fd.ensayos.some(e => e.tipo !== '');
         if (!algunEnsayo) errs.ensayos = 'Debe seleccionar al menos un ensayo de laboratorio';
@@ -212,13 +212,13 @@ export function BitacoraForm({ onBack, onSubmit }: {
   const addEnsayo    = () => set('ensayos', [...fd.ensayos, newEnsayo()]);
   const removeEnsayo = (id: string) => set('ensayos', fd.ensayos.filter(e => e.id !== id));
 
-  /* Manejo de FotografÃ­a RenglÃ³n: Tomar Foto (con GPS) vs Subir Foto (sin GPS) */
+  /* Manejo de Fotografía Renglón: Tomar Foto (con GPS) vs Subir Foto (sin GPS) */
   const handleTomarFotoRenglon = (id: string) => {
     updateRenglon(id, 'fotoUrl', 'https://images.unsplash.com/photo-1541888946425-d0fbb186a5b3?auto=format&fit=crop&w=400&q=80');
     updateRenglon(id, 'fotoNombre', 'evidencia_camara_01.jpg');
     updateRenglon(id, 'fotoGeo', '14.6349Â° N, 90.5069Â° W Â· Carretera a El Salvador KM 18.5');
-    toast.success('CÃ¡mara activada y foto con GPS capturada', {
-      description: 'DirecciÃ³n GPS: 14.6349Â° N, 90.5069Â° W',
+    toast.success('Cámara activada y foto con GPS capturada', {
+      description: 'Dirección GPS: 14.6349Â° N, 90.5069Â° W',
     });
   };
 
@@ -229,7 +229,7 @@ export function BitacoraForm({ onBack, onSubmit }: {
     toast.success('Archivo adjuntado correctamente');
   };
 
-  /* Manejo de FotografÃ­a Ensayo */
+  /* Manejo de Fotografía Ensayo */
 
 
   const handleGuardarRegistro = () => {
@@ -237,7 +237,7 @@ export function BitacoraForm({ onBack, onSubmit }: {
 
 
     // Disparar Toast success
-    toast.success('Â¡Registro de BitÃ¡cora guardado exitosamente!', {
+    toast.success('Â¡Registro de Bitácora guardado exitosamente!', {
       description: `El registro de ${fd.tipoIngreso === 'Campo' ? 'Campo' : 'Laboratorio'} ha sido almacenado en el expediente digital.`,
       duration: 4000,
     });
@@ -306,10 +306,10 @@ export function BitacoraForm({ onBack, onSubmit }: {
       {/* Back & Header */}
       <div>
         <button onClick={onBack} style={{ display:'flex', alignItems:'center', gap:5, background:'none', border:'none', color:C.gray500, fontSize:13, cursor:'pointer', fontFamily:POPPINS, padding:0, marginBottom:8 }}>
-          <ArrowLeft size={14}/> Volver a BitÃ¡cora
+          <ArrowLeft size={14}/> Volver a Bitácora
         </button>
-        <h2 style={{ fontSize:22, fontWeight:700, color:C.gray900, margin:'0 0 4px', fontFamily:POPPINS }}>Nuevo Registro de BitÃ¡cora</h2>
-        <p style={{ fontSize:13, color:C.gray500, margin:0, fontFamily:POPPINS }}>GestiÃ³n de ingresos diarios de campo y pruebas de laboratorio</p>
+        <h2 style={{ fontSize:22, fontWeight:700, color:C.gray900, margin:'0 0 4px', fontFamily:POPPINS }}>Nuevo Registro de Bitácora</h2>
+        <p style={{ fontSize:13, color:C.gray500, margin:0, fontFamily:POPPINS }}>Gestión de ingresos diarios de campo y pruebas de laboratorio</p>
       </div>
 
       {/* -- STEPPER (1. Info General, 2. Condiciones, 3. Detalle) -- */}
@@ -327,7 +327,7 @@ export function BitacoraForm({ onBack, onSubmit }: {
                   type="button"
                   className="step-btn"
                   onClick={() => {
-                    // Permitir navegaciÃ³n a pasos ya validados o anteriores
+                    // Permitir navegación a pasos ya validados o anteriores
                     if (s.num < step || validateStep(step)) {
                       setStep(s.num);
                     }
@@ -351,10 +351,10 @@ export function BitacoraForm({ onBack, onSubmit }: {
       {/* -- SECTION CONTENT -- */}
       <div style={{ ...card, padding:28 }}>
 
-        {/* --- PASO 1: InformaciÃ³n General --- */}
+        {/* --- PASO 1: Información General --- */}
         {step === 1 && (
           <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
-            {sectionHeader('InformaciÃ³n General', <ClipboardList size={16} color={C.brand}/>)}
+            {sectionHeader('Información General', <ClipboardList size={16} color={C.brand}/>)}
 
             {/* Segmented Control horizontal obligatorio: TIPO DE INGRESO ("Campo" vs "Laboratorio") */}
             <div>
@@ -429,7 +429,7 @@ export function BitacoraForm({ onBack, onSubmit }: {
                 <select className="form-input" value={fd.turno} onChange={e => set('turno', e.target.value)} style={inputBase}>
                   <option value="Diurno">Diurno</option>
                   <option value="Nocturno">Nocturno</option>
-                  <option value="MÃºltiple">MÃºltiple / Continuo</option>
+                  <option value="Múltiple">Múltiple / Continuo</option>
                 </select>
               </div>
 
@@ -445,9 +445,9 @@ export function BitacoraForm({ onBack, onSubmit }: {
                 />
               </div>
 
-              {/* UbicaciÃ³n / EstaciÃ³n del DÃ­a (Input) */}
+              {/* Ubicación / Estación del Día (Input) */}
               <div>
-                <label style={sLabel}>UBICACIÃ“N / ESTACIÃ“N DEL DÃA *</label>
+                <label style={sLabel}>UBICACIÓN / ESTACIÓN DEL DÍA *</label>
                 <input
                   className="form-input"
                   placeholder="Ej. KM 22+300 al KM 24+100"
@@ -461,10 +461,10 @@ export function BitacoraForm({ onBack, onSubmit }: {
           </div>
         )}
 
-        {/* --- PASO 2: Condiciones ClimÃ¡ticas --- */}
+        {/* --- PASO 2: Condiciones Climáticas --- */}
         {step === 2 && (
           <div>
-            {sectionHeader('Condiciones ClimÃ¡ticas', <Sun size={16} color={C.orange}/>)}
+            {sectionHeader('Condiciones Climáticas', <Sun size={16} color={C.orange}/>)}
 
             <label style={{ ...sLabel, marginBottom: 12 }}>TIPO DE CLIMA *</label>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:12, marginBottom:24 }}>
@@ -480,29 +480,29 @@ export function BitacoraForm({ onBack, onSubmit }: {
             </div>
 
             <div style={{ marginBottom:20 }}>
-              <label style={sLabel}>OBSERVACIÃ“N CLIMÃTICA</label>
+              <label style={sLabel}>OBSERVACIÓN CLIMÃTICA</label>
               <textarea className="form-input" rows={3} placeholder="Describe particularidades del clima durante la jornada..." value={fd.obsClima} onChange={e => set('obsClima', e.target.value)} style={{ ...inputBase, resize:'vertical' }}/>
             </div>
 
-            {/* Switch de SuspensiÃ³n por Clima */}
+            {/* Switch de Suspensión por Clima */}
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', background:C.gray50, border:`1px solid ${C.gray200}`, borderRadius:10, padding:'14px 16px', marginBottom: fd.suspensionClima ? 16 : 0 }}>
               <div>
                 <div style={{ fontSize:13, fontWeight:600, color:C.gray900, fontFamily:POPPINS }}>Â¿Se suspendieron actividades por clima?</div>
-                <div style={{ fontSize:11, color:C.gray500, fontFamily:POPPINS }}>Activar si hubo interrupciÃ³n de labores en obra</div>
+                <div style={{ fontSize:11, color:C.gray500, fontFamily:POPPINS }}>Activar si hubo interrupción de labores en obra</div>
               </div>
               <Toggle on={fd.suspensionClima} onChange={v => set('suspensionClima', v)}/>
             </div>
 
-            {/* Campos desplegados si se suspendiÃ³ */}
+            {/* Campos desplegados si se suspendió */}
             {fd.suspensionClima && (
               <div style={{ background:'rgba(217,119,6,0.06)', border:'1px solid rgba(217,119,6,0.2)', borderRadius:10, padding:'16px', display:'flex', flexDirection:'column', gap:14, marginTop:12 }}>
                 <div>
-                  <label style={sLabel}>JUSTIFICACIÃ“N DE SUSPENSIÃ“N *</label>
-                  <textarea className="form-input" rows={3} placeholder="Explica detalladamente la causa de la suspensiÃ³n y sectores afectados..." value={fd.justSuspension} onChange={e => { set('justSuspension', e.target.value); setErrors(p => ({ ...p, justSuspension:'' })); }} style={{ ...inpErr('justSuspension'), resize:'vertical' }}/>
+                  <label style={sLabel}>JUSTIFICACIÓN DE SUSPENSIÓN *</label>
+                  <textarea className="form-input" rows={3} placeholder="Explica detalladamente la causa de la suspensión y sectores afectados..." value={fd.justSuspension} onChange={e => { set('justSuspension', e.target.value); setErrors(p => ({ ...p, justSuspension:'' })); }} style={{ ...inpErr('justSuspension'), resize:'vertical' }}/>
                   {errors.justSuspension && <span style={errStyle}>{errors.justSuspension}</span>}
                 </div>
                 <div>
-                  <label style={sLabel}>HORAS DE SUSPENSIÃ“N *</label>
+                  <label style={sLabel}>HORAS DE SUSPENSIÓN *</label>
                   <input className="form-input" type="number" placeholder="Ej. 3.5" value={fd.horasSuspension} onChange={e => { set('horasSuspension', e.target.value); setErrors(p => ({ ...p, horasSuspension:'' })); }} style={{ ...inpErr('horasSuspension'), maxWidth:180 }}/>
                   {errors.horasSuspension && <span style={errStyle}>{errors.horasSuspension}</span>}
                 </div>
@@ -511,17 +511,17 @@ export function BitacoraForm({ onBack, onSubmit }: {
           </div>
         )}
 
-        {/* --- PASO 3: Detalle (DinÃ¡mico segÃºn Tipo de Ingreso) --- */}
+        {/* --- PASO 3: Detalle (Dinámico según Tipo de Ingreso) --- */}
         {step === 3 && (
           <div>
             {fd.tipoIngreso === 'Campo' ? (
-              /* CondiciÃ³n A: Campo (Tabla "Renglones") */
+              /* Condición A: Campo (Tabla "Renglones") */
               <div>
                 {sectionHeader('Renglones de Trabajo en Campo', <ClipboardList size={16} color={C.brand}/>)}
                 
                 <div style={{ position:'relative', marginBottom:14 }}>
                   <Search size={14} color={C.gray400} style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)' }} />
-                  <input className="form-input" value={renglonSearch} onChange={e => setRenglonSearch(e.target.value)} placeholder="Filtrar catÃ¡logo de renglones por cÃ³digo o descripciÃ³n..." style={{ ...inputBase, paddingLeft:34, fontSize:12 }} />
+                  <input className="form-input" value={renglonSearch} onChange={e => setRenglonSearch(e.target.value)} placeholder="Filtrar catálogo de renglones por código o descripción..." style={{ ...inputBase, paddingLeft:34, fontSize:12 }} />
                 </div>
 
                 {errors.renglones && <div style={{ ...errStyle, marginBottom: 10 }}>{errors.renglones}</div>}
@@ -530,7 +530,7 @@ export function BitacoraForm({ onBack, onSubmit }: {
                   <table style={{ width:'100%', borderCollapse:'collapse', minWidth:700 }}>
                     <thead>
                       <tr style={{ background:C.gray50 }}>
-                        {['RenglÃ³n','EstaciÃ³n Inicio','EstaciÃ³n Fin','FotografÃ­a','Observaciones',''].map(h => <th key={h} style={thS}>{h}</th>)}
+                        {['Renglón','Estación Inicio','Estación Fin','Fotografía','Observaciones',''].map(h => <th key={h} style={thS}>{h}</th>)}
                       </tr>
                     </thead>
                     <tbody>
@@ -538,7 +538,7 @@ export function BitacoraForm({ onBack, onSubmit }: {
                         <tr key={r.id} style={{ borderBottom:`1px solid ${C.gray100}` }}>
                           <td style={{ ...tdS, minWidth:220 }}>
                             <select className="form-input" value={r.renglon} onChange={e => updateRenglon(r.id,'renglon',e.target.value)} style={{ ...inputBase, fontSize:12, padding:'6px 8px', fontWeight: 600 }}>
-                              <option value="">-- Seleccionar RenglÃ³n --</option>
+                              <option value="">-- Seleccionar Renglón --</option>
                               {getRenglonesOptions(r.renglon).map(rp => <option key={rp.id} value={rp.id}>{rp.id} - {rp.desc}</option>)}
                             </select>
                           </td>
@@ -596,7 +596,7 @@ export function BitacoraForm({ onBack, onSubmit }: {
                   </table>
                 </div>
 
-                {/* PaginaciÃ³n si supera 3 renglones */}
+                {/* Paginación si supera 3 renglones */}
                 {fd.renglones.length > 3 && (
                   <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', fontSize:11, marginTop:8, color:C.gray500 }}>
                     <span>Mostrando {(paginaRenglones - 1) * 3 + 1} - {Math.min(paginaRenglones * 3, fd.renglones.length)} de {fd.renglones.length} renglones</span>
@@ -621,10 +621,10 @@ export function BitacoraForm({ onBack, onSubmit }: {
                     </div>
                   </div>
                 )}
-                {addRowBtn(addRenglon, '+ Agregar renglÃ³n')}
+                {addRowBtn(addRenglon, '+ Agregar renglón')}
               </div>
             ) : (
-              /* CondiciÃ³n B: Laboratorio (Tabla "Ensayos") */
+              /* Condición B: Laboratorio (Tabla "Ensayos") */
               <div>
                 {sectionHeader('Ensayos de Laboratorio', <FlaskConical size={16} color={C.brand}/>)}
 
@@ -634,7 +634,7 @@ export function BitacoraForm({ onBack, onSubmit }: {
                   <table style={{ width:'100%', borderCollapse:'collapse', minWidth:700 }}>
                     <thead>
                       <tr style={{ background:C.gray50 }}>
-                        {['Tipo de Ensayo','EstaciÃ³n','Resultado','Valor MÃ­n. Req.','FotografÃ­a / Muestra','Observaciones',''].map(h => <th key={h} style={thS}>{h}</th>)}
+                        {['Tipo de Ensayo','Estación','Resultado','Valor Mín. Req.','Fotografía / Muestra','Observaciones',''].map(h => <th key={h} style={thS}>{h}</th>)}
                       </tr>
                     </thead>
                     <tbody>
@@ -687,14 +687,14 @@ export function BitacoraForm({ onBack, onSubmit }: {
               </div>
             )}
 
-            {/* REQUERIMIENTO 4: Mostrar textarea unificado de "Observaciones Generales" Ãºnicamente si se ingresan 2 o mÃ¡s registros */}
+            {/* REQUERIMIENTO 4: Mostrar textarea unificado de "Observaciones Generales" únicamente si se ingresan 2 o más registros */}
             {countRegistrosPaso3 >= 2 && (
               <div style={{ marginTop: 24, paddingTop: 18, borderTop: `1px solid ${C.gray200}` }}>
                 <label style={sLabel}>OBSERVACIONES GENERALES DEL REGISTRO</label>
                 <textarea
                   className="form-input"
                   rows={4}
-                  placeholder="Observaciones integradas para los mÃºltiples registros ingresados..."
+                  placeholder="Observaciones integradas para los múltiples registros ingresados..."
                   value={fd.observacionesGenerales}
                   onChange={e => set('observacionesGenerales', e.target.value)}
                   style={{ ...inputBase, resize:'vertical' }}

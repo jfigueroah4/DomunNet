@@ -1,1 +1,5 @@
-export { default } from '../../(dashboard)/estadisticas/page'
+import { EstadisticasView } from '@/components/modules/estadisticas/EstadisticasView'
+
+export default function EstadisticasPage() {
+  return <EstadisticasView />
+}

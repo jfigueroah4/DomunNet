@@ -1,5 +1,5 @@
-import ReportesPage from '@/app/(dashboard)/reportes/page'
+import ReportesView from '@/components/modules/reportes/ReportesView'
 
-export default function ProxyReportesPage() {
-  return <ReportesPage />
+export default function ReportesPage() {
+  return <ReportesView />
 }

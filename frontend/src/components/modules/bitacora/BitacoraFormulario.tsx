@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useMemo, useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
@@ -271,7 +271,7 @@ export default function BitacoraFormulario({ modo = 'crear', id }: BitacoraFormu
 
     console.log(`Registro ${modo === 'crear' ? 'creado' : 'actualizado'}:`, datosRegistro)
     resetForm()
-    router.push('/bitacora')
+    router.push('/dashboard/bitacora')
   }
 
   const renderPasoActual = () => {
@@ -296,7 +296,7 @@ export default function BitacoraFormulario({ modo = 'crear', id }: BitacoraFormu
                 <option value="">-- Seleccionar proyecto --</option>
                 {PROYECTOS_MOCK.map((proyecto) => (
                   <option key={proyecto.id} value={proyecto.id}>
-                    {proyecto.codigo} · {proyecto.nombre}
+                    {proyecto.codigo} Â· {proyecto.nombre}
                   </option>
                 ))}
               </select>
@@ -443,7 +443,7 @@ export default function BitacoraFormulario({ modo = 'crear', id }: BitacoraFormu
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="text-[12px] font-semibold text-gray-700">
-                  ¿Se suspendieron actividades por clima?
+                  Â¿Se suspendieron actividades por clima?
                 </p>
                 <p className="text-[10px] text-gray-400">Indica si hubo pausa por condiciones adversas</p>
               </div>
@@ -592,7 +592,7 @@ export default function BitacoraFormulario({ modo = 'crear', id }: BitacoraFormu
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="text-[12px] font-semibold text-gray-700">
-                  ¿Se realizaron ensayos de laboratorio hoy?
+                  Â¿Se realizaron ensayos de laboratorio hoy?
                 </p>
                 <p className="text-[10px] text-gray-400">Activa para registrar resultados</p>
               </div>

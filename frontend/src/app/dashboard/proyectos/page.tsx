@@ -1,1 +1,5 @@
-export { default } from '../../(dashboard)/proyectos/page'
+import { ProyectosView } from '@/components/modules/proyectos/ProyectosView'
+
+export default function ProyectosPage() {
+  return <ProyectosView />
+}

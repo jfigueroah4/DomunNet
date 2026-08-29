@@ -13,7 +13,8 @@ import { rolesRutas } from '@/modules/roles/roles.rutas'
 import { configuracionRutas } from '@/modules/configuracion/configuracion.rutas'
 import { catalogosRutas } from '@/modules/catalogos/catalogos.rutas'
 import { respaldoRutas } from '@/modules/respaldo/respaldo.rutas'
-import { mantenimientoRutas } from '@/modules/mantenimiento/mantenimiento.routes'
+import { mantenimientoRutas } from '@/modules/mantenimiento/mantenimiento.rutas'
+import { auditoriaRutas } from '@/modules/auditoria/auditoria.rutas'
 
 const app = express()
 const PORT = entorno.puerto
@@ -53,6 +54,7 @@ app.use('/api/v1/catalogos', catalogosRutas)
 app.use('/api/v1/respaldo', respaldoRutas)
 app.use('/api/v1/backup', respaldoRutas)
 app.use('/api/v1/mantenimiento', mantenimientoRutas)
+app.use('/api/v1/auditoria', auditoriaRutas)
 
 app.use((_req, res) => sendError(res, 404, 'Endpoint no encontrado'))
 app.use((error: Error, _req: express.Request, res: express.Response) => {

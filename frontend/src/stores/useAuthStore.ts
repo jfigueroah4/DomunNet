@@ -41,7 +41,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         const data = await profilePromise
         set({ profile: data, loading: false })
       } catch (err: any) {
-        set({ error: err, loading: false })
+        set({ profile: null, error: err, loading: false })
       }
       return
     }
@@ -58,7 +58,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       const data = await profilePromise
       set({ profile: data, loading: false })
     } catch (err: any) {
-      set({ error: err, loading: false })
+      set({ profile: null, error: err, loading: false })
     } finally {
       profilePromise = null // Reset the promise after it resolves/rejects
     }

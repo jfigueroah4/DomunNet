@@ -1,4 +1,4 @@
-﻿import { RegistroBitacora } from '@/types/bitacora'
+import { RegistroBitacora } from '@/types/bitacora'
 import { ChevronRight, FolderOpen, User, MapPin, Camera } from 'lucide-react'
 import { BitacoraEstadoBadge } from './BitacoraEstadoBadge'
 
@@ -13,9 +13,9 @@ export function BitacoraCard({ registro, onClick }: BitacoraCardProps) {
       actividad: { bg: '#EED9B9', color: '#9B0F06', indicador: '#9B0F06', label: 'Actividad' },
       incidente: { bg: '#FEE2E2', color: '#DC2626', indicador: '#DC2626', label: 'Incidente' },
       visita: { bg: '#DBEAFE', color: '#0284C7', indicador: '#0284C7', label: 'Visita' },
-      inspeccion: { bg: '#E0E7FF', color: '#6366F1', indicador: '#6366F1', label: 'InspecciÃ³n' },
-      material: { bg: '#DCFCE7', color: '#16�4A', indicador: '#16�4A', label: 'Laboratorio' },
-      observacion: { bg: '#F3E8FF', color: '#9333EA', indicador: '#9333EA', label: 'ObservaciÃ³n' },
+      inspeccion: { bg: '#E0E7FF', color: '#6366F1', indicador: '#6366F1', label: 'Inspección' },
+      material: { bg: '#DCFCE7', color: '#16A34A', indicador: '#16A34A', label: 'Laboratorio' },
+      observacion: { bg: '#F3E8FF', color: '#9333EA', indicador: '#9333EA', label: 'Observación' },
     }
     return config[tipo] || config.actividad
   }
@@ -46,7 +46,7 @@ export function BitacoraCard({ registro, onClick }: BitacoraCardProps) {
               >
                 {registro.tipoIngreso === 'laboratorio' ? 'Laboratorio' : tipoConfig.label}
               </span>
-              {/* Badge estado (Borrador, En RevisiÃ³n, Aprobado, Publicado) */}
+              {/* Badge estado (Borrador, En Revisión, Aprobado, Publicado) */}
               <BitacoraEstadoBadge estado={registro.estado} />
               {/* Etiquetas */}
               {registro.etiquetas.map((etiqueta) => (
@@ -59,7 +59,7 @@ export function BitacoraCard({ registro, onClick }: BitacoraCardProps) {
             <span className="text-[9px] font-mono text-gray-400 font-bold flex-shrink-0">{registro.hora}</span>
           </div>
 
-          {/* TÃ­tulo y DescripciÃ³n */}
+          {/* Título y Descripción */}
           <div>
             <p className="text-xs font-black text-gray-900 leading-snug">{registro.titulo}</p>
             <p className="text-[10px] text-gray-500 mt-0.5 line-clamp-2 leading-relaxed">{registro.descripcion}</p>

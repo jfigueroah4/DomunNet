@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -50,7 +50,7 @@ export function FotografiaFormulario() {
       ubicacion,
       etiquetas,
     })
-    router.push('/fotografias')
+    router.push('/dashboard/fotografias')
   }
 
   const handleCancelar = () => {
@@ -76,7 +76,7 @@ export function FotografiaFormulario() {
             o haz click para seleccionar
           </p>
           <p className="text-[9px] text-gray-300 mt-2">
-            JPG, PNG, WEBP — máx. 10MB
+            JPG, PNG, WEBP â€” máx. 10MB
           </p>
         </div>
       </div>
