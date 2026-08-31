@@ -254,21 +254,22 @@ export default function EmpresasPage() {
           setDeleteOpen(false)
           setEmpresaEliminar(undefined)
         }}
-        onConfirm={async () => {
+        onConfirm={async (accion) => {
           if (empresaEliminar) {
             try {
-              if (empresaEliminar.activo) {
-                // Inactivate
+              if (accion === 'suspender') {
                 await api.put(`/empresas/${empresaEliminar.id}`, { ...empresaEliminar, activo: false, nombre_empresa: empresaEliminar.nombre })
-                showSuccessToast('Empresa inactivada correctamente')
-              } else {
-                // Hard delete
+                showSuccessToast('Empresa inactivada temporalmente')
+              } else if (accion === 'activar') {
+                await api.put(`/empresas/${empresaEliminar.id}`, { ...empresaEliminar, activo: true, nombre_empresa: empresaEliminar.nombre })
+                showSuccessToast('Empresa activada exitosamente')
+              } else if (accion === 'eliminar') {
                 await api.delete(`/empresas/${empresaEliminar.id}`)
-                showSuccessToast('Empresa y contactos eliminados exitosamente')
+                showSuccessToast('Empresa y usuario vinculados eliminados definitivamente')
               }
               await fetchEmpresas()
             } catch (e: any) {
-              showErrorToast(e.response?.data?.error || e.message || 'Error al procesar la accin')
+              showErrorToast(e.response?.data?.error || e.message || 'Error al procesar la acción')
             }
           }
           setDeleteOpen(false)
@@ -279,3 +280,4 @@ export default function EmpresasPage() {
     </div>
   )
 }
+

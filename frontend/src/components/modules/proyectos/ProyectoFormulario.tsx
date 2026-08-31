@@ -2,6 +2,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import { Combobox } from '@/components/ui/Combobox'
 import { useRouter } from 'next/navigation'
 import { api } from '@/lib/api/cliente'
 import { useEffect } from 'react'
@@ -206,11 +207,15 @@ function EquipoAsignadoSelector({
 function SelectorMapaInteractivo({
   direccion,
   setDireccion,
+  errors,
+  setErrors,
   coordenadas,
   setCoordenadas,
 }: {
   direccion: string
   setDireccion: (val: string) => void
+  errors: Record<string, boolean>
+  setErrors: React.Dispatch<React.SetStateAction<Record<string, boolean>>>
   coordenadas: { lat: number; lng: number; puntoTexto?: string }
   setCoordenadas: (val: { lat: number; lng: number; puntoTexto?: string }) => void
 }) {
@@ -866,6 +871,8 @@ export function ProyectoFormulario({
                 <SelectorMapaInteractivo
                   direccion={direccion}
                   setDireccion={setDireccion}
+                  errors={errors}
+                  setErrors={setErrors}
                   coordenadas={coordenadasMapa}
                   setCoordenadas={setCoordenadasMapa}
                 />
@@ -1219,3 +1226,4 @@ export function ProyectoFormulario({
 }
 
 export default ProyectoFormulario;
+

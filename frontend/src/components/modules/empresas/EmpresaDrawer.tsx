@@ -344,9 +344,9 @@ export function EmpresaDrawer({ isOpen, onClose, onSave, mode = 'create', empres
  {errors.nombre_empresa && <p className="mt-1 text-[8px] font-medium text-red-500">El nombre es obligatorio</p>}
  </div>
 
- <div className="grid grid-cols-2 gap-4">
- <div>
- <label className="mb-1.5 block text-[8px] font-bold uppercase tracking-wide text-gray-600">NIT *</label>
+ <div className="flex flex-col gap-4">
+                  <div>
+                    <label className="mb-1.5 block text-[8px] font-bold uppercase tracking-wide text-gray-600">NIT *</label>
  <input
  type="text"
  name="nit"
@@ -527,3 +527,4 @@ export function EmpresaDrawer({ isOpen, onClose, onSave, mode = 'create', empres
  </>
  )
 }
+
