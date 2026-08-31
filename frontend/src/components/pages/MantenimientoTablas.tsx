@@ -151,7 +151,10 @@ export default function MantenimientoTablas() {
       const res = await api.get(`${endpoint}?${params.toString()}`)
       if (res.data?.success) {
         setData(res.data.data)
-        setTotalRecords(res.data.total)
+          setTotalRecords(res.data.total)
+          if (res.data.columnasVisibles) {
+            setColumnasVisibles(res.data.columnasVisibles.split(',').map((c: string) => c.trim()))
+          }
       }
     } catch (error: any) {
       if (error.response?.status === 403) {
@@ -209,7 +212,10 @@ export default function MantenimientoTablas() {
   }
 
   // Filtrar id y dependenciasCount de las columnas visibles
-  const columns = data.length > 0 ? Object.keys(data[0]).filter(k => k !== 'id' && k !== 'dependenciasCount') : []
+  const [columnasVisibles, setColumnasVisibles] = useState<string[]>([]);
+  const columns = data.length > 0 
+    ? Object.keys(data[0]).filter(k => k !== 'id' && k !== 'dependenciasCount') 
+    : columnasVisibles.filter(k => k !== 'id' && k !== 'dependenciasCount');
 
   const handleSort = (key: string) => {
     let direction: 'asc' | 'desc' = 'asc'
