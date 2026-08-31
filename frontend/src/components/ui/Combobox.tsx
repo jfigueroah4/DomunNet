@@ -21,21 +21,28 @@ export function Combobox({ options, value, onChange, placeholder = 'Seleccionar.
     function handleClickOutside(event: MouseEvent) {
       if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
         setOpen(false)
+        const selectedLabel = options.find(o => o.value === value)?.label || ''
+        setSearch(selectedLabel)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+  }, [value, options])
 
-  // When value changes from outside, update search text to match the label
   useEffect(() => {
-    const selectedLabel = options.find(o => o.value === value)?.label || ''
     if (!open) {
+      const selectedLabel = options.find(o => o.value === value)?.label || ''
       setSearch(selectedLabel)
     }
   }, [value, options, open])
 
-  const filteredOptions = options.filter(o => o.label.toLowerCase().includes(search.toLowerCase()))
+  const selectedLabel = options.find(o => o.value === value)?.label || ''
+  
+  // Show all options if search is exactly the selected label, otherwise filter
+  const isSearchMatchingLabel = search === selectedLabel
+  const filteredOptions = isSearchMatchingLabel 
+    ? options 
+    : options.filter(o => o.label.toLowerCase().includes(search.toLowerCase()))
 
   return (
     <div ref={wrapperRef} className={`relative ${className}`}>
@@ -50,15 +57,21 @@ export function Combobox({ options, value, onChange, placeholder = 'Seleccionar.
             setOpen(true)
             if (e.target.value === '') onChange('')
           }}
-          onClick={() => {
-            if (!disabled) setOpen(true)
+          onClick={(e) => {
+            if (!disabled) {
+              setOpen(true)
+              ;(e.target as HTMLInputElement).select()
+            }
           }}
           className={`w-full rounded-xl border ${open ? 'border-[#9B0F06]' : 'border-gray-200'} bg-white px-3 py-2 text-xs text-gray-700 focus:border-[#9B0F06] focus:outline-none focus:ring-1 focus:ring-[#9B0F06] pr-8 ${disabled ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''}`}
         />
         <button
           type="button"
           onClick={() => {
-            if (!disabled) setOpen(!open)
+            if (!disabled) {
+              setOpen(!open)
+              if (!open) setSearch('')
+            }
           }}
           className="absolute inset-y-0 right-0 flex items-center px-2 text-gray-400 hover:text-gray-600"
         >
