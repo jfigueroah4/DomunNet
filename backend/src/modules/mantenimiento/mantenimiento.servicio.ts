@@ -1,10 +1,10 @@
-import { clienteSupabase } from '@/configuracion/cliente-supabase'
+﻿import { clienteSupabase } from '@/configuracion/cliente-supabase'
 import { TablaConfig } from './mantenimiento.types'
 
 export async function listarRegistros(config: TablaConfig, pagina: number, limite: number, busqueda?: string, columnaOrden?: string, direccionOrden: 'asc'|'desc' = 'asc', filtros: Record<string, any> = {}) {
   let query = clienteSupabase.from(config.nombreTablaDb).select(config.columnasVisibles, { count: 'exact' });
   
-  // Validar filtros contra whitelist de menú
+  // Validar filtros contra whitelist de menÃº
   for (const [key, value] of Object.entries(filtros)) {
     const isFilterAllowed = config.columnasFiltroMenu?.some(f => f.columna === key);
     if (isFilterAllowed && value !== undefined && value !== null && value !== '') {
@@ -25,7 +25,7 @@ export async function listarRegistros(config: TablaConfig, pagina: number, limit
   // Fake dependenciasCount to avoid mapping manually for now (can be optimized later)
   const enrichedData = data.map((d: any) => ({...d, dependenciasCount: 0}));
   
-  return { data: enrichedData, total: count || 0 };
+  return { data: enrichedData, total: count || 0, columnasVisibles: config.columnasVisibles };
 }
 
 export async function obtenerRegistro(config: TablaConfig, id: string) {
@@ -51,3 +51,4 @@ export async function eliminarRegistro(config: TablaConfig, id: string) {
   if (error) throw new Error(error.message);
   return true;
 }
+

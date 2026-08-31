@@ -8,6 +8,7 @@
 
 
 import { useState, useEffect } from 'react'
+import { Portal } from '@/components/ui/Portal'
 
 import { useRolesStore, RolMinimo } from '@/stores/useRolesStore'
 
@@ -599,14 +600,9 @@ export function UsuarioFormularioDrawer({
 
 
   return (
-
-
-
-    <>
-
-
-
-      {/* Overlay */}
+    <Portal>
+      <>
+        {/* Overlay */}
 
 
 
@@ -1438,7 +1434,7 @@ export function UsuarioFormularioDrawer({
 
                 <option value="">Sin rol asignado</option>
 
-                {roles.filter((r: RolMinimo) => r.nombre !== 'Contratante' && (r.estado === 'Activo' || r.nombre === formData.rol)).map((rol: RolMinimo) => (
+                {roles.filter((r: RolMinimo) => r.nombre.toLowerCase() !== 'contratante' && (r.estado === 'Activo' || r.nombre === formData.rol)).map((rol: RolMinimo) => (
 
                   <option key={rol.id} value={rol.nombre}>{rol.nombre}</option>
 
@@ -1657,25 +1653,7 @@ export function UsuarioFormularioDrawer({
 
 
       </div>
-
-
-
-    </>
-
-
-
+      </>
+    </Portal>
   )
-
-
-
 }
-
-
-
-
-
-
-
-
-
-

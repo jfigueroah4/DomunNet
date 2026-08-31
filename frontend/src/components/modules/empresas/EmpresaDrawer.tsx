@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { Portal } from '@/components/ui/Portal'
 import { X, Building2, User } from 'lucide-react'
 import { useRolesStore } from '@/stores/useRolesStore'
 import { useCustomToast } from '@/hooks/useCustomToast'
@@ -64,7 +65,7 @@ export function EmpresaDrawer({ isOpen, onClose, onSave, mode = 'create', empres
    : (usuarioRaw.dato_usuario || {});
  let dia = '', mes = '', ano = '';
  if (du.fecha_nacimiento) {
-   const parts = String(du.fecha_nacimiento).split('-');
+   const parts = String(du.fecha_nacimiento).split('T')[0].split('-');
    if (parts.length === 3) {
      ano = parts[0];
      mes = parts[1];
@@ -287,8 +288,9 @@ export function EmpresaDrawer({ isOpen, onClose, onSave, mode = 'create', empres
  const anos = Array.from({ length: 100 }, (_, i) => ({ value: String(currentYear - i), label: String(currentYear - i) }))
 
  return (
- <>
- <div className="fixed top-0 left-0 right-0 bottom-0 z-[100] bg-black/40 backdrop-blur-[1px]" onClick={onClose} />
+    <Portal>
+      <>
+   <div className="fixed top-0 left-0 right-0 bottom-0 z-[100] bg-black/40 backdrop-blur-[1px]" onClick={onClose} />
  <div className="fixed top-0 left-0 right-0 bottom-0 z-[101] flex justify-end overflow-hidden pointer-events-none">
  <aside className="pointer-events-auto relative w-[600px] max-w-[100vw] box-border bg-white h-full shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-right">
  
@@ -298,7 +300,9 @@ export function EmpresaDrawer({ isOpen, onClose, onSave, mode = 'create', empres
  {paso === 1 ? <Building2 size={18} /> : <User size={18} />}
  </div>
  <div>
- <h2 className="text-[16px] font-extrabold text-gray-900">Nueva Empresa</h2>
+ <h2 className="text-[16px] font-extrabold text-gray-900">
+   {mode === 'view' ? 'Vista Empresa' : mode === 'edit' ? 'Editar Empresa' : 'Nueva Empresa'}
+   </h2>
  <p className="text-[11px] font-medium text-gray-400">
  {paso === 1 ? 'Paso 1: Datos de la Empresa' : 'Paso 2: Datos del Contacto Principal (Usuario)'}
  </p>
@@ -512,19 +516,25 @@ export function EmpresaDrawer({ isOpen, onClose, onSave, mode = 'create', empres
  </>
  ) : (
  <>
- <button onClick={() => setPaso(1)} disabled={isSubmitting || mode === 'view'} className="flex-1 rounded-xl bg-white border border-gray-200 px-4 py-3 text-[13px] font-bold text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50">
- Atrás
- </button>
- <button onClick={handleGuardar} disabled={isSubmitting || mode === 'view'} className="flex-1 rounded-xl bg-[#9B0F06] px-4 py-3 text-[13px] font-bold text-white shadow-md hover:bg-[#7A0C05] transition-all disabled:opacity-50">
- {isSubmitting ? 'Guardando...' : (orphanUserId ? 'Reintentar guardar empresa' : 'Guardar Empresa')}
- </button>
+ <button onClick={() => setPaso(1)} disabled={isSubmitting} className="flex-1 rounded-xl bg-white border border-gray-200 px-4 py-3 text-[13px] font-bold text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50">
+   Atrás
+   </button>
+   {mode === 'view' ? (
+     <button onClick={onClose} className="flex-1 rounded-xl bg-[#9B0F06] px-4 py-3 text-[13px] font-bold text-white shadow-md hover:bg-[#7A0C05] transition-all">
+       Cerrar
+     </button>
+   ) : (
+     <button onClick={handleGuardar} disabled={isSubmitting} className="flex-1 rounded-xl bg-[#9B0F06] px-4 py-3 text-[13px] font-bold text-white shadow-md hover:bg-[#7A0C05] transition-all disabled:opacity-50">
+       {isSubmitting ? 'Guardando...' : (orphanUserId ? 'Reintentar guardar empresa' : 'Guardar Empresa')}
+     </button>
+   )}
  </>
  )}
  </div>
  </div>
  </aside>
- </div>
- </>
- )
+   </div>
+      </>
+    </Portal>
+  )
 }
-

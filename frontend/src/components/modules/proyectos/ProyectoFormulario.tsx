@@ -1,4 +1,4 @@
-// @ts-nocheck
+﻿// @ts-nocheck
 'use client'
 
 import { useState, useMemo } from 'react'
@@ -105,13 +105,15 @@ function SectionHeader({
   )
 }
 
-// Componente "Equipo Asignado al Proyecto" con Dropdown y Rol Automático
+// Componente "Equipo Asignado al Proyecto" con Dropdown y Rol AutomÃ¡tico
 function EquipoAsignadoSelector({
   equipo,
   setEquipo,
+  usuariosDisponibles,
 }: {
   equipo: MiembroEquipo[]
   setEquipo: React.Dispatch<React.SetStateAction<MiembroEquipo[]>>
+  usuariosDisponibles: any[]
 }) {
   const [selectedUsuarioId, setSelectedUsuarioId] = useState('')
 
@@ -135,7 +137,7 @@ function EquipoAsignadoSelector({
 
     setEquipo((prev) => [...prev, nuevoMiembro])
     setSelectedUsuarioId('')
-    showSuccessToast(`Se agregó a ${userObj.nombre} (${rolFormateado}) al equipo`)
+    showSuccessToast(`Se agregÃ³ a ${userObj.nombre} (${rolFormateado}) al equipo`)
   }
 
   const handleEliminar = (id: string) => {
@@ -145,7 +147,7 @@ function EquipoAsignadoSelector({
   return (
     <div className="space-y-1.5 rounded-lg border border-gray-100 bg-gray-50/60 p-2.5">
       <label className={labelClass}>
-        Equipo Asignado al Proyecto (Seleccionar del Módulo de Usuarios)
+        Equipo Asignado al Proyecto (Seleccionar del MÃ³dulo de Usuarios)
       </label>
       <div className="flex flex-wrap gap-1.5">
         <select
@@ -153,10 +155,10 @@ function EquipoAsignadoSelector({
           onChange={(e) => setSelectedUsuarioId(e.target.value)}
           className="flex-1 min-w-[200px] rounded border border-gray-200 bg-white px-2 py-1 text-[10px] text-gray-800 font-medium focus:border-[#9B0F06] focus:outline-none"
         >
-          <option value="">-- Seleccionar profesional del Módulo de Usuarios --</option>
+          <option value="">-- Seleccionar profesional del MÃ³dulo de Usuarios --</option>
           {usuariosDisponibles.map((usuario: any) => (
             <option key={usuario.id} value={usuario.id}>
-              {usuario.nombre} — {usuario.cargo || usuario.rol.toUpperCase()}
+              {usuario.nombre} â€” {usuario.cargo || usuario.rol.toUpperCase()}
             </option>
           ))}
         </select>
@@ -173,7 +175,7 @@ function EquipoAsignadoSelector({
       </div>
 
       <p className="text-[8px] text-gray-400">
-        El rol de cada profesional se asigna automáticamente de su perfil configurado en el Módulo de Usuarios.
+        El rol de cada profesional se asigna automÃ¡ticamente de su perfil configurado en el MÃ³dulo de Usuarios.
       </p>
 
       {equipo.length > 0 ? (
@@ -223,8 +225,8 @@ function SelectorMapaInteractivo({
   const [modoSeleccion, setModoSeleccion] = useState<'punto' | 'tramo'>('punto')
 
   const presets = [
-    { label: 'Km 22.5 CA-9 Sur', lat: 14.5021, lng: -90.5841, desc: 'CA-9 Sur, Tramo Amatitlán-Palín' },
-    { label: 'Blvd. Vista Hermosa', lat: 14.5982, lng: -90.4851, desc: 'Trébol Vista Hermosa, Zona 15' },
+    { label: 'Km 22.5 CA-9 Sur', lat: 14.5021, lng: -90.5841, desc: 'CA-9 Sur, Tramo AmatitlÃ¡n-PalÃ­n' },
+    { label: 'Blvd. Vista Hermosa', lat: 14.5982, lng: -90.4851, desc: 'TrÃ©bol Vista Hermosa, Zona 15' },
     { label: 'Calzada Roosevelt', lat: 14.6284, lng: -90.5412, desc: 'Km 14.5 Calzada Roosevelt' },
     { label: 'Ruta a El Salvador', lat: 14.5621, lng: -90.4321, desc: 'Km 18.5 Carretera a El Salvador' },
   ]
@@ -242,15 +244,15 @@ function SelectorMapaInteractivo({
     setCoordenadas({
       lat: newLat,
       lng: newLng,
-      puntoTexto: `Punto seleccionado (${newLat}°, ${newLng}°)`,
+      puntoTexto: `Punto seleccionado (${newLat}Â°, ${newLng}Â°)`,
     })
-    showInfoToast(`Ubicación marcada: ${newLat}°, ${newLng}°`)
+    showInfoToast(`UbicaciÃ³n marcada: ${newLat}Â°, ${newLng}Â°`)
   }
 
   return (
     <div className="space-y-2 rounded-lg border border-gray-200 bg-gray-50/50 p-2.5">
       <div>
-        <label className={labelClass}>Dirección (Texto Corto) <span className="text-[#9B0F06]">*</span></label>
+        <label className={labelClass}>DirecciÃ³n (Texto Corto) <span className="text-[#9B0F06]">*</span></label>
         <input
           type="text"
           value={direccion}
@@ -259,7 +261,7 @@ function SelectorMapaInteractivo({
           placeholder="Ej: Km 22.5, Carril Izquierdo Norte-Sur"
         />
         <p className="mt-0.5 text-[8px] text-gray-400">
-          Dirección física corta de referencia rápida, independiente del punto GPS en el mapa.
+          DirecciÃ³n fÃ­sica corta de referencia rÃ¡pida, independiente del punto GPS en el mapa.
         </p>
       </div>
 
@@ -272,7 +274,7 @@ function SelectorMapaInteractivo({
               onClick={() => setTipoMapa(tipoMapa === 'mapa' ? 'satelite' : 'mapa')}
               className="rounded bg-white px-1.5 py-0.2 text-[8px] font-semibold text-gray-600 border border-gray-200 hover:bg-gray-100"
             >
-              {tipoMapa === 'mapa' ? '🛰️ Vista Satélite' : '🗺️ Vista Mapa'}
+              {tipoMapa === 'mapa' ? 'ðŸ›°ï¸ Vista SatÃ©lite' : 'ðŸ—ºï¸ Vista Mapa'}
             </button>
             <button
               type="button"
@@ -283,7 +285,7 @@ function SelectorMapaInteractivo({
                   : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-100'
               }`}
             >
-              {modoSeleccion === 'punto' ? '📍 Punto Único' : '🛣️ Tramo Vial'}
+              {modoSeleccion === 'punto' ? 'ðŸ“ Punto Ãšnico' : 'ðŸ›£ï¸ Tramo Vial'}
             </button>
           </div>
         </div>
@@ -343,7 +345,7 @@ function SelectorMapaInteractivo({
           <div className="absolute bottom-1.5 left-1.5 flex items-center gap-1 rounded bg-white/90 px-1.5 py-0.5 text-[8px] font-mono font-medium text-gray-700 backdrop-blur border border-gray-200 shadow-2xs">
             <Navigation size={9} className="text-[#9B0F06]" />
             <span>
-              Lat: {coordenadas.lat}° | Lng: {coordenadas.lng}°
+              Lat: {coordenadas.lat}Â° | Lng: {coordenadas.lng}Â°
             </span>
           </div>
 
@@ -356,7 +358,7 @@ function SelectorMapaInteractivo({
   )
 }
 
-// COMPONENTE: Configuración inicial del Plan de Trabajo
+// COMPONENTE: ConfiguraciÃ³n inicial del Plan de Trabajo
 interface RenglonPlanInicial {
   id: string
   codigoDGC: string
@@ -387,13 +389,13 @@ function PantallaConfiguracionPlanInicial({
     const newObj: RenglonPlanInicial = {
       id: `p-new-${Date.now()}`,
       codigoDGC: '701.01',
-      descripcion: 'Señalización vertical informativa y defensas',
+      descripcion: 'SeÃ±alizaciÃ³n vertical informativa y defensas',
       unidad: 'und',
       cant: '100',
       costo: '450',
     }
     setList((prev) => [...prev, newObj])
-    showSuccessToast('Renglón adicional agregado al plan')
+    showSuccessToast('RenglÃ³n adicional agregado al plan')
   }
 
   const removeItem = (id: string) => {
@@ -430,9 +432,9 @@ function PantallaConfiguracionPlanInicial({
       </div>
 
       <div>
-        <h2 className="text-sm font-bold text-gray-900">Configuración Inicial del Plan de Trabajo</h2>
+        <h2 className="text-sm font-bold text-gray-900">ConfiguraciÃ³n Inicial del Plan de Trabajo</h2>
         <p className="text-[11px] text-gray-500">
-          Precargado con el Catálogo Oficial DGC aplicable. Complete las cantidades y precios unitarios contratados.
+          Precargado con el CatÃ¡logo Oficial DGC aplicable. Complete las cantidades y precios unitarios contratados.
         </p>
       </div>
 
@@ -447,8 +449,8 @@ function PantallaConfiguracionPlanInicial({
           <table className="w-full text-left font-mono text-[10px]">
             <thead>
               <tr className="bg-gray-50 text-gray-600 font-semibold border-b border-gray-200 text-[9px] uppercase">
-                <th className="p-2 w-20">Código</th>
-                <th className="p-2 min-w-[200px]">Descripción DGC</th>
+                <th className="p-2 w-20">CÃ³digo</th>
+                <th className="p-2 min-w-[200px]">DescripciÃ³n DGC</th>
                 <th className="p-2 w-16 text-center">Unidad</th>
                 <th className="p-2 w-28 text-right">Cant. Contratada</th>
                 <th className="p-2 w-28 text-right">Costo Unit. (Q)</th>
@@ -488,7 +490,7 @@ function PantallaConfiguracionPlanInicial({
                         type="button"
                         onClick={() => removeItem(r.id)}
                         className="p-1 text-gray-400 hover:text-red-600 rounded"
-                        title="Eliminar renglón"
+                        title="Eliminar renglÃ³n"
                       >
                         <Trash2 size={13} />
                       </button>
@@ -532,7 +534,7 @@ function PantallaConfiguracionPlanInicial({
           onClick={addItem}
           className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border border-dashed border-[#9B0F06]/40 bg-red-50/40 text-[#9B0F06] font-semibold text-xs hover:bg-red-50 transition-colors"
         >
-          <Plus size={14} /> + Agregar renglón
+          <Plus size={14} /> + Agregar renglÃ³n
         </button>
       </div>
 
@@ -562,7 +564,7 @@ export function ProyectoFormulario({
   // Estado de Pasos para Formulario Paginado (Wizard)
   const [pasoActual, setPasoActual] = useState<1 | 2 | 3>(1)
 
-  // REQUERIMIENTO ESPECIAL: Modo Captura Vacía de Hoja Sábana para Nuevo Proyecto
+  // REQUERIMIENTO ESPECIAL: Modo Captura VacÃ­a de Hoja SÃ¡bana para Nuevo Proyecto
   const [modoCapturaSabanaInicial, setModoCapturaSabanaInicial] = useState(false)
 
   // Campos Comunes
@@ -573,7 +575,7 @@ export function ProyectoFormulario({
   const [descripcion, setDescripcion] = useState(proyectoInicial?.descripcion || '')
   const [ubicacionFisica, setUbicacionFisica] = useState(proyectoInicial?.ubicacionFisica || proyectoInicial?.ubicacion || '')
   const [direccion, setDireccion] = useState(proyectoInicial?.direccion || 'Km 22.5 CA-9 Sur')
-  // Catálogos
+  // CatÃ¡logos
   const { empresas, fetchEmpresas } = useEmpresasStore()
   const { usuarios: usuariosDisponibles, cargarUsuarios } = useUsuariosStore()
   const [empresasContratantes, setEmpresasContratantes] = useState<any[]>([]) // Legacy
@@ -615,7 +617,7 @@ export function ProyectoFormulario({
   )
   const [errorFechaFin, setErrorFechaFin] = useState(false)
 
-  // Cálculo en tiempo real de Plazo de Ejecución Contractual Original (Solo Lectura)
+  // CÃ¡lculo en tiempo real de Plazo de EjecuciÃ³n Contractual Original (Solo Lectura)
   const plazoCalculadoOriginal = useMemo(() => {
     if (!fechaInicioContractual || !fechaFinContractualPlan) {
       return 'Pendiente de fechas'
@@ -628,7 +630,7 @@ export function ProyectoFormulario({
     const diffTime = Math.abs(fin.getTime() - inicio.getTime())
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
     const diffMonths = Math.round(diffDays / 30)
-    return `${diffMonths} Meses (${diffDays} días)`
+    return `${diffMonths} Meses (${diffDays} dÃ­as)`
   }, [fechaInicioContractual, fechaFinContractualPlan])
 
   const [montoContractualOriginal, setMontoContractualOriginal] = useState(
@@ -639,7 +641,7 @@ export function ProyectoFormulario({
   const [responsable, setResponsable] = useState(proyectoInicial?.responsable || '')
   const [estado, setEstado] = useState<EstadoProyecto>(proyectoInicial?.estado || 'borrador')
 
-  // CAMPOS EXCLUSIVOS DE EDICIÓN
+  // CAMPOS EXCLUSIVOS DE EDICIÃ“N
   const [fechaFinalizacionReal, setFechaFinalizacionReal] = useState(proyectoInicial?.fechaFinalizacionReal || '')
   const [plazoEjecucionRealAmpliado, setPlazoEjecucionRealAmpliado] = useState(
     proyectoInicial?.plazoEjecucionRealAmpliado || ''
@@ -648,16 +650,16 @@ export function ProyectoFormulario({
     proyectoInicial?.montoFinancieroFinalEjecutado?.toString() || ''
   )
 
-  // Lista de Equipo Asignado (Módulo de Usuarios)
+  // Lista de Equipo Asignado (MÃ³dulo de Usuarios)
   const [equipo, setEquipo] = useState<MiembroEquipo[]>(proyectoInicial?.equipo || [])
   const [fases] = useState<FaseTimeline[]>(proyectoInicial?.fases || [])
   const [categorias] = useState<string[]>(proyectoInicial?.categorias || [])
   const [rolesProyecto] = useState<ProyectoRolAsignado[]>(proyectoInicial?.rolesProyecto || [])
 
-  // REQUERIMIENTO ESPECIAL: Comportamiento condicional del botón "Ver"
+  // REQUERIMIENTO ESPECIAL: Comportamiento condicional del botÃ³n "Ver"
   const handleIrAPrograma = () => {
     const codProy = proyectoInicial?.codigo || 'PROY-001'
-    showSuccessToast(`Ahora estás en el Plan de Trabajo de ${codProy}`)
+    showSuccessToast(`Ahora estÃ¡s en el Plan de Trabajo de ${codProy}`)
     
     if (esEditar) {
       const targetId = proyectoInicial?.id || '1'
@@ -667,7 +669,7 @@ export function ProyectoFormulario({
     }
   }
 
-  // Lógica de avance entre pasos con validación
+  // LÃ³gica de avance entre pasos con validaciÃ³n
   const handleAvanzarPaso = (siguientePaso: 1 | 2 | 3) => {
     const newErrors: Record<string, boolean> = {}
     let isValid = true
@@ -695,7 +697,7 @@ export function ProyectoFormulario({
       const fin = new Date(fechaFinContractualPlan)
       if (fin <= inicio) {
         setErrorFechaFin(true)
-        showErrorToast('La fecha de finalización debe ser posterior a la fecha de inicio')
+        showErrorToast('La fecha de finalizaciÃ³n debe ser posterior a la fecha de inicio')
         return false
       }
     }
@@ -739,23 +741,23 @@ export function ProyectoFormulario({
   }
 
   const pasosMeta = [
-    { num: 1, label: 'Identificación y Ubicación' },
+    { num: 1, label: 'IdentificaciÃ³n y UbicaciÃ³n' },
     { num: 2, label: 'Entidades y Equipo' },
-    { num: 3, label: 'Términos y Seguimiento' },
+    { num: 3, label: 'TÃ©rminos y Seguimiento' },
   ]
 
-  // REQUERIMIENTO ESPECIAL: Si está activo el modo captura sabana inicial para Nuevo Proyecto
+  // REQUERIMIENTO ESPECIAL: Si estÃ¡ activo el modo captura sabana inicial para Nuevo Proyecto
   if (modoCapturaSabanaInicial) {
-    // Renglones precargados por defecto del catálogo DGC
+    // Renglones precargados por defecto del catÃ¡logo DGC
     const renglonesPrecargadosDGC = [
-      { id: 'p-dgc-1', codigoDGC: '101.01', descripcion: 'Mantenimiento del tránsito y construcción de desvíos provisionales', unidad: 'Glb', cant: '1', costo: '250000' },
-      { id: 'p-dgc-2', codigoDGC: '102.03', descripcion: 'Clechado, chapeo, destronque y limpieza del derecho de vía', unidad: 'Ha', cant: '18.5', costo: '18500' },
-      { id: 'p-dgc-3', codigoDGC: '201.01', descripcion: 'Excavación no clasificada para corte en vía', unidad: 'm³', cant: '45000', costo: '68' },
-      { id: 'p-dgc-4', codigoDGC: '201.03(b)', descripcion: 'Excavación en roca mediante perforación y voladura controlada', unidad: 'm³', cant: '12500', costo: '210' },
-      { id: 'p-dgc-5', codigoDGC: '301.01', descripcion: 'Reacondicionamiento de subrasante existente', unidad: 'm²', cant: '32000', costo: '22' },
-      { id: 'p-dgc-6', codigoDGC: '304.01', descripcion: 'Subbase granular tipo B e=20cm', unidad: 'm³', cant: '14500', costo: '180' },
-      { id: 'p-dgc-7', codigoDGC: '401.01', descripcion: 'Base granular tipo B e=15cm', unidad: 'm³', cant: '11000', costo: '220' },
-      { id: 'p-dgc-8', codigoDGC: '551.03', descripcion: 'Pavimento de concreto hidráulico MR=48 e=25cm', unidad: 'm²', cant: '18000', costo: '460' },
+      { id: 'p-dgc-1', codigoDGC: '101.01', descripcion: 'Mantenimiento del trÃ¡nsito y construcciÃ³n de desvÃ­os provisionales', unidad: 'Glb', cant: '1', costo: '250000' },
+      { id: 'p-dgc-2', codigoDGC: '102.03', descripcion: 'Clechado, chapeo, destronque y limpieza del derecho de vÃ­a', unidad: 'Ha', cant: '18.5', costo: '18500' },
+      { id: 'p-dgc-3', codigoDGC: '201.01', descripcion: 'ExcavaciÃ³n no clasificada para corte en vÃ­a', unidad: 'mÂ³', cant: '45000', costo: '68' },
+      { id: 'p-dgc-4', codigoDGC: '201.03(b)', descripcion: 'ExcavaciÃ³n en roca mediante perforaciÃ³n y voladura controlada', unidad: 'mÂ³', cant: '12500', costo: '210' },
+      { id: 'p-dgc-5', codigoDGC: '301.01', descripcion: 'Reacondicionamiento de subrasante existente', unidad: 'mÂ²', cant: '32000', costo: '22' },
+      { id: 'p-dgc-6', codigoDGC: '304.01', descripcion: 'Subbase granular tipo B e=20cm', unidad: 'mÂ³', cant: '14500', costo: '180' },
+      { id: 'p-dgc-7', codigoDGC: '401.01', descripcion: 'Base granular tipo B e=15cm', unidad: 'mÂ³', cant: '11000', costo: '220' },
+      { id: 'p-dgc-8', codigoDGC: '551.03', descripcion: 'Pavimento de concreto hidrÃ¡ulico MR=48 e=25cm', unidad: 'mÂ²', cant: '18000', costo: '460' },
       { id: 'p-dgc-9', codigoDGC: '601.01', descripcion: 'Alcantarilla tubular de concreto reforzado 36"', unidad: 'ml', cant: '850', costo: '950' },
       { id: 'p-dgc-10', codigoDGC: '608.01', descripcion: 'Cuneta de concreto revestida triangular', unidad: 'ml', cant: '2400', costo: '310' },
     ]
@@ -814,13 +816,13 @@ export function ProyectoFormulario({
 
       {/* PASOS DEL FORMULARIO */}
       <div className="rounded-lg bg-white p-3 shadow-2xs border border-gray-200 space-y-3">
-        {/* PASO 1: Identificación y Ubicación */}
+        {/* PASO 1: IdentificaciÃ³n y UbicaciÃ³n */}
         {pasoActual === 1 && (
           <div className="space-y-3">
             <div>
               <SectionHeader
-                title="Sección 1: Identificación Oficial del Proyecto"
-                subtitle="Nombre oficial, descripción detallada del alcance y especificaciones"
+                title="SecciÃ³n 1: IdentificaciÃ³n Oficial del Proyecto"
+                subtitle="Nombre oficial, descripciÃ³n detallada del alcance y especificaciones"
                 icon={Building2}
               />
               <div className="space-y-2">
@@ -833,18 +835,18 @@ export function ProyectoFormulario({
                     value={nombreOficial}
                     onChange={(e) => { setNombreOficial(e.target.value); setErrors(prev => ({...prev, nombreOficial: false})) }}
                     className={errorInputClass(errors, 'nombreOficial')}
-                    placeholder="Ej: Construcción del Paso a Desnivel e Intersección Vial CA-9 Sur Km 22.5"
+                    placeholder="Ej: ConstrucciÃ³n del Paso a Desnivel e IntersecciÃ³n Vial CA-9 Sur Km 22.5"
                   />
                 </div>
 
                 <div>
-                  <label className={labelClass}>Descripción del Proyecto (Detalle de Alcance Vial) <span className="text-[#9B0F06]">*</span></label>
+                  <label className={labelClass}>DescripciÃ³n del Proyecto (Detalle de Alcance Vial) <span className="text-[#9B0F06]">*</span></label>
                   <textarea
                     value={descripcion}
                     onChange={(e) => { setDescripcion(e.target.value); setErrors(prev => ({...prev, descripcion: false})) }}
                     rows={2}
                     className={errorInputClass(errors, 'descripcion')}
-                    placeholder="Describe a detalle el alcance físico: longitud en kilómetros, número de carriles, estructura de pavimento..."
+                    placeholder="Describe a detalle el alcance fÃ­sico: longitud en kilÃ³metros, nÃºmero de carriles, estructura de pavimento..."
                   />
                 </div>
               </div>
@@ -852,13 +854,13 @@ export function ProyectoFormulario({
 
             <div>
               <SectionHeader
-                title="Sección 2: Ubicación Física y Tramo Vial Exacto"
-                subtitle="Coordenadas GPS interactivas y dirección corta de referencia"
+                title="SecciÃ³n 2: UbicaciÃ³n FÃ­sica y Tramo Vial Exacto"
+                subtitle="Coordenadas GPS interactivas y direcciÃ³n corta de referencia"
                 icon={MapPin}
               />
               <div className="space-y-2">
                 <div>
-                  <label className={labelClass}>Ubicación Física (Texto Descriptivo) <span className="text-[#9B0F06]">*</span></label>
+                  <label className={labelClass}>UbicaciÃ³n FÃ­sica (Texto Descriptivo) <span className="text-[#9B0F06]">*</span></label>
                   <input
                     type="text"
                     value={ubicacionFisica}
@@ -886,7 +888,7 @@ export function ProyectoFormulario({
           <div className="space-y-3">
             <div>
               <SectionHeader
-                title="Sección 3: Entidades y Empresas Intervinientes"
+                title="SecciÃ³n 3: Entidades y Empresas Intervinientes"
                 subtitle="Propietario, Contratista Ejecutor, Empresa Supervisora y Delegado Residente"
                 icon={Users}
               />
@@ -922,7 +924,7 @@ export function ProyectoFormulario({
                     value={empresaSupervisora}
                     onChange={(e) => setEmpresaSupervisora(e.target.value)}
                     className={inputClass}
-                    placeholder="Ej: Consorcio de Ingeniería y Supervisión Vial R.L."
+                    placeholder="Ej: Consorcio de IngenierÃ­a y SupervisiÃ³n Vial R.L."
                   />
                 </div>
 
@@ -940,23 +942,23 @@ export function ProyectoFormulario({
             </div>
 
             {/* Componente Equipo Asignado al Proyecto */}
-            <EquipoAsignadoSelector equipo={equipo} setEquipo={setEquipo} />
+            <EquipoAsignadoSelector equipo={equipo} setEquipo={setEquipo} usuariosDisponibles={usuariosDisponibles} />
           </div>
         )}
 
-        {/* PASO 3: Términos Contractuales y Seguimiento */}
+        {/* PASO 3: TÃ©rminos Contractuales y Seguimiento */}
         {pasoActual === 3 && (
           <div className="space-y-3">
             <div>
               <SectionHeader
-                title="Sección 4: Datos Contractuales y Financieros Originales"
-                subtitle="Fechas de adjudicación, número de escritura, plazo y monto original"
+                title="SecciÃ³n 4: Datos Contractuales y Financieros Originales"
+                subtitle="Fechas de adjudicaciÃ³n, nÃºmero de escritura, plazo y monto original"
                 icon={FileSignature}
               />
               <div className="space-y-2">
                 <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                   <div>
-                    <label className={labelClass}>Fecha de Adjudicación / Contrato</label>
+                    <label className={labelClass}>Fecha de AdjudicaciÃ³n / Contrato</label>
                     <input
                       type="date"
                       value={fechaAdjudicacion}
@@ -966,13 +968,13 @@ export function ProyectoFormulario({
                   </div>
 
                   <div>
-                    <label className={labelClass}>Número de Escritura Pública (Campo Anexo)</label>
+                    <label className={labelClass}>NÃºmero de Escritura PÃºblica (Campo Anexo)</label>
                     <input
                       type="text"
                       value={numeroEscrituraPublica}
                       onChange={(e) => setNumeroEscrituraPublica(e.target.value)}
                       className={inputClass}
-                      placeholder="Ej: Escritura No. 142-2024 Notaría de Gobierno"
+                      placeholder="Ej: Escritura No. 142-2024 NotarÃ­a de Gobierno"
                     />
                   </div>
                 </div>
@@ -1004,7 +1006,7 @@ export function ProyectoFormulario({
                           const fin = new Date(nuevaFin)
                           if (fin <= inicio) {
                             setErrorFechaFin(true)
-                            showErrorToast('La fecha de finalización debe ser posterior a la fecha de inicio')
+                            showErrorToast('La fecha de finalizaciÃ³n debe ser posterior a la fecha de inicio')
                           } else {
                             setErrorFechaFin(false)
                           }
@@ -1018,14 +1020,14 @@ export function ProyectoFormulario({
 
                   <div>
                     <label className={labelClass}>
-                      Plazo de Ejecución Contractual Original
+                      Plazo de EjecuciÃ³n Contractual Original
                     </label>
                     <div className="flex items-center rounded border border-gray-200 bg-gray-100 px-2 py-1 text-[10px] font-bold text-gray-700">
                       <span>{plazoCalculadoOriginal}</span>
                     </div>
                   </div>
 
-                  {/* REQUERIMIENTO ESPECIAL: Campo "Monto Contractual Original *" de Solo Lectura con Botón "Ver" */}
+                  {/* REQUERIMIENTO ESPECIAL: Campo "Monto Contractual Original *" de Solo Lectura con BotÃ³n "Ver" */}
                   <div>
                     <label className={labelClass}>
                       Monto Contractual Original <span className="text-[#9B0F06]">*</span> <span className="text-[8px] font-normal text-gray-400">(SOLO LECTURA)</span>
@@ -1055,7 +1057,7 @@ export function ProyectoFormulario({
                         title={
                           esEditar
                             ? 'Ver Programa de Trabajo del Proyecto'
-                            : 'Capturar Renglones de la Hoja Sábana para autocompletar el Monto'
+                            : 'Capturar Renglones de la Hoja SÃ¡bana para autocompletar el Monto'
                         }
                       >
                         <CalendarDays size={10} />
@@ -1081,7 +1083,7 @@ export function ProyectoFormulario({
                           value={usuario.nombre}
                           className="py-1 px-1.5 hover:bg-blue-50 checked:bg-blue-100 checked:text-blue-900"
                         >
-                          {usuario.nombre} — @{usuario.username || usuario.correo.split('@')[0]} ({usuario.rol})
+                          {usuario.nombre} â€” @{usuario.username || usuario.correo.split('@')[0]} ({usuario.rol})
                         </option>
                       ))}
                     </select>
@@ -1097,7 +1099,7 @@ export function ProyectoFormulario({
                     >
                       <option value="borrador">Borrador</option>
                       <option value="activo">Activo</option>
-                      <option value="en_revision">En Revisión</option>
+                      <option value="en_revision">En RevisiÃ³n</option>
                       <option value="completado">Completado</option>
                       <option value="cancelado">Cancelado</option>
                     </select>
@@ -1106,29 +1108,29 @@ export function ProyectoFormulario({
               </div>
             </div>
 
-            {/* Sección 5: Campos de Seguimiento y Cierre (Exclusivos de Edición) */}
+            {/* SecciÃ³n 5: Campos de Seguimiento y Cierre (Exclusivos de EdiciÃ³n) */}
             {esEditar ? (
               <div className="rounded-lg border border-gray-200 bg-white p-2.5 space-y-2">
                 <SectionHeader
-                  title="Sección 5: Campos de Seguimiento y Cierre (Exclusivos de Edición)"
-                  subtitle="Control de ejecución real, ampliación de plazos y liquidación financiera final"
+                  title="SecciÃ³n 5: Campos de Seguimiento y Cierre (Exclusivos de EdiciÃ³n)"
+                  subtitle="Control de ejecuciÃ³n real, ampliaciÃ³n de plazos y liquidaciÃ³n financiera final"
                   icon={Sparkles}
-                  badge="EXCLUSIVO DE EDICIÓN"
+                  badge="EXCLUSIVO DE EDICIÃ“N"
                 />
                 <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
                   <div>
-                    <label className={labelClass}>Fecha de Finalización Real</label>
+                    <label className={labelClass}>Fecha de FinalizaciÃ³n Real</label>
                     <input
                       type="date"
                       value={fechaFinalizacionReal}
                       onChange={(e) => setFechaFinalizacionReal(e.target.value)}
                       className={inputClass}
                     />
-                    <p className="mt-0.5 text-[8px] text-gray-400">Fecha de acta de recepción definitiva de obra.</p>
+                    <p className="mt-0.5 text-[8px] text-gray-400">Fecha de acta de recepciÃ³n definitiva de obra.</p>
                   </div>
 
                   <div>
-                    <label className={labelClass}>Plazo de Ejecución Real Ampliado</label>
+                    <label className={labelClass}>Plazo de EjecuciÃ³n Real Ampliado</label>
                     <input
                       type="text"
                       value={plazoEjecucionRealAmpliado}
@@ -1136,7 +1138,7 @@ export function ProyectoFormulario({
                       className={inputClass}
                       placeholder="Ej: 24 Meses (+6 meses por orden de cambio #2)"
                     />
-                    <p className="mt-0.5 text-[8px] text-gray-400">Plazo acumulado autorizados por prórroga.</p>
+                    <p className="mt-0.5 text-[8px] text-gray-400">Plazo acumulado autorizados por prÃ³rroga.</p>
                   </div>
 
                   <div>
@@ -1163,10 +1165,10 @@ export function ProyectoFormulario({
               <div className="rounded border border-dashed border-gray-200 bg-gray-50/80 p-2 text-[9px] text-gray-500">
                 <div className="flex items-center gap-1 font-bold text-gray-700">
                   <CheckCircle2 size={11} className="text-emerald-600" />
-                  <span>Optimizaciones del Formulario de Creación:</span>
+                  <span>Optimizaciones del Formulario de CreaciÃ³n:</span>
                 </div>
                 <p className="mt-0.5">
-                  • El <strong>Código del Proyecto</strong> se generará automáticamente (ej.{' '}
+                  â€¢ El <strong>CÃ³digo del Proyecto</strong> se generarÃ¡ automÃ¡ticamente (ej.{' '}
                   <span className="font-mono font-bold text-gray-800">{siguienteCodigoVial()}</span>).
                 </p>
               </div>
@@ -1174,7 +1176,7 @@ export function ProyectoFormulario({
           </div>
         )}
 
-        {/* Botones de Navegación de Paso */}
+        {/* Botones de NavegaciÃ³n de Paso */}
         <div className="flex items-center justify-between border-t border-gray-100 pt-2.5">
           <div>
             {pasoActual > 1 ? (
@@ -1226,4 +1228,5 @@ export function ProyectoFormulario({
 }
 
 export default ProyectoFormulario;
+
 

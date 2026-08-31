@@ -288,7 +288,7 @@ export default function MantenimientoTablas() {
                 </span>
               )}
               {selectedTable.relaciones && selectedTable.relaciones.length > 0 && (
-                <span className="font-semibold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-sm border border-blue-100">
+                <span className="font-semibold text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded-sm border border-blue-100 border-orange-100">
                   Relacionado con: {selectedTable.relaciones.join(', ')}
                 </span>
               )}

@@ -1,7 +1,7 @@
 ﻿'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Check, ChevronDown, Search } from 'lucide-react'
+import { Check, ChevronDown } from 'lucide-react'
 
 export interface ComboboxProps {
   options: { value: string; label: string }[]
@@ -27,40 +27,47 @@ export function Combobox({ options, value, onChange, placeholder = 'Seleccionar.
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const selectedLabel = options.find(o => o.value === value)?.label || ''
-  
+  // When value changes from outside, update search text to match the label
+  useEffect(() => {
+    const selectedLabel = options.find(o => o.value === value)?.label || ''
+    if (!open) {
+      setSearch(selectedLabel)
+    }
+  }, [value, options, open])
+
   const filteredOptions = options.filter(o => o.label.toLowerCase().includes(search.toLowerCase()))
 
   return (
     <div ref={wrapperRef} className={`relative ${className}`}>
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={() => {
-           if (!disabled) {
-             setOpen(!open)
-             setSearch('')
-           }
-        }}
-        className={`flex w-full items-center justify-between rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs text-gray-700 focus:border-[#9B0F06] focus:outline-none focus:ring-1 focus:ring-[#9B0F06] ${disabled ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''}`}
-      >
-        <span className="truncate">{selectedLabel || <span className="text-gray-400">{placeholder}</span>}</span>
-        <ChevronDown size={14} className="text-gray-400" />
-      </button>
+      <div className="relative">
+        <input
+          type="text"
+          disabled={disabled}
+          placeholder={placeholder}
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value)
+            setOpen(true)
+            if (e.target.value === '') onChange('')
+          }}
+          onClick={() => {
+            if (!disabled) setOpen(true)
+          }}
+          className={`w-full rounded-xl border ${open ? 'border-[#9B0F06]' : 'border-gray-200'} bg-white px-3 py-2 text-xs text-gray-700 focus:border-[#9B0F06] focus:outline-none focus:ring-1 focus:ring-[#9B0F06] pr-8 ${disabled ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''}`}
+        />
+        <button
+          type="button"
+          onClick={() => {
+            if (!disabled) setOpen(!open)
+          }}
+          className="absolute inset-y-0 right-0 flex items-center px-2 text-gray-400 hover:text-gray-600"
+        >
+          <ChevronDown size={14} />
+        </button>
+      </div>
 
       {open && (
         <div className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-xl border border-gray-200 bg-white py-1 shadow-lg">
-          <div className="sticky top-0 flex items-center bg-white px-2 pb-1 pt-1">
-            <Search size={12} className="text-gray-400 ml-1" />
-            <input
-              type="text"
-              className="w-full border-none px-2 py-1 text-xs outline-none focus:ring-0"
-              placeholder="Buscar..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              onClick={e => e.stopPropagation()}
-            />
-          </div>
           <div className="px-1">
             {filteredOptions.length === 0 ? (
               <div className="px-2 py-2 text-xs text-gray-500 text-center">No hay resultados.</div>
@@ -71,8 +78,8 @@ export function Combobox({ options, value, onChange, placeholder = 'Seleccionar.
                   type="button"
                   onClick={() => {
                     onChange(option.value)
+                    setSearch(option.label)
                     setOpen(false)
-                    setSearch('')
                   }}
                   className={`flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left text-xs transition-colors hover:bg-gray-100 ${value === option.value ? 'bg-gray-50 font-bold text-[#9B0F06]' : 'text-gray-700'}`}
                 >
