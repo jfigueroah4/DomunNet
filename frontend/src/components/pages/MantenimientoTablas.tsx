@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { Combobox } from '@/components/ui/Combobox'
 import { Plus, Filter, Search, ChevronDown, ChevronLeft, ChevronRight, Edit2, Trash2, Eye, ChevronUp } from 'lucide-react'
 import { api } from '@/lib/api/cliente'
 import { useCustomToast } from '@/hooks/useCustomToast'
@@ -274,22 +275,12 @@ export default function MantenimientoTablas() {
         </div>
         <div className="flex items-center gap-3 w-full sm:w-auto">
           <div className="relative w-full sm:w-72 flex flex-col gap-1">
-            <div className="relative w-full">
-              <select
+            <Combobox
+                options={TABLAS_MANTENIMIENTO.map(t => ({ value: t.id, label: t.nombre + (t.esAuditoria ? ' (Solo lectura)' : '') }))}
                 value={selectedTable.id}
-                onChange={handleTableChange}
-                className="w-full pl-3 pr-8 py-2 bg-white border border-gray-200 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-[#9B0F06] focus:border-[#9B0F06] appearance-none text-[11px] font-semibold text-gray-700 cursor-pointer"
-              >
-                {TABLAS_MANTENIMIENTO.map(t => (
-                  <option key={t.id} value={t.id}>
-                    {t.nombre || t.id} {t.esAuditoria ? '(Solo lectura)' : ''}
-                  </option>
-                ))}
-              </select>
-              <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                <ChevronDown size={14} className="text-gray-400" />
-              </div>
-            </div>
+                onChange={(val) => handleTableChange({ target: { value: val } } as any)}
+                placeholder="Buscar tabla..."
+              />
             <div className="text-[9px] text-gray-500 flex gap-1 items-center mt-0.5">
               {selectedTable.esAuditoria && (
                 <span className="font-semibold text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded-sm border border-orange-100 flex items-center gap-1">
