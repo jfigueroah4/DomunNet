@@ -2,7 +2,9 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
+import { tienePermiso, RUTAS_PERMISOS } from '@/lib/rutas-permisos'
+import { useAuthStore } from '@/stores/useAuthStore'
 import Image from 'next/image'
 import {
   Home,
@@ -31,54 +33,84 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
     return pathname === path || pathname.startsWith(`${path}/`)
   }
 
-  const navSections = [
-    {
-      label: 'GENERAL',
-      items: [{ icon: Home, href: '/', label: 'Inicio' }],
-    },
-    {
-      label: 'OPERACIONES',
-      items: [
-        {
-          icon: FolderOpen,
-          href: '/dashboard/proyectos',
-          label: 'Proyectos',
-          submenu: [{ icon: Eye, href: '/dashboard/proyectos/supervision', label: 'Hoja Sábana' }],
-        },
-        {
-          icon: ClipboardList,
-          href: '/dashboard/bitacora',
-          label: 'Bitácora',
-          submenu: [
-            { icon: Package, href: '/dashboard/bitacora?tab=laboratorio', label: 'Laboratorio' },
-            { icon: Package, href: '/dashboard/bitacora?tab=campo', label: 'Campo de Trabajo' },
-          ],
-        },
-        { icon: Camera, href: '/dashboard/fotografias', label: 'Fotografías' },
-        {
-          icon: BarChart2,
-          href: '/dashboard/reportes',
-          label: 'Reportes',
-          submenu: [{ icon: Package, href: '/dashboard/reportes', label: 'Documentos formales' }],
-        },
-      ],
-    },
-    {
-      label: 'ADMINISTRACIÓN',
-      items: [
-        {
-          icon: Users,
-          href: '/dashboard/usuarios',
-          label: 'Usuarios',
-          submenu: [{ icon: Package, href: '/dashboard/roles', label: 'Roles' }],
-        },
-      ],
-    },
-    {
-      label: 'AJUSTES',
-      items: [{ icon: Settings, href: '/dashboard/configuracion', label: 'Ajustes' }],
-    },
-  ]
+
+  const { profile } = useAuthStore()
+
+  const navSections = useMemo(() => {
+    const rawSections = [
+      {
+        label: 'GENERAL',
+        items: [{ icon: Home, href: '/dashboard', label: 'Inicio' }],
+      },
+      {
+        label: 'OPERACIONES',
+        items: [
+          {
+            icon: FolderOpen,
+            href: '/dashboard/proyectos',
+            label: 'Proyectos',
+            submenu: [{ icon: Eye, href: '/dashboard/proyectos/supervision', label: 'Hoja Sábana' }],
+          },
+          {
+            icon: ClipboardList,
+            href: '/dashboard/bitacora',
+            label: 'Bitácora',
+            submenu: [
+              { icon: Package, href: '/dashboard/bitacora?tab=laboratorio', label: 'Laboratorio' },
+              { icon: Package, href: '/dashboard/bitacora?tab=campo', label: 'Campo de Trabajo' },
+            ],
+          },
+          { icon: Camera, href: '/dashboard/fotografias', label: 'Fotografías' },
+          {
+            icon: BarChart2,
+            href: '/dashboard/reportes',
+            label: 'Reportes',
+            submenu: [{ icon: Package, href: '/dashboard/reportes', label: 'Documentos formales' }],
+          },
+        ],
+      },
+      {
+        label: 'ADMINISTRACIÓN',
+        items: [
+          {
+            icon: Users,
+            href: '/dashboard/usuarios',
+            label: 'Usuarios',
+            submenu: [{ icon: Package, href: '/dashboard/roles', label: 'Roles' }],
+          },
+        ],
+      },
+      {
+        label: 'AJUSTES',
+        items: [{ icon: Settings, href: '/dashboard/configuracion', label: 'Ajustes' }],
+      },
+    ]
+
+    const permisos = profile?.permisos || []
+    
+    // Filter sections based on permissions
+    return rawSections.map(section => {
+      const filteredItems = section.items.filter(item => {
+        // Strip query params for checking
+        const basePath = item.href.split('?')[0]
+        const permisoRequerido = RUTAS_PERMISOS[basePath]
+        if (!permisoRequerido) return true // No permission required
+        return tienePermiso(permisos, permisoRequerido)
+      }).map(item => {
+        if (!item.submenu) return item
+        // Filter submenus
+        const filteredSubmenu = item.submenu.filter(sub => {
+          const subBasePath = sub.href.split('?')[0]
+          // If submenu path is same as parent, it requires same perm, or check RUTAS_PERMISOS
+          const req = RUTAS_PERMISOS[subBasePath] || RUTAS_PERMISOS[item.href.split('?')[0]]
+          if (!req) return true
+          return tienePermiso(permisos, req)
+        })
+        return { ...item, submenu: filteredSubmenu }
+      })
+      return { ...section, items: filteredItems }
+    }).filter(section => section.items.length > 0)
+  }, [profile?.permisos])
 
   return (
     <aside

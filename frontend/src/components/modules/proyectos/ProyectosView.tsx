@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronLeft, ChevronRight, List, MapPin, Plus, User, LayoutGrid } from 'lucide-react'
+import { Building2, ChevronLeft, ChevronRight, List, MapPin, Plus, User, LayoutGrid } from 'lucide-react'
 import { PROYECTOS_MOCK } from '@/data/proyectos.mock'
 import { EstadoProyecto, Proyecto } from '@/types/proyecto'
 import ProyectoCard from '@/components/modules/proyectos/ProyectoCard'
@@ -156,7 +156,7 @@ export function ProyectosView() {
             <ChevronLeft size={16} />
           </button>
           <div>
-            <h1 className="m-0 text-[18px] font-black text-gray-900 uppercase tracking-wide">Proyectos</h1>
+            <h1 className="m-0 text-[18px] font-black text-gray-900 tracking-wide">Proyectos</h1>
             <p className="m-0 mt-0.5 text-[11px] font-medium text-gray-400">Gestión de proyectos de construcción</p>
           </div>
         </div>
@@ -185,9 +185,21 @@ export function ProyectosView() {
               </button>
             </div>
 
-            <button
-              type="button"
-              onClick={() => router.push('/dashboard/proyectos/nuevo')}
+            
+              <button
+                type="button"
+                onClick={() => router.push('/dashboard/proyectos/empresas')}
+                className="inline-flex h-8 items-center gap-1.5 rounded-md bg-white border border-gray-200 px-3 text-[11px] font-bold text-gray-700 transition-colors hover:bg-gray-50 shadow-sm"
+                title="Catálogo de Empresas"
+              >
+                <Building2 size={12} className="text-[#9B0F06]" />
+                <span className="hidden sm:inline">Empresas</span>
+              </button>
+              
+              <button
+                type="button"
+                onClick={() => router.push('/dashboard/proyectos/nuevo')}
+
               className="inline-flex h-8 items-center gap-1.5 rounded-md bg-[#9B0F06] px-3.5 text-[11px] font-bold text-white transition-colors hover:bg-[#5E0006] shadow-sm"
             >
               <Plus size={12} />

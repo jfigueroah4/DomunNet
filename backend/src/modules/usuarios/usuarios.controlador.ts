@@ -1,3 +1,5 @@
+import { obtenerRolPorNombre } from '@/modules/roles/roles.servicio';
+import { SolicitudAutenticada } from '@/middlewares/autenticacion.middleware';
 import { Request, Response } from 'express'
 import { z } from 'zod'
 import { sendError, sendResponse } from '@/shared/response'
@@ -7,7 +9,7 @@ import {
   listarUsuarios,
   obtenerUsuarioPorId,
   actualizarUsuario,
-  verificarUsernameDisponible,
+  verificarUsernameDisponible, verificarCorreoDisponible,
 } from '@/modules/usuarios/usuarios.servicio'
 
 export const esquemaUsuario = z.object({
@@ -67,7 +69,7 @@ export async function crearUsuarioControlador(req: Request, res: Response) {
   }
 }
 
-export async function actualizarUsuarioControlador(req: Request, res: Response) {
+export async function actualizarUsuarioControlador(req: SolicitudAutenticada, res: Response) {
   const resultado = esquemaUsuario.safeParse(req.body)
   if (!resultado.success) {
     return sendError(
@@ -79,6 +81,21 @@ export async function actualizarUsuarioControlador(req: Request, res: Response) 
   }
 
   try {
+    
+  try {
+    const targetUser = await obtenerUsuarioPorId(req.params.id);
+    if (targetUser) {
+      const targetRole = await obtenerRolPorNombre(targetUser.rol);
+      const targetNivel = targetRole ? targetRole.nivel_permisos : 0;
+      const myNivel = req.usuario?.nivel_permisos || 0;
+      if (targetNivel > myNivel) {
+        return sendError(res, 403, 'No tienes jerarquía suficiente para modificar este usuario');
+      }
+    }
+  } catch (err) {
+    return sendError(res, 500, 'Error verificando jerarquía');
+  }
+
     const usuario = await actualizarUsuario(req.params.id, resultado.data)
     return sendResponse(res, 200, usuario, 'Usuario actualizado correctamente')
   } catch (error) {
@@ -86,13 +103,42 @@ export async function actualizarUsuarioControlador(req: Request, res: Response) 
   }
 }
 
-export async function eliminarUsuarioControlador(req: Request, res: Response) {
+export async function eliminarUsuarioControlador(req: SolicitudAutenticada, res: Response) {
   try {
-    const usuario = await eliminarUsuario(req.params.id)
+    
+  try {
+    const targetUser = await obtenerUsuarioPorId(req.params.id);
+    if (targetUser) {
+      const targetRole = await obtenerRolPorNombre(targetUser.rol);
+      const targetNivel = targetRole ? targetRole.nivel_permisos : 0;
+      const myNivel = req.usuario?.nivel_permisos || 0;
+      if (targetNivel > myNivel) {
+        return sendError(res, 403, 'No tienes jerarquía suficiente para eliminar este usuario');
+      }
+    }
+  } catch (err) {
+    return sendError(res, 500, 'Error verificando jerarquía');
+  }
+
+      const usuario = await eliminarUsuario(req.params.id)
     return sendResponse(res, 200, usuario, 'Usuario eliminado correctamente')
   } catch (error) {
     return sendError(res, 404, 'No se pudo eliminar el usuario', error instanceof Error ? error.message : error)
   }
+}
+
+
+export async function validarCorreoControlador(req: Request, res: Response) {
+  const correo = req.query.correo
+  const excluirId = req.query.excluir_id as string | undefined
+
+  if (typeof correo !== 'string' || !correo) {
+    return sendError(res, 400, 'El parámetro correo es requerido')
+  }
+
+  const correoNormalizado = correo.trim().toLowerCase()
+  const disponible = await verificarCorreoDisponible(correoNormalizado, excluirId)
+  return sendResponse(res, 200, { disponible }, 'Verificación de correo realizada')
 }
 
 export async function validarUsernameControlador(req: Request, res: Response) {

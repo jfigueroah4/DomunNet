@@ -1,20 +1,20 @@
-/**
- * REGLA DE SEGURIDAD CRÍTICA (NON-NEGOTIABLE):
+﻿/**
+ * REGLA DE SEGURIDAD CRÃTICA (NON-NEGOTIABLE):
  * 
- * El parámetro de ruta `:tabla` y cualquier nombre de columna (para ordenamiento o filtrado) 
+ * El parÃ¡metro de ruta `:tabla` y cualquier nombre de columna (para ordenamiento o filtrado) 
  * recibido desde el cliente NUNCA deben utilizarse directamente para construir consultas 
- * (nada de sentencias crudas ni interpolación de strings tipo `SELECT * FROM ${tabla}`).
+ * (nada de sentencias crudas ni interpolaciÃ³n de strings tipo `SELECT * FROM ${tabla}`).
  * 
- * 1. El parámetro `:tabla` se utilizará ÚNICAMENTE como llave para buscar en el registro 
+ * 1. El parÃ¡metro `:tabla` se utilizarÃ¡ ÃšNICAMENTE como llave para buscar en el registro 
  *    fijo `models/index.ts` (un objeto TypeScript compilado, whitelist estricto). Si la 
  *    tabla no existe en este registro, el endpoint debe responder 404 Inmediatamente antes 
  *    de invocar a la base de datos.
- * 2. Los nombres de columnas utilizados en `columnaOrden` o en los filtros de búsqueda 
+ * 2. Los nombres de columnas utilizados en `columnaOrden` o en los filtros de bÃºsqueda 
  *    deben validarse estrictamente contra el arreglo `columnasPermitidas` de la 
- *    configuración de la tabla respectiva.
- * 3. Todos los valores y parámetros (filtros, IDs) deben delegarse al Query Builder 
- *    de Supabase (.eq(), .ilike(), etc.), el cual se encarga de bindear los parámetros 
- *    de forma segura, previniendo cualquier inyección SQL.
+ *    configuraciÃ³n de la tabla respectiva.
+ * 3. Todos los valores y parÃ¡metros (filtros, IDs) deben delegarse al Query Builder 
+ *    de Supabase (.eq(), .ilike(), etc.), el cual se encarga de bindear los parÃ¡metros 
+ *    de forma segura, previniendo cualquier inyecciÃ³n SQL.
  */
 
 
@@ -40,6 +40,7 @@ export interface TablaConfig {
   columnasFiltroOrden: string[]; 
   dependenciasDelete?: DependenciaDelete[];
   columnasFiltroMenu?: FiltroMenuDef[];
+  limiteMaximo?: number;
 }
 
 export interface AuditoriaTablaConfig {
@@ -50,3 +51,4 @@ export interface AuditoriaTablaConfig {
   columnaFechaFiltro: string;
   columnaUsuarioFiltro: string;
 }
+

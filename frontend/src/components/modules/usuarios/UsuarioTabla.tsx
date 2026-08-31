@@ -1,8 +1,10 @@
 'use client'
 
-import React from 'react'
+import React, { useState, useMemo } from 'react'
 import { Trash2, Edit2, Eye } from 'lucide-react'
 import { Usuario } from '@/types/usuario'
+import { useAuthStore } from '@/stores/useAuthStore';
+import { useRolesStore } from '@/stores/useRolesStore';
 import { UsuarioEstadoBadge } from './UsuarioEstadoBadge'
 import { UsuarioRolBadge } from './UsuarioRolBadge'
 
@@ -19,29 +21,88 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
   onEditar,
   onEliminar,
 }: UsuarioTablaProps) {
+  const profile = useAuthStore((state) => state.profile);
+  const roles = useRolesStore((state) => state.roles);
+  const miNivel = profile?.nivel_permisos || 0;
+
+  const [sortColumn, setSortColumn] = useState<string>('');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  const handleSort = (column: string) => {
+    if (sortColumn === column) {
+      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  };
+
+  const sortIndicator = (column: string) =>
+    sortColumn === column ? (sortDirection === 'asc' ? ' ▲' : ' ▼') : '';
+
+  const sortedUsuarios = useMemo(() => {
+    if (!sortColumn) return usuarios;
+    const sorted = [...usuarios].sort((a, b) => {
+      let aVal = '';
+      let bVal = '';
+      switch (sortColumn) {
+        case 'nombre':
+          aVal = `${a.primer_nombre} ${a.primer_apellido}`.toLowerCase();
+          bVal = `${b.primer_nombre} ${b.primer_apellido}`.toLowerCase();
+          break;
+        case 'correo':
+          aVal = a.correo.toLowerCase();
+          bVal = b.correo.toLowerCase();
+          break;
+        case 'rol':
+          aVal = (a.rol || '').toLowerCase();
+          bVal = (b.rol || '').toLowerCase();
+          break;
+        case 'estado':
+          aVal = a.estado.toLowerCase();
+          bVal = b.estado.toLowerCase();
+          break;
+        case 'ultimoAcceso':
+          aVal = a.ultimoAcceso || '';
+          bVal = b.ultimoAcceso || '';
+          break;
+        case 'proyectos': {
+          const aCount = a.rol === 'Administrador' ? 2 : 1;
+          const bCount = b.rol === 'Administrador' ? 2 : 1;
+          return sortDirection === 'asc' ? aCount - bCount : bCount - aCount;
+        }
+        default:
+          return 0;
+      }
+      const cmp = aVal.localeCompare(bVal);
+      return sortDirection === 'asc' ? cmp : -cmp;
+    });
+    return sorted;
+  }, [usuarios, sortColumn, sortDirection]);
+
   return (
     <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-2xs">
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse min-w-[900px]">
           <thead className="bg-gray-50 border-b border-gray-100">
             <tr>
-              <th className="px-4 py-3 text-[9px] text-gray-400 uppercase tracking-wide font-semibold">
-                Usuario
+              <th className="px-4 py-3 text-[9px] text-gray-400 uppercase tracking-wide font-semibold cursor-pointer hover:text-gray-600 select-none" onClick={() => handleSort('nombre')}>
+                Usuario{sortIndicator('nombre')}
               </th>
-              <th className="px-4 py-3 text-[9px] text-gray-400 uppercase tracking-wide font-semibold">
-                Correo
+              <th className="px-4 py-3 text-[9px] text-gray-400 uppercase tracking-wide font-semibold cursor-pointer hover:text-gray-600 select-none" onClick={() => handleSort('correo')}>
+                Correo{sortIndicator('correo')}
               </th>
-              <th className="px-4 py-3 text-[9px] text-gray-400 uppercase tracking-wide font-semibold">
-                Rol
+              <th className="px-4 py-3 text-[9px] text-gray-400 uppercase tracking-wide font-semibold cursor-pointer hover:text-gray-600 select-none" onClick={() => handleSort('rol')}>
+                Rol{sortIndicator('rol')}
               </th>
-              <th className="px-4 py-3 text-[9px] text-gray-400 uppercase tracking-wide font-semibold">
-                Estado
+              <th className="px-4 py-3 text-[9px] text-gray-400 uppercase tracking-wide font-semibold cursor-pointer hover:text-gray-600 select-none" onClick={() => handleSort('estado')}>
+                Estado{sortIndicator('estado')}
               </th>
-              <th className="px-4 py-3 text-[9px] text-gray-400 uppercase tracking-wide font-semibold">
-                Último Acceso
+              <th className="px-4 py-3 text-[9px] text-gray-400 uppercase tracking-wide font-semibold cursor-pointer hover:text-gray-600 select-none" onClick={() => handleSort('ultimoAcceso')}>
+                Último Acceso{sortIndicator('ultimoAcceso')}
               </th>
-              <th className="px-4 py-3 text-[9px] text-gray-400 uppercase tracking-wide font-semibold">
-                Proyectos
+              <th className="px-4 py-3 text-[9px] text-gray-400 uppercase tracking-wide font-semibold cursor-pointer hover:text-gray-600 select-none" onClick={() => handleSort('proyectos')}>
+                Proyectos{sortIndicator('proyectos')}
               </th>
               <th className="text-right px-4 py-3 text-[9px] text-gray-400 uppercase tracking-wide font-semibold">
                 Acciones
@@ -49,7 +110,7 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
             </tr>
           </thead>
           <tbody>
-            {usuarios.map((usuario) => {
+            {sortedUsuarios.map((usuario) => {
               const proyectosCount = usuario.rol === 'Administrador' ? 2 : 1;
               const fechaAcceso = usuario.ultimoAcceso ? usuario.ultimoAcceso.split(' ')[0] : '';
               
@@ -61,7 +122,11 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
               if (nombreCompleto.includes('Natalia')) subtitle = 'Administrador del sistema';
               else if (nombreCompleto.includes('Marco')) subtitle = 'Ingeniero residente';
               else if (usuario.rol === 'Administrador') subtitle = 'Administrador del sistema';
-              else subtitle = usuario.rol;
+              else subtitle = usuario.rol || 'Sin rol asignado';
+
+              const targetRole = roles.find(r => r.nombre === usuario.rol);
+              const targetNivel = targetRole?.nivel_permisos || 0;
+              const canEdit = targetNivel <= miNivel;
 
               return (
                 <tr
@@ -102,18 +167,10 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
                       >
                         <Eye size={12} />
                       </button>
-                      <button
-                        onClick={() => onEditar(usuario)}
-                        className="p-1 text-gray-400 transition-colors hover:text-[#9B0F06]"
-                        title="Editar"
-                      >
+                      <button onClick={() => canEdit && onEditar(usuario)} className={`p-1 transition-colors ${canEdit ? 'text-gray-400 hover:text-blue-600' : 'text-gray-200 cursor-not-allowed'}`} title={canEdit ? 'Editar' : 'Jerarquía insuficiente'} disabled={!canEdit}>
                         <Edit2 size={12} />
                       </button>
-                      <button
-                        onClick={() => onEliminar(usuario.id)}
-                        className="p-1 text-gray-400 transition-colors hover:text-red-600"
-                        title="Eliminar"
-                      >
+                      <button onClick={() => canEdit && onEliminar(usuario.id)} className={`p-1 transition-colors ${canEdit ? 'text-gray-400 hover:text-red-600' : 'text-gray-200 cursor-not-allowed'}`} title={canEdit ? 'Eliminar' : 'Jerarquía insuficiente'} disabled={!canEdit}>
                         <Trash2 size={12} />
                       </button>
                     </div>
@@ -127,4 +184,3 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
     </div>
   )
 })
-

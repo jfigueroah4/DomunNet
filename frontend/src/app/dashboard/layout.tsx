@@ -7,6 +7,8 @@ import TopBar from '@/components/layout/TopBar'
 import BottomNavbar from '@/components/layout/BottomNavbar'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { Loader2 } from 'lucide-react'
+import { tienePermiso, RUTAS_PERMISOS } from '@/lib/rutas-permisos'
+import AccessDenied from '@/components/layout/AccessDenied'
 
 function getSectionTitle(pathname: string) {
   if (pathname === '/dashboard') return 'INICIO'
@@ -45,6 +47,20 @@ export default function DashboardLayout({
     }
   }, [loading, profile, router])
 
+  
+  const autorizado = useMemo(() => {
+    if (!profile) return false
+    // Match the exact path or its base path
+        // Find the longest matching prefix in RUTAS_PERMISOS
+    const matches = Object.keys(RUTAS_PERMISOS).filter(p => pathname === p || pathname.startsWith(`${p}/`))
+    if (matches.length === 0) return true // Unprotected or implicit
+    
+    // Check if user has permission for the most specific matched route
+    const mostSpecific = matches.sort((a, b) => b.length - a.length)[0]
+    const permiso = RUTAS_PERMISOS[mostSpecific]
+    return tienePermiso(profile.permisos || [], permiso)
+  }, [pathname, profile])
+
   const section = useMemo(() => getSectionTitle(pathname), [pathname])
 
   if (loading) {
@@ -71,7 +87,7 @@ export default function DashboardLayout({
         <TopBar section={section} onToggle={() => setCollapsed(!collapsed)} />
         <div className="flex-1 overflow-auto px-4 pt-4 pb-20 md:pb-4 xl:px-5">
           <div className="mx-auto w-full max-w-[1600px]">
-            {children}
+            {autorizado ? children : <AccessDenied />}
           </div>
         </div>
       </main>

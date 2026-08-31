@@ -1,4 +1,4 @@
-﻿import { create } from 'zustand'
+import { create } from 'zustand'
 import { api } from '@/lib/api/cliente'
 
 interface UserProfile {
@@ -19,13 +19,15 @@ interface UserProfile {
   direccion: string
   cargo: string
   rol: string
+  permisos?: string[]
+  nivel_permisos?: number
 }
 
 interface AuthState {
   profile: UserProfile | null
   loading: boolean
   error: Error | null
-  fetchProfile: () => Promise<void>
+  fetchProfile: (retries?: number) => Promise<void>
 }
 
 // Global promise to prevent duplicate concurrent fetches
@@ -35,7 +37,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   profile: null,
   loading: true,
   error: null,
-  fetchProfile: async () => {
+  fetchProfile: async (retries = 3) => {
     if (profilePromise) {
       try {
         const data = await profilePromise
@@ -46,13 +48,30 @@ export const useAuthStore = create<AuthState>((set) => ({
       return
     }
 
-    profilePromise = api.get('/auth/perfil')
-      .then(res => {
+    const fetchWithRetry = async (attemptsLeft: number): Promise<any> => {
+      try {
+        // Timeout de 15s para evitar que la petición quede colgada 
+        // silenciosamente durante la compilación pesada de Next.js
+        const res = await api.get('/auth/perfil', { timeout: 15000 })
         if (res.data?.success && res.data?.data) {
           return res.data.data
         }
         throw new Error('No profile data')
-      })
+      } catch (err: any) {
+        const status = err.response?.status
+        const isAuthError = status === 401 || status === 403
+        
+        // Si no es un error de autenticación explícito (ej. timeout o network error)
+        // y nos quedan reintentos, probamos de nuevo.
+        if (!isAuthError && attemptsLeft > 0) {
+          console.warn(`[fetchProfile] Network/Timeout error, reintentando... (${attemptsLeft} intentos restantes)`)
+          return fetchWithRetry(attemptsLeft - 1)
+        }
+        throw err
+      }
+    }
+
+    profilePromise = fetchWithRetry(retries)
 
     try {
       const data = await profilePromise
@@ -64,3 +83,4 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   }
 }))
+

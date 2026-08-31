@@ -17,7 +17,7 @@ interface FotografiaFeedProps {
 export function FotografiaFeed({ fotos, onFotoClick }: FotografiaFeedProps) {
   return (
     <div className="flex flex-col gap-3">
-      {fotos.map((foto) => (
+      {(fotos ?? []).map((foto) => (
         <div
           key={foto.id}
           className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 flex gap-3 cursor-pointer hover:shadow-md transition-all"
@@ -35,7 +35,7 @@ export function FotografiaFeed({ fotos, onFotoClick }: FotografiaFeedProps) {
             {/* Tipo y etiquetas */}
             <div className="flex items-center gap-1.5 flex-wrap mb-1">
               <FotografiaTipoBadge tipo={foto.tipo} />
-              {foto.etiquetas.map((tag) => (
+              {(foto.etiquetas ?? []).map((tag) => (
                 <span
                   key={tag}
                   className="bg-gray-100 text-gray-500 text-[9px] px-1.5 py-0.5 rounded-full whitespace-nowrap"

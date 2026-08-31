@@ -14,7 +14,7 @@ const esquemaRol = z.object({
   nombre: z.string().min(2),
   descripcion: z.string().min(2),
   color: z.string().min(3),
-  permisos: z.array(z.string().min(1)).min(1),
+  permisos: z.array(z.string().min(1)),
   usuariosAsignados: z.array(z.string()).optional(),
   estado: z.enum(['Activo', 'Inactivo']),
 })

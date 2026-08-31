@@ -1,4 +1,4 @@
-﻿import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Poppins } from 'next/font/google'
 import './globals.css'
 import LoadingScreen from '@/components/ui/LoadingScreen'
@@ -10,6 +10,11 @@ const poppins = Poppins({
   display: 'swap',
   variable: '--font-poppins',
 })
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+}
 
 export const metadata: Metadata = {
   title: 'DOMUN - Gestión inteligente de transporte',
@@ -26,10 +31,6 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es" className={`${poppins.variable} scroll-smooth`}>
-      <head>
-        <meta charSet="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-      </head>
       <body className={`${poppins.className} min-h-screen bg-[#F3F4F7] text-[#07152B] antialiased`}>
         <Providers>
           <LoadingScreen />

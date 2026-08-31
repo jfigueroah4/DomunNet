@@ -2,8 +2,19 @@
 
 import { Search, X } from 'lucide-react'
 import { EstadoProyecto } from '@/types/proyecto'
-import { useMemo } from 'react'
-import { MOCK_UBICACIONES } from '@/mocks/proyectoMock'
+import { useMemo, useState, useEffect } from 'react'
+import { api } from '@/lib/api/cliente'
+
+interface Departamento {
+  id: string
+  nombre: string
+}
+
+interface Municipio {
+  id: string
+  nombre: string
+  departamento_id: string
+}
 
 interface ProyectoFiltrosProps {
   busqueda: string
@@ -36,6 +47,29 @@ export default function ProyectoFiltros({
   setFiltroFechaFin,
   onLimpiar,
 }: ProyectoFiltrosProps) {
+  const [departamentos, setDepartamentos] = useState<Departamento[]>([])
+  const [municipiosData, setMunicipiosData] = useState<Municipio[]>([])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    const fetchLocations = async () => {
+      try {
+        const [resDep, resMun] = await Promise.all([
+          api.get('/mantenimiento/departamento?limite=500', { signal: controller.signal }),
+          api.get('/mantenimiento/municipio?limite=1000', { signal: controller.signal })
+        ])
+        if (resDep.data?.success) setDepartamentos(resDep.data.data)
+        if (resMun.data?.success) setMunicipiosData(resMun.data.data)
+      } catch (error: any) {
+        if (error.name !== 'CanceledError') {
+          console.error('Error fetching locations:', error)
+        }
+      }
+    }
+    fetchLocations()
+    return () => controller.abort()
+  }, [])
+
   const estados: Array<{ value: EstadoProyecto | 'todos'; label: string }> = [
     { value: 'todos', label: 'Todos' },
     { value: 'borrador', label: 'Borradores' },
@@ -47,10 +81,10 @@ export default function ProyectoFiltros({
 
   const municipios = useMemo(() => {
     if (!filtroDepa) return []
-    const dep = MOCK_UBICACIONES.departamentos.find(d => d.nombre === filtroDepa)
+    const dep = departamentos.find(d => d.nombre === filtroDepa)
     if (!dep) return []
-    return MOCK_UBICACIONES.municipios.filter(m => m.departamentoId === dep.id)
-  }, [filtroDepa])
+    return municipiosData.filter(m => m.departamento_id === dep.id)
+  }, [filtroDepa, departamentos, municipiosData])
 
   return (
     <div className="w-full rounded-lg border border-gray-200 bg-white p-2 shadow-sm font-[Poppins]">
@@ -74,7 +108,7 @@ export default function ProyectoFiltros({
           className="h-[32px] w-[140px] rounded-md border border-gray-200 bg-white px-2 text-[11px] font-medium text-gray-800 focus:border-[#9B0F06] focus:outline-none cursor-pointer"
         >
           {estados.map((estado) => (
-            <option key={estado.value} value={estado.value}>Estado: {estado.label}</option>
+            <option key={estado.value} value={estado.value}>{estado.label}</option>
           ))}
         </select>
 
@@ -88,7 +122,7 @@ export default function ProyectoFiltros({
           className="h-[32px] w-[140px] rounded-md border border-gray-200 bg-white px-2 text-[11px] font-medium text-gray-800 focus:border-[#9B0F06] focus:outline-none cursor-pointer"
         >
           <option value="">Departamento ▼</option>
-          {MOCK_UBICACIONES.departamentos.map(d => (
+          {departamentos.map(d => (
             <option key={d.id} value={d.nombre}>{d.nombre}</option>
           ))}
         </select>

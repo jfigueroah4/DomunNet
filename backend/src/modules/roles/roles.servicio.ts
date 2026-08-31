@@ -1,5 +1,5 @@
 import { clienteSupabase } from '@/configuracion/cliente-supabase'
-import { permisosDeRol } from '@/middlewares/permisos.middleware'
+
 
 export interface DatosRol {
   nombre: string
@@ -33,6 +33,7 @@ function mapearRolBase(
     permisos,
     usuariosAsignados,
     estado: rol.activo ? 'Activo' : 'Inactivo',
+    nivel_permisos: rol.nivel_permisos,
     totalUsuarios: usuariosAsignados.length,
     createdAt: rol.created_at,
     updatedAt: rol.created_at, // O usando created_at como fallback
@@ -79,7 +80,7 @@ async function obtenerRolCompletoPorId(rolId: string) {
   // Si la columna JSONB `permisos` existe, convertirla a lista plana 'modulo.accion'
   const permisos = (fila.permisos && Object.keys(fila.permisos || {}).length > 0)
     ? Object.entries(fila.permisos).flatMap(([mod, acciones]) => (acciones || []).map((a) => `${mod}.${a}`))
-    : permisosDeRol(fila.nombre_rol)
+    : []
 
   return mapearRolBase(fila, permisos, usuariosAsignados)
 }
@@ -98,7 +99,7 @@ export async function listarRoles() {
     const usuariosAsignados = mapaUsuarios.get(rol.id) || []
     const permisos = (rol.permisos && Object.keys(rol.permisos || {}).length > 0)
       ? Object.entries(rol.permisos).flatMap(([mod, acciones]) => (acciones || []).map((a) => `${mod}.${a}`))
-      : permisosDeRol(rol.nombre_rol)
+      : []
     return mapearRolBase(rol, permisos, usuariosAsignados)
   })
 }
@@ -120,7 +121,7 @@ export async function obtenerRolPorNombre(nombre: string) {
   const fila = data as FilaRol
   const permisos = (fila.permisos && Object.keys(fila.permisos || {}).length > 0)
     ? Object.entries(fila.permisos).flatMap(([mod, acciones]) => (acciones || []).map((a) => `${mod}.${a}`))
-    : permisosDeRol(fila.nombre_rol)
+    : []
 
   return mapearRolBase(fila, permisos, usuariosAsignados)
 }
@@ -289,8 +290,6 @@ export async function asignarUsuariosRol(id: string, usuariosAsignados: string[]
   }
 
   if (idsAEliminar.length > 0) {
-    // Al desasignar, se les puede poner un rol por defecto o dejarlos en nulo. Como es un NOT NULL, lanzará error si no hay un rol id.
-    // Busquemos el rol "Residente" por defecto para asignarles
     const { data: rolDefecto } = await clienteSupabase.from('rol').select('id').ilike('nombre_rol', 'Residente').maybeSingle()
     const fallbackRolId = rolDefecto?.id || id // Si no hay, los dejamos en el mismo para evitar violación de FK.
 
@@ -309,7 +308,7 @@ export async function asignarUsuariosRol(id: string, usuariosAsignados: string[]
 }
 
 export async function obtenerPermisosRolPorNombre(nombre: string) {
-  return permisosDeRol(nombre)
+  return []
 }
 
 export async function obtenerPermisosRolPorId(id: string) {

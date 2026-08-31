@@ -1,4 +1,4 @@
-import express from 'express'
+﻿import express from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
 import morgan from 'morgan'
@@ -14,7 +14,9 @@ import { configuracionRutas } from '@/modules/configuracion/configuracion.rutas'
 import { catalogosRutas } from '@/modules/catalogos/catalogos.rutas'
 import { respaldoRutas } from '@/modules/respaldo/respaldo.rutas'
 import { mantenimientoRutas } from '@/modules/mantenimiento/mantenimiento.rutas'
+import empresasRutas from '@/modules/empresas/empresas.rutas'
 import { auditoriaRutas } from '@/modules/auditoria/auditoria.rutas'
+import proyectosRutas from '@/modules/proyectos/proyectos.rutas'
 
 const app = express()
 const PORT = entorno.puerto
@@ -54,7 +56,9 @@ app.use('/api/v1/catalogos', catalogosRutas)
 app.use('/api/v1/respaldo', respaldoRutas)
 app.use('/api/v1/backup', respaldoRutas)
 app.use('/api/v1/mantenimiento', mantenimientoRutas)
+app.use('/api/v1/empresas', empresasRutas)
 app.use('/api/v1/auditoria', auditoriaRutas)
+app.use('/api/v1/proyectos', proyectosRutas)
 
 app.use((_req, res) => sendError(res, 404, 'Endpoint no encontrado'))
 app.use((error: Error, _req: express.Request, res: express.Response) => {
@@ -62,6 +66,9 @@ app.use((error: Error, _req: express.Request, res: express.Response) => {
 })
 
 app.listen(PORT, () => {
-  console.log(`Servidor ejecutándose en puerto ${PORT}`)
+  console.log(`Servidor ejecutÃ¡ndose en puerto ${PORT}`)
   console.log(`Environment: ${entorno.modo}`)
 })
+
+
+

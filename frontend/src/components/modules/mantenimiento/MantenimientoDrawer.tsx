@@ -1,4 +1,4 @@
-﻿
+
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
@@ -101,15 +101,8 @@ export const TABLES_SCHEMA: Record<string, FieldSchema[]> = {
     { name: 'departamento_id', label: 'Departamento', type: 'select', required: true, endpoint: '/mantenimiento/departamento', labelKey: 'nombre', valueKey: 'id' },
     { name: 'nombre', label: 'Nombre', type: 'text', required: true }
   ],
-  empresa_contratante: [
-    { name: 'nombre', label: 'Nombre', type: 'text', required: true },
-    { name: 'nit', label: 'NIT', type: 'text' },
-    { name: 'direccion', label: 'Dirección', type: 'text' },
-    { name: 'telefono', label: 'Teléfono', type: 'text' },
-    { name: 'correo_institucional', label: 'Correo Institucional', type: 'email' }
-  ],
-  contacto_contratante: [
-    { name: 'empresa_contratante_id', label: 'Empresa', type: 'select', required: true, endpoint: '/mantenimiento/empresa_contratante', labelKey: 'nombre', valueKey: 'id' },
+contacto_contratante: [
+
     { name: 'nombre', label: 'Nombre', type: 'text', required: true },
     { name: 'cargo', label: 'Cargo', type: 'text' },
     { name: 'telefono', label: 'Teléfono', type: 'text' },
@@ -147,8 +140,8 @@ export const TABLES_SCHEMA: Record<string, FieldSchema[]> = {
     { name: 'numero_contrato_original', label: 'NÂº Contrato Orig.', type: 'text' },
     { name: 'fecha_firma_contrato_original', label: 'Fecha Firma Orig.', type: 'date' },
     { name: 'monto_original', label: 'Monto Original', type: 'number' },
-    { name: 'empresa_contratante_id', label: 'Empresa Contratante', type: 'select', endpoint: '/mantenimiento/empresa_contratante', labelKey: 'nombre', valueKey: 'id' },
-    { name: 'contacto_contratante_id', label: 'Contacto Contratante', type: 'select', endpoint: '/mantenimiento/contacto_contratante', labelKey: 'nombre', valueKey: 'id' },
+
+
     { name: 'empresa_contratista_ejecutora', label: 'Contratista Ejecutora', type: 'text' }
   ],
   fase_proyecto: [

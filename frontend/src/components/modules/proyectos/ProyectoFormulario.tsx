@@ -3,6 +3,8 @@
 
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
+import { api } from '@/lib/api/cliente'
+import { useEffect } from 'react'
 import type {
   EstadoProyecto,
   FaseTimeline,
@@ -40,10 +42,11 @@ import {
   X,
   ChevronLeft,
 } from 'lucide-react'
-import { toast } from 'sonner'
+import { useCustomToast } from '@/hooks/useCustomToast'
 
 import { PROYECTOS_MOCK } from '@/data/proyectos.mock'
-import { USUARIOS_MOCK } from '@/data/usuarios.mock'
+import { useUsuariosStore } from '@/stores/useUsuariosStore'
+import { useEmpresasStore } from '@/stores/useEmpresasStore'
 import { ProyectoTimeline } from '@/components/modules/proyectos/ProyectoTimeline'
 
 interface ProyectoFormularioProps {
@@ -58,6 +61,11 @@ const inputClass =
   'w-full rounded border border-gray-200 bg-white px-2 py-1 text-[10px] text-gray-800 placeholder-gray-400 focus:border-[#9B0F06] focus:outline-none focus:ring-1 focus:ring-[#9B0F06] transition-colors font-medium'
 
 const labelClass = 'mb-0.5 block text-[8px] font-extrabold uppercase tracking-wider text-gray-600'
+
+// Helper: returns inputClass with red border if field has error
+function errorInputClass(errors: Record<string, boolean>, field: string) {
+  return `w-full rounded border ${errors[field] ? 'border-red-400' : 'border-gray-200'} bg-white px-2 py-1 text-[10px] text-gray-800 placeholder-gray-400 focus:border-[#9B0F06] focus:outline-none focus:ring-1 focus:ring-[#9B0F06] transition-colors font-medium`
+}
 
 function siguienteCodigoVial() {
   const max = PROYECTOS_MOCK.reduce((actual, proyecto) => {
@@ -108,11 +116,11 @@ function EquipoAsignadoSelector({
 
   const handleAgregar = () => {
     if (!selectedUsuarioId) return
-    const userObj = USUARIOS_MOCK.find((u) => u.id === selectedUsuarioId)
+    const userObj = usuariosDisponibles.find((u: any) => u.id === selectedUsuarioId)
     if (!userObj) return
 
     if (equipo.some((m) => m.nombre === userObj.nombre)) {
-      toast.info(`${userObj.nombre} ya forma parte del equipo`)
+      showInfoToast(`${userObj.nombre} ya forma parte del equipo`)
       return
     }
 
@@ -126,7 +134,7 @@ function EquipoAsignadoSelector({
 
     setEquipo((prev) => [...prev, nuevoMiembro])
     setSelectedUsuarioId('')
-    toast.success(`Se agregó a ${userObj.nombre} (${rolFormateado}) al equipo`)
+    showSuccessToast(`Se agregó a ${userObj.nombre} (${rolFormateado}) al equipo`)
   }
 
   const handleEliminar = (id: string) => {
@@ -145,7 +153,7 @@ function EquipoAsignadoSelector({
           className="flex-1 min-w-[200px] rounded border border-gray-200 bg-white px-2 py-1 text-[10px] text-gray-800 font-medium focus:border-[#9B0F06] focus:outline-none"
         >
           <option value="">-- Seleccionar profesional del Módulo de Usuarios --</option>
-          {USUARIOS_MOCK.map((usuario) => (
+          {usuariosDisponibles.map((usuario: any) => (
             <option key={usuario.id} value={usuario.id}>
               {usuario.nombre} — {usuario.cargo || usuario.rol.toUpperCase()}
             </option>
@@ -231,18 +239,18 @@ function SelectorMapaInteractivo({
       lng: newLng,
       puntoTexto: `Punto seleccionado (${newLat}°, ${newLng}°)`,
     })
-    toast.info(`Ubicación marcada: ${newLat}°, ${newLng}°`)
+    showInfoToast(`Ubicación marcada: ${newLat}°, ${newLng}°`)
   }
 
   return (
     <div className="space-y-2 rounded-lg border border-gray-200 bg-gray-50/50 p-2.5">
       <div>
-        <label className={labelClass}>Dirección (Texto Corto)</label>
+        <label className={labelClass}>Dirección (Texto Corto) <span className="text-[#9B0F06]">*</span></label>
         <input
           type="text"
           value={direccion}
-          onChange={(e) => setDireccion(e.target.value)}
-          className={inputClass}
+          onChange={(e) => { setDireccion(e.target.value); setErrors(prev => ({...prev, direccion: false})) }}
+          className={errorInputClass(errors, 'direccion')}
           placeholder="Ej: Km 22.5, Carril Izquierdo Norte-Sur"
         />
         <p className="mt-0.5 text-[8px] text-gray-400">
@@ -380,7 +388,7 @@ function PantallaConfiguracionPlanInicial({
       costo: '450',
     }
     setList((prev) => [...prev, newObj])
-    toast.success('Renglón adicional agregado al plan')
+    showSuccessToast('Renglón adicional agregado al plan')
   }
 
   const removeItem = (id: string) => {
@@ -554,16 +562,39 @@ export function ProyectoFormulario({
 
   // Campos Comunes
   const [nombreOficial, setNombreOficial] = useState(proyectoInicial?.nombreOficial || proyectoInicial?.nombre || '')
+  const { showSuccessToast, showErrorToast, showInfoToast } = useCustomToast()
+  const [errors, setErrors] = useState<Record<string, boolean>>({})
   const [nombre, setNombre] = useState(proyectoInicial?.nombre || '')
   const [descripcion, setDescripcion] = useState(proyectoInicial?.descripcion || '')
   const [ubicacionFisica, setUbicacionFisica] = useState(proyectoInicial?.ubicacionFisica || proyectoInicial?.ubicacion || '')
   const [direccion, setDireccion] = useState(proyectoInicial?.direccion || 'Km 22.5 CA-9 Sur')
+  // Catálogos
+  const { empresas, fetchEmpresas } = useEmpresasStore()
+  const { usuarios: usuariosDisponibles, cargarUsuarios } = useUsuariosStore()
+  const [empresasContratantes, setEmpresasContratantes] = useState<any[]>([]) // Legacy
+  const [departamentos, setDepartamentos] = useState<any[]>([])
+  const [municipios, setMunicipios] = useState<any[]>([])
+  const [usuarios, setUsuarios] = useState<any[]>([])
+  const [departamentoId, setDepartamentoId] = useState('')
+  const [municipioId, setMunicipioId] = useState('')
+  const [delegadoResidenteId, setDelegadoResidenteId] = useState('')
+  const [empresaContratanteId, setEmpresaContratanteId] = useState('')
+  
+  useEffect(() => {
+    fetchEmpresas()
+    api.get('/api/v1/mantenimiento/departamento').then(r => setDepartamentos(r.data?.data || []))
+    api.get('/api/v1/mantenimiento/municipio').then(r => setMunicipios(r.data?.data || []))
+    cargarUsuarios()
+  }, [])
+
   const [coordenadasMapa, setCoordenadasMapa] = useState(
     proyectoInicial?.coordenadasMapa || { lat: 14.5021, lng: -90.5841, puntoTexto: 'Tramo Obra Vial CA-9 Sur' }
   )
 
   // Entidades e Instituciones
-  const [entidadContratante, setEntidadContratante] = useState(proyectoInicial?.entidadContratante || '')
+  const [entidadContratante, setEntidadContratante] = useState(proyectoInicial?.entidadContratante || '') // Fallback text
+  const [empresaContratistaId, setEmpresaContratistaId] = useState('')
+  const [empresaSupervisoraId, setEmpresaSupervisoraId] = useState('')
   const [empresaContratista, setEmpresaContratista] = useState(proyectoInicial?.empresaContratista || '')
   const [empresaSupervisora, setEmpresaSupervisora] = useState(proyectoInicial?.empresaSupervisora || '')
   const [delegadoResidente, setDelegadoResidente] = useState(proyectoInicial?.delegadoResidente || '')
@@ -621,28 +652,36 @@ export function ProyectoFormulario({
   // REQUERIMIENTO ESPECIAL: Comportamiento condicional del botón "Ver"
   const handleIrAPrograma = () => {
     const codProy = proyectoInicial?.codigo || 'PROY-001'
-    toast.success(`Ahora estás en el Plan de Trabajo de ${codProy}`)
+    showSuccessToast(`Ahora estás en el Plan de Trabajo de ${codProy}`)
     
     if (esEditar) {
       const targetId = proyectoInicial?.id || '1'
       router.push(`/dashboard/proyectos/${targetId}/hoja-sabana`)
     } else {
-      // En Creación: Navegar a la página completa de HojaSábanaDigital con plantilla
       router.push('/dashboard/proyectos/nuevo/hoja-sabana')
     }
   }
 
-  // Lógica de avance entre pasos
+  // Lógica de avance entre pasos con validación
   const handleAvanzarPaso = (siguientePaso: 1 | 2 | 3) => {
+    const newErrors: Record<string, boolean> = {}
+    let isValid = true
+
     if (pasoActual === 1) {
-      if (!nombreOficial.trim() && !nombre.trim()) {
-        toast.error('Ingrese el Nombre Oficial del Proyecto antes de continuar')
+      if (!nombreOficial.trim() && !nombre.trim()) { newErrors.nombreOficial = true; isValid = false }
+      if (!descripcion.trim()) { newErrors.descripcion = true; isValid = false }
+      if (!ubicacionFisica.trim()) { newErrors.ubicacionFisica = true; isValid = false }
+      if (!direccion.trim()) { newErrors.direccion = true; isValid = false }
+
+      if (!isValid) {
+        setErrors(newErrors)
+        showErrorToast('Por favor complete todos los campos obligatorios antes de continuar')
         return
       }
     }
 
+    setErrors({})
     setPasoActual(siguientePaso)
-    toast.success(`Paso ${pasoActual} guardado. Avanzando al Paso ${siguientePaso}`)
   }
 
   const validarFechasContractuales = (): boolean => {
@@ -651,7 +690,7 @@ export function ProyectoFormulario({
       const fin = new Date(fechaFinContractualPlan)
       if (fin <= inicio) {
         setErrorFechaFin(true)
-        toast.error('La fecha de finalización debe ser posterior a la fecha de inicio')
+        showErrorToast('La fecha de finalización debe ser posterior a la fecha de inicio')
         return false
       }
     }
@@ -661,7 +700,7 @@ export function ProyectoFormulario({
 
   const handleFinalizarFormulario = () => {
     if (!nombreOficial.trim() && !nombre.trim()) {
-      toast.error('Ingrese el Nombre Oficial del Proyecto')
+      showErrorToast('Ingrese el Nombre Oficial del Proyecto')
       return
     }
 
@@ -670,45 +709,28 @@ export function ProyectoFormulario({
     }
 
     const proyectoData: Partial<Proyecto> = {
-      nombreOficial: nombreOficial || nombre,
-      nombre: nombre || nombreOficial,
-      descripcion,
-      ubicacionFisica: ubicacionFisica || direccion,
-      ubicacion: direccion || ubicacionFisica,
-      direccion,
-      coordenadasMapa,
-      entidadContratante,
-      empresaContratista,
-      empresaSupervisora,
-      delegadoResidente,
-      fechaAdjudicacion,
-      numeroEscrituraPublica,
-      fechaInicioContractual,
-      fechaInicio: fechaInicioContractual,
-      fechaFin: fechaFinContractualPlan || fechaInicioContractual,
-      plazoEjecucionContractualOriginal: plazoCalculadoOriginal,
-      montoContractualOriginal: Number(montoContractualOriginal) || 0,
-      presupuesto: Number(montoContractualOriginal) || 0,
-      responsable,
-      estado,
-      equipo,
-      fases,
-      categorias,
-      rolesProyecto,
-    }
-
-    if (esEditar) {
-      proyectoData.fechaFinalizacionReal = fechaFinalizacionReal
-      proyectoData.plazoEjecucionRealAmpliado = plazoEjecucionRealAmpliado
-      proyectoData.montoFinancieroFinalEjecutado = montoFinancieroFinalEjecutado
-        ? Number(montoFinancieroFinalEjecutado)
-        : undefined
-      toast.success('Proyecto guardado correctamente')
-    } else {
-      toast.success('Proyecto creado correctamente')
-    }
-
-    onGuardar?.(proyectoData)
+        nombreOficial: nombreOficial || nombre,
+        nombre: nombre || nombreOficial,
+        descripcion,
+        ubicacionFisica: ubicacionFisica || direccion,
+        municipioId,
+        empresaContratanteId,
+        empresaContratista,
+        empresaSupervisora,
+        delegadoResidenteId,
+        fechaAdjudicacion,
+        numeroEscrituraPublica,
+        fechaInicioContractual,
+        fechaInicio: fechaInicioContractual,
+        fechaFin: fechaFinContractualPlan || fechaInicioContractual,
+        plazoEjecucionContractualOriginal: plazoCalculadoOriginal,
+        montoContractualOriginal: Number(montoContractualOriginal) || 0,
+        presupuesto: Number(montoContractualOriginal) || 0,
+        responsable,
+        coordenadasMapa
+      }
+      
+      onGuardar?.(proyectoData)
   }
 
   const pasosMeta = [
@@ -737,7 +759,7 @@ export function ProyectoFormulario({
       setMontoContractualOriginal(montoTotal.toString())
       setModoCapturaSabanaInicial(false)
       setPasoActual(3)
-      toast.success(`Monto Contractual Original autocompletado con Q ${montoTotal.toLocaleString('es-GT', { minimumFractionDigits: 2 })}`)
+      showSuccessToast(`Monto Contractual Original autocompletado con Q ${montoTotal.toLocaleString('es-GT', { minimumFractionDigits: 2 })}`)
     }} renglonesIniciales={renglonesPrecargadosDGC} />
   }
 
@@ -804,19 +826,19 @@ export function ProyectoFormulario({
                   <input
                     type="text"
                     value={nombreOficial}
-                    onChange={(e) => setNombreOficial(e.target.value)}
-                    className={inputClass}
+                    onChange={(e) => { setNombreOficial(e.target.value); setErrors(prev => ({...prev, nombreOficial: false})) }}
+                    className={errorInputClass(errors, 'nombreOficial')}
                     placeholder="Ej: Construcción del Paso a Desnivel e Intersección Vial CA-9 Sur Km 22.5"
                   />
                 </div>
 
                 <div>
-                  <label className={labelClass}>Descripción del Proyecto (Detalle de Alcance Vial)</label>
+                  <label className={labelClass}>Descripción del Proyecto (Detalle de Alcance Vial) <span className="text-[#9B0F06]">*</span></label>
                   <textarea
                     value={descripcion}
-                    onChange={(e) => setDescripcion(e.target.value)}
+                    onChange={(e) => { setDescripcion(e.target.value); setErrors(prev => ({...prev, descripcion: false})) }}
                     rows={2}
-                    className={inputClass}
+                    className={errorInputClass(errors, 'descripcion')}
                     placeholder="Describe a detalle el alcance físico: longitud en kilómetros, número de carriles, estructura de pavimento..."
                   />
                 </div>
@@ -831,12 +853,12 @@ export function ProyectoFormulario({
               />
               <div className="space-y-2">
                 <div>
-                  <label className={labelClass}>Ubicación Física (Texto Descriptivo)</label>
+                  <label className={labelClass}>Ubicación Física (Texto Descriptivo) <span className="text-[#9B0F06]">*</span></label>
                   <input
                     type="text"
                     value={ubicacionFisica}
-                    onChange={(e) => setUbicacionFisica(e.target.value)}
-                    className={inputClass}
+                    onChange={(e) => { setUbicacionFisica(e.target.value); setErrors(prev => ({...prev, ubicacionFisica: false})) }}
+                    className={errorInputClass(errors, 'ubicacionFisica')}
                     placeholder="Ej: Municipio de Villa Nueva, Departamento de Guatemala, Tramo CA-9 Sur Km 20 al 25"
                   />
                 </div>
@@ -975,7 +997,7 @@ export function ProyectoFormulario({
                           const fin = new Date(nuevaFin)
                           if (fin <= inicio) {
                             setErrorFechaFin(true)
-                            toast.error('La fecha de finalización debe ser posterior a la fecha de inicio')
+                            showErrorToast('La fecha de finalización debe ser posterior a la fecha de inicio')
                           } else {
                             setErrorFechaFin(false)
                           }
@@ -1046,7 +1068,7 @@ export function ProyectoFormulario({
                       size={1}
                     >
                       <option value="">Selecciona el responsable de obra...</option>
-                      {USUARIOS_MOCK.map((usuario) => (
+                      {usuariosDisponibles.map((usuario: any) => (
                         <option
                           key={usuario.id}
                           value={usuario.nombre}

@@ -38,9 +38,9 @@ export function FotografiaFiltros({
   onFechaHastaChange,
   onLimpiar,
   totalFotos,
-  tiposDisponibles,
-  proyectosDisponibles,
-  bitacorasDisponibles,
+  tiposDisponibles = [],
+  proyectosDisponibles = [],
+  bitacorasDisponibles = [],
 }: FotografiaFiltrosProps) {
   const hayFiltrosActivos =
     busqueda ||
@@ -78,7 +78,7 @@ export function FotografiaFiltros({
         className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-[10px] text-gray-700 bg-white focus:outline-none focus:border-[#9B0F06] w-36"
       >
         <option value="">Todos los tipos</option>
-        {tiposDisponibles.map((t) => {
+        {(tiposDisponibles ?? []).map((t) => {
           const labels: Record<TipoFotografia, string> = {
             avance: 'Avance',
             incidente: 'Incidente',
@@ -102,7 +102,7 @@ export function FotografiaFiltros({
         className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-[10px] text-gray-700 bg-white focus:outline-none focus:border-[#9B0F06] w-44"
       >
         <option value="todos">Todos los proyectos</option>
-        {proyectosDisponibles.map((p) => (
+        {(proyectosDisponibles ?? []).map((p) => (
           <option key={p} value={p}>
             {p}
           </option>
@@ -116,7 +116,7 @@ export function FotografiaFiltros({
         className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-[10px] text-gray-700 bg-white focus:outline-none focus:border-[#9B0F06] w-44"
       >
         <option value="">Todas las bitácoras</option>
-        {bitacorasDisponibles.map((b) => (
+        {(bitacorasDisponibles ?? []).map((b) => (
           <option key={b} value={b}>
             {b}
           </option>

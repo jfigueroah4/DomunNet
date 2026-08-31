@@ -38,14 +38,12 @@ export function esCorreo(identificador: string): boolean {
   return identificador.includes('@')
 }
 
-// NOTE: Session management and refresh tokens are delegated to Supabase Auth.
-// We no longer persist `sesion_usuario` in the database.
 
 export async function iniciarSesion(identificador: string, contrasena: string, ipAddress?: string, userAgent?: string) {
   let correo = identificador
 
   if (!esCorreo(identificador)) {
-    // Buscar correo por username en dato_usuario, haciendo join con usuario
+    // correo por username 
     const identificadorNormalizado = identificador.trim().toLowerCase()
     const { data: dato, error: errorBusqueda } = await clienteSupabase
       .from('dato_usuario')
@@ -54,7 +52,6 @@ export async function iniciarSesion(identificador: string, contrasena: string, i
       .maybeSingle()
 
     if (errorBusqueda || !dato || !dato.usuario) {
-      // Registrar intento fallido en seguridad_log
       await clienteSupabase.from('seguridad_log').insert({
         usuario_id: null,
         accion: 'login',
@@ -81,8 +78,6 @@ export async function iniciarSesion(identificador: string, contrasena: string, i
     password: contrasena,
   })
 
-  // Limpiar el contexto de auth después de signInWithPassword para que las consultas
-  // posteriores usen service_role en lugar de authenticated
   await clienteSupabase.auth.signOut()
 
   if (errorAuth || !accesoAuth.user) {
@@ -102,7 +97,6 @@ export async function iniciarSesion(identificador: string, contrasena: string, i
       hasUser: !!accesoAuth?.user,
     })
 
-    // Registrar intento fallido en seguridad_log
     await clienteSupabase.from('seguridad_log').insert({
       usuario_id: null,
       accion: 'login',
@@ -154,32 +148,17 @@ export async function iniciarSesion(identificador: string, contrasena: string, i
     return null
   }
 
-  if (!usuarioFila.rol_id) {
-    console.error('[autenticacion.servicio] Usuario sin rol_id', {
-      usuarioId: usuarioFila.id,
-      correo: usuarioFila.correo,
-    })
-    return null
-  }
-
-  let rol
-  try {
-    rol = await obtenerRolPorId(usuarioFila.rol_id)
-  } catch (errorRol) {
-    console.error('[autenticacion.servicio] Error obteniendo rol', {
-      usuarioId: usuarioFila.id,
-      rolId: usuarioFila.rol_id,
-      error: errorRol,
-    })
-    throw errorRol
-  }
-
-  if (!rol) {
-    console.error('[autenticacion.servicio] Rol no encontrado', {
-      usuarioId: usuarioFila.id,
-      rolId: usuarioFila.rol_id,
-    })
-    return null
+  let rol: { nombre: string; permisos: string[]; nivel_permisos: number } = { nombre: 'Sin rol asignado', permisos: [], nivel_permisos: 0 };
+  if (usuarioFila.rol_id) {
+    try {
+      const dbRol = await obtenerRolPorId(usuarioFila.rol_id);
+      if (dbRol) {
+        rol = { nombre: dbRol.nombre, permisos: dbRol.permisos, nivel_permisos: dbRol.nivel_permisos };
+      }
+    } catch (errorRol) {
+      console.error('[autenticacion.servicio] Error obteniendo rol', { error: errorRol });
+      throw errorRol;
+    }
   }
 
   const nombreCompleto = obtenerNombreCompleto(usuarioFila.dato_usuario)
@@ -210,7 +189,8 @@ export async function iniciarSesion(identificador: string, contrasena: string, i
       sub: usuarioFila.id,
       nombre: nombreCompleto,
       rol: rol.nombre,
-      permisos: rol.permisos,
+        permisos: rol.permisos,
+        nivel_permisos: rol.nivel_permisos,
     },
     entorno.jwtSecret,
     { expiresIn: '8h' }
@@ -233,7 +213,6 @@ export async function iniciarSesion(identificador: string, contrasena: string, i
     throw new Error(errorAcceso.message)
   }
 
-  // Registrar evento de seguridad: login exitoso
   const { error: errorLog } = await clienteSupabase.from('seguridad_log').insert({
     usuario_id: usuarioFila.id,
     accion: 'login',
@@ -263,8 +242,8 @@ export async function iniciarSesion(identificador: string, contrasena: string, i
       nombre: nombreCompleto,
       correo: usuarioFila.correo,
       rol: rol.nombre,
-      permisos: rol.permisos,
-    },
+        permisos: rol.permisos,
+        nivel_permisos: rol.nivel_permisos,
+      },
   }
 }
-// refresco de sesión ahora debe delegarse a Supabase Auth desde el cliente.

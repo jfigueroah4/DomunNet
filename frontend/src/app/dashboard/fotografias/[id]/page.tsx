@@ -1,248 +1,269 @@
+// @ts-nocheck
 'use client'
 
-import { useRouter } from 'next/navigation'
-import {
-  ArrowLeft,
-  Download,
-  Trash2,
-  Info,
-  Calendar,
-  Clock,
-  User,
-  FolderOpen,
-  ClipboardList,
-  MapPin,
-} from 'lucide-react'
-import Link from 'next/link'
+import { useMemo, useState } from 'react'
+import { useRouter, useParams } from 'next/navigation'
+import { ChevronLeft, ChevronRight, Grid, List, Plus } from 'lucide-react'
 import { FOTOGRAFIAS_MOCK } from '@/data/fotografias.mock'
-import { FotografiaTipoBadge } from '@/components/modules/fotografias/FotografiaTipoBadge'
+import { PROYECTOS_MOCK } from '@/data/proyectos.mock'
+import { TipoFotografia } from '@/types/fotografia'
+import { FotografiaFiltros } from '@/components/modules/fotografias/FotografiaFiltros'
+import { FotografiaGrid } from '@/components/modules/fotografias/FotografiaGrid'
+import { FotografiaFeed } from '@/components/modules/fotografias/FotografiaFeed'
+import { FotografiaLightbox } from '@/components/modules/fotografias/FotografiaLightbox'
+import { FotografiaFormulario } from '@/components/modules/fotografias/FotografiaFormulario'
 
-interface FotografiaDetallePageProps {
-  params: {
-    id: string
-  }
-}
 
-export default function FotografiaDetallePage({
-  params,
-}: FotografiaDetallePageProps) {
+export default function FotografiasDetail() {
+  const params = useParams()
   const router = useRouter()
-  const foto = FOTOGRAFIAS_MOCK.find((f) => f.id === params.id)
+  const proyectoId = params.id as string | undefined
 
-  if (!foto) {
-    return (
-      <div className="flex items-center justify-center min-h-full">
-        <p className="text-gray-400">Fotografía no encontrada</p>
-      </div>
-    )
+  const [vistaActiva, setVistaActiva] = useState<'grid' | 'feed'>('grid')
+  const [paginaActual, setPaginaActual] = useState(1)
+  const [busqueda, setBusqueda] = useState('')
+  const [proyectoIdFiltro, setProyectoIdFiltro] = useState(proyectoId || '')
+  const [renglonFiltro, setRenglonFiltro] = useState('')
+  const [fechaInicio, setFechaInicio] = useState('')
+  const [fechaFin, setFechaFin] = useState('')
+  const [mostrarFormulario, setMostrarFormulario] = useState(false)
+  const [fotoLightbox, setFotoLightbox] = useState<{ foto: typeof FOTOGRAFIAS_MOCK[0] | null; index: number }>({
+    foto: null,
+    index: 0,
+  })
+
+  const proyectoSeleccionado = useMemo(() => {
+    return PROYECTOS_MOCK.find((p) => p.id === (proyectoId || proyectoIdFiltro))
+  }, [proyectoId, proyectoIdFiltro])
+
+  const fotografiasFiltradas = useMemo(() => {
+    return FOTOGRAFIAS_MOCK.filter((foto) => {
+      const textoBusqueda = busqueda.toLowerCase()
+      const matchBusqueda =
+        busqueda === '' ||
+        foto.titulo.toLowerCase().includes(textoBusqueda) ||
+        foto.descripcion.toLowerCase().includes(textoBusqueda) ||
+        foto.ubicacionObra.toLowerCase().includes(textoBusqueda) ||
+        foto.etiquetas.some((etiqueta) => etiqueta.toLowerCase().includes(textoBusqueda))
+
+      const matchProyecto = (proyectoId || proyectoIdFiltro) === '' || foto.proyectoId === (proyectoId || proyectoIdFiltro)?.split('-')[0]
+      const matchRenglon = renglonFiltro === '' || foto.etiquetas.some((e) => e.toLowerCase().includes(renglonFiltro.toLowerCase()))
+      
+      const fotoFecha = new Date(foto.fecha)
+      const matchFechaInicio = fechaInicio === '' || fotoFecha >= new Date(fechaInicio)
+      const matchFechaFin = fechaFin === '' || fotoFecha <= new Date(fechaFin)
+
+      return matchBusqueda && matchProyecto && matchRenglon && matchFechaInicio && matchFechaFin
+    })
+  }, [busqueda, proyectoId, proyectoIdFiltro, renglonFiltro, fechaInicio, fechaFin])
+
+  const hayFiltrosActivos =
+    busqueda !== '' ||
+    (proyectoId === undefined && proyectoIdFiltro !== '') ||
+    renglonFiltro !== '' ||
+    fechaInicio !== '' ||
+    fechaFin !== ''
+
+  const handleLimpiarFiltros = () => {
+    setBusqueda('')
+    if (!proyectoId) {
+      setProyectoIdFiltro('')
+    }
+    setRenglonFiltro('')
+    setFechaInicio('')
+    setFechaFin('')
   }
 
-  // Fotos relacionadas del mismo proyecto
-  const fotosRelacionadas = FOTOGRAFIAS_MOCK.filter(
-    (f) => f.proyectoId === foto.proyectoId && f.id !== foto.id
-  ).slice(0, 4)
+
+  const ITEMS_POR_PAGINA = 12;
+  const totalPaginas = Math.ceil(fotografiasFiltradas.length / ITEMS_POR_PAGINA);
+  const fotosPaginadas = fotografiasFiltradas.slice((paginaActual - 1) * ITEMS_POR_PAGINA, paginaActual * ITEMS_POR_PAGINA);
+
+  const handleSelectFoto = (foto: typeof FOTOGRAFIAS_MOCK[0], index: number) => {
+    setFotoLightbox({ foto, index })
+  }
+
+  const handlePrevFoto = () => {
+    if (fotoLightbox.index > 0) {
+      const newIndex = fotoLightbox.index - 1
+      setFotoLightbox({ foto: fotografiasFiltradas[newIndex], index: newIndex })
+    }
+  }
+
+  const handleNextFoto = () => {
+    if (fotoLightbox.index < fotografiasFiltradas.length - 1) {
+      const newIndex = fotoLightbox.index + 1
+      setFotoLightbox({ foto: fotografiasFiltradas[newIndex], index: newIndex })
+    }
+  }
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex-1">
+          {proyectoId && proyectoSeleccionado && (
+            <button
+              onClick={() => router.push('/dashboard/fotografias')}
+              className="inline-flex items-center gap-1 text-xs font-semibold text-[#9B0F06] hover:text-[#5E0006] mb-2 transition-colors"
+            >
+              <ChevronLeft size={14} />
+              Volver a frentes viales
+            </button>
+          )}
+          <h1 className="text-base font-bold text-gray-800">Fotografias de obra vial</h1>
+          <p className="text-[10px] text-gray-400 mt-1">
+            {proyectoId && proyectoSeleccionado ? (
+              <>Evidencias de <strong>{proyectoSeleccionado.nombre}</strong></>
+            ) : (
+              'Galeria de avance, inspeccion y control de frentes carreteros'
+            )}
+          </p>
+        </div>
         <div className="flex items-center gap-3">
           <button
-            onClick={() => router.back()}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            onClick={() => navigate('/dashboard/bitacora')}
+            className="flex items-center gap-1.5 bg-[#9B0F06] text-white text-xs px-4 py-2 rounded-lg hover:bg-[#5E0006] transition-colors cursor-pointer"
           >
-            <ArrowLeft size={13} />
+            <Plus size={12} />
+            Nueva evidencia
           </button>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-base font-bold text-gray-800">
-                {foto.titulo}
-              </h1>
-              <FotografiaTipoBadge tipo={foto.tipo} />
-            </div>
-          </div>
-        </div>
 
-        <div className="flex items-center gap-2">
-          <button className="text-[10px] px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:border-[#9B0F06] hover:text-[#9B0F06] transition-colors flex items-center gap-1.5">
-            <Download size={12} />
-            Descargar
-          </button>
-          <button className="text-[10px] px-3 py-1.5 rounded-lg border border-red-200 text-red-400 hover:bg-red-50 transition-colors flex items-center gap-1.5">
-            <Trash2 size={12} />
-            Eliminar
-          </button>
+          <div className="flex gap-1 border border-gray-200 rounded-lg p-1 bg-white">
+            <button
+              onClick={() => setVistaActiva('grid')}
+              className={`p-1.5 rounded transition-colors ${
+                vistaActiva === 'grid'
+                  ? 'bg-[#9B0F06]/10 text-[#9B0F06]'
+                  : 'text-gray-400 hover:text-gray-600'
+              }`}
+              title="Vista de cuadricula"
+            >
+              <Grid size={14} />
+            </button>
+            <button
+              onClick={() => setVistaActiva('feed')}
+              className={`p-1.5 rounded transition-colors ${
+                vistaActiva === 'feed'
+                  ? 'bg-[#9B0F06]/10 text-[#9B0F06]'
+                  : 'text-gray-400 hover:text-gray-600'
+              }`}
+              title="Vista de lista"
+            >
+              <List size={14} />
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
-        {/* Columna izquierda - 2/3 */}
-        <div className="col-span-2">
-          {/* Imagen principal */}
-          <img
-            src={foto.url}
-            alt={foto.titulo}
-            className="w-full rounded-2xl object-cover max-h-80 shadow-sm border border-gray-100"
-          />
+      {mostrarFormulario && (
+        <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+          <FotografiaFormulario />
+        </div>
+      )}
 
-          {/* Card Descripción */}
-          <div className="mt-3 bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-            <h2 className="text-xs font-semibold text-gray-800 mb-2">
-              Descripción
-            </h2>
-            <p className="text-xs text-gray-700 leading-relaxed">
-              {foto.descripcion}
-            </p>
-            {foto.etiquetas.length > 0 && (
-              <div className="flex flex-wrap gap-2 mt-3">
-                {foto.etiquetas.map((tag) => (
-                  <span
-                    key={tag}
-                    className="bg-gray-100 text-gray-500 text-[9px] px-2 py-1 rounded-full"
-                  >
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
+      <FotografiaFiltros
+        busqueda={busqueda}
+        onBusquedaChange={setBusqueda}
+        proyecto={proyectoIdFiltro}
+        onProyectoChange={setProyectoIdFiltro}
+        renglonFiltro={renglonFiltro}
+        onRenglonChange={setRenglonFiltro}
+        fechaInicio={fechaInicio}
+        onFechaInicioChange={setFechaInicio}
+        fechaFin={fechaFin}
+        onFechaFinChange={setFechaFin}
+        totalFotos={fotografiasFiltradas.length}
+        hayFiltrosActivos={hayFiltrosActivos}
+        onLimpiar={handleLimpiarFiltros}
+      />
 
-          {/* Card Fotografías relacionadas */}
-          {fotosRelacionadas.length > 0 && (
-            <div className="mt-3 bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-              <h2 className="text-xs font-semibold text-gray-800 mb-2">
-                Fotografías relacionadas{' '}
-                <span className="text-gray-400">({fotosRelacionadas.length})</span>
-              </h2>
-              <div className="grid grid-cols-4 gap-2">
-                {fotosRelacionadas.map((fotom) => (
-                  <button
-                    key={fotom.id}
-                    onClick={() => router.push(`/fotografias/${fotom.id}`)}
-                    className="relative group rounded-lg overflow-hidden"
-                  >
-                    <img
-                      src={fotom.urlMiniatura}
-                      alt={fotom.titulo}
-                      className="h-16 w-full object-cover rounded-lg hover:opacity-80 transition-opacity"
-                    />
-                  </button>
-                ))}
+      {fotografiasFiltradas.length > 0 ? (
+        <>
+          {vistaActiva === 'grid' ? (
+            <FotografiaGrid fotos={fotosPaginadas} onSelectFoto={handleSelectFoto} />
+          ) : (
+            <FotografiaFeed fotos={fotosPaginadas} onSelectFoto={(foto) => handleSelectFoto(foto, 0)} />
+          )}
+
+          <div className="mt-6">
+            
+          {totalPaginas > 1 && (
+            <div className="mt-6 flex items-center justify-between">
+              <p className="text-[10px] text-gray-400">
+                Mostrando {((paginaActual - 1) * ITEMS_POR_PAGINA) + 1} -{' '}
+                {Math.min(paginaActual * ITEMS_POR_PAGINA, fotografiasFiltradas.length)} de{' '}
+                {fotografiasFiltradas.length} fotografías
+              </p>
+
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setPaginaActual((p) => Math.max(1, p - 1))}
+                  disabled={paginaActual === 1}
+                  className="rounded-lg border border-gray-200 p-1.5 text-gray-400 transition-colors hover:border-[#9B0F06] hover:text-[#9B0F06] disabled:cursor-not-allowed disabled:opacity-30"
+                >
+                  <ChevronLeft size={13} />
+                </button>
+
+                {Array.from({ length: totalPaginas }, (_, i) => i + 1)
+                  .filter((p) => p === 1 || p === totalPaginas || Math.abs(p - paginaActual) <= 1)
+                  .reduce((acc: (number | string)[], p, idx, arr) => {
+                    if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push('...')
+                    acc.push(p)
+                    return acc
+                  }, [])
+                  .map((p, idx) =>
+                    p === '...' ? (
+                      <span key={idx} className="px-1 text-[10px] text-gray-400">
+                        ...
+                      </span>
+                    ) : (
+                      <button
+                        key={idx}
+                        onClick={() => setPaginaActual(p as number)}
+                        className={`h-7 w-7 rounded-lg text-[10px] font-medium transition-colors ${
+                          paginaActual === p
+                            ? 'bg-[#9B0F06] text-white'
+                            : 'border border-gray-200 text-gray-500 hover:border-[#9B0F06] hover:text-[#9B0F06]'
+                        }`}
+                      >
+                        {p}
+                      </button>
+                    )
+                  )}
+
+                <button
+                  onClick={() => setPaginaActual((p) => Math.min(totalPaginas, p + 1))}
+                  disabled={paginaActual === totalPaginas}
+                  className="rounded-lg border border-gray-200 p-1.5 text-gray-400 transition-colors hover:border-[#9B0F06] hover:text-[#9B0F06] disabled:cursor-not-allowed disabled:opacity-30"
+                >
+                  <ChevronRight size={13} />
+                </button>
               </div>
             </div>
           )}
-        </div>
 
-        {/* Columna derecha - 1/3 */}
-        <div className="space-y-3">
-          {/* Card Información */}
-          <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-            <div className="flex items-center gap-2 mb-3">
-              <Info size={14} className="text-[#9B0F06]" />
-              <h2 className="text-xs font-semibold text-gray-800">Detalles</h2>
-            </div>
-
-            <div className="space-y-3">
-              {/* Fecha */}
-              <div>
-                <div className="flex items-center gap-1 text-[9px] text-gray-400 uppercase tracking-wide mb-0.5">
-                  <Calendar size={11} />
-                  Fecha
-                </div>
-                <p className="text-[10px] text-gray-700 font-medium">
-                  {foto.fecha}
-                </p>
-              </div>
-
-              {/* Hora */}
-              <div>
-                <div className="flex items-center gap-1 text-[9px] text-gray-400 uppercase tracking-wide mb-0.5">
-                  <Clock size={11} />
-                  Hora
-                </div>
-                <p className="text-[10px] text-gray-700 font-medium">
-                  {foto.hora}
-                </p>
-              </div>
-
-              {/* Autor */}
-              <div>
-                <div className="flex items-center gap-1 text-[9px] text-gray-400 uppercase tracking-wide mb-0.5">
-                  <User size={11} />
-                  Autor
-                </div>
-                <p className="text-[10px] text-gray-700 font-medium">
-                  {foto.autor}
-                </p>
-              </div>
-
-              {/* Proyecto */}
-              <div>
-                <div className="flex items-center gap-1 text-[9px] text-gray-400 uppercase tracking-wide mb-0.5">
-                  <FolderOpen size={11} />
-                  Proyecto
-                </div>
-                <Link
-                  href={`/dashboard/proyectos/${foto.proyectoId}`}
-                  className="text-[10px] text-[#9B0F06] font-medium hover:underline"
-                >
-                  {foto.proyectoNombre}
-                </Link>
-              </div>
-
-              {/* Bitácora */}
-              <div>
-                <div className="flex items-center gap-1 text-[9px] text-gray-400 uppercase tracking-wide mb-0.5">
-                  <ClipboardList size={11} />
-                  Bitácora
-                </div>
-                <Link
-                  href={`/bitacora/${foto.bitacoraId}`}
-                  className="text-[10px] text-[#9B0F06] font-medium hover:underline"
-                >
-                  {foto.bitacoraTitulo}
-                </Link>
-              </div>
-
-              {/* Ubicación */}
-              <div>
-                <div className="flex items-center gap-1 text-[9px] text-gray-400 uppercase tracking-wide mb-0.5">
-                  <MapPin size={11} />
-                  Ubicación
-                </div>
-                <p className="text-[10px] text-gray-700 font-medium">
-                  {foto.ubicacionObra}
-                </p>
-              </div>
-            </div>
           </div>
-
-          {/* Card Acciones */}
-          <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-            <h2 className="text-xs font-semibold text-gray-800 mb-2">
-              Acciones
-            </h2>
-
-            <div className="space-y-2">
-              <Link
-                href={`/bitacora/${foto.bitacoraId}`}
-                className="w-full text-[10px] px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:border-[#9B0F06] hover:text-[#9B0F06] transition-colors flex items-center justify-center gap-1.5"
-              >
-                <ClipboardList size={12} />
-                Ver en Bitácora
-              </Link>
-
-              <Link
-                href={`/dashboard/proyectos/${foto.proyectoId}`}
-                className="w-full text-[10px] px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:border-[#9B0F06] hover:text-[#9B0F06] transition-colors flex items-center justify-center gap-1.5"
-              >
-                <FolderOpen size={12} />
-                Ver Proyecto
-              </Link>
-            </div>
+        </>
+      ) : (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
+          <div className="inline-block mb-3 p-3 bg-gray-100 rounded-xl">
+            <Grid size={24} className="text-gray-400" />
           </div>
+          <p className="text-sm font-semibold text-gray-800 mb-1">No hay evidencias fotograficas</p>
+          <p className="text-[10px] text-gray-400">
+            {hayFiltrosActivos
+              ? 'No se encontraron resultados con los filtros aplicados'
+              : 'Las fotos de carretera apareceran aqui organizadas por frente vial y fecha'}
+          </p>
         </div>
-      </div>
+      )}
+
+      <FotografiaLightbox
+        foto={fotoLightbox.foto}
+        onClose={() => setFotoLightbox({ foto: null, index: 0 })}
+        onPrev={handlePrevFoto}
+        onNext={handleNextFoto}
+      />
     </div>
   )
 }

@@ -12,11 +12,9 @@ export interface SolicitudAutenticada extends Request {
 export function autenticarSolicitud(req: SolicitudAutenticada, res: Response, next: NextFunction) {
   let token: string | null = null
 
-  // 1. Intentar obtener el token desde la cookie
   const cookieHeader = req.headers.cookie
   token = obtenerCookie(cookieHeader, 'token')
 
-  // 2. Si no está en cookie, intentar desde la cabecera Authorization
   if (!token) {
     const encabezado = req.headers.authorization
     if (encabezado?.startsWith('Bearer ')) {

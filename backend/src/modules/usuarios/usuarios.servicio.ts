@@ -199,6 +199,16 @@ async function validarUsernameUnico(username: string, idUsuarioIgnorado?: string
   }
 }
 
+
+export async function verificarCorreoDisponible(correo: string, excluirId?: string): Promise<boolean> {
+  try {
+    await validarCorreoUnico(correo, excluirId)
+    return true
+  } catch (error) {
+    return false
+  }
+}
+
 export async function verificarUsernameDisponible(username: string, excluirId?: string): Promise<boolean> {
   try {
     await validarUsernameUnico(username, excluirId)

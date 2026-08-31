@@ -1,4 +1,4 @@
-import { Request, Response } from 'express'
+﻿import { Request, Response } from 'express'
 import { sendResponse, sendError } from '@/shared/response'
 import { tablasPermitidas } from './models'
 import { logger } from '@/shared/utils/logger'
@@ -7,7 +7,7 @@ import { z } from 'zod'
 
 const paginationSchema = z.object({
   pagina: z.coerce.number().min(1).default(1),
-  limite: z.coerce.number().min(1).max(100).default(10),
+  limite: z.coerce.number().min(1).default(10),
   busqueda: z.string().optional(),
   columnaOrden: z.string().optional(),
   direccionOrden: z.enum(['asc', 'desc']).optional().default('asc'),
@@ -17,10 +17,12 @@ const paginationSchema = z.object({
 export async function listar(req: any, res: Response) {
   const { tabla } = req.params;
   const config = tablasPermitidas[tabla];
-  if (!config) return sendError(res, 404, `La tabla '${tabla}' no existe o no está permitida`);
+  if (!config) return sendError(res, 404, `La tabla '${tabla}' no existe o no estÃ¡ permitida`);
   
   const query = paginationSchema.safeParse(req.query);
-  if (!query.success) return sendError(res, 400, 'Parámetros inválidos');
+  if (!query.success) return sendError(res, 400, 'ParÃ¡metros invÃ¡lidos');
+  const maxLimit = config.limiteMaximo ?? 100;
+  const appliedLimit = Math.min(query.data.limite, maxLimit);
   
   let parsedFiltros = {};
   if (query.data.filtros) {
@@ -29,10 +31,10 @@ export async function listar(req: any, res: Response) {
   
   try {
     const { data, total } = await listarRegistros(
-      config, query.data.pagina, query.data.limite, query.data.busqueda, 
+      config, query.data.pagina, appliedLimit, query.data.busqueda, 
       query.data.columnaOrden, query.data.direccionOrden, parsedFiltros
     );
-    return res.status(200).json({ success: true, data, total, pagina: query.data.pagina, limite: query.data.limite });
+    return res.status(200).json({ success: true, data, total, pagina: query.data.pagina, limite: appliedLimit });
   } catch (error: any) {
     return sendError(res, 500, `Error al listar ${tabla}`, error.message);
   }
@@ -90,3 +92,4 @@ export async function eliminar(req: any, res: Response) {
     return sendError(res, 500, `Error al eliminar registro`, error.message);
   }
 }
+

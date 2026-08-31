@@ -3,11 +3,10 @@
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import { Plus, ChevronLeft, ChevronRight } from 'lucide-react'
-import { DEMO_ROLES, Role } from '@/data/roles'
-import { USUARIOS_MOCK } from '@/data/usuarios.mock'
+
 import { type RoleDrawerMode } from '@/components/modules/roles/RoleDrawer'
 import { showSuccessToast } from '@/hooks/useCustomToast'
-import { toast } from 'sonner'
+
 import dynamic from 'next/dynamic'
 import { useEffect } from 'react'
 import { Search } from 'lucide-react'
@@ -18,12 +17,28 @@ const RoleDeleteModal = dynamic(() => import('@/components/modules/roles/RoleDel
 
 
 export default function RolesPage() {
-  const [roles, setRoles] = useState(DEMO_ROLES)
+  const [roles, setRoles] = useState<any[]>([])
+    
+  const fetchRoles = async () => {
+    try {
+      const { api } = await import('@/lib/api/cliente');
+      const res = await api.get('/roles');
+      setRoles(res.data?.data || []);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      ;
+    }
+  }
+  
+  useEffect(() => {
+    fetchRoles();
+  }, [])
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [drawerMode, setDrawerMode] = useState<RoleDrawerMode>('create')
-  const [roleActivo, setRoleActivo] = useState<Role | undefined>()
+  const [roleActivo, setRoleActivo] = useState<any | undefined>()
   const [deleteOpen, setDeleteOpen] = useState(false)
-  const [roleEliminar, setRoleEliminar] = useState<Role | undefined>()
+  const [roleEliminar, setRoleEliminar] = useState<any | undefined>()
   
   const [busqueda, setBusqueda] = useState('')
   const [debouncedBusqueda, setDebouncedBusqueda] = useState('')
@@ -43,20 +58,21 @@ export default function RolesPage() {
   const rolesConUsuarios = useMemo(
     () =>
       roles.filter((role) => {
+        const name = role.name || role.nombre;
+        const descripcion = role.descripcion || '';
         const cumpleBusqueda =
-          role.name.toLowerCase().includes(debouncedBusqueda.toLowerCase()) ||
-          role.descripcion.toLowerCase().includes(debouncedBusqueda.toLowerCase())
+          name.toLowerCase().includes(debouncedBusqueda.toLowerCase()) ||
+          descripcion.toLowerCase().includes(debouncedBusqueda.toLowerCase())
           
         const cumpleEstado = filtroEstado === 'Todos' || role.estado === filtroEstado
         
         return cumpleBusqueda && cumpleEstado
       }).map((role) => {
-        const usuariosAsignados = USUARIOS_MOCK.filter(
-          (usuario) => usuario.rol.toLowerCase() === role.name.toLowerCase()
-        )
-
+        const usuariosAsignados = role.usuariosAsignados || [];
+        const name = role.name || role.nombre;
         return {
           ...role,
+          name,
           usuariosAsignados,
         }
       }),
@@ -74,13 +90,13 @@ export default function RolesPage() {
     setPaginaActual(1)
   }, [debouncedBusqueda, filtroEstado, registrosPorPagina])
 
-  const abrirDrawer = (mode: RoleDrawerMode, role?: Role) => {
+  const abrirDrawer = (mode: RoleDrawerMode, role?: any) => {
     setRoleActivo(role)
     setDrawerMode(mode)
     setDrawerOpen(true)
   }
 
-  const handleGuardarRole = (payload: {
+  const handleGuardarRole = async (payload: {
     name: string
     email: string
     descripcion: string
@@ -90,46 +106,37 @@ export default function RolesPage() {
     permisos: string[]
     usuariosAsignados: string[]
   }) => {
-    const ejecutarGuardado = () => {
-      if (drawerMode === 'edit' && roleActivo) {
-        setRoles((actuales) =>
-          actuales.map((role) =>
-            role.id === roleActivo.id
-              ? {
-                  ...role,
-                  name: payload.name,
-                  email: payload.email,
-                  descripcion: payload.descripcion,
-                  color: payload.color,
-                  estado: payload.estado,
-                  nivelJerarquico: payload.nivelJerarquico,
-                  permisos: payload.permisos,
-                }
-              : role
-          )
-        )
-        showSuccessToast('Rol actualizado exitosamente')
-        return
-      }
+    console.log('PAYLOAD RECIBIDO:', payload);
+    const ejecutarGuardado = async () => {
+      try {
+        const { api } = await import('@/lib/api/cliente');
+        const payloadApi = {
+          nombre: payload.name,
+          descripcion: payload.descripcion,
+          color: payload.color || '#6d28d9',
+          estado: payload.estado || 'Activo',
+          permisos: payload.permisos,
+          usuariosAsignados: payload.usuariosAsignados
+        };
 
-      const nuevoRol: Role = {
-        id: `role-${Date.now()}`,
-        name: payload.name || 'Nuevo Rol',
-        email: payload.email,
-        descripcion: payload.descripcion,
-        color: payload.color,
-        estado: payload.estado,
-        nivelJerarquico: payload.nivelJerarquico,
-        permisos: payload.permisos,
+        if (drawerMode === 'edit' && roleActivo) {
+          await api.put(`/roles/${roleActivo.id}`, payloadApi);
+          showSuccessToast('Rol actualizado exitosamente');
+        } else {
+          await api.post('/roles', payloadApi);
+          showSuccessToast('Rol creado exitosamente');
+        }
+        await fetchRoles(); // Reload from DB
+        closeDrawer();
+      } catch (e) {
+        console.error(e);
       }
-
-      setRoles((actuales) => [nuevoRol, ...actuales])
-      showSuccessToast('Rol creado exitosamente')
     }
 
-    if (payload.estado === 'Inactivo' && payload.usuariosAsignados.length > 0) {
+    if (payload.estado === 'Inactivo' && roleActivo?.estado !== 'Inactivo' && payload.usuariosAsignados.length > 0) {
+      const { toast } = await import('sonner');
       toast('Confirmación requerida', {
-        description: `Se inhabilitarán ${payload.usuariosAsignados.length} usuarios asociados a este rol. Â¿Deseas continuar?`,
+        description: `Se inhabilitarán ${payload.usuariosAsignados.length} usuarios asociados a este rol. ¿Deseas continuar?`,
         duration: 10000,
         action: {
           label: 'Continuar',
@@ -143,10 +150,10 @@ export default function RolesPage() {
       return;
     }
 
-    ejecutarGuardado()
+    await ejecutarGuardado()
   }
 
-  const handleDelete = (role: Role) => {
+  const handleDelete = (role: any) => {
     setRoleEliminar(role)
     setDeleteOpen(true)
   }
@@ -274,13 +281,7 @@ export default function RolesPage() {
         onSave={handleGuardarRole}
         role={roleActivo}
         mode={drawerMode}
-        usuariosAsignados={
-          roleActivo
-            ? USUARIOS_MOCK.filter(
-                (usuario) => usuario.rol.toLowerCase() === roleActivo.name.toLowerCase()
-              )
-            : []
-        }
+        usuariosAsignados={roleActivo ? roleActivo.usuariosAsignados : []}
       />
 
       <RoleDeleteModal
@@ -289,10 +290,16 @@ export default function RolesPage() {
           setDeleteOpen(false)
           setRoleEliminar(undefined)
         }}
-        onConfirm={() => {
+        onConfirm={async () => {
           if (roleEliminar) {
-            setRoles((actuales) => actuales.filter((role) => role.id !== roleEliminar.id))
-            showSuccessToast('Rol eliminado exitosamente')
+            try {
+              const { api } = await import('@/lib/api/cliente');
+              await api.delete(`/roles/${roleEliminar.id}`);
+              showSuccessToast('Rol eliminado exitosamente');
+              await fetchRoles(); // Reload from DB
+            } catch (e) {
+              console.error(e);
+            }
           }
           setDeleteOpen(false)
           setRoleEliminar(undefined)
@@ -302,9 +309,3 @@ export default function RolesPage() {
     </div>
   )
 }
-
-
-
-
-
-

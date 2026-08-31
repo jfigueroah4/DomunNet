@@ -1,4 +1,4 @@
-﻿import { ProyectoDetalleView } from '@/components/modules/proyectos/ProyectoDetalleView'
+import { ProyectoDetalleView } from '@/components/modules/proyectos/ProyectoDetalleView'
 import { proyectoService } from '@/services/proyectos/proyecto.service'
 import { redirect } from 'next/navigation'
 
@@ -16,4 +16,4 @@ export default async function ProyectoDetallesPage({
   const proyecto = await proyectoService.getProyectoBySlug(slug)
 
   return <ProyectoDetalleView proyecto={proyecto} />
-}
+}

@@ -1,4 +1,4 @@
-﻿import { ProyectoEditorView } from '@/components/modules/proyectos/ProyectoEditorView'
+import { ProyectoEditorView } from '@/components/modules/proyectos/ProyectoEditorView'
 import { proyectoService } from '@/services/proyectos/proyecto.service'
 import { redirect } from 'next/navigation'
 
@@ -16,4 +16,4 @@ export default async function ProyectoEditarPage({
   const proyecto = await proyectoService.getProyectoBySlug(slug)
 
   return <ProyectoEditorView modo="editar" proyectoInicial={proyecto} />
-}
+}

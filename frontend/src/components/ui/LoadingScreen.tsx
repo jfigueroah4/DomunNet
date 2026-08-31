@@ -8,7 +8,6 @@ export default function LoadingScreen() {
   const [fade, setFade] = useState(false)
 
   useEffect(() => {
-    // Eliminado el check de sessionStorage para que aparezca siempre al recargar
     setShow(true)
 
     const fadeTimer = setTimeout(() => {
@@ -34,7 +33,6 @@ export default function LoadingScreen() {
         fade ? 'opacity-0 pointer-events-none' : 'opacity-100'
       }`}
     >
-      {/* Script de escape/fallback de emergencia por si la hidratación de JS tarda o se bloquea */}
       <script
         dangerouslySetInnerHTML={{
           __html: `
@@ -53,7 +51,6 @@ export default function LoadingScreen() {
         }}
       />
       <div className="flex flex-col items-center gap-4">
-        {/* Animated Logo */}
         <div className="relative w-16 h-16 animate-pulse">
           <Image
             src="/logo.png"
@@ -64,7 +61,6 @@ export default function LoadingScreen() {
           />
         </div>
 
-        {/* Loading Text and Indicator */}
         <div className="flex flex-col items-center gap-1.5 mt-2">
           <span className="text-[10px] font-bold text-gray-500 tracking-[0.2em] uppercase">
             Cargando

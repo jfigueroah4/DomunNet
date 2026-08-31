@@ -17,11 +17,12 @@ export interface Usuario {
   username?: string | null
   nombre: string
   correo: string
-  rol: RolUsuario
+  rol: RolUsuario | null
   estado: EstadoUsuario
   fechaCreacion: string
   ultimoAcceso?: string
   telefono?: string
   fecha_nacimiento?: string | null
+  direccion?: string | null
   avatar?: string
 }

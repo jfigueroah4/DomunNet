@@ -13,7 +13,7 @@ interface FotografiaGridProps {
 export function FotografiaGrid({ fotos, onFotoClick }: FotografiaGridProps) {
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-      {fotos.map((foto, index) => (
+      {(fotos ?? []).map((foto, index) => (
         <div
           key={foto.id}
           className="relative group rounded-xl overflow-hidden cursor-pointer bg-white shadow-sm border border-gray-100 hover:shadow-md transition-shadow"

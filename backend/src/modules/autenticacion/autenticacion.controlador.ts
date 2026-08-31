@@ -34,7 +34,6 @@ export async function iniciarSesionControlador(req: Request, res: Response) {
       return sendError(res, 401, 'Credenciales incorrectas')
     }
 
-    // Configurar cookie del token; el refresh debe manejarlo el cliente/Supabase
     res.cookie('token', acceso.token, {
       httpOnly: true,
       secure: entorno.modo === 'production',
@@ -59,7 +58,6 @@ export async function iniciarSesionControlador(req: Request, res: Response) {
 export async function cerrarSesionControlador(req: Request, res: Response) {
   const cookieHeader = req.headers.cookie
   try {
-    // No eliminamos sesiones en BD; Supabase Auth maneja la invalidación.
     res.clearCookie('token')
     res.clearCookie('refreshToken')
 
@@ -91,6 +89,7 @@ export async function obtenerPerfilControlador(req: SolicitudAutenticada, res: R
           apellido: '',
           rol: req.usuario.rol,
           permisos: req.usuario.permisos,
+          nivel_permisos: req.usuario.nivel_permisos,
         },
         'Perfil recuperado (token)'
       )
@@ -123,6 +122,7 @@ export async function obtenerPerfilControlador(req: SolicitudAutenticada, res: R
         cargo: '',
         rol: req.usuario.rol,
         permisos: req.usuario.permisos,
+          nivel_permisos: req.usuario.nivel_permisos,
       },
       'Perfil recuperado'
     )

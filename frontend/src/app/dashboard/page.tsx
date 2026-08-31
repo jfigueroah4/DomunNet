@@ -10,52 +10,68 @@ import {
   Users,
   Settings2,
 } from 'lucide-react'
+import { tienePermiso, RUTAS_PERMISOS } from '@/lib/rutas-permisos'
+import { useAuthStore } from '@/stores/useAuthStore'
+import { useMemo } from 'react'
 
 export default function DashboardPage() {
-  const modules = [
-    {
-      name: 'Proyectos',
-      icon: FolderOpen,
-      bgColor: 'bg-gradient-to-br from-[#B91C1C] to-[#E57373]',
-      href: '/dashboard/proyectos',
-      description: 'Gestión y control integral de obras viales',
-    },
-    {
-      name: 'Bitácora',
-      icon: ClipboardList,
-      bgColor: 'bg-gradient-to-br from-[#E2542F] to-[#E87070]',
-      href: '/dashboard/bitacora',
-      description: 'Registro diario de avances de campo y eventos',
-    },
-    {
-      name: 'Fotografías',
-      icon: Camera,
-      bgColor: 'bg-gradient-to-br from-[#E86B2A] to-[#F4A460]',
-      href: '/dashboard/fotografias',
-      description: 'Galería técnica y evidencia fotográfica',
-    },
-    {
-      name: 'Reportes',
-      icon: BarChart2,
-      bgColor: 'bg-gradient-to-br from-[#E26B00] to-[#E8A000]',
-      href: '/dashboard/reportes',
-      description: 'Generación de informes y hojas de liquidación',
-    },
-    {
-      name: 'Usuarios',
-      icon: Users,
-      bgColor: 'bg-gradient-to-br from-[#F08A86] to-[#F3D7B2]',
-      href: '/dashboard/usuarios',
-      description: 'Administración de personal y permisos',
-    },
-    {
-      name: 'Configuración',
-      icon: Settings2,
-      bgColor: 'bg-gradient-to-br from-[#7B736F] to-[#6D6661]',
-      href: '/dashboard/configuracion',
-      description: 'Ajustes del sistema y tablas de mantenimiento',
-    },
-  ]
+
+  const { profile } = useAuthStore()
+
+  const modules = useMemo(() => {
+    const rawModules = [
+      {
+        name: 'Proyectos',
+        icon: FolderOpen,
+        bgColor: 'bg-gradient-to-br from-[#B91C1C] to-[#E57373]',
+        href: '/dashboard/proyectos',
+        description: 'Gestión y control integral de obras viales',
+      },
+      {
+        name: 'Bitácora',
+        icon: ClipboardList,
+        bgColor: 'bg-gradient-to-br from-[#E2542F] to-[#E87070]',
+        href: '/dashboard/bitacora',
+        description: 'Registro diario de avances de campo y eventos',
+      },
+      {
+        name: 'Fotografías',
+        icon: Camera,
+        bgColor: 'bg-gradient-to-br from-[#E86B2A] to-[#F4A460]',
+        href: '/dashboard/fotografias',
+        description: 'Galería técnica y evidencia fotográfica',
+      },
+      {
+        name: 'Reportes',
+        icon: BarChart2,
+        bgColor: 'bg-gradient-to-br from-[#E26B00] to-[#E8A000]',
+        href: '/dashboard/reportes',
+        description: 'Dashboard ejecutivo, alertas y analíticas',
+      },
+      {
+        name: 'Usuarios',
+        icon: Users,
+        bgColor: 'bg-gradient-to-br from-[#6b7280] to-[#9ca3af]',
+        href: '/dashboard/usuarios',
+        description: 'Gestión de accesos y roles del sistema',
+      },
+      {
+        name: 'Configuración',
+        icon: Settings2,
+        bgColor: 'bg-gradient-to-br from-[#4b5563] to-[#6b7280]',
+        href: '/dashboard/configuracion',
+        description: 'Ajustes globales y catálogos maestros',
+      },
+    ]
+
+    const permisos = profile?.permisos || []
+    
+    return rawModules.filter(mod => {
+      const permisoRequerido = RUTAS_PERMISOS[mod.href]
+      if (!permisoRequerido) return true
+      return tienePermiso(permisos, permisoRequerido)
+    })
+  }, [profile?.permisos])
 
   return (
     <div className="space-y-4 p-2 md:p-3">

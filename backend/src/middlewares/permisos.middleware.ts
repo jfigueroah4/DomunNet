@@ -1,72 +1,21 @@
-import { NextFunction, Response } from 'express'
+﻿import { NextFunction, Response } from 'express'
 import { sendError } from '@/shared/response'
 import { PermisoClave, RolNombre } from '@/shared/types/api.types'
 import { SolicitudAutenticada } from '@/middlewares/autenticacion.middleware'
 
-const permisosPorDefecto: Record<string, string[]> = {
-  Administrador: [
-    '*.read',
-    '*.write',
-    '*.delete',
-    '*.export',
-    '*.admin',
-  ],
-  Gerencia: [
-    'dashboard.read',
-    'reportes.read',
-    'reportes.export',
-    'proyectos.read',
-    'alertas.read',
-    'finanzas.read',
-  ],
-  IngenieroResidente: [
-    'bitacora.read',
-    'bitacora.write',
-    'bitacora.firmar',
-    'control_calidad.read',
-    'control_calidad.write',
-    'hoja_sabana.read',
-    'hoja_sabana.write',
-    'reportes.read',
-    'reportes.export',
-    'plazos.read',
-    'plazos.write',
-  ],
-  Laboratorista: [
-    'control_calidad.read',
-    'control_calidad.write',
-    'bitacora.read',
-  ],
-  AuxiliarDeCampo: [
-    'bitacora.read',
-    'bitacora.write',
-    'evidencia_fotografica.read',
-    'evidencia_fotografica.write',
-    'clima.read',
-    'clima.write',
-    'ubicacion.read',
-    'ubicacion.write',
-  ],
-  Contratante: [
-    'dashboard.read',
-    'reportes.read',
-    'reportes.export',
-    'proyectos.read',
-    'evidencia_fotografica.read',
-  ],
-}
-
-export function permisosDeRol(rol: string): string[] {
-  return permisosPorDefecto[rol] || []
-}
-
 export function tienePermiso(permisosUsuario: string[], permisoRequerido: string): boolean {
+  if (!permisosUsuario || !Array.isArray(permisosUsuario)) {
+    return false;
+  }
+  
   const parts = permisoRequerido.split('.')
   const modulo = parts[0]
   const accion = parts[1] || ''
+  
   return (
     permisosUsuario.includes(permisoRequerido) ||
     permisosUsuario.includes('*') ||
+    permisosUsuario.includes('*.*') ||
     permisosUsuario.includes(`*.${accion}`) ||
     permisosUsuario.includes(`${modulo}.*`)
   )
@@ -79,7 +28,7 @@ export function requierePermisos(...permisos: string[]) {
       return sendError(res, 401, 'No autenticado')
     }
 
-    const permisosUsuario = usuario.permisos?.length ? usuario.permisos : permisosDeRol(usuario.rol)
+    const permisosUsuario = usuario.permisos || []
 
     const autorizado = permisos.some((permiso) => tienePermiso(permisosUsuario, permiso))
 
