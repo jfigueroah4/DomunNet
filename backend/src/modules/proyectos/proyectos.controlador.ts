@@ -44,7 +44,11 @@ const crearProyectoSchema = z.object({
   fechaAdjudicacion: z.string().optional().nullable(),
   fechaInicioContractual: z.string().optional().nullable(),
   numeroEscrituraPublica: z.string().optional().nullable(),
-  montoContractualOriginal: z.number().optional().nullable()
+  montoContractualOriginal: z.number().optional().nullable(),
+  plazoEjecucionOriginal: z.string().optional().nullable(),
+  plazoEjecucionRealAmpliado: z.string().optional().nullable(),
+  fechaFinalizacionReal: z.string().optional().nullable(),
+  equipo: z.array(z.object({ id: z.string().uuid().optional(), rol: z.string().optional() })).optional().nullable()
 })
 
 export async function crearProyectoControlador(req: Request, res: Response) {

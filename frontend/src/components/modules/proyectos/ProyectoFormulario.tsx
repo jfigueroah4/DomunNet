@@ -130,7 +130,7 @@ function EquipoAsignadoSelector({
     const rolFormateado = userObj.cargo || userObj.rol.charAt(0).toUpperCase() + userObj.rol.slice(1)
 
     const nuevoMiembro: MiembroEquipo = {
-      id: Date.now().toString(),
+      id: userObj.id,
       nombre: userObj.nombre,
       rol: rolFormateado,
     }
@@ -1069,7 +1069,7 @@ export function ProyectoFormulario({
                   <div className="relative">
                     <label className={labelClass}>Ingeniero Responsable / Director</label>
                     <Combobox
-  options={usuariosDisponibles.map((u: any) => ({ value: u.nombre, label: u.nombre + ' @' + (u.username || (u.correo ? u.correo.split('@')[0] : '')) + ' (' + u.rol + ')' }))}
+  options={usuariosDisponibles.map((u: any) => ({ value: u.id, label: u.nombre + ' @' + (u.username || (u.correo ? u.correo.split('@')[0] : '')) + ' (' + u.rol + ')' }))}
   value={responsable}
   onChange={(val) => setResponsable(val)}
   placeholder="Buscar responsable de obra..."
@@ -1078,7 +1078,7 @@ export function ProyectoFormulario({
                   </div>
 
                   <div>
-                    <label className={labelClass}>Estado Inicial del Proyecto</label>
+                    <label className={labelClass}>Estado Inicial del Proyecto <span className="text-[8px] font-normal text-gray-400">(AUTOMÁTICO)</span></label>
                     <select
                       value={estado}
                       onChange={(e) => setEstado(e.target.value as EstadoProyecto)}
