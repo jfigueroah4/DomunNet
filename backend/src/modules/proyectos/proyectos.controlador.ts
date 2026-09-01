@@ -36,7 +36,14 @@ const crearProyectoSchema = z.object({
   descripcion: z.string().optional().nullable(),
   ubicacionFisica: z.string().optional().nullable(),
   responsable: z.string().uuid().optional().nullable(),
-  municipioId: z.string().uuid().optional().nullable(),
+  
+    municipioId: z.any().optional().nullable(),
+    departamentoId: z.any().optional().nullable(),
+    latitud: z.number().optional().nullable(),
+    longitud: z.number().optional().nullable(),
+    direccion: z.string().optional().nullable(),
+    montoFinal: z.number().optional().nullable(),
+
   empresaContratanteId: z.string().uuid().optional().nullable(),
   empresaContratista: z.string().optional().nullable(),
   empresaSupervisora: z.string().optional().nullable(),

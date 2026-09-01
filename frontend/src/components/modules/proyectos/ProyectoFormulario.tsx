@@ -1,7 +1,7 @@
 ﻿// @ts-nocheck
 'use client'
 
-import { Map, Satellite, Route, MapPin, Loader2, useState, useMemo } from 'react'
+import { Satellite, Route, Loader2, useState, useMemo } from 'react'
 import { Combobox } from '@/components/ui/Combobox'
 import { useRouter } from 'next/navigation'
 import { api } from '@/lib/api/cliente'
@@ -717,7 +717,13 @@ export function ProyectoFormulario({
         nombre: nombre || nombreOficial,
         descripcion,
         ubicacionFisica: ubicacionFisica || direccion,
+        
         municipioId,
+        departamentoId,
+        latitud: coordenadasMapa?.lat,
+        longitud: coordenadasMapa?.lng,
+        direccion: direccion,
+        montoFinal: parseFloat(montoFinancieroFinalEjecutado) || null,
         empresaContratanteId,
         empresaContratista,
         empresaSupervisora,

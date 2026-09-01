@@ -120,7 +120,14 @@ export async function crearProyecto(datosFormulario: any) {
       nombre_oficial: datosFormulario.nombreOficial,
       descripcion_proyecto: datosFormulario.descripcion,
       tramo: datosFormulario.ubicacionFisica,
-      municipio_id: datosFormulario.municipioId || null,
+      
+      municipio_id: datosFormulario.municipioId ? parseInt(datosFormulario.municipioId) : null,
+      departamento_id: datosFormulario.departamentoId ? parseInt(datosFormulario.departamentoId) : null,
+      latitud: datosFormulario.latitud || null,
+      longitud: datosFormulario.longitud || null,
+      direccion: datosFormulario.direccion || null,
+      monto_final: datosFormulario.montoFinal || null,
+
       empresa_contratante_id: datosFormulario.empresaContratanteId || null,
       empresa_contratista_id: datosFormulario.empresaContratista || null,
       empresa_supervisora: datosFormulario.empresaSupervisora || null,
