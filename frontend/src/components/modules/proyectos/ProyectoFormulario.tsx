@@ -1,7 +1,7 @@
 ﻿// @ts-nocheck
 'use client'
 
-import { useState, useMemo } from 'react'
+import { Map, Satellite, Route, MapPin, Loader2, useState, useMemo } from 'react'
 import { Combobox } from '@/components/ui/Combobox'
 import { useRouter } from 'next/navigation'
 import { api } from '@/lib/api/cliente'
@@ -673,6 +673,8 @@ export function ProyectoFormulario({
       if (!nombreOficial.trim() && !nombre.trim()) { newErrors.nombreOficial = true; isValid = false }
       if (!descripcion.trim()) { newErrors.descripcion = true; isValid = false }
       if (!ubicacionFisica.trim()) { newErrors.ubicacionFisica = true; isValid = false }
+        if (!departamentoId) { newErrors.departamentoId = true; isValid = false }
+        if (!municipioId) { newErrors.municipioId = true; isValid = false }
       if (!direccion.trim()) { newErrors.direccion = true; isValid = false }
 
       if (!isValid) {

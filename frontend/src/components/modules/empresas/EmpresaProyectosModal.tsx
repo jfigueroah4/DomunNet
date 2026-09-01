@@ -1,7 +1,7 @@
 ﻿'use client'
 
 import React from 'react'
-import { X, Building2, MapPin, Search } from 'lucide-react'
+import { X, Building2, MapPin } from 'lucide-react'
 
 export function EmpresaProyectosModal({
   isOpen,

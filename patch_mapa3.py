@@ -1,0 +1,250 @@
+﻿import sys
+
+with open('C:/DomunNet/frontend/src/components/modules/proyectos/ProyectoFormulario.tsx', 'r', encoding='utf-8') as f:
+    lines = f.readlines()
+
+new_mapa = '''function SelectorMapaInteractivo({
+  direccion,
+  setDireccion,
+  errors,
+  setErrors,
+  coordenadas,
+  setCoordenadas,
+  departamentoId,
+  municipioId,
+  departamentos,
+  municipios
+}: {
+  direccion: string
+  setDireccion: (val: string) => void
+  errors: Record<string, boolean>
+  setErrors: React.Dispatch<React.SetStateAction<Record<string, boolean>>>
+  coordenadas: { lat: number; lng: number; puntoTexto?: string }
+  setCoordenadas: (val: { lat: number; lng: number; puntoTexto?: string }) => void
+  departamentoId?: string
+  municipioId?: string
+  departamentos?: any[]
+  municipios?: any[]
+}) {
+  const [tipoMapa, setTipoMapa] = useState<'mapa' | 'satelite'>('mapa')
+  const [modoSeleccion, setModoSeleccion] = useState<'punto' | 'tramo'>('punto')
+  
+  const [sugerencias, setSugerencias] = useState<any[]>([])
+  const [isGeocoding, setIsGeocoding] = useState(false)
+  const [showSugerencias, setShowSugerencias] = useState(false)
+
+  // Context for Nominatim Search
+  const contextoBusqueda = useMemo(() => {
+    if (!municipioId || !departamentoId || !municipios || !departamentos) return '';
+    const m = municipios.find(x => x.id === municipioId)?.nombre || '';
+    const d = departamentos.find(x => x.id === departamentoId)?.nombre || '';
+    return m && d ? m + ', ' + d : '';
+  }, [municipioId, departamentoId, municipios, departamentos]);
+
+  useEffect(() => {
+    if (!direccion || direccion.length < 3) {
+      setSugerencias([])
+      setShowSugerencias(false)
+      return
+    }
+
+    const handler = setTimeout(async () => {
+      setIsGeocoding(true)
+      try {
+        const query = direccion + (contextoBusqueda ? ', ' + contextoBusqueda : '') + ', Guatemala'
+        const res = await fetch(https://nominatim.openstreetmap.org/search?q=\&format=json&countrycodes=gt&limit=5, {
+          headers: { 'User-Agent': 'DomunNet/1.0 (contacto@domunnet.test)' }
+        })
+        const data = await res.json()
+        if (data && data.length > 0) {
+          if (data.length === 1) {
+            const result = data[0]
+            setCoordenadas({
+              lat: parseFloat(result.lat),
+              lng: parseFloat(result.lon),
+              puntoTexto: result.display_name
+            })
+            setSugerencias([])
+            setShowSugerencias(false)
+          } else {
+            setSugerencias(data)
+            setShowSugerencias(true)
+          }
+        } else {
+          setSugerencias([])
+          setShowSugerencias(false)
+        }
+      } catch (err) {
+        console.error('Error fetching geocoding data:', err)
+      } finally {
+        setIsGeocoding(false)
+      }
+    }, 800)
+
+    return () => clearTimeout(handler)
+  }, [direccion, contextoBusqueda, setCoordenadas])
+
+  const handleSelectSugerencia = (s: any) => {
+    setCoordenadas({
+      lat: parseFloat(s.lat),
+      lng: parseFloat(s.lon),
+      puntoTexto: s.display_name
+    })
+    setDireccion(s.name || s.display_name.split(',')[0])
+    setSugerencias([])
+    setShowSugerencias(false)
+  }
+
+  const presets = [
+    { label: 'Km 22.5 CA-9 Sur', lat: 14.5021, lng: -90.5841, desc: 'CA-9 Sur, Tramo Amatitlán-Palín' },
+    { label: 'Blvd. Vista Hermosa', lat: 14.5982, lng: -90.4851, desc: 'Trébol Vista Hermosa, Zona 15' },
+    { label: 'Calzada Roosevelt', lat: 14.6284, lng: -90.5412, desc: 'Km 14.5 Calzada Roosevelt' },
+    { label: 'Ruta a El Salvador', lat: 14.5621, lng: -90.4321, desc: 'Km 18.5 Carretera a El Salvador' },
+  ]
+
+  const handleMapClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    const x = (e.clientX - rect.left) / rect.width
+    const y = (e.clientY - rect.top) / rect.height
+
+    const baseLat = 14.6349
+    const baseLng = -90.5069
+    const newLat = Number((baseLat + (0.5 - y) * 0.15).toFixed(4))
+    const newLng = Number((baseLng + (x - 0.5) * 0.15).toFixed(4))
+
+    setCoordenadas({
+      lat: newLat,
+      lng: newLng,
+      puntoTexto: Punto seleccionado (\°, \°),
+    })
+  }
+
+  const labelClass = "mb-1 block text-[10px] font-bold uppercase text-gray-700"
+  
+  return (
+    <div className="space-y-2 rounded-lg border border-gray-200 bg-gray-50/50 p-2.5">
+      <div className="relative">
+        <label className={labelClass}>Dirección (Texto Corto) <span className="text-[#9B0F06]">*</span></label>
+        <div className="relative">
+          <input
+            type="text"
+            value={direccion}
+            onChange={(e) => { setDireccion(e.target.value); setErrors(prev => ({...prev, direccion: false})) }}
+            className={w-full rounded-xl border \ bg-white px-3 py-2 text-xs text-gray-700 focus:border-[#9B0F06] focus:outline-none focus:ring-1 focus:ring-[#9B0F06]}
+            placeholder="Ej: Km 22.5, Carril Izquierdo Norte-Sur"
+          />
+          {isGeocoding && <Loader2 size={12} className="absolute right-3 top-2.5 animate-spin text-[#9B0F06]" />}
+        </div>
+        <p className="mt-0.5 text-[8px] text-gray-400">
+          Dirección física corta de referencia rápida, independiente del punto GPS en el mapa.
+        </p>
+
+        {showSugerencias && sugerencias.length > 0 && (
+          <div className="absolute z-50 mt-1 w-full rounded-xl border border-gray-200 bg-white py-1 shadow-lg max-h-48 overflow-y-auto">
+            {sugerencias.map((s, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => handleSelectSugerencia(s)}
+                className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 flex items-start gap-2 border-b border-gray-50 last:border-0"
+              >
+                <MapPin size={12} className="text-[#9B0F06] mt-0.5 shrink-0" />
+                <span className="text-gray-700 truncate block">{s.display_name}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div>
+        <div className="mb-1 flex flex-wrap items-center justify-between gap-1.5">
+          <label className={labelClass}>Selector de Mapa Interactivo (Punto o Tramo Exacto)</label>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setTipoMapa(tipoMapa === 'mapa' ? 'satelite' : 'mapa')}
+              className="rounded bg-white px-1.5 py-0.5 text-[8px] font-semibold text-gray-600 border border-gray-200 hover:bg-gray-100 flex items-center gap-1"
+            >
+              {tipoMapa === 'mapa' ? <><Satellite size={10} /> Vista Satélite</> : <><Map size={10} /> Vista Mapa</>}
+            </button>
+            <button
+              type="button"
+              onClick={() => setModoSeleccion(modoSeleccion === 'punto' ? 'tramo' : 'punto')}
+              className={ounded px-1.5 py-0.5 text-[8px] font-semibold border flex items-center gap-1 \}
+            >
+              {modoSeleccion === 'punto' ? <><MapPin size={10} /> Punto Único</> : <><Route size={10} /> Tramo Vial</>}
+            </button>
+          </div>
+        </div>
+
+        <div className="mb-1.5 flex flex-wrap gap-1">
+          <span className="text-[8px] font-bold text-gray-400 self-center">Ubicaciones Frecuentes:</span>
+          {presets.map((preset) => (
+            <button
+              key={preset.label}
+              type="button"
+              onClick={() => {
+                setCoordenadas({ lat: preset.lat, lng: preset.lng, puntoTexto: preset.desc })
+                if (!direccion) setDireccion(preset.label)
+              }}
+              className="rounded-full bg-white px-2 py-0.5 text-[8px] font-medium text-gray-700 border border-gray-200 hover:border-[#9B0F06] hover:text-[#9B0F06] transition-colors"
+            >
+              {preset.label}
+            </button>
+          ))}
+        </div>
+
+        <div
+          onClick={handleMapClick}
+          className={elative h-28 w-full overflow-hidden rounded border border-gray-300 cursor-crosshair select-none transition-all \}
+        >
+          {tipoMapa === 'satelite' ? (
+            <div className="absolute inset-0 bg-[radial-gradient(#334155_1px,transparent_1px)] [background-size:16px_16px] opacity-60">
+              <svg className="absolute inset-0 h-full w-full stroke-emerald-600/30" strokeWidth="3">
+                <line x1="0" y1="30%" x2="100%" y2="70%" />
+                <line x1="20%" y1="0" x2="80%" y2="100%" />
+                <circle cx="50%" cy="50%" r="80" fill="none" stroke="#059669" strokeWidth="1" strokeDasharray="4" />
+              </svg>
+            </div>
+          ) : (
+            <div className="absolute inset-0 bg-[linear-gradient(to_right,#e2e8f0_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f0_1px,transparent_1px)] bg-[size:20px_20px]">
+              <svg className="absolute inset-0 h-full w-full stroke-amber-400" strokeWidth="4">
+                <line x1="0" y1="40%" x2="100%" y2="60%" />
+                <line x1="30%" y1="0" x2="70%" y2="100%" stroke="#94a3b8" strokeWidth="3" />
+                {modoSeleccion === 'tramo' && (
+                  <path d="M 50 100 Q 150 50 250 80 T 400 120" fill="none" stroke="#9B0F06" strokeWidth="4" strokeDasharray="6" />
+                )}
+              </svg>
+            </div>
+          )}
+
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none flex flex-col items-center">
+            <div className="flex items-center gap-1 rounded-full bg-[#9B0F06] px-1.5 py-0.5 text-[7.5px] font-bold text-white shadow-2xs">
+              <MapPin size={9} className="animate-bounce" />
+              <span>{coordenadas.puntoTexto || 'Punto de Obra Marcado'}</span>
+            </div>
+            <div className="h-2.5 w-0.5 bg-[#9B0F06]" />
+            <div className="h-1 w-2.5 rounded-full bg-black/30 blur-[1px]" />
+          </div>
+
+          <div className="absolute bottom-1.5 left-1.5 flex items-center gap-1 rounded bg-white/90 px-1.5 py-0.5 text-[8px] font-mono font-medium text-gray-700 backdrop-blur border border-gray-200 shadow-2xs">
+            <MapPin size={9} className="text-[#9B0F06]" />
+            <span>
+              Lat: {coordenadas.lat}° | Lng: {coordenadas.lng}°
+            </span>
+          </div>
+
+          <div className="absolute top-1.5 right-1.5 text-[7.5px] bg-black/60 text-white px-1.5 py-0.5 rounded">
+            Haz clic para marcar punto exacto
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+'''
+
+new_lines = lines[:203] + [new_mapa + '\n'] + lines[355:]
+with open('C:/DomunNet/frontend/src/components/modules/proyectos/ProyectoFormulario.tsx', 'w', encoding='utf-8') as f:
+    f.writelines(new_lines)
+
