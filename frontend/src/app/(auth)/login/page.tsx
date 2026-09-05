@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useCustomToast } from '@/hooks/useCustomToast';
@@ -80,6 +80,14 @@ export default function LoginPage() {
   const [isQuickAccessOpen, setIsQuickAccessOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  useEffect(() => {
+    const savedUsername = localStorage.getItem('domun_remembered_username');
+    if (savedUsername) {
+      setUsername(savedUsername);
+      setRememberMe(true);
+    }
+  }, []);
+
   const { showErrorToast, showSuccessToast } = useCustomToast();
 
   const iniciarSesion = async (identificador: string, contrasena: string) => {
@@ -89,6 +97,12 @@ export default function LoginPage() {
     });
 
     showSuccessToast("¡Sesión iniciada correctamente!");
+
+    if (rememberMe) {
+      localStorage.setItem('domun_remembered_username', identificador);
+    } else {
+      localStorage.removeItem('domun_remembered_username');
+    }
 
     setTimeout(() => {
       router.replace('/');
@@ -273,7 +287,13 @@ export default function LoginPage() {
               <input
                 type="checkbox"
                 checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
+                onChange={(e) => {
+                  const isChecked = e.target.checked;
+                  setRememberMe(isChecked);
+                  if (!isChecked) {
+                    localStorage.removeItem('domun_remembered_username');
+                  }
+                }}
                 className="w-4 h-4 rounded border border-white/50 bg-transparent cursor-pointer accent-red-600"
               />
               <span className="text-xs text-white" style={{ fontFamily: 'Poppins, sans-serif' }}>Recuérdame</span>
