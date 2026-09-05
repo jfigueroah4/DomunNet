@@ -1,22 +1,22 @@
 import { TablaConfig } from '../mantenimiento.types';
 
-export const proyectoUsuarioConfig: TablaConfig = {
-  "nombreTablaDb": "proyecto_usuario",
+export const contactoContratistaConfig: TablaConfig = {
+  "nombreTablaDb": "contacto_contratista",
   "permisoRequerido": "catalogos.write",
-  "columnasVisibles": "id, proyecto_id, usuario_id, rol_proyecto, fecha_asignacion, activo",
+  "columnasVisibles": "id, empresa_contratista_id, usuario_id, cargo, created_at, updated_at",
   "columnasFiltroOrden": [
     "id",
-    "proyecto_id",
+    "empresa_contratista_id",
     "usuario_id",
-    "rol_proyecto",
-    "fecha_asignacion",
-    "activo"
+    "cargo",
+    "created_at",
+    "updated_at"
   ],
   "columnasFiltroMenu": [
     {
-      "columna": "proyecto_id",
+      "columna": "empresa_contratista_id",
       "tipo": "foreign_key",
-      "tablaReferencia": "proyecto",
+      "tablaReferencia": "empresa_contratista",
       "columnaLabel": "nombre",
       "renderizado": "select"
     },
@@ -26,14 +26,6 @@ export const proyectoUsuarioConfig: TablaConfig = {
       "tablaReferencia": "usuario",
       "columnaLabel": "correo",
       "renderizado": "combobox"
-    },
-    {
-      "columna": "activo",
-      "tipo": "boolean",
-      "opciones": [
-        "true",
-        "false"
-      ]
     }
   ]
 };
