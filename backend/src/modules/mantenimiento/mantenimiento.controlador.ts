@@ -1,4 +1,4 @@
-﻿import { Request, Response } from 'express'
+import { Request, Response } from 'express'
 import { sendResponse, sendError } from '@/shared/response'
 import { tablasPermitidas } from './models'
 import { logger } from '@/shared/utils/logger'
@@ -30,11 +30,11 @@ export async function listar(req: any, res: Response) {
   }
   
   try {
-    const { data, total } = await listarRegistros(
+    const { data, total, columnasVisibles, columnasFiltroMenu } = await listarRegistros(
       config, query.data.pagina, appliedLimit, query.data.busqueda, 
       query.data.columnaOrden, query.data.direccionOrden, parsedFiltros
     );
-    return res.status(200).json({ success: true, data, total, pagina: query.data.pagina, limite: appliedLimit });
+    return res.status(200).json({ success: true, data, total, pagina: query.data.pagina, limite: appliedLimit, columnasVisibles, columnasFiltroMenu });
   } catch (error: any) {
     return sendError(res, 500, `Error al listar ${tabla}`, error.message);
   }
@@ -54,6 +54,19 @@ export async function obtener(req: any, res: Response) {
   }
 }
 
+function traducirErrorPostgres(error: any, accion: string): string {
+  const code = error?.code || error?.cause?.code;
+  const message = error?.message || '';
+
+  if (code === '23505' || message.includes('unique constraint') || message.includes('duplicate key')) {
+    return 'Ya existe un registro con ese valor. Verifica los datos e intenta de nuevo.';
+  }
+  if (code === '23503' || message.includes('foreign key constraint') || message.includes('violates foreign key')) {
+    return 'No se puede completar la operación porque el registro está relacionado con otros datos del sistema.';
+  }
+  return `Error al ${accion} el registro`;
+}
+
 export async function crear(req: any, res: Response) {
   const { tabla } = req.params;
   const config = tablasPermitidas[tabla];
@@ -63,7 +76,8 @@ export async function crear(req: any, res: Response) {
     const data = await crearRegistro(config, req.body, req.usuario?.sub);
     return sendResponse(res, 201, data, 'Registro creado');
   } catch (error: any) {
-    return sendError(res, 500, `Error al crear registro`, error.message);
+    const userMessage = traducirErrorPostgres(error, 'crear');
+    return sendError(res, 400, userMessage, error.message);
   }
 }
 
@@ -76,7 +90,8 @@ export async function actualizar(req: any, res: Response) {
     const data = await actualizarRegistro(config, id, req.body);
     return sendResponse(res, 200, data, 'Registro actualizado');
   } catch (error: any) {
-    return sendError(res, 500, `Error al actualizar registro`, error.message);
+    const userMessage = traducirErrorPostgres(error, 'actualizar');
+    return sendError(res, 400, userMessage, error.message);
   }
 }
 
@@ -89,7 +104,8 @@ export async function eliminar(req: any, res: Response) {
     await eliminarRegistro(config, id);
     return sendResponse(res, 200, null, 'Registro eliminado');
   } catch (error: any) {
-    return sendError(res, 500, `Error al eliminar registro`, error.message);
+    const userMessage = traducirErrorPostgres(error, 'eliminar');
+    return sendError(res, 400, userMessage, error.message);
   }
 }
 

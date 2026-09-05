@@ -1,11 +1,25 @@
 import { TablaConfig } from '../mantenimiento.types';
 
 export const condicionClimaticaConfig: TablaConfig = {
-  nombreTablaDb: 'condicion_climatica',
-  permisoRequerido: 'catalogos.write',
-  columnasVisibles: 'id, bitacora_entrada_id, temperatura, precipitacion, viento, visibilidad, estado_general',
-  columnasFiltroOrden: ['id', 'bitacora_entrada_id', 'temperatura', 'precipitacion', 'viento', 'visibilidad', 'estado_general'],
-  columnasFiltroMenu: [
-    { columna: 'bitacora_entrada_id', tipo: 'foreign_key', tablaReferencia: 'bitacora_entrada', columnaLabel: 'nombre', renderizado: 'select' }
+  "nombreTablaDb": "condicion_climatica",
+  "permisoRequerido": "catalogos.write",
+  "columnasVisibles": "id, bitacora_entrada_id, temperatura, precipitacion, viento, visibilidad, estado_general",
+  "columnasFiltroOrden": [
+    "id",
+    "bitacora_entrada_id",
+    "temperatura",
+    "precipitacion",
+    "viento",
+    "visibilidad",
+    "estado_general"
   ],
+  "columnasFiltroMenu": [
+    {
+      "columna": "bitacora_entrada_id",
+      "tipo": "foreign_key",
+      "tablaReferencia": "bitacora_entrada",
+      "columnaLabel": "titulo",
+      "renderizado": "combobox"
+    }
+  ]
 };

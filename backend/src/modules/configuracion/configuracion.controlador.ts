@@ -2,8 +2,8 @@ import { Request, Response } from 'express';
 import { z } from 'zod';
 import { sendError, sendResponse } from '@/shared/response';
 import {
-  obtenerConfiguracionEmpresa,
-  actualizarConfiguracionEmpresa,
+  obtenerConfiguracionGeneral,
+  actualizarConfiguracionGeneral,
 } from '@/modules/configuracion/configuracion.servicio';
 
 const esquemaEmpresa = z.object({
@@ -20,7 +20,7 @@ export async function obtenerConfiguracionGeneralControlador(
   return sendResponse(
     res,
     200,
-    await obtenerConfiguracionEmpresa(),
+    await obtenerConfiguracionGeneral(),
     'Configuración empresa obtenida'
   );
 }
@@ -41,6 +41,6 @@ export async function actualizarConfiguracionGeneralControlador(
       }))
     );
   }
-  const configuracion = await actualizarConfiguracionEmpresa(resultado.data);
+  const configuracion = await actualizarConfiguracionGeneral(resultado.data as any);
   return sendResponse(res, 200, configuracion, 'Configuración empresa actualizada');
 }
