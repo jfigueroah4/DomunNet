@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Combobox } from '@/components/ui/Combobox'
-import { Plus, Filter, Search, ChevronDown, ChevronLeft, ChevronRight, Edit2, Trash2, Eye, ChevronUp } from 'lucide-react'
+import { Plus, Search, ChevronDown, ChevronLeft, ChevronRight, Edit2, Trash2, Eye, ChevronUp, X } from 'lucide-react'
 import { api } from '@/lib/api/cliente'
 import { useCustomToast } from '@/hooks/useCustomToast'
 import MantenimientoDrawer from '@/components/modules/mantenimiento/MantenimientoDrawer'
@@ -10,50 +10,58 @@ import { MantenimientoDeleteModal } from '@/components/modules/mantenimiento/Man
 import { EstadoVacio } from '@/components/ui/EstadoVacio'
 
 const TABLAS_MANTENIMIENTO: any[] = [
-  {"id": "catalogo", "nombre": "Catálogos", "endpoint": "/mantenimiento/catalogo", "grupo": "Operacionales", "relaciones": ["Catálogo Items"], "columnasFiltroMenu": [{"columna": "activo", "tipo": "boolean", "opciones": ["true", "false"]}]},
-  {"id": "catalogo_item", "nombre": "Ítems de Catálogo", "endpoint": "/mantenimiento/catalogo_item", "grupo": "Operacionales", "columnasFiltroMenu": [{"columna": "activo", "tipo": "boolean", "opciones": ["true", "false"]}]},
+  {"id": "catalogo", "nombre": "Catálogos", "endpoint": "/mantenimiento/catalogo", "grupo": "Operacionales", "relaciones": ["Catálogo Items"]},
+  {"id": "catalogo_item", "nombre": "Ítems de Catálogo", "endpoint": "/mantenimiento/catalogo_item", "grupo": "Operacionales"},
   {"id": "unidad_medida", "nombre": "Unidades de Medida", "endpoint": "/mantenimiento/unidad_medida", "grupo": "Operacionales"},
-  {"id": "usuario", "nombre": "Usuarios", "endpoint": "/mantenimiento/usuario", "grupo": "Seguridad", "relaciones": ["Datos", "Roles"], "columnasFiltroMenu": [{"columna": "activo", "tipo": "boolean", "opciones": ["true", "false"]}]},
-  {"id": "dato_usuario", "nombre": "Datos de Usuario", "endpoint": "/mantenimiento/dato_usuario", "grupo": "Seguridad", "columnasFiltroMenu": [{"columna": "estado", "tipo": "enum", "opciones": ["Activo"]}]},
-  {"id": "rol", "nombre": "Roles", "endpoint": "/mantenimiento/rol", "grupo": "Seguridad", "relaciones": ["Usuarios"], "columnasFiltroMenu": [{"columna": "activo", "tipo": "boolean", "opciones": ["true", "false"]}]},
+  {"id": "usuario", "nombre": "Usuarios", "endpoint": "/mantenimiento/usuario", "grupo": "Seguridad", "relaciones": ["Datos", "Roles"]},
+  {"id": "dato_usuario", "nombre": "Datos de Usuario", "endpoint": "/mantenimiento/dato_usuario", "grupo": "Seguridad"},
+  {"id": "rol", "nombre": "Roles", "endpoint": "/mantenimiento/rol", "grupo": "Seguridad", "relaciones": ["Usuarios"]},
   {"id": "empresa", "nombre": "Empresas Sistema", "endpoint": "/mantenimiento/empresa", "grupo": "Entidades"},
-      {"id": "proyecto", "nombre": "Proyectos", "endpoint": "/mantenimiento/proyecto", "grupo": "Proyectos", "relaciones": ["Fases", "Detalles", "Usuarios"], "columnasFiltroMenu": [{"columna": "estado_id", "tipo": "foreign_key", "tablaReferencia": "catalogo_item", "columnaLabel": "nombre", "renderizado": "select", "filtroFijo": {"catalogo_id": "aa548cb3-8382-4a62-8b90-1185b2418326"}}]},
-  {"id": "proyecto_usuario", "nombre": "Usuarios por Proyecto", "endpoint": "/mantenimiento/proyecto_usuario", "grupo": "Proyectos", "columnasFiltroMenu": [{"columna": "activo", "tipo": "boolean", "opciones": ["true", "false"]}]},
-  {"id": "proyecto_detalle", "nombre": "Detalles de Proyecto", "endpoint": "/mantenimiento/proyecto_detalle", "grupo": "Proyectos", "columnasFiltroMenu": [{"columna": "municipio_id", "tipo": "foreign_key", "tablaReferencia": "municipio", "columnaLabel": "nombre", "renderizado": "combobox"}]},
-  {"id": "fase_proyecto", "nombre": "Fases de Proyecto", "endpoint": "/mantenimiento/fase_proyecto", "grupo": "Proyectos", },
+  {"id": "empresa_externa", "nombre": "Empresas Externas", "endpoint": "/mantenimiento/empresa_externa", "grupo": "Entidades"},
+  {"id": "entidad_contratante", "nombre": "Entidades Contratantes", "endpoint": "/mantenimiento/entidad_contratante", "grupo": "Entidades"},
+  {"id": "contacto_entidad", "nombre": "Contactos de Entidad", "endpoint": "/mantenimiento/contacto_entidad", "grupo": "Entidades"},
+  {"id": "empresa_contratista", "nombre": "Empresas Contratistas", "endpoint": "/mantenimiento/empresa_contratista", "grupo": "Entidades"},
+  {"id": "contacto_contratista", "nombre": "Contactos de Contratista", "endpoint": "/mantenimiento/contacto_contratista", "grupo": "Entidades"},
+  {"id": "contacto_empresa_externa", "nombre": "Contactos de Empresa Externa", "endpoint": "/mantenimiento/contacto_empresa_externa", "grupo": "Entidades"},
+  {"id": "proyecto", "nombre": "Proyectos", "endpoint": "/mantenimiento/proyecto", "grupo": "Proyectos", "relaciones": ["Fases", "Detalles", "Usuarios"]},
+  {"id": "proyecto_usuario", "nombre": "Usuarios por Proyecto", "endpoint": "/mantenimiento/proyecto_usuario", "grupo": "Proyectos"},
+  {"id": "proyecto_detalle", "nombre": "Detalles de Proyecto", "endpoint": "/mantenimiento/proyecto_detalle", "grupo": "Proyectos"},
+  {"id": "fase_proyecto", "nombre": "Fases de Proyecto", "endpoint": "/mantenimiento/fase_proyecto", "grupo": "Proyectos"},
   {"id": "documento_proyecto", "nombre": "Documentos de Proyecto", "endpoint": "/mantenimiento/documento_proyecto", "grupo": "Proyectos"},
-  {"id": "categoria_actividad", "nombre": "Categorías de Actividad", "endpoint": "/mantenimiento/categoria_actividad", "grupo": "Proyectos", "columnasFiltroMenu": [{"columna": "activo", "tipo": "boolean", "opciones": ["true", "false"]}]},
+  {"id": "categoria_actividad", "nombre": "Categorías de Actividad", "endpoint": "/mantenimiento/categoria_actividad", "grupo": "Proyectos"},
   {"id": "capitulo_sabana", "nombre": "Capítulos (Sábana)", "endpoint": "/mantenimiento/capitulo_sabana", "grupo": "Proyectos"},
-  {"id": "renglon_trabajo", "nombre": "Renglones de Trabajo", "endpoint": "/mantenimiento/renglon_trabajo", "grupo": "Proyectos", "columnasFiltroMenu": [{"columna": "aplica_indirectos", "tipo": "boolean", "opciones": ["true", "false"]}, {"columna": "aplica_iva", "tipo": "boolean", "opciones": ["true", "false"]}]},
+  {"id": "renglon_trabajo", "nombre": "Renglones de Trabajo", "endpoint": "/mantenimiento/renglon_trabajo", "grupo": "Proyectos"},
+  {"id": "renglon_trabajo_catalogo", "nombre": "Catálogo de Renglones", "endpoint": "/mantenimiento/renglon_trabajo_catalogo", "grupo": "Proyectos"},
+  {"id": "renglon_trabajo_plantilla", "nombre": "Plantilla de Renglones", "endpoint": "/mantenimiento/renglon_trabajo_plantilla", "grupo": "Proyectos"},
   {"id": "modificativo_renglon", "nombre": "Modificativos de Renglón", "endpoint": "/mantenimiento/modificativo_renglon", "grupo": "Proyectos"},
   {"id": "catalogo_descuento_tecnico", "nombre": "Descuentos Técnicos", "endpoint": "/mantenimiento/catalogo_descuento_tecnico", "grupo": "Proyectos"},
   {"id": "departamento", "nombre": "Departamentos", "endpoint": "/mantenimiento/departamento", "grupo": "Geografía", "relaciones": ["Municipios"]},
-  {"id": "municipio", "nombre": "Municipios", "endpoint": "/mantenimiento/municipio", "grupo": "Geografía", "columnasFiltroMenu": [{"columna": "departamento_id", "tipo": "foreign_key", "tablaReferencia": "departamento", "columnaLabel": "nombre", "renderizado": "select"}]},
+  {"id": "municipio", "nombre": "Municipios", "endpoint": "/mantenimiento/municipio", "grupo": "Geografía"},
   {"id": "especificacion_tecnica", "nombre": "Especificaciones Técnicas", "endpoint": "/mantenimiento/especificacion_tecnica", "grupo": "Laboratorio"},
-  {"id": "tipo_ensayo", "nombre": "Tipos de Ensayo", "endpoint": "/mantenimiento/tipo_ensayo", "grupo": "Laboratorio", "columnasFiltroMenu": [{"columna": "activo", "tipo": "boolean", "opciones": ["true", "false"]}]},
-  {"id": "ensayo_laboratorio", "nombre": "Ensayos de Laboratorio", "endpoint": "/mantenimiento/ensayo_laboratorio", "grupo": "Laboratorio", "columnasFiltroMenu": [{"columna": "aprobado", "tipo": "boolean", "opciones": ["true", "false"]}]},
+  {"id": "tipo_ensayo", "nombre": "Tipos de Ensayo", "endpoint": "/mantenimiento/tipo_ensayo", "grupo": "Laboratorio"},
+  {"id": "ensayo_laboratorio", "nombre": "Ensayos de Laboratorio", "endpoint": "/mantenimiento/ensayo_laboratorio", "grupo": "Laboratorio"},
   {"id": "configuracion_general", "nombre": "Configuración General", "endpoint": "/mantenimiento/configuracion_general", "grupo": "Configuración"},
   {"id": "parametro_proyecto", "nombre": "Parámetros de Proyecto", "endpoint": "/mantenimiento/parametro_proyecto", "grupo": "Configuración"},
-  {"id": "cronograma_planificado", "nombre": "Cronogramas Planificados", "endpoint": "/mantenimiento/cronograma_planificado", "grupo": "Configuración", "columnasFiltroMenu": [{"columna": "linea_base", "tipo": "boolean", "opciones": ["true", "false"]}]},
+  {"id": "cronograma_planificado", "nombre": "Cronogramas Planificados", "endpoint": "/mantenimiento/cronograma_planificado", "grupo": "Configuración"},
   {"id": "control_anticipo", "nombre": "Controles de Anticipo", "endpoint": "/mantenimiento/control_anticipo", "grupo": "Configuración"},
   {"id": "control_plazo", "nombre": "Controles de Plazo", "endpoint": "/mantenimiento/control_plazo", "grupo": "Configuración"},
   {"id": "suspension_plazo", "nombre": "Suspensiones de Plazo", "endpoint": "/mantenimiento/suspension_plazo", "grupo": "Configuración"},
   {"id": "condicion_climatica", "nombre": "Condiciones Climáticas", "endpoint": "/mantenimiento/condicion_climatica", "grupo": "Bitácora"},
   {"id": "estacion_kilometrica", "nombre": "Estaciones Kilométricas", "endpoint": "/mantenimiento/estacion_kilometrica", "grupo": "Bitácora"},
-  {"id": "bitacora_entrada", "nombre": "Entradas de Bitácora", "endpoint": "/mantenimiento/bitacora_entrada", "grupo": "Bitácora", "columnasFiltroMenu": [{"columna": "publicada", "tipo": "boolean", "opciones": ["true", "false"]}, {"columna": "bloqueada", "tipo": "boolean", "opciones": ["true", "false"]}]},
+  {"id": "bitacora_entrada", "nombre": "Entradas de Bitácora", "endpoint": "/mantenimiento/bitacora_entrada", "grupo": "Bitácora"},
   {"id": "bitacora_avance", "nombre": "Avances de Bitácora", "endpoint": "/mantenimiento/bitacora_avance", "grupo": "Bitácora"},
-  {"id": "bitacora_pendiente", "nombre": "Pendientes de Bitácora", "endpoint": "/mantenimiento/bitacora_pendiente", "grupo": "Bitácora", "columnasFiltroMenu": [{"columna": "lado_via", "tipo": "enum", "opciones": ["Izquierdo", "Derecho", "Sección Completa"]}, {"columna": "es_derrumbre", "tipo": "boolean", "opciones": ["true", "false"]}]},
+  {"id": "bitacora_pendiente", "nombre": "Pendientes de Bitácora", "endpoint": "/mantenimiento/bitacora_pendiente", "grupo": "Bitácora"},
   {"id": "bitacora_pendiente_ajuste", "nombre": "Ajustes de Pendientes", "endpoint": "/mantenimiento/bitacora_pendiente_ajuste", "grupo": "Bitácora"},
   {"id": "incidente_obra", "nombre": "Incidentes de Obra", "endpoint": "/mantenimiento/incidente_obra", "grupo": "Bitácora"},
   {"id": "incidente_evidencia", "nombre": "Evidencias de Incidente", "endpoint": "/mantenimiento/incidente_evidencia", "grupo": "Bitácora"},
   {"id": "evidencia_fotografica", "nombre": "Evidencias Fotográficas", "endpoint": "/mantenimiento/evidencia_fotografica", "grupo": "Bitácora"},
-  {"id": "estado_usuario", "nombre": "Estados de Usuario", "endpoint": "/mantenimiento/estado_usuario", "grupo": "Auditoría", "esAuditoria": true, },
-  {"id": "backup_sistema", "nombre": "Backups del Sistema", "endpoint": "/mantenimiento/backup_sistema", "grupo": "Auditoría", "esAuditoria": true, },
-  {"id": "restauracion_sistema", "nombre": "Restauraciones del Sistema", "endpoint": "/mantenimiento/restauracion_sistema", "grupo": "Auditoría", "esAuditoria": true, },
-  {"id": "reporte", "nombre": "Reportes Generados", "endpoint": "/mantenimiento/reporte", "grupo": "Auditoría", "esAuditoria": true, "columnasFiltroMenu": [{"columna": "estado", "tipo": "enum", "opciones": []}, {"columna": "logo_incluido", "tipo": "boolean", "opciones": ["true", "false"]}, {"columna": "marca_agua_incluida", "tipo": "boolean", "opciones": ["true", "false"]}]},
+  {"id": "estado_usuario", "nombre": "Estados de Usuario", "endpoint": "/mantenimiento/estado_usuario", "grupo": "Auditoría", "esAuditoria": true},
+  {"id": "backup_sistema", "nombre": "Backups del Sistema", "endpoint": "/mantenimiento/backup_sistema", "grupo": "Auditoría", "esAuditoria": true},
+  {"id": "restauracion_sistema", "nombre": "Restauraciones del Sistema", "endpoint": "/mantenimiento/restauracion_sistema", "grupo": "Auditoría", "esAuditoria": true},
+  {"id": "reporte", "nombre": "Reportes Generados", "endpoint": "/mantenimiento/reporte", "grupo": "Auditoría", "esAuditoria": true},
   {"id": "auditoria_operativa", "nombre": "Auditorías Operativas", "endpoint": "/mantenimiento/auditoria_operativa", "grupo": "Auditoría", "esAuditoria": true},
-  {"id": "seguridad_log", "nombre": "Logs de Seguridad", "endpoint": "/mantenimiento/seguridad_log", "grupo": "Auditoría", "esAuditoria": true, "columnasFiltroMenu": [{"columna": "exitoso", "tipo": "boolean", "opciones": ["true", "false"]}]},
-]
+  {"id": "seguridad_log", "nombre": "Logs de Seguridad", "endpoint": "/mantenimiento/seguridad_log", "grupo": "Auditoría", "esAuditoria": true}
+];
 
 
 function ComboboxFiltro({ options, value, onChange, placeholder = "Buscar..." }: { options: any[], value: any, onChange: (v: any) => void, placeholder?: string }) {
@@ -114,9 +122,19 @@ export default function MantenimientoTablas() {
 
   // Estados UI
   const [globalFilter, setGlobalFilter] = useState('')
+  const [debouncedGlobalFilter, setDebouncedGlobalFilter] = useState('')
   const [filters, setFilters] = useState<Record<string, string>>({})
   const [sortConfig, setSortConfig] = useState<{key: string, direction: 'asc'|'desc'} | null>(null)
   const [foreignKeyOptions, setForeignKeyOptions] = useState<Record<string, any[]>>({})
+  const [filtroMenuActivo, setFiltroMenuActivo] = useState<any[]>([])
+
+  // Debounce globalFilter -> debouncedGlobalFilter (400ms)
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedGlobalFilter(globalFilter)
+    }, 400)
+    return () => clearTimeout(handler)
+  }, [globalFilter])
   
   // Paginación
   const [currentPage, setCurrentPage] = useState(1)
@@ -137,7 +155,7 @@ export default function MantenimientoTablas() {
       const params = new URLSearchParams()
       params.append('pagina', currentPage.toString())
       params.append('limite', itemsPerPage.toString())
-      if (globalFilter) params.append('busqueda', globalFilter)
+      if (debouncedGlobalFilter) params.append('busqueda', debouncedGlobalFilter)
       if (sortConfig) {
         params.append('columnaOrden', sortConfig.key)
         params.append('direccionOrden', sortConfig.direction)
@@ -151,10 +169,15 @@ export default function MantenimientoTablas() {
       const res = await api.get(`${endpoint}?${params.toString()}`)
       if (res.data?.success) {
         setData(res.data.data)
-          setTotalRecords(res.data.total)
-          if (res.data.columnasVisibles) {
-            setColumnasVisibles(res.data.columnasVisibles.split(',').map((c: string) => c.trim()))
-          }
+        setTotalRecords(res.data.total)
+        if (res.data.columnasVisibles) {
+          setColumnasVisibles(res.data.columnasVisibles.split(',').map((c: string) => c.trim()))
+        }
+        if (res.data.columnasFiltroMenu) {
+          setFiltroMenuActivo(res.data.columnasFiltroMenu)
+        } else {
+          setFiltroMenuActivo([])
+        }
       }
     } catch (error: any) {
       if (error.response?.status === 403) {
@@ -171,15 +194,15 @@ export default function MantenimientoTablas() {
 
   useEffect(() => {
     fetchData()
-  }, [selectedTable, currentPage, itemsPerPage, globalFilter, sortConfig, filters])
+  }, [selectedTable.id, currentPage, itemsPerPage, debouncedGlobalFilter, sortConfig, filters])
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [globalFilter, sortConfig, filters])
+  }, [debouncedGlobalFilter, sortConfig, filters])
 
-  // Fetch options for foreign_key filters whenever the selected table changes
+  // Fetch options for foreign_key filters whenever the active filter menu changes
   useEffect(() => {
-    const fkFiltros = selectedTable.columnasFiltroMenu?.filter((f: any) => f.tipo === 'foreign_key') || []
+    const fkFiltros = filtroMenuActivo?.filter((f: any) => f.tipo === 'foreign_key') || []
     if (fkFiltros.length === 0) {
       setForeignKeyOptions({})
       return
@@ -198,11 +221,12 @@ export default function MantenimientoTablas() {
       setForeignKeyOptions(results)
     }
     fetchAll()
-  }, [selectedTable])
+  }, [filtroMenuActivo])
 
   const handleTableChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const table = TABLAS_MANTENIMIENTO.find(t => t.id === e.target.value)
     if (table) {
+      setFiltroMenuActivo([])
       setSelectedTable(table)
       setGlobalFilter('')
       setFilters({})
@@ -255,7 +279,7 @@ export default function MantenimientoTablas() {
       showSuccessToast('Registro eliminado correctamente')
       fetchData()
     } catch (error: any) {
-      const msg = error.response?.data?.error?.mensaje || 'Error al eliminar el registro'
+      const msg = error.response?.data?.message || 'Error al eliminar el registro'
       showErrorToast(msg)
     } finally {
       setIsDeleteModalOpen(false)
@@ -263,9 +287,22 @@ export default function MantenimientoTablas() {
     }
   }
 
-  const handleSave = () => {
-    fetchData()
-    setIsDrawerOpen(false)
+  const handleSave = async (payload: any) => {
+    try {
+      if (drawerMode === 'create') {
+        await api.post(selectedTable.endpoint, payload)
+        showSuccessToast('Registro creado correctamente')
+      } else if (drawerMode === 'edit') {
+        await api.put(`${selectedTable.endpoint}/${selectedRecord.id}`, payload)
+        showSuccessToast('Registro actualizado correctamente')
+      }
+      setIsDrawerOpen(false)
+      fetchData()
+    } catch (error: any) {
+      const msg = error.response?.data?.message || 'Error al procesar el registro'
+      showErrorToast(msg)
+      throw error
+    }
   }
 
   const totalPages = Math.ceil(totalRecords / itemsPerPage)
@@ -304,9 +341,9 @@ export default function MantenimientoTablas() {
           {!selectedTable.esAuditoria && (
             <button
               onClick={handleCreate}
-              className="flex items-center gap-1.5 bg-[#9B0F06] hover:bg-[#7a0c05] text-white px-3 py-1.5 rounded-lg transition-colors shadow-sm whitespace-nowrap text-[11px] font-bold h-[34px] self-start"
+              className="inline-flex h-8 items-center gap-1.5 bg-[#9B0F06] hover:bg-[#5E0006] text-white px-3.5 rounded-md transition-colors shadow-sm whitespace-nowrap text-[11px] font-bold self-start"
             >
-              <Plus size={14} />
+              <Plus size={13} />
               <span className="hidden sm:inline">Nuevo Registro</span>
             </button>
           )}
@@ -329,86 +366,102 @@ export default function MantenimientoTablas() {
           </div>
 
           <div className="flex flex-wrap gap-2 items-center flex-1 justify-start">
-            {!selectedTable.esAuditoria && selectedTable.columnasFiltroMenu && selectedTable.columnasFiltroMenu.length > 0 && (
-              <div className="relative group/filters">
-                <button 
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-semibold text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors bg-white shadow-sm"
-                >
-                  <Filter size={12} />
-                  <span>Filtros</span>
-                  {Object.keys(filters).length > 0 && (
-                    <span className="bg-[#9B0F06] text-white rounded-full w-4 h-4 flex items-center justify-center text-[8px] ml-1">
-                      {Object.keys(filters).length}
-                    </span>
-                  )}
-                </button>
-                
-                <div className="absolute top-full mt-1 left-0 w-64 bg-white border border-gray-100 shadow-xl rounded-xl p-3 z-50 hidden group-hover/filters:block">
-                  {selectedTable.columnasFiltroMenu.filter((filtro: any) =>
-                    filtro.tipo === 'boolean' ||
-                    filtro.tipo === 'foreign_key' ||
-                    (filtro.tipo === 'enum' && filtro.opciones && filtro.opciones.length > 0)
-                  ).map((filtro: any) => (
-                    <div key={filtro.columna} className="mb-3 last:mb-0">
-                      <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1.5">{filtro.columna.replace('_', ' ')}</label>
-                      <div className="flex flex-wrap gap-1">
-                        <button
-                          onClick={() => { const newFilters = {...filters}; delete newFilters[filtro.columna]; setFilters(newFilters); }}
-                          className={`px-2 py-1 text-[9px] transition-all rounded-md ${!filters[filtro.columna] ? 'bg-gray-100 text-gray-800 font-bold shadow-2xs' : 'text-gray-400 hover:bg-gray-50'}`}
-                        >
-                          Todos
-                        </button>
-                                                {filtro.tipo === 'foreign_key' ? (
-                          <div className="w-full mt-1">
-                            {filtro.renderizado === 'combobox' ? (
-                              <ComboboxFiltro 
-                                options={(foreignKeyOptions[filtro.columna] || []).map((row: any) => ({ value: row.id, label: row[filtro.columnaLabel || 'nombre'] }))}
-                                value={filters[filtro.columna]}
-                                onChange={(val) => {
-                                  const newFilters = {...filters};
-                                  if (val === null) delete newFilters[filtro.columna];
-                                  else newFilters[filtro.columna] = val;
-                                  setFilters(newFilters);
-                                }}
-                              />
-                            ) : (
-                              <select 
-                                className="w-full text-[9px] px-2 py-1 border border-gray-200 rounded-md outline-none bg-white"
-                                value={filters[filtro.columna] || ''}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  const newFilters = {...filters};
-                                  if (!val) delete newFilters[filtro.columna];
-                                  else newFilters[filtro.columna] = val;
-                                  setFilters(newFilters);
-                                }}
-                              >
-                                <option value="">Todos</option>
-                                {(foreignKeyOptions[filtro.columna] || []).map((row: any) => (
-                                  <option key={row.id} value={row.id}>{row[filtro.columnaLabel || 'nombre']}</option>
-                                ))}
-                              </select>
-                            )}
-                          </div>
-                        ) : (
-                          filtro.opciones?.map((opt: string) => {
-                            const isSelected = filters[filtro.columna] === opt;
-                            return (
-                              <button
-                                key={opt}
-                                onClick={() => setFilters({...filters, [filtro.columna]: opt})}
-                                className={`px-2 py-1 text-[9px] transition-all rounded-md ${isSelected ? 'bg-white text-[#9B0F06] border border-[#9B0F06] font-bold shadow-2xs' : 'text-gray-500 border border-transparent hover:bg-gray-50'}`}
-                              >
-                                {opt === 'true' ? 'Sí' : opt === 'false' ? 'No' : opt}
-                              </button>
-                            )
-                          })
-                        )}
+            {!selectedTable.esAuditoria && filtroMenuActivo && filtroMenuActivo.length > 0 && (
+              filtroMenuActivo.map((filtro: any) => {
+                if (filtro.tipo === 'foreign_key') {
+                  if (filtro.renderizado === 'combobox') {
+                    return (
+                      <div key={filtro.columna} className="w-44">
+                        <ComboboxFiltro 
+                          options={(foreignKeyOptions[filtro.columna] || []).map((row: any) => ({ value: row.id, label: row[filtro.columnaLabel || 'nombre'] }))}
+                          value={filters[filtro.columna]}
+                          placeholder={`Filtrar por ${filtro.columna.replace('_', ' ')}...`}
+                          onChange={(val) => {
+                            const newFilters = {...filters};
+                            if (val === null) delete newFilters[filtro.columna];
+                            else newFilters[filtro.columna] = val;
+                            setFilters(newFilters);
+                          }}
+                        />
                       </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+                    )
+                  }
+                  return (
+                    <select
+                      key={filtro.columna}
+                      className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-[10px] text-gray-700 bg-white focus:outline-none focus:border-[#9B0F06] w-40"
+                      value={filters[filtro.columna] || ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        const newFilters = {...filters};
+                        if (!val) delete newFilters[filtro.columna];
+                        else newFilters[filtro.columna] = val;
+                        setFilters(newFilters);
+                      }}
+                    >
+                      <option value="">Todos ({filtro.columna.replace('_', ' ')})</option>
+                      {(foreignKeyOptions[filtro.columna] || []).map((row: any) => (
+                        <option key={row.id} value={row.id}>{row[filtro.columnaLabel || 'nombre']}</option>
+                      ))}
+                    </select>
+                  )
+                }
+
+                if (filtro.tipo === 'boolean') {
+                  return (
+                    <select
+                      key={filtro.columna}
+                      className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-[10px] text-gray-700 bg-white focus:outline-none focus:border-[#9B0F06] w-32"
+                      value={filters[filtro.columna] || ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        const newFilters = {...filters};
+                        if (!val) delete newFilters[filtro.columna];
+                        else newFilters[filtro.columna] = val;
+                        setFilters(newFilters);
+                      }}
+                    >
+                      <option value="">Todos ({filtro.columna.replace('_', ' ')})</option>
+                      <option value="true">Sí</option>
+                      <option value="false">No</option>
+                    </select>
+                  )
+                }
+
+                if (filtro.tipo === 'enum' && filtro.opciones && filtro.opciones.length > 0) {
+                  return (
+                    <select
+                      key={filtro.columna}
+                      className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-[10px] text-gray-700 bg-white focus:outline-none focus:border-[#9B0F06] w-36"
+                      value={filters[filtro.columna] || ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        const newFilters = {...filters};
+                        if (!val) delete newFilters[filtro.columna];
+                        else newFilters[filtro.columna] = val;
+                        setFilters(newFilters);
+                      }}
+                    >
+                      <option value="">Todos ({filtro.columna.replace('_', ' ')})</option>
+                      {filtro.opciones.map((opt: string) => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  )
+                }
+
+                return null
+              })
+            )}
+
+            {(Object.keys(filters).length > 0 || globalFilter !== '') && (
+              <button
+                onClick={() => { setFilters({}); setGlobalFilter(''); }}
+                className="flex items-center gap-1 text-[10px] text-gray-400 hover:text-[#9B0F06] transition-colors ml-1"
+              >
+                <X size={12} />
+                <span>Limpiar</span>
+              </button>
             )}
             
             {selectedTable.esAuditoria && (

@@ -416,14 +416,15 @@ interface Props {
   mode: 'create' | 'edit' | 'view'
   table: string
   record?: any
-  onSave: (data: any) => void
+  onSave: (data: any) => Promise<void> | void
   dataKeys?: string[]
 }
 
 export default function MantenimientoDrawer({ isOpen, onClose, mode, table, record, onSave, dataKeys = [] }: Props) {
   const [formData, setFormData] = useState<any>({})
   const [optionsMap, setOptionsMap] = useState<Record<string, any[]>>({})
-  
+  const [isSaving, setIsSaving] = useState(false)
+
   const schema = useMemo(() => {
     const baseSchema = TABLES_SCHEMA[table] || []
     let newSchema = [...baseSchema]
@@ -477,6 +478,7 @@ export default function MantenimientoDrawer({ isOpen, onClose, mode, table, reco
 
   useEffect(() => {
     if (isOpen) {
+      setIsSaving(false)
       if (mode === 'create' || !record) {
         // Inicializar con valores por defecto
         const defaultData: any = {}
@@ -496,16 +498,23 @@ export default function MantenimientoDrawer({ isOpen, onClose, mode, table, reco
     setFormData((prev: any) => ({ ...prev, [name]: value }))
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // Limpiar campos vacíos si son strings para enviarlos como null
-    const payload = { ...formData }
-    schema.forEach(f => {
-      if (f.type !== 'boolean' && payload[f.name] === '') {
-        payload[f.name] = null
-      }
-    })
-    onSave(payload)
+    if (isSaving) return
+    setIsSaving(true)
+    try {
+      const payload = { ...formData }
+      schema.forEach(f => {
+        if (f.type !== 'boolean' && payload[f.name] === '') {
+          payload[f.name] = null
+        }
+      })
+      await onSave(payload)
+    } catch {
+      // Si la promesa falla (error HTTP), el drawer se mantiene abierto
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   const isReadOnly = mode === 'view'
@@ -630,7 +639,8 @@ export default function MantenimientoDrawer({ isOpen, onClose, mode, table, reco
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 border border-gray-200 bg-white text-gray-700 text-xs font-semibold h-8 rounded-lg hover:bg-gray-50 transition-colors"
+            disabled={isSaving}
+            className="flex-1 border border-gray-200 bg-white text-gray-700 text-xs font-semibold h-8 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
           >
             {isReadOnly ? 'Cerrar' : 'Cancelar'}
           </button>
@@ -638,9 +648,10 @@ export default function MantenimientoDrawer({ isOpen, onClose, mode, table, reco
             <button
               type="submit"
               form="mantenimiento-form"
-              className="flex-1 bg-[#9B0F06] text-white text-xs font-semibold h-8 rounded-lg hover:bg-[#7a0c05] transition-colors flex items-center justify-center gap-2"
+              disabled={isSaving}
+              className="flex-1 bg-[#9B0F06] text-white text-xs font-semibold h-8 rounded-lg hover:bg-[#7a0c05] transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
             >
-              {mode === 'create' ? 'Crear' : 'Guardar Cambios'}
+              {isSaving ? 'Guardando...' : mode === 'create' ? 'Crear' : 'Guardar Cambios'}
             </button>
           )}
         </div>

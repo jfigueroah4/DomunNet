@@ -3,13 +3,17 @@ import { rolConfig } from './rol.model';
 import { usuarioConfig } from './usuario.model';
 import { datoUsuarioConfig } from './dato_usuario.model';
 import { empresaConfig } from './empresa.model';
+import { empresaExternaConfig } from './empresa_externa.model';
+import { entidadContratanteConfig } from './entidad_contratante.model';
+import { contactoEntidadConfig } from './contacto_entidad.model';
+import { empresaContratistaConfig } from './empresa_contratista.model';
+import { contactoContratistaConfig } from './contacto_contratista.model';
+import { contactoEmpresaExternaConfig } from './contacto_empresa_externa.model';
 import { catalogoConfig } from './catalogo.model';
 import { catalogoItemConfig } from './catalogo_item.model';
 import { configuracionGeneralConfig } from './configuracion_general.model';
 import { departamentoConfig } from './departamento.model';
 import { municipioConfig } from './municipio.model';
-import { empresaContratanteConfig } from './empresa_contratante.model';
-import { contactoContratanteConfig } from './contacto_contratante.model';
 import { proyectoConfig } from './proyecto.model';
 import { proyectoUsuarioConfig } from './proyecto_usuario.model';
 import { proyectoDetalleConfig } from './proyecto_detalle.model';
@@ -21,6 +25,8 @@ import { tipoEnsayoConfig } from './tipo_ensayo.model';
 import { capituloSabanaConfig } from './capitulo_sabana.model';
 import { unidadMedidaConfig } from './unidad_medida.model';
 import { renglonTrabajoConfig } from './renglon_trabajo.model';
+import { renglonTrabajoCatalogoConfig } from './renglon_trabajo_catalogo.model';
+import { renglonTrabajoPlantillaConfig } from './renglon_trabajo_plantilla.model';
 import { modificativoRenglonConfig } from './modificativo_renglon.model';
 import { bitacoraEntradaConfig } from './bitacora_entrada.model';
 import { ensayoLaboratorioConfig } from './ensayo_laboratorio.model';
@@ -38,19 +44,22 @@ import { suspensionPlazoConfig } from './suspension_plazo.model';
 import { incidenteObraConfig } from './incidente_obra.model';
 import { incidenteEvidenciaConfig } from './incidente_evidencia.model';
 import { evidenciaFotograficaConfig } from './evidencia_fotografica.model';
-
 export const tablasPermitidas: Record<string, TablaConfig> = {
   'rol': rolConfig,
   'usuario': usuarioConfig,
   'dato_usuario': datoUsuarioConfig,
   'empresa': empresaConfig,
+  'empresa_externa': empresaExternaConfig,
+  'entidad_contratante': entidadContratanteConfig,
+  'contacto_entidad': contactoEntidadConfig,
+  'empresa_contratista': empresaContratistaConfig,
+  'contacto_contratista': contactoContratistaConfig,
+  'contacto_empresa_externa': contactoEmpresaExternaConfig,
   'catalogo': catalogoConfig,
   'catalogo_item': catalogoItemConfig,
   'configuracion_general': configuracionGeneralConfig,
   'departamento': departamentoConfig,
   'municipio': municipioConfig,
-  'empresa_contratante': empresaContratanteConfig,
-  'contacto_contratante': contactoContratanteConfig,
   'proyecto': proyectoConfig,
   'proyecto_usuario': proyectoUsuarioConfig,
   'proyecto_detalle': proyectoDetalleConfig,
@@ -62,6 +71,8 @@ export const tablasPermitidas: Record<string, TablaConfig> = {
   'capitulo_sabana': capituloSabanaConfig,
   'unidad_medida': unidadMedidaConfig,
   'renglon_trabajo': renglonTrabajoConfig,
+  'renglon_trabajo_catalogo': renglonTrabajoCatalogoConfig,
+  'renglon_trabajo_plantilla': renglonTrabajoPlantillaConfig,
   'modificativo_renglon': modificativoRenglonConfig,
   'bitacora_entrada': bitacoraEntradaConfig,
   'ensayo_laboratorio': ensayoLaboratorioConfig,

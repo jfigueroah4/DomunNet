@@ -1,4 +1,4 @@
-﻿import { clienteSupabase } from '@/configuracion/cliente-supabase'
+import { clienteSupabase } from '@/configuracion/cliente-supabase'
 import { TablaConfig } from './mantenimiento.types'
 
 export async function listarRegistros(config: TablaConfig, pagina: number, limite: number, busqueda?: string, columnaOrden?: string, direccionOrden: 'asc'|'desc' = 'asc', filtros: Record<string, any> = {}) {
@@ -25,7 +25,7 @@ export async function listarRegistros(config: TablaConfig, pagina: number, limit
   // Fake dependenciasCount to avoid mapping manually for now (can be optimized later)
   const enrichedData = data.map((d: any) => ({...d, dependenciasCount: 0}));
   
-  return { data: enrichedData, total: count || 0, columnasVisibles: config.columnasVisibles };
+  return { data: enrichedData, total: count || 0, columnasVisibles: config.columnasVisibles, columnasFiltroMenu: config.columnasFiltroMenu || [] };
 }
 
 export async function obtenerRegistro(config: TablaConfig, id: string) {

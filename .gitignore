@@ -42,6 +42,8 @@ Thumbs.db
 .AppleDouble
 .LSOverride
 
-# Misc
 .cache/
+
 dist-ssr/
+frontend/tsconfig.tsbuildinfo
+
