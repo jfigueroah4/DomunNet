@@ -17,6 +17,8 @@ import { mantenimientoRutas } from '@/modules/mantenimiento/mantenimiento.rutas'
 import empresasRutas from '@/modules/empresas/empresas.rutas'
 import { auditoriaRutas } from '@/modules/auditoria/auditoria.rutas'
 import proyectosRutas from '@/modules/proyectos/proyectos.rutas'
+import entidadContratanteRutas from '@/modules/entidad-contratante/entidad-contratante.rutas'
+import empresaContratistaRutas from '@/modules/empresa-contratista/empresa-contratista.rutas'
 
 const app = express()
 const PORT = entorno.puerto
@@ -57,6 +59,8 @@ app.use('/api/v1/respaldo', respaldoRutas)
 app.use('/api/v1/backup', respaldoRutas)
 app.use('/api/v1/mantenimiento', mantenimientoRutas)
 app.use('/api/v1/empresas', empresasRutas)
+app.use('/api/v1/entidades-contratantes', entidadContratanteRutas)
+app.use('/api/v1/empresas-contratistas', empresaContratistaRutas)
 app.use('/api/v1/auditoria', auditoriaRutas)
 app.use('/api/v1/proyectos', proyectosRutas)
 

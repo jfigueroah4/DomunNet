@@ -111,6 +111,19 @@ CREATE TABLE empresa (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE TABLE empresa_externa (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    nombre VARCHAR(150) NOT NULL,
+    nit VARCHAR(50) UNIQUE NOT NULL,
+    direccion VARCHAR(255),
+    telefono VARCHAR(50),
+    correo_institucional VARCHAR(255),
+    activo BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+
 CREATE TABLE catalogo (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     codigo VARCHAR(100) UNIQUE NOT NULL,

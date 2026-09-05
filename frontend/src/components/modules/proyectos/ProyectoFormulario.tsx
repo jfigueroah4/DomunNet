@@ -1,7 +1,7 @@
 ﻿// @ts-nocheck
 'use client'
 
-import { Satellite, Route, Loader2, useState, useMemo } from 'react'
+import { Satellite, Route, Loader2, useRef, useState, useMemo } from 'react'
 import { Combobox } from '@/components/ui/Combobox'
 import { useRouter } from 'next/navigation'
 import { api } from '@/lib/api/cliente'
@@ -216,8 +216,12 @@ function SelectorMapaInteractivo({
   coordenadas: { lat: number; lng: number; puntoTexto?: string }
   setCoordenadas: (val: { lat: number; lng: number; puntoTexto?: string }) => void
 }) {
-  const [tipoMapa, setTipoMapa] = useState<'mapa' | 'satelite'>('mapa')
-  const [modoSeleccion, setModoSeleccion] = useState<'punto' | 'tramo'>('punto')
+  const [busquedaDireccion, setBusquedaDireccion] = useState(direccion)
+  const [buscandoDireccion, setBuscandoDireccion] = useState(false)
+  const [errorBusqueda, setErrorBusqueda] = useState('')
+  const mapaRef = useRef<HTMLDivElement>(null)
+  const instanciaMapaRef = useRef<any>(null)
+  const marcadorRef = useRef<any>(null)
 
   const presets = [
     { label: 'Km 22.5 CA-9 Sur', lat: 14.5021, lng: -90.5841, desc: 'CA-9 Sur, Tramo Amatitlán-Palín' },
@@ -226,22 +230,110 @@ function SelectorMapaInteractivo({
     { label: 'Ruta a El Salvador', lat: 14.5621, lng: -90.4321, desc: 'Km 18.5 Carretera a El Salvador' },
   ]
 
-  const handleMapClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect()
-    const x = (e.clientX - rect.left) / rect.width
-    const y = (e.clientY - rect.top) / rect.height
+  const actualizarDireccionDesdeCoordenadas = async (lat: number, lng: number) => {
+    setBuscandoDireccion(true)
+    setErrorBusqueda('')
+    try {
+      const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=18&lat=${lat}&lon=${lng}`, {
+        headers: { 'Accept-Language': 'es' },
+      })
+      if (!response.ok) throw new Error('No se pudo consultar la ubicación')
 
-    const baseLat = 14.6349
-    const baseLng = -90.5069
-    const newLat = Number((baseLat + (0.5 - y) * 0.15).toFixed(4))
-    const newLng = Number((baseLng + (x - 0.5) * 0.15).toFixed(4))
+      const resultado = await response.json()
+      if (!resultado.display_name) throw new Error('No se encontró una dirección')
 
-    setCoordenadas({
-      lat: newLat,
-      lng: newLng,
-      puntoTexto: `Punto seleccionado (${newLat}Â°, ${newLng}Â°)`,
-    })
-    showInfoToast(`Ubicación marcada: ${newLat}Â°, ${newLng}Â°`)
+      setDireccion(resultado.display_name)
+      setBusquedaDireccion(resultado.display_name)
+      setCoordenadas({ lat, lng, puntoTexto: resultado.display_name })
+    } catch {
+      setErrorBusqueda('No se pudo obtener la dirección del punto seleccionado')
+      setCoordenadas({ lat, lng, puntoTexto: `Punto seleccionado (${lat.toFixed(4)}Â°, ${lng.toFixed(4)}Â°)` })
+    } finally {
+      setBuscandoDireccion(false)
+    }
+  }
+
+  useEffect(() => {
+    let activo = true
+
+    const inicializarMapa = async () => {
+      if (!mapaRef.current || instanciaMapaRef.current) return
+      const L = await import('leaflet')
+      if (!activo || !mapaRef.current) return
+
+      const mapa = L.map(mapaRef.current).setView([coordenadas.lat, coordenadas.lng], 13)
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors',
+        maxZoom: 19,
+      }).addTo(mapa)
+
+      const marcador = L.marker([coordenadas.lat, coordenadas.lng], { draggable: true }).addTo(mapa)
+      marcador.on('dragend', () => {
+        const posicion = marcador.getLatLng()
+        void actualizarDireccionDesdeCoordenadas(
+          Number(posicion.lat.toFixed(6)),
+          Number(posicion.lng.toFixed(6))
+        )
+      })
+      mapa.on('click', (evento: any) => {
+        marcador.setLatLng(evento.latlng)
+        void actualizarDireccionDesdeCoordenadas(
+          Number(evento.latlng.lat.toFixed(6)),
+          Number(evento.latlng.lng.toFixed(6))
+        )
+      })
+
+      instanciaMapaRef.current = mapa
+      marcadorRef.current = marcador
+      setTimeout(() => mapa.invalidateSize(), 0)
+    }
+
+    void inicializarMapa()
+    return () => {
+      activo = false
+      instanciaMapaRef.current?.remove()
+      instanciaMapaRef.current = null
+      marcadorRef.current = null
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!instanciaMapaRef.current || !marcadorRef.current) return
+    const posicion: [number, number] = [coordenadas.lat, coordenadas.lng]
+    marcadorRef.current.setLatLng(posicion)
+    instanciaMapaRef.current.setView(posicion)
+  }, [coordenadas.lat, coordenadas.lng])
+
+  const buscarDireccion = async () => {
+    const consulta = busquedaDireccion.trim()
+    if (!consulta) return
+
+    setBuscandoDireccion(true)
+    setErrorBusqueda('')
+    try {
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(consulta)}`, {
+        headers: { 'Accept-Language': 'es' },
+      })
+      if (!response.ok) throw new Error('No se pudo consultar la ubicación')
+
+      const resultados = await response.json()
+      const resultado = resultados[0]
+      if (!resultado) {
+        setErrorBusqueda('No se encontró la dirección')
+        return
+      }
+
+      const lat = Number.parseFloat(resultado.lat)
+      const lng = Number.parseFloat(resultado.lon)
+      setDireccion(resultado.display_name)
+      setBusquedaDireccion(resultado.display_name)
+      setCoordenadas({ lat, lng, puntoTexto: resultado.display_name })
+      showInfoToast(`Ubicación encontrada: ${lat.toFixed(4)}Â°, ${lng.toFixed(4)}Â°`)
+    } catch {
+      setErrorBusqueda('No se pudo buscar la dirección')
+    } finally {
+      setBuscandoDireccion(false)
+    }
   }
 
   return (
@@ -251,38 +343,37 @@ function SelectorMapaInteractivo({
         <input
           type="text"
           value={direccion}
-          onChange={(e) => { setDireccion(e.target.value); setErrors(prev => ({...prev, direccion: false})) }}
+          onChange={(e) => { setDireccion(e.target.value); setBusquedaDireccion(e.target.value); setErrors(prev => ({...prev, direccion: false})) }}
           className={errorInputClass(errors, 'direccion')}
           placeholder="Ej: Km 22.5, Carril Izquierdo Norte-Sur"
         />
+        <div className="mt-1.5 flex gap-1.5">
+          <input
+            type="search"
+            value={busquedaDireccion}
+            onChange={(e) => setBusquedaDireccion(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void buscarDireccion() } }}
+            className="min-w-0 flex-1 rounded border border-gray-200 bg-white px-2 py-1 text-[9px] outline-none focus:border-[#9B0F06]"
+            placeholder="Buscar dirección en el mapa"
+          />
+          <button
+            type="button"
+            onClick={() => void buscarDireccion()}
+            disabled={buscandoDireccion}
+            className="rounded bg-[#9B0F06] px-2.5 py-1 text-[9px] font-semibold text-white disabled:opacity-50"
+          >
+            {buscandoDireccion ? 'Buscando...' : 'Buscar'}
+          </button>
+        </div>
+        {errorBusqueda && <p className="mt-1 text-[8px] text-red-600">{errorBusqueda}</p>}
         <p className="mt-0.5 text-[8px] text-gray-400">
-          Dirección física corta de referencia rápida, independiente del punto GPS en el mapa.
+          La búsqueda actualiza la dirección y coloca el marcador en la ubicación encontrada.
         </p>
       </div>
 
       <div>
         <div className="mb-1 flex flex-wrap items-center justify-between gap-1.5">
-          <label className={labelClass}>Selector de Mapa Interactivo (Punto o Tramo Exacto)</label>
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => setTipoMapa(tipoMapa === 'mapa' ? 'satelite' : 'mapa')}
-              className="rounded bg-white px-1.5 py-0.2 text-[8px] font-semibold text-gray-600 border border-gray-200 hover:bg-gray-100"
-            >
-              {tipoMapa === 'mapa' ? 'ðŸ›°ï¸ Vista Satélite' : 'ðŸ—ºï¸ Vista Mapa'}
-            </button>
-            <button
-              type="button"
-              onClick={() => setModoSeleccion(modoSeleccion === 'punto' ? 'tramo' : 'punto')}
-              className={`rounded px-1.5 py-0.2 text-[8px] font-semibold border ${
-                modoSeleccion === 'tramo'
-                  ? 'bg-[#9B0F06] text-white border-[#9B0F06]'
-                  : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-100'
-              }`}
-            >
-              {modoSeleccion === 'punto' ? 'ðŸ“ Punto Íšnico' : 'ðŸ›£ï¸ Tramo Vial'}
-            </button>
-          </div>
+          <label className={labelClass}>Mapa OpenStreetMap (Punto exacto)</label>
         </div>
 
         <div className="mb-1.5 flex flex-wrap gap-1">
@@ -302,51 +393,10 @@ function SelectorMapaInteractivo({
           ))}
         </div>
 
-        <div
-          onClick={handleMapClick}
-          className={`relative h-28 w-full overflow-hidden rounded border border-gray-300 cursor-crosshair select-none transition-all ${
-            tipoMapa === 'satelite' ? 'bg-slate-800' : 'bg-slate-100'
-          }`}
-        >
-          {tipoMapa === 'satelite' ? (
-            <div className="absolute inset-0 bg-[radial-gradient(#334155_1px,transparent_1px)] [background-size:16px_16px] opacity-60">
-              <svg className="absolute inset-0 h-full w-full stroke-emerald-600/30" strokeWidth="3">
-                <line x1="0" y1="30%" x2="100%" y2="70%" />
-                <line x1="20%" y1="0" x2="80%" y2="100%" />
-                <circle cx="50%" cy="50%" r="80" fill="none" stroke="#059669" strokeWidth="1" strokeDasharray="4" />
-              </svg>
-            </div>
-          ) : (
-            <div className="absolute inset-0 bg-[linear-gradient(to_right,#e2e8f0_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f0_1px,transparent_1px)] bg-[size:20px_20px]">
-              <svg className="absolute inset-0 h-full w-full stroke-amber-400" strokeWidth="4">
-                <line x1="0" y1="40%" x2="100%" y2="60%" />
-                <line x1="30%" y1="0" x2="70%" y2="100%" stroke="#94a3b8" strokeWidth="3" />
-                {modoSeleccion === 'tramo' && (
-                  <path d="M 50 100 Q 150 50 250 80 T 400 120" fill="none" stroke="#9B0F06" strokeWidth="4" strokeDasharray="6" />
-                )}
-              </svg>
-            </div>
-          )}
-
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none flex flex-col items-center">
-            <div className="flex items-center gap-1 rounded-full bg-[#9B0F06] px-1.5 py-0.2 text-[7.5px] font-bold text-white shadow-2xs">
-              <MapPin size={9} className="animate-bounce" />
-              <span>{coordenadas.puntoTexto || 'Punto de Obra Marcado'}</span>
-            </div>
-            <div className="h-2.5 w-0.5 bg-[#9B0F06]" />
-            <div className="h-1 w-2.5 rounded-full bg-black/30 blur-[1px]" />
-          </div>
-
-          <div className="absolute bottom-1.5 left-1.5 flex items-center gap-1 rounded bg-white/90 px-1.5 py-0.5 text-[8px] font-mono font-medium text-gray-700 backdrop-blur border border-gray-200 shadow-2xs">
-            <Navigation size={9} className="text-[#9B0F06]" />
-            <span>
-              Lat: {coordenadas.lat}Â° | Lng: {coordenadas.lng}Â°
-            </span>
-          </div>
-
-          <div className="absolute top-1.5 right-1.5 text-[7.5px] bg-black/60 text-white px-1.5 py-0.2 rounded">
-            Haz clic para marcar punto exacto
-          </div>
+        <div ref={mapaRef} className="h-56 w-full overflow-hidden rounded border border-gray-300" />
+        <div className="flex items-center gap-1 rounded bg-white px-1.5 py-0.5 text-[8px] font-mono font-medium text-gray-700 border border-gray-200">
+          <Navigation size={9} className="text-[#9B0F06]" />
+          <span>Lat: {coordenadas.lat}Â° | Lng: {coordenadas.lng}Â°</span>
         </div>
       </div>
     </div>

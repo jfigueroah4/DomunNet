@@ -876,6 +876,20 @@ export function UsuarioFormularioDrawer({
 
           </div>
 
+          <div>
+            <label className="text-[10px] font-semibold text-gray-700 block mb-1 uppercase tracking-wide">
+              Dirección
+            </label>
+            <input
+              type="text"
+              name="direccion"
+              value={formData.direccion}
+              onChange={handleChange}
+              placeholder="Ej: Ciudad de Guatemala"
+              className="w-full h-9 border border-gray-200 rounded-lg px-2.5 text-xs text-gray-700 bg-white focus:outline-none focus:border-[#9B0F06] transition-colors"
+            />
+          </div>
+
 
 
 
