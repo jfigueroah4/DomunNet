@@ -1,7 +1,7 @@
-﻿'use client'
+'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Check, ChevronDown } from 'lucide-react'
+import { Check, ChevronDown, Plus } from 'lucide-react'
 
 export interface ComboboxProps {
   options: { value: string; label: string }[]
@@ -10,9 +10,10 @@ export interface ComboboxProps {
   placeholder?: string
   className?: string
   disabled?: boolean
+  emptyAction?: { label?: string; onClick: () => void }
 }
 
-export function Combobox({ options, value, onChange, placeholder = 'Seleccionar...', className = '', disabled }: ComboboxProps) {
+export function Combobox({ options, value, onChange, placeholder = 'Seleccionar...', className = '', disabled, emptyAction }: ComboboxProps) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
   const wrapperRef = useRef<HTMLDivElement>(null)
@@ -102,6 +103,22 @@ export function Combobox({ options, value, onChange, placeholder = 'Seleccionar.
               ))
             )}
           </div>
+
+          {emptyAction && (
+            <div className="mt-1 border-t border-gray-100 pt-1 px-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false)
+                  emptyAction.onClick()
+                }}
+                className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-xs font-bold text-[#9B0F06] hover:bg-red-50 transition-colors cursor-pointer"
+              >
+                <Plus size={13} className="text-[#9B0F06]" />
+                <span>{emptyAction.label || 'Crear nuevo'}</span>
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -255,11 +255,26 @@ export default function UsuariosPage() {
         showSuccessToast('Usuario actualizado exitosamente')
 
       } else {
-
-        await api.post('/usuarios', payloadApi)
-
+        const res = await api.post('/usuarios', payloadApi)
+        const nuevoUser = res.data?.data
+        const empresaId = (payload as any).empresa_contratista_id
+        if (nuevoUser && empresaId) {
+          try {
+            await api.post('/mantenimiento/contacto_contratista', {
+              empresa_contratista_id: empresaId,
+              usuario_id: nuevoUser.id,
+              cargo: 'Representante Contratante',
+            })
+          } catch (error: any) {
+            const errCode = error.response?.data?.errors?.code || error.response?.data?.code
+            const isDuplicate = errCode === '23505'
+            if (!isDuplicate) {
+              console.error('Error al vincular contacto con empresa contratista:', error)
+              showErrorToast('El usuario se creó, pero falló la vinculación con la empresa contratista')
+            }
+          }
+        }
         showSuccessToast('Usuario creado exitosamente')
-
       }
 
 

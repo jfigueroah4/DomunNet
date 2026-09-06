@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 
 
@@ -9,20 +9,13 @@
 
 import { useState, useEffect } from 'react'
 import { Portal } from '@/components/ui/Portal'
-
 import { useRolesStore, RolMinimo } from '@/stores/useRolesStore'
-
-
-
 import { X, Calendar, Eye, EyeOff } from 'lucide-react'
-
-
-
 import { Usuario, RolUsuario } from '@/types/usuario'
-
-
-
 import { useCustomToast } from '@/hooks/useCustomToast'
+import { Combobox } from '@/components/ui/Combobox'
+import { useRouter } from 'next/navigation'
+import { apiGetDeduplicado } from '@/lib/api/cliente'
 
 
 
@@ -79,92 +72,39 @@ export function UsuarioFormularioDrawer({
 
 
 }: UsuarioFormularioDrawerProps) {
+  const router = useRouter()
   const { roles, fetchRoles } = useRolesStore();
-
-
+  const [empresasContratistas, setEmpresasContratistas] = useState<any[]>([])
+  const [empresaContratistaId, setEmpresaContratistaId] = useState('')
 
   const [formData, setFormData] = useState({
-
-
-
     primer_nombre: '',
-
-
-
     segundo_nombre: '',
-
-
-
     primer_apellido: '',
-
-
-
     segundo_apellido: '',
-
-
-
     correo: '',
-
-
-
     telefono: '',
-
-
-
     rol: 'IngenieroResidente' as RolUsuario,
-
-
-
     estado: 'Activo',
-
-
-
     diaNacimiento: '',
-
-
-
     mesNacimiento: '',
-
-
-
     anoNacimiento: '',
     password: '',
     direccion: '',
-
-
-
   })
-
-
-
-
-
-
 
   const [errors, setErrors] = useState<any>({})
   const [showPassword, setShowPassword] = useState(false)
-
-
-
   const [fechaInvalida, setFechaInvalida] = useState(false)
-
-
-
   const { showErrorToast } = useCustomToast()
 
-
-
-
-
-
-
   useEffect(() => {
-
-
-
     if (isOpen) {
-
       fetchRoles()
+      apiGetDeduplicado('/empresas-contratistas')
+        .then(r => setEmpresasContratistas(r.data?.data || []))
+        .catch(() => {})
+      setEmpresaContratistaId('')
 
 
 
@@ -535,9 +475,10 @@ export function UsuarioFormularioDrawer({
 
 
 
-
-
-
+    if (formData.rol.toLowerCase() === 'contratante' && !empresaContratistaId) {
+      newErrors.empresaContratistaId = true
+      showErrorToast('Debe seleccionar una Empresa Contratista para el rol Contratante')
+    }
 
     if (Object.keys(newErrors).length > 0 || errorFecha) {
 
@@ -572,9 +513,7 @@ export function UsuarioFormularioDrawer({
 
 
         ...formData,
-
-
-
+        empresa_contratista_id: empresaContratistaId,
         fecha_nacimiento: `${formData.anoNacimiento}-${formData.mesNacimiento}-${formData.diaNacimiento}T00:00:00.000Z`
 
 
@@ -603,58 +542,19 @@ export function UsuarioFormularioDrawer({
     <Portal>
       <>
         {/* Overlay */}
+        {isOpen && (
+          <div
+            className="fixed inset-0 bg-black/40 backdrop-blur-[1px] z-[9999] transition-opacity"
+            onClick={onClose}
+          />
+        )}
 
-
-
-      {isOpen && (
-
-
-
+        {/* Drawer */}
         <div
-
-
-
-          className="fixed inset-0 bg-black/40 backdrop-blur-[1px] z-40 transition-opacity"
-
-
-
-          onClick={onClose}
-
-
-
-        />
-
-
-
-      )}
-
-
-
-
-
-
-
-      {/* Drawer */}
-
-
-
-      <div
-
-
-
-        className={`fixed right-0 top-0 h-full w-full max-w-[420px] bg-white shadow-2xl z-50 transform transition-transform duration-300 flex flex-col ${
-
-
-
-          isOpen ? 'translate-x-0' : 'translate-x-full'
-
-
-
-        }`}
-
-
-
-      >
+          className={`fixed right-0 top-0 bottom-0 h-screen w-full max-w-[420px] bg-white shadow-2xl z-[10000] transform transition-transform duration-300 flex flex-col ${
+            isOpen ? 'translate-x-0' : 'translate-x-full'
+          }`}
+        >
 
 
 
@@ -1519,14 +1419,34 @@ export function UsuarioFormularioDrawer({
 
 
               </select>
-
-
-
             </div>
-
-
-
           </div>
+
+          {/* Empresa Contratista (Obligatoria cuando el rol es Contratante) */}
+          {formData.rol.toLowerCase() === 'contratante' && (
+            <div className="mt-2">
+              <label className="text-[10px] font-semibold text-gray-700 block mb-1 uppercase tracking-wide">
+                Empresa Contratista *
+              </label>
+              <Combobox
+                options={empresasContratistas.map((e: any) => ({ value: e.id, label: e.nombre }))}
+                value={empresaContratistaId}
+                onChange={(val) => {
+                  setEmpresaContratistaId(val)
+                  setErrors((prev: any) => ({ ...prev, empresaContratistaId: false }))
+                }}
+                placeholder="Seleccionar Empresa Contratista..."
+                emptyAction={{
+                  label: 'Crear nueva en Catálogo de Empresas',
+                  onClick: () => router.push('/dashboard/proyectos/empresas?tab=empresas-contratistas')
+                }}
+                className={errors.empresaContratistaId ? 'border-red-500 bg-red-50' : ''}
+              />
+              {errors.empresaContratistaId && (
+                <p className="text-xs text-red-500 mt-1">Debe seleccionar una Empresa Contratista para este rol</p>
+              )}
+            </div>
+          )}
 
 
 

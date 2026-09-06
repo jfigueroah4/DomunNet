@@ -1,6 +1,7 @@
-﻿'use client'
+'use client'
 
 import { useRolesStore, RolMinimo } from '@/stores/useRolesStore';
+import { Portal } from '@/components/ui/Portal'
 
 
 
@@ -1062,15 +1063,15 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
 
 
 
-    <>
+    <Portal>
 
 
 
-      <div className="fixed top-0 left-0 right-0 bottom-0 z-[9990] bg-black/40 backdrop-blur-[1px]" onClick={onClose} />
+      <div className="fixed inset-0 z-[9999] bg-black/40 backdrop-blur-[1px]" onClick={onClose} />
 
 
 
-      <div className="fixed top-0 left-0 right-0 bottom-0 z-[9991] flex justify-end overflow-hidden pointer-events-none">
+      <div className="fixed inset-0 z-[10000] flex justify-end overflow-hidden pointer-events-none">
 
 
 
@@ -2098,10 +2099,8 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
 
                 <option value="">Seleccione un rol</option>
 
-                {roles.filter((r: RolMinimo) => r.estado === 'Activo' || r.nombre === formData.rol).map((rol: RolMinimo) => (
-
+                {roles.filter((r: RolMinimo) => (r.estado === 'Activo' || r.nombre === formData.rol) && r.nombre !== 'Contratante' && r.nombre !== 'Contratista').map((rol: RolMinimo) => (
                   <option key={rol.id} value={rol.nombre}>{rol.nombre}</option>
-
                 ))}
 
               </select>
@@ -2568,15 +2567,15 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
 
 
 
-    </>
+    </Portal>
 
 
 
   )
-
-
-
 }
+
+
+
 
 
 
