@@ -854,7 +854,7 @@ useEffect(() => {
     return true
   }
 
-  const handleFinalizarFormulario = () => {
+  const handleFinalizarFormulario = async () => {
     if (!nombreOficial.trim() && !nombre.trim()) {
       showErrorToast('Ingrese el Nombre Oficial del Proyecto')
       return
