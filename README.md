@@ -131,7 +131,13 @@ docker-compose up
 docker-compose -f docker-compose.yml -f docker-compose.prod.yml up
 ```
 
-## Deployment
+
 
 - **Frontend**: Despliegue pendiente de configurar
 - **Backend**: Se despliega automáticamente en Railway al hacer push a `main`
+
+## Entorno y notas de herramienta
+
+- En **Windows 10** con **Node v24.12.0** el gestor de paquetes **npm** ≥ 10 presenta un bug en `@npmcli/arborist` que provoca el error `Cannot read properties of null (reading 'matches')`. 
+- Para evitar este problema, **usa pnpm** (versión 10.33.4 o superior) tal como se indica en la sección *Primeros Pasos* del README. 
+- Si necesitas usar npm, la versión **9.9.4** es la última que funciona sin el bug; sin embargo, en este entorno sigue fallando, por lo que recomendamos mantener pnpm como gestor principal.
