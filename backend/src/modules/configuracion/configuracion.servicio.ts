@@ -5,39 +5,22 @@ const idSingleton = 'principal'
 export async function obtenerConfiguracionGeneral() {
   const { data, error } = await clienteSupabase
     .from('configuracion_general')
-    .select('id, empresa, zona_horaria, idioma, tema')
-    .eq('id', idSingleton)
-    .maybeSingle()
+    .select('id, clave, valor, categoria, updated_at, cambiado_por')
+    .eq('categoria', 'empresa')
 
   if (error) throw new Error(error.message)
 
-  if (!data) {
-    return null
-  }
-
-  return {
-    empresa: data.empresa,
-    zonaHoraria: data.zona_horaria,
-    idioma: data.idioma,
-    tema: data.tema,
-  }
+  return data || []
 }
 
-export async function actualizarConfiguracionGeneral(datos: {
-  empresa: string
-  zonaHoraria: string
-  idioma: string
-  tema: 'claro' | 'oscuro'
-}) {
-  const { error } = await clienteSupabase.from('configuracion_general').upsert({
-    id: idSingleton,
-    empresa: datos.empresa,
-    zona_horaria: datos.zonaHoraria,
-    idioma: datos.idioma,
-    tema: datos.tema,
-  })
+export async function actualizarConfiguracionGeneral(datos: Record<string, string>) {
+  for (const [clave, valor] of Object.entries(datos)) {
+    const { error } = await clienteSupabase
+      .from('configuracion_general')
+      .upsert({ clave, valor, categoria: 'empresa' })
 
-  if (error) throw new Error(error.message)
+    if (error) throw new Error(error.message)
+  }
 
   return obtenerConfiguracionGeneral()
 }

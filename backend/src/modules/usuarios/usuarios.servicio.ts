@@ -148,54 +148,6 @@ export async function listarUsuarios(filtros: FiltrosUsuarios = {}) {
   }).map((usuario) => mapearUsuario(usuario, usuario.rol_id ? mapaRoles.get(usuario.rol_id) || null : null))
 }
 
-// New function to list delegados residente with optional search and pagination
-export interface FiltrosDelegados {
-  busqueda?: string;
-  page?: number; // 1‑based page number
-  limit?: number; // items per page
-}
-
-export async function listarDelegadosResidente(filtros: FiltrosDelegados = {}) {
-  // Fetch users and role map
-  const [usuarios, mapaRoles] = await Promise.all([obtenerUsuariosBase(), obtenerRolesPorId()]);
-
-  // Resolve role IDs for allowed roles
-  const rolResidente = await obtenerRolPorNombre('IngenieroResidente');
-  const rolAdmin = await obtenerRolPorNombre('Administrador');
-  const idsPermitidos = new Set<string>();
-  if (rolResidente?.id) idsPermitidos.add(rolResidente.id);
-  if (rolAdmin?.id) idsPermitidos.add(rolAdmin.id);
-
-  const busqueda = normalizar(filtros.busqueda || '');
-
-  const filtrados = usuarios
-    .filter((usuario) => {
-      const tieneRol = usuario.rol_id && idsPermitidos.has(usuario.rol_id);
-      if (!tieneRol) return false;
-
-      const dato = Array.isArray(usuario.dato_usuario) ? usuario.dato_usuario[0] : usuario.dato_usuario;
-      const nombreCompleto = dato
-        ? `${dato.primer_nombre} ${dato.segundo_nombre || ''} ${dato.primer_apellido} ${dato.segundo_apellido || ''}`.replace(/\s+/g, ' ').trim()
-        : '';
-      const nombreRol = usuario.rol_id ? mapaRoles.get(usuario.rol_id) || '' : '';
-      const cumpleBusqueda =
-        !busqueda ||
-        normalizar(nombreCompleto).includes(busqueda) ||
-        normalizar(usuario.correo).includes(busqueda) ||
-        normalizar(nombreRol).includes(busqueda);
-      return cumpleBusqueda;
-    })
-    .map((usuario) => mapearUsuario(usuario, usuario.rol_id ? mapaRoles.get(usuario.rol_id) || null : null));
-
-  // Return full list with role, no pagination needed (max 2-3 items)
-  const resultados = filtrados.map((u) => ({
-    id: u.id,
-    nombre: u.nombre,
-    rol: u.rol,
-  }));
-  return resultados;
-}
-
 
 export async function obtenerUsuarioPorId(id: string) {
   const { data, error } = await clienteSupabase
@@ -505,4 +457,69 @@ export async function eliminarUsuario(id: string) {
   if (error) throw new Error(error.message)
 
   return usuario
+}
+
+export async function listarDelegadosResidente(busqueda?: string) {
+  const [rolIngRes, rolAdmin, mapaRoles] = await Promise.all([
+    obtenerRolPorNombre('IngenieroResidente'),
+    obtenerRolPorNombre('Administrador'),
+    obtenerRolesPorId(),
+  ])
+
+  const rolIds: string[] = []
+  if (rolIngRes?.id) rolIds.push(rolIngRes.id)
+  if (rolAdmin?.id) rolIds.push(rolAdmin.id)
+
+  if (rolIds.length === 0) return []
+
+  const { data, error } = await clienteSupabase
+    .from('usuario')
+    .select('id, correo, rol_id, dato_usuario(primer_nombre, segundo_nombre, primer_apellido, segundo_apellido, username)')
+    .eq('activo', true)
+    .in('rol_id', rolIds)
+
+  if (error || !data) {
+    console.error('Error al listar delegados residente:', error)
+    return []
+  }
+
+  const busquedaNorm = normalizar(busqueda || '')
+
+  return data
+    .map((fila: any) => {
+      const dato = Array.isArray(fila.dato_usuario) ? fila.dato_usuario[0] : fila.dato_usuario
+      const nombreParts = dato
+        ? [dato.primer_nombre, dato.segundo_nombre, dato.primer_apellido, dato.segundo_apellido]
+            .map((p) => (p ?? '').trim())
+            .filter(Boolean)
+        : []
+      const nombreCompleto = nombreParts.join(' ') || fila.correo
+
+      const username = dato?.username?.trim()
+      const emailPrefix = fila.correo ? fila.correo.split('@')[0] : ''
+      const identificador = username || emailPrefix
+      const rolNombre = fila.rol_id ? mapaRoles.get(fila.rol_id) || 'Residente' : 'Residente'
+
+      const label = `${nombreCompleto} @${identificador} (${rolNombre})`
+
+      return {
+        id: fila.id,
+        nombre: label,
+        nombreCompleto,
+        correo: fila.correo,
+        username: identificador,
+      }
+    })
+    .filter((u) => {
+      if (!busquedaNorm) return true
+      return (
+        normalizar(u.nombreCompleto).includes(busquedaNorm) ||
+        normalizar(u.correo).includes(busquedaNorm) ||
+        normalizar(u.username).includes(busquedaNorm)
+      )
+    })
+    .map((u) => ({
+      id: u.id,
+      nombre: u.nombre,
+    }))
 }

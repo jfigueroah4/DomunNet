@@ -1,4 +1,4 @@
-﻿import { Request, Response } from 'express'
+import { Request, Response } from 'express'
 import { z } from 'zod'
 import { sendError, sendResponse } from '@/shared/response'
 import { actualizarEstadoProyecto, actualizarProyecto, obtenerProyectoPorId, ValidationError } from './proyectos.servicio'
@@ -20,8 +20,17 @@ const actualizarProyectoSchema = z.object({
   kilometroInicio: z.number().optional().nullable(),
   kilometroFin: z.number().optional().nullable(),
 
-  // Reservado para Equipo B/C: estos bloques se validan como extensibles,
-  // pero su mapeo y persistencia se implementará en sus propias tareas.
+  // Paso 2 & 3: Entidades y Seguimiento
+  empresaContratanteId: z.string().uuid().optional().nullable(),
+  empresaContratista: z.string().optional().nullable(),
+  empresaSupervisora: z.string().optional().nullable(),
+  delegadoResidenteId: z.string().uuid().optional().nullable(),
+  fechaAdjudicacion: z.string().optional().nullable(),
+  fechaInicioContractual: z.string().optional().nullable(),
+  numeroEscrituraPublica: z.string().optional().nullable(),
+  montoContractualOriginal: z.number().optional().nullable(),
+  equipo: z.array(z.object({ id: z.string().uuid().optional(), rol: z.string().optional() })).optional().nullable(),
+
   paso2: z.record(z.unknown()).optional(),
   paso3: z.record(z.unknown()).optional(),
 }).strict()

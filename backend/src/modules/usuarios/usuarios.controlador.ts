@@ -43,11 +43,8 @@ export async function listarUsuariosControlador(req: Request, res: Response) {
 }
 
 export async function listarDelegadosResidenteControlador(req: Request, res: Response) {
-  const delegados = await listarDelegadosResidente({
-    busqueda: typeof req.query.busqueda === 'string' ? req.query.busqueda : undefined,
-    page: typeof req.query.page === 'string' ? parseInt(req.query.page) : undefined,
-    limit: typeof req.query.limit === 'string' ? parseInt(req.query.limit) : undefined,
-  })
+  const busqueda = typeof req.query.busqueda === 'string' ? req.query.busqueda : (typeof req.query.q === 'string' ? req.query.q : undefined)
+  const delegados = await listarDelegadosResidente(busqueda)
   return sendResponse(res, 200, delegados, 'Delegados residentes obtenidos correctamente')
 }
 

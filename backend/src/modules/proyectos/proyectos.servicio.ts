@@ -1,4 +1,4 @@
-﻿import { clienteSupabase } from '@/configuracion/cliente-supabase'
+import { clienteSupabase } from '@/configuracion/cliente-supabase'
 
 export class ValidationError extends Error {
   public field: string;
@@ -97,11 +97,22 @@ export async function obtenerProyectoPorId(proyectoId: string) {
 
   const { data: detalle, error: detalleError } = await clienteSupabase
     .from('proyecto_detalle')
-    .select('nombre_oficial, descripcion_proyecto, tramo, direccion, latitud, longitud, municipio_id, departamento_id, kilometro_inicio, kilometro_fin')
+    .select('nombre_oficial, descripcion_proyecto, tramo, direccion, latitud, longitud, municipio_id, departamento_id, kilometro_inicio, kilometro_fin, empresa_contratante_id, empresa_contratista_id, empresa_supervisora, delegado_residente_id, fecha_adjudicacion, fecha_inicio_contractual, numero_escritura_publica, monto_original')
     .eq('proyecto_id', proyectoId)
     .single()
 
   if (detalleError || !detalle) throw new Error('Detalle del proyecto no encontrado')
+
+  const { data: equipoRows } = await clienteSupabase
+    .from('proyecto_usuario')
+    .select('usuario_id, rol_proyecto, usuario(id, primer_nombre, primer_apellido, correo)')
+    .eq('proyecto_id', proyectoId)
+
+  const equipo = (equipoRows || []).map((row: any) => ({
+    id: row.usuario_id,
+    nombre: row.usuario ? `${row.usuario.primer_nombre || ''} ${row.usuario.primer_apellido || ''}`.trim() || row.usuario.correo : 'Usuario',
+    rol: row.rol_proyecto || 'Miembro'
+  }))
 
   return {
     id: proyecto.id,
@@ -121,8 +132,16 @@ export async function obtenerProyectoPorId(proyectoId: string) {
     departamentoId: detalle.departamento_id,
     kilometroInicio: detalle.kilometro_inicio,
     kilometroFin: detalle.kilometro_fin,
+    empresaContratanteId: detalle.empresa_contratante_id ?? null,
+    empresaContratistaId: detalle.empresa_contratista_id ?? null,
+    empresaSupervisora: detalle.empresa_supervisora ?? '',
+    delegadoResidenteId: detalle.delegado_residente_id ?? null,
+    fechaAdjudicacion: detalle.fecha_adjudicacion ?? '',
+    fechaInicioContractual: detalle.fecha_inicio_contractual ?? '',
+    numeroEscrituraPublica: detalle.numero_escritura_publica ?? '',
+    montoContractualOriginal: detalle.monto_original ?? null,
+    equipo,
     estado: 'borrador',
-    // Reservado para Paso 2/3: sus campos aún no se mapean en este GET.
     paso2: {},
     paso3: {},
   }
@@ -177,6 +196,7 @@ export async function crearProyecto(datosFormulario: any) {
       empresa_contratante_id: datosFormulario.empresaContratanteId || null,
       empresa_contratista_id: datosFormulario.empresaContratista || null,
       empresa_supervisora: datosFormulario.empresaSupervisora || null,
+      delegado_residente_id: datosFormulario.delegadoResidenteId || null,
       fecha_adjudicacion: datosFormulario.fechaAdjudicacion || null,
       fecha_inicio_contractual: datosFormulario.fechaInicioContractual || null,
       numero_escritura_publica: datosFormulario.numeroEscrituraPublica || null,
@@ -247,6 +267,10 @@ export async function actualizarProyecto(proyectoId: string, datosFormulario: Re
   if ('direccion' in datosFormulario) detalleUpdates.direccion = datosFormulario.direccion
   if ('kilometroInicio' in datosFormulario) detalleUpdates.kilometro_inicio = datosFormulario.kilometroInicio
   if ('kilometroFin' in datosFormulario) detalleUpdates.kilometro_fin = datosFormulario.kilometroFin
+  if ('empresaContratanteId' in datosFormulario) detalleUpdates.empresa_contratante_id = datosFormulario.empresaContratanteId
+  if ('empresaContratista' in datosFormulario) detalleUpdates.empresa_contratista_id = datosFormulario.empresaContratista
+  if ('empresaSupervisora' in datosFormulario) detalleUpdates.empresa_supervisora = datosFormulario.empresaSupervisora
+  if ('delegadoResidenteId' in datosFormulario) detalleUpdates.delegado_residente_id = datosFormulario.delegadoResidenteId
 
   if (Object.keys(proyectoUpdates).length > 0) {
     const { error } = await clienteSupabase.from('proyecto').update(proyectoUpdates).eq('id', proyectoId)
@@ -256,6 +280,19 @@ export async function actualizarProyecto(proyectoId: string, datosFormulario: Re
   if (Object.keys(detalleUpdates).length > 0) {
     const { error } = await clienteSupabase.from('proyecto_detalle').update(detalleUpdates).eq('proyecto_id', proyectoId)
     if (error) throw new Error(error.message)
+  }
+
+  if (Array.isArray(datosFormulario.equipo)) {
+    await clienteSupabase.from('proyecto_usuario').delete().eq('proyecto_id', proyectoId)
+    const usuariosAInsertar = (datosFormulario.equipo as any[]).map((miembro) => ({
+      proyecto_id: proyectoId,
+      usuario_id: miembro.id,
+      rol_proyecto: miembro.rol || 'Miembro'
+    }))
+    if (usuariosAInsertar.length > 0) {
+      const { error: errEq } = await clienteSupabase.from('proyecto_usuario').insert(usuariosAInsertar)
+      if (errEq) console.error('Error actualizando equipo proyecto_usuario:', errEq)
+    }
   }
 
   return { id: proyectoId }

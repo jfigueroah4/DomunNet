@@ -7,47 +7,39 @@ export async function listarEmpresas() {
     .from('empresa_externa')
     .select(`
       *, 
-      contactos: contacto_empresa_externa(*, usuario(*, dato_usuario(*))),
-      como_contratante: proyecto_detalle!proyecto_detalle_empresa_contratante_id_fkey(id),
-      como_contratista: proyecto_detalle!proyecto_detalle_empresa_contratista_id_fkey(id)
+      contactos: contacto_empresa_externa(*, usuario(*, dato_usuario(*)))
     `)
     .order('created_at', { ascending: false });
 
   if (error) throw new Error(`Error al listar empresas: ${error.message}`);
   
   return data.map((emp: any) => {
-    const proyectosVinculados = (emp.como_contratante?.length || 0) + (emp.como_contratista?.length || 0);
-    delete emp.como_contratante;
-    delete emp.como_contratista;
-    return {
-      ...emp,
-      proyectos_vinculados: proyectosVinculados
-    };
-  });
+  // No relationship to proyecto_detalle, so set count to 0
+  const proyectosVinculados = 0;
+  return {
+    ...emp,
+    proyectos_vinculados: proyectosVinculados,
+  };
+});
 }
 
 export async function obtenerEmpresa(id: string) {
   const { data, error } = await clienteSupabase
     .from('empresa_externa')
     .select(`
-      *, 
-      contactos: contacto_empresa_externa(*),
-      como_contratante: proyecto_detalle!proyecto_detalle_empresa_contratante_id_fkey(id),
-      como_contratista: proyecto_detalle!proyecto_detalle_empresa_contratista_id_fkey(id)
+      *,
+      contactos: contacto_empresa_externa(*)
     `)
     .eq('id', id)
     .single();
 
   if (error) throw new Error(`Error al obtener empresa: ${error.message}`);
   
-  const proyectosVinculados = (data.como_contratante?.length || 0) + (data.como_contratista?.length || 0);
-  delete data.como_contratante;
-  delete data.como_contratista;
-  
-  return {
-    ...data,
-    proyectos_vinculados: proyectosVinculados
-  };
+  const proyectosVinculados = 0;
+return {
+  ...data,
+  proyectos_vinculados: proyectosVinculados,
+};
 }
 
 export async function crearEmpresaWizard(payload: WizardEmpresaType) {

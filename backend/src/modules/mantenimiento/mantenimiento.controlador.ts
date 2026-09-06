@@ -77,7 +77,8 @@ export async function crear(req: any, res: Response) {
     return sendResponse(res, 201, data, 'Registro creado');
   } catch (error: any) {
     const userMessage = traducirErrorPostgres(error, 'crear');
-    return sendError(res, 400, userMessage, error.message);
+    const code = error?.code || error?.cause?.code;
+    return sendError(res, 400, userMessage, { code, message: error.message });
   }
 }
 
@@ -91,7 +92,8 @@ export async function actualizar(req: any, res: Response) {
     return sendResponse(res, 200, data, 'Registro actualizado');
   } catch (error: any) {
     const userMessage = traducirErrorPostgres(error, 'actualizar');
-    return sendError(res, 400, userMessage, error.message);
+    const code = error?.code || error?.cause?.code;
+    return sendError(res, 400, userMessage, { code, message: error.message });
   }
 }
 
@@ -105,7 +107,8 @@ export async function eliminar(req: any, res: Response) {
     return sendResponse(res, 200, null, 'Registro eliminado');
   } catch (error: any) {
     const userMessage = traducirErrorPostgres(error, 'eliminar');
-    return sendError(res, 400, userMessage, error.message);
+    const code = error?.code || error?.cause?.code;
+    return sendError(res, 400, userMessage, { code, message: error.message });
   }
 }
 
