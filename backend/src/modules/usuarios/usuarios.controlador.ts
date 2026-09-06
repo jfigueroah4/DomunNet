@@ -7,6 +7,7 @@ import {
   crearUsuario,
   eliminarUsuario,
   listarUsuarios,
+  listarDelegadosResidente,
   obtenerUsuarioPorId,
   actualizarUsuario,
   verificarUsernameDisponible, verificarCorreoDisponible,
@@ -39,6 +40,15 @@ export async function listarUsuariosControlador(req: Request, res: Response) {
   })
 
   return sendResponse(res, 200, usuarios, 'Usuarios obtenidos correctamente')
+}
+
+export async function listarDelegadosResidenteControlador(req: Request, res: Response) {
+  const delegados = await listarDelegadosResidente({
+    busqueda: typeof req.query.busqueda === 'string' ? req.query.busqueda : undefined,
+    page: typeof req.query.page === 'string' ? parseInt(req.query.page) : undefined,
+    limit: typeof req.query.limit === 'string' ? parseInt(req.query.limit) : undefined,
+  })
+  return sendResponse(res, 200, delegados, 'Delegados residentes obtenidos correctamente')
 }
 
 export async function obtenerUsuarioControlador(req: Request, res: Response) {

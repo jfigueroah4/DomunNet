@@ -1,10 +1,10 @@
-﻿const jwt = require('jsonwebtoken');
+const jwt = require('jsonwebtoken');
 
 const token = jwt.sign({
   id: '149ff0d5-5e97-4491-8547-c896778fda40',
   correo: 'test@domunnet.test',
   rol: 'Administrador'
-}, 'super_secret_for_e2e_testing_123_abc_xyz', { expiresIn: '1h' });
+}, process.env.JWT_SECRET, { expiresIn: '1h' });
 
 const payload = {
   nombreOficial: "Proyecto de Prueba E2E",

@@ -17,6 +17,11 @@ import {
 export const USE_MOCK = true
 
 export const proyectoService = {
+  getProyectoReal: async (slug: string) => {
+    const { data } = await api.get(`/proyectos/${slug}`)
+    return data?.data
+  },
+
   getProyectoBySlug: async (slug: string): Promise<ProyectoType | undefined> => {
     if (USE_MOCK) {
       // Simulate network latency

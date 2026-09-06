@@ -86,6 +86,48 @@ export async function actualizarEstadoProyecto(proyectoId: string, nuevoEstadoCo
   return true
 }
 
+export async function obtenerProyectoPorId(proyectoId: string) {
+  const { data: proyecto, error: proyectoError } = await clienteSupabase
+    .from('proyecto')
+    .select('id, codigo, nombre, descripcion, ubicacion, responsable_id, fecha_inicio, fecha_fin_estimada, estado_id')
+    .eq('id', proyectoId)
+    .single()
+
+  if (proyectoError || !proyecto) throw new Error('Proyecto no encontrado')
+
+  const { data: detalle, error: detalleError } = await clienteSupabase
+    .from('proyecto_detalle')
+    .select('nombre_oficial, descripcion_proyecto, tramo, direccion, latitud, longitud, municipio_id, departamento_id, kilometro_inicio, kilometro_fin')
+    .eq('proyecto_id', proyectoId)
+    .single()
+
+  if (detalleError || !detalle) throw new Error('Detalle del proyecto no encontrado')
+
+  return {
+    id: proyecto.id,
+    codigo: proyecto.codigo,
+    nombre: proyecto.nombre,
+    descripcion: detalle.descripcion_proyecto ?? proyecto.descripcion ?? '',
+    ubicacion: detalle.tramo ?? proyecto.ubicacion ?? '',
+    nombreOficial: detalle.nombre_oficial ?? proyecto.nombre,
+    ubicacionFisica: detalle.tramo ?? proyecto.ubicacion ?? '',
+    direccion: detalle.direccion ?? '',
+    latitud: detalle.latitud,
+    longitud: detalle.longitud,
+    coordenadasMapa: detalle.latitud != null && detalle.longitud != null
+      ? { lat: Number(detalle.latitud), lng: Number(detalle.longitud), puntoTexto: detalle.direccion ?? 'Punto de obra' }
+      : undefined,
+    municipioId: detalle.municipio_id,
+    departamentoId: detalle.departamento_id,
+    kilometroInicio: detalle.kilometro_inicio,
+    kilometroFin: detalle.kilometro_fin,
+    estado: 'borrador',
+    // Reservado para Paso 2/3: sus campos aún no se mapean en este GET.
+    paso2: {},
+    paso3: {},
+  }
+}
+
 export async function crearProyecto(datosFormulario: any) {
   // 1. Resolver estado 'borrador' por default para nuevos proyectos
   const estadoBorradorId = await obtenerEstadoIdPorCodigo('borrador')
@@ -97,6 +139,8 @@ export async function crearProyecto(datosFormulario: any) {
       codigo: datosFormulario.codigo || `PROY-${Math.floor(Math.random()*10000)}`, // Provisional
       nombre: datosFormulario.nombreOficial,
       descripcion: datosFormulario.descripcion,
+      // Se replica el mismo texto para conservar la ubicación resumida del proyecto
+      // y el tramo técnico de su ficha de detalle sincronizados durante la creación.
       ubicacion: datosFormulario.ubicacionFisica,
       fecha_inicio: datosFormulario.fechaInicioContractual || null,
       fecha_fin_estimada: datosFormulario.fechaFinContractualPlan || datosFormulario.fechaInicioContractual || null,
@@ -121,8 +165,10 @@ export async function crearProyecto(datosFormulario: any) {
       descripcion_proyecto: datosFormulario.descripcion,
       tramo: datosFormulario.ubicacionFisica,
       
-      municipio_id: datosFormulario.municipioId ? parseInt(datosFormulario.municipioId) : null,
-      departamento_id: datosFormulario.departamentoId ? parseInt(datosFormulario.departamentoId) : null,
+      municipio_id: datosFormulario.municipioId || null,
+      departamento_id: datosFormulario.departamentoId || null,
+      kilometro_inicio: datosFormulario.kilometroInicio ?? null,
+      kilometro_fin: datosFormulario.kilometroFin ?? null,
       latitud: datosFormulario.latitud || null,
       longitud: datosFormulario.longitud || null,
       direccion: datosFormulario.direccion || null,
@@ -175,6 +221,44 @@ export async function crearProyecto(datosFormulario: any) {
   }
 
   return proyecto.id
+}
+
+export async function actualizarProyecto(proyectoId: string, datosFormulario: Record<string, unknown>) {
+  const proyectoUpdates: Record<string, unknown> = {}
+  const detalleUpdates: Record<string, unknown> = {}
+
+  if ('nombreOficial' in datosFormulario) {
+    proyectoUpdates.nombre = datosFormulario.nombreOficial
+    detalleUpdates.nombre_oficial = datosFormulario.nombreOficial
+  }
+  if ('descripcion' in datosFormulario) {
+    proyectoUpdates.descripcion = datosFormulario.descripcion
+    detalleUpdates.descripcion_proyecto = datosFormulario.descripcion
+  }
+  if ('ubicacionFisica' in datosFormulario) {
+    // Mantener sincronizados proyecto.ubicacion y proyecto_detalle.tramo.
+    proyectoUpdates.ubicacion = datosFormulario.ubicacionFisica
+    detalleUpdates.tramo = datosFormulario.ubicacionFisica
+  }
+  if ('municipioId' in datosFormulario) detalleUpdates.municipio_id = datosFormulario.municipioId
+  if ('departamentoId' in datosFormulario) detalleUpdates.departamento_id = datosFormulario.departamentoId
+  if ('latitud' in datosFormulario) detalleUpdates.latitud = datosFormulario.latitud
+  if ('longitud' in datosFormulario) detalleUpdates.longitud = datosFormulario.longitud
+  if ('direccion' in datosFormulario) detalleUpdates.direccion = datosFormulario.direccion
+  if ('kilometroInicio' in datosFormulario) detalleUpdates.kilometro_inicio = datosFormulario.kilometroInicio
+  if ('kilometroFin' in datosFormulario) detalleUpdates.kilometro_fin = datosFormulario.kilometroFin
+
+  if (Object.keys(proyectoUpdates).length > 0) {
+    const { error } = await clienteSupabase.from('proyecto').update(proyectoUpdates).eq('id', proyectoId)
+    if (error) throw new Error(error.message)
+  }
+
+  if (Object.keys(detalleUpdates).length > 0) {
+    const { error } = await clienteSupabase.from('proyecto_detalle').update(detalleUpdates).eq('proyecto_id', proyectoId)
+    if (error) throw new Error(error.message)
+  }
+
+  return { id: proyectoId }
 }
 
 

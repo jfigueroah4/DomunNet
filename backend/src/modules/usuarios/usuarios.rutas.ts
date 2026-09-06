@@ -6,6 +6,7 @@ import {
   crearUsuarioControlador,
   eliminarUsuarioControlador,
   listarUsuariosControlador,
+  listarDelegadosResidenteControlador,
   obtenerUsuarioControlador,
   validarUsernameControlador,
   validarCorreoControlador,
@@ -16,6 +17,7 @@ const router = Router()
 router.get('/', autenticarSolicitud, requierePermisos('usuarios.read'), listarUsuariosControlador)
 router.get('/validar-correo', autenticarSolicitud, requierePermisos('usuarios.read'), validarCorreoControlador)
 router.get('/validar-username', autenticarSolicitud, requierePermisos('usuarios.read'), validarUsernameControlador)
+router.get('/delegados_residente', autenticarSolicitud, requierePermisos('usuarios.read'), listarDelegadosResidenteControlador)
 router.get('/:id', autenticarSolicitud, requierePermisos('usuarios.read'), obtenerUsuarioControlador)
 router.post('/', autenticarSolicitud, requierePermisos('usuarios.write'), crearUsuarioControlador)
 router.put('/:id', autenticarSolicitud, requierePermisos('usuarios.write'), actualizarUsuarioControlador)

@@ -1,11 +1,30 @@
 ﻿import { Request, Response } from 'express'
 import { z } from 'zod'
 import { sendError, sendResponse } from '@/shared/response'
-import { actualizarEstadoProyecto, ValidationError } from './proyectos.servicio'
+import { actualizarEstadoProyecto, actualizarProyecto, obtenerProyectoPorId, ValidationError } from './proyectos.servicio'
 
 const cambiarEstadoSchema = z.object({
   estado_codigo: z.string().min(1)
 })
+
+const actualizarProyectoSchema = z.object({
+  // Paso 1: Identificación y Ubicación.
+  nombreOficial: z.string().min(1).optional(),
+  descripcion: z.string().optional().nullable(),
+  ubicacionFisica: z.string().optional().nullable(),
+  municipioId: z.string().uuid().optional().nullable(),
+  departamentoId: z.string().uuid().optional().nullable(),
+  latitud: z.number().optional().nullable(),
+  longitud: z.number().optional().nullable(),
+  direccion: z.string().optional().nullable(),
+  kilometroInicio: z.number().optional().nullable(),
+  kilometroFin: z.number().optional().nullable(),
+
+  // Reservado para Equipo B/C: estos bloques se validan como extensibles,
+  // pero su mapeo y persistencia se implementará en sus propias tareas.
+  paso2: z.record(z.unknown()).optional(),
+  paso3: z.record(z.unknown()).optional(),
+}).strict()
 
 export async function cambiarEstadoControlador(req: Request, res: Response) {
   try {
@@ -29,6 +48,30 @@ export async function cambiarEstadoControlador(req: Request, res: Response) {
   }
 }
 
+export async function actualizarProyectoControlador(req: Request, res: Response) {
+  try {
+    const body = actualizarProyectoSchema.parse(req.body)
+    const proyecto = await actualizarProyecto(req.params.id, body)
+    return sendResponse(res, 200, proyecto, 'Proyecto actualizado correctamente')
+  } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      return sendError(res, 400, 'Error de formato en solicitud', error.errors)
+    }
+    console.error('Error en actualizarProyectoControlador:', error)
+    return sendError(res, 500, error.message || 'Error interno del servidor')
+  }
+}
+
+export async function obtenerProyectoControlador(req: Request, res: Response) {
+  try {
+    const proyecto = await obtenerProyectoPorId(req.params.id)
+    return sendResponse(res, 200, proyecto, 'Proyecto obtenido correctamente')
+  } catch (error: any) {
+    console.error('Error en obtenerProyectoControlador:', error)
+    return sendError(res, 404, error.message || 'Proyecto no encontrado')
+  }
+}
+
 import { crearProyecto } from './proyectos.servicio'
 
 const crearProyectoSchema = z.object({
@@ -37,11 +80,13 @@ const crearProyectoSchema = z.object({
   ubicacionFisica: z.string().optional().nullable(),
   responsable: z.string().uuid().optional().nullable(),
   
-    municipioId: z.any().optional().nullable(),
-    departamentoId: z.any().optional().nullable(),
+    municipioId: z.string().uuid().optional().nullable(),
+    departamentoId: z.string().uuid().optional().nullable(),
     latitud: z.number().optional().nullable(),
     longitud: z.number().optional().nullable(),
     direccion: z.string().optional().nullable(),
+    kilometroInicio: z.number().optional().nullable(),
+    kilometroFin: z.number().optional().nullable(),
     montoFinal: z.number().optional().nullable(),
 
   empresaContratanteId: z.string().uuid().optional().nullable(),
