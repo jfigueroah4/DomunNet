@@ -3,8 +3,9 @@
 
 import { Satellite, Route, Loader2, useRef, useState, useMemo } from 'react'
 import { Combobox } from '@/components/ui/Combobox'
+import { DelegadoResidenteSelect } from './DelegadoResidenteSelect'
 import { useRouter } from 'next/navigation'
-import { api } from '@/lib/api/cliente'
+import { api, apiGetDeduplicado } from '@/lib/api/cliente'
 import { useEffect } from 'react'
 import type {
   EstadoProyecto,
@@ -49,6 +50,7 @@ import { PROYECTOS_MOCK } from '@/data/proyectos.mock'
 import { useUsuariosStore } from '@/stores/useUsuariosStore'
 import { useEmpresasStore } from '@/stores/useEmpresasStore'
 import { ProyectoTimeline } from '@/components/modules/proyectos/ProyectoTimeline'
+import { UsuarioFormularioDrawer } from '@/components/modules/usuarios/UsuarioFormularioDrawer'
 
 interface ProyectoFormularioProps {
   proyectoInicial?: Proyecto
@@ -92,7 +94,7 @@ function SectionHeader({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
           {Icon && <Icon size={12} className="text-[#9B0F06]" />}
-          <h3 className="text-[10.5px] font-black uppercase tracking-wider text-gray-800">{title}</h3>
+          <h3 className="text-[8.5px] font-black uppercase tracking-wider text-gray-800">{title}</h3>
         </div>
         {badge && (
           <span className="rounded-full bg-gray-100 px-1.5 py-0.2 text-[8px] font-bold text-gray-600 border border-gray-200">
@@ -110,12 +112,15 @@ function EquipoAsignadoSelector({
   equipo,
   setEquipo,
   usuariosDisponibles,
+  onAbrirCrearUsuario,
 }: {
   equipo: MiembroEquipo[]
   setEquipo: React.Dispatch<React.SetStateAction<MiembroEquipo[]>>
   usuariosDisponibles: any[]
+  onAbrirCrearUsuario?: () => void
 }) {
   const [selectedUsuarioId, setSelectedUsuarioId] = useState('')
+  const { showSuccessToast, showErrorToast, showInfoToast } = useCustomToast()
 
   const handleAgregar = () => {
     if (!selectedUsuarioId) return
@@ -151,12 +156,12 @@ function EquipoAsignadoSelector({
       </label>
       <div className="flex flex-wrap gap-1.5">
         <Combobox
-  options={usuariosDisponibles.filter((u: any) => u.rol?.toLowerCase() !== 'contratante').map((u: any) => ({ value: u.id, label: u.nombre + ' - ' + (u.cargo || u.rol.toUpperCase()) }))}
-  value={selectedUsuarioId}
-  onChange={(val) => setSelectedUsuarioId(val)}
-  placeholder="Buscar profesional del Módulo de Usuarios..."
-  className="flex-1"
-/>
+          options={usuariosDisponibles.filter((u: any) => u.rol?.toLowerCase() !== 'contratante').map((u: any) => ({ value: u.id, label: u.nombre + ' - ' + (u.cargo || u.rol.toUpperCase()) }))}
+          value={selectedUsuarioId}
+          onChange={(val) => setSelectedUsuarioId(val)}
+          placeholder="Buscar profesional del Módulo de Usuarios..."
+          className="flex-1"
+        />
 
         <button
           type="button"
@@ -167,6 +172,17 @@ function EquipoAsignadoSelector({
           <UserPlus size={11} />
           <span>Agregar al Equipo</span>
         </button>
+
+        {onAbrirCrearUsuario && (
+          <button
+            type="button"
+            onClick={onAbrirCrearUsuario}
+            className="inline-flex items-center gap-1 rounded border border-gray-200 bg-white px-2.5 py-1 text-[10px] font-bold text-gray-700 transition-colors hover:bg-gray-50 shrink-0 shadow-2xs cursor-pointer"
+          >
+            <Plus size={11} className="text-[#9B0F06]" />
+            <span>Crear Usuario</span>
+          </button>
+        )}
       </div>
 
       <p className="text-[8px] text-gray-400">
@@ -267,7 +283,17 @@ function SelectorMapaInteractivo({
         maxZoom: 19,
       }).addTo(mapa)
 
-      const marcador = L.marker([coordenadas.lat, coordenadas.lng], { draggable: true }).addTo(mapa)
+      const outlinePinIcon = L.divIcon({
+        className: 'custom-map-pin',
+        html: `<svg width="26" height="34" viewBox="0 0 24 32" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));">
+          <path d="M12 1C5.925 1 1 5.925 1 12C1 20.25 12 31 12 31C12 31 23 20.25 23 12C23 5.925 18.075 1 12 1Z" fill="#FFFFFF" stroke="#0f172a" stroke-width="2"/>
+          <circle cx="12" cy="11" r="4" fill="#0f172a"/>
+        </svg>`,
+        iconSize: [26, 34],
+        iconAnchor: [13, 34],
+      })
+
+      const marcador = L.marker([coordenadas.lat, coordenadas.lng], { draggable: true, icon: outlinePinIcon }).addTo(mapa)
       marcador.on('dragend', () => {
         const posicion = marcador.getLatLng()
         void actualizarDireccionDesdeCoordenadas(
@@ -623,9 +649,9 @@ export function ProyectoFormulario({
   const [kilometroInicio, setKilometroInicio] = useState(String((proyectoInicial as any)?.kilometroInicio ?? ''))
   const [kilometroFin, setKilometroFin] = useState(String((proyectoInicial as any)?.kilometroFin ?? ''))
   // Catálogos
-  const { empresas, fetchEmpresas } = useEmpresasStore()
   const { usuarios: usuariosDisponibles, cargarUsuarios } = useUsuariosStore()
-  const [empresasContratantes, setEmpresasContratantes] = useState<any[]>([]) // Legacy
+  const [entidadesContratantes, setEntidadesContratantes] = useState<any[]>([])
+  const [empresasContratistas, setEmpresasContratistas] = useState<any[]>([])
   const [departamentos, setDepartamentos] = useState<any[]>([])
   const [municipios, setMunicipios] = useState<any[]>([])
   const [usuarios, setUsuarios] = useState<any[]>([])
@@ -633,20 +659,85 @@ export function ProyectoFormulario({
   const [municipioId, setMunicipioId] = useState((proyectoInicial as any)?.municipioId || '')
   const [delegadoResidenteId, setDelegadoResidenteId] = useState('')
   const [empresaContratanteId, setEmpresaContratanteId] = useState('')
+  const [openCrearUsuarioDrawer, setOpenCrearUsuarioDrawer] = useState(false)
+
+  const handleUsuarioCreadoEnWizard = async (formData: any) => {
+    try {
+      const payloadApi: any = {
+        primer_nombre: formData.primer_nombre,
+        segundo_nombre: formData.segundo_nombre,
+        primer_apellido: formData.primer_apellido,
+        segundo_apellido: formData.segundo_apellido,
+        correo: formData.correo,
+        telefono: formData.telefono,
+        rol: formData.rol,
+        estado: formData.estado,
+        fecha_nacimiento: formData.fecha_nacimiento,
+        direccion: formData.direccion,
+      }
+      if (formData.password && formData.password.trim().length >= 6) {
+        payloadApi.contrasena = formData.password.trim()
+      }
+      const res = await api.post('/usuarios', payloadApi)
+      const nuevoUsuario = res.data?.data
+      if (nuevoUsuario && formData.empresa_contratista_id) {
+        try {
+          await api.post('/mantenimiento/contacto_contratista', {
+            empresa_contratista_id: formData.empresa_contratista_id,
+            usuario_id: nuevoUsuario.id,
+            cargo: 'Representante Contratante',
+          })
+        } catch (error: any) {
+          const errCode = error.response?.data?.errors?.code || error.response?.data?.code
+          const isDuplicate = errCode === '23505'
+          if (!isDuplicate) {
+            console.error('Error al vincular contacto con empresa contratista:', error)
+            showErrorToast('El usuario se creó, pero falló la vinculación con la empresa contratista')
+          }
+        }
+      }
+      showSuccessToast('Usuario creado exitosamente')
+      await cargarUsuarios()
+      if (nuevoUsuario) {
+        const nombreCompleto = `${nuevoUsuario.primer_nombre} ${nuevoUsuario.primer_apellido}`.trim()
+        const rolFormateado = nuevoUsuario.cargo || (nuevoUsuario.rol ? (nuevoUsuario.rol.charAt(0).toUpperCase() + nuevoUsuario.rol.slice(1)) : 'Miembro')
+        const nuevoMiembro: MiembroEquipo = {
+          id: nuevoUsuario.id,
+          nombre: nombreCompleto,
+          rol: rolFormateado,
+        }
+        setEquipo((prev) => [...prev, nuevoMiembro])
+      }
+    } catch (error: any) {
+      showErrorToast(error.response?.data?.message || 'Error al crear el usuario')
+    }
+  }
   
   useEffect(() => {
-    fetchEmpresas()
-    api.get('/api/v1/mantenimiento/departamento').then(r => setDepartamentos(r.data?.data || []))
-    api.get('/api/v1/mantenimiento/municipio').then(r => setMunicipios(r.data?.data || []))
+    apiGetDeduplicado('/entidades-contratantes').then(r => setEntidadesContratantes(r.data?.data || [])).catch(() => {});
+    apiGetDeduplicado('/empresas-contratistas').then(r => setEmpresasContratistas(r.data?.data || [])).catch(() => {});
+    apiGetDeduplicado('/mantenimiento/departamento').then(r => setDepartamentos(r.data?.data || [])).catch(() => {});
+    apiGetDeduplicado('/mantenimiento/municipio').then(r => setMunicipios(r.data?.data || [])).catch(() => {});
     cargarUsuarios();
-// Sync departamentoId/municipioId when proyectoInicial arrives (fix async init)
+    apiGetDeduplicado('/configuracion/general').then(r => {
+      const configArray = r.data?.data || [];
+      const item = configArray.find((c: any) => c.clave === 'nombre_empresa');
+      if (item?.valor) {
+        setEmpresaSupervisora(item.valor);
+      }
+    }).catch(() => {});
+  }, []);
+
+// Sync departamentoId/municipioId/delegadoResidenteId when proyectoInicial arrives (fix async init)
 useEffect(() => {
   if (proyectoInicial) {
     if (!departamentoId && proyectoInicial?.departamentoId) setDepartamentoId(proyectoInicial.departamentoId);
     if (!municipioId && proyectoInicial?.municipioId) setMunicipioId(proyectoInicial.municipioId);
+    if (!delegadoResidenteId && (proyectoInicial as any)?.delegadoResidenteId) setDelegadoResidenteId((proyectoInicial as any).delegadoResidenteId);
+    if (!empresaContratanteId && (proyectoInicial as any)?.empresaContratanteId) setEmpresaContratanteId((proyectoInicial as any).empresaContratanteId);
+    if (!empresaContratistaId && (proyectoInicial as any)?.empresaContratistaId) setEmpresaContratistaId((proyectoInicial as any).empresaContratistaId);
   }
 }, [proyectoInicial]);
-  }, [])
 
   const [coordenadasMapa, setCoordenadasMapa] = useState(
     proyectoInicial?.coordenadasMapa || ((proyectoInicial as any)?.latitud != null && (proyectoInicial as any)?.longitud != null
@@ -804,6 +895,27 @@ useEffect(() => {
       }
       
       onGuardar?.(proyectoData)
+      if (!onGuardar) {
+        try {
+          if (esEditar && proyectoInicial?.id) {
+            await api.put(`/proyectos/${proyectoInicial.id}`, proyectoData)
+            showSuccessToast('Proyecto actualizado exitosamente')
+            router.push(`/dashboard/proyectos/${proyectoInicial.id}`)
+          } else {
+            const res = await api.post('/proyectos', proyectoData)
+            showSuccessToast('Proyecto creado exitosamente en Borrador')
+            const nuevoId = res.data?.data?.id
+            if (nuevoId) {
+              router.push(`/dashboard/proyectos/${nuevoId}`)
+            } else {
+              router.push('/dashboard/proyectos')
+            }
+          }
+        } catch (err: any) {
+          console.error('Error al guardar proyecto:', err)
+          showErrorToast(err.response?.data?.message || 'Error al guardar el proyecto')
+        }
+      }
   }
 
   const pasosMeta = [
@@ -938,6 +1050,49 @@ useEffect(() => {
 
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   <div>
+                    <label className={labelClass}>
+                      Departamento <span className="text-[#9B0F06]">*</span>
+                    </label>
+                    <select
+                      value={departamentoId}
+                      onChange={(e) => {
+                        setDepartamentoId(e.target.value)
+                        setMunicipioId('')
+                        setErrors((prev) => ({ ...prev, departamentoId: false }))
+                      }}
+                      className={errorInputClass(errors, 'departamentoId')}
+                    >
+                      <option value="">Seleccione Departamento...</option>
+                      {departamentos.map((d: any) => (
+                        <option key={d.id} value={d.id}>{d.nombre}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className={labelClass}>
+                      Municipio <span className="text-[#9B0F06]">*</span>
+                    </label>
+                    <select
+                      value={municipioId}
+                      onChange={(e) => {
+                        setMunicipioId(e.target.value)
+                        setErrors((prev) => ({ ...prev, municipioId: false }))
+                      }}
+                      className={errorInputClass(errors, 'municipioId')}
+                    >
+                      <option value="">Seleccione Municipio...</option>
+                      {municipios
+                        .filter((m: any) => !departamentoId || m.departamento_id === departamentoId)
+                        .map((m: any) => (
+                          <option key={m.id} value={m.id}>{m.nombre}</option>
+                        ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <div>
                     <label className={labelClass}>Kilómetro Inicial</label>
                     <input
                       type="number"
@@ -993,51 +1148,65 @@ useEffect(() => {
                     Entidad Contratante / Propietaria <span className="text-[#9B0F06]">*</span>
                   </label>
                   <Combobox
-  options={empresas.map((e: any) => ({ value: e.nombre, label: e.nombre }))}
-  value={entidadContratante}
-  onChange={(val) => setEntidadContratante(val)}
-  placeholder="Buscar Empresa Contratante..."
-  className="mt-1"
-/>
+                    options={entidadesContratantes.map((e: any) => ({ value: e.nombre, label: e.nombre }))}
+                    value={entidadContratante}
+                    onChange={(val) => setEntidadContratante(val)}
+                    placeholder="Buscar Entidad Contratante..."
+                    className="mt-1"
+                    emptyAction={{
+                      label: 'Crear nueva en Catálogo de Empresas',
+                      onClick: () => router.push('/dashboard/proyectos/empresas?tab=entidades-contratantes')
+                    }}
+                  />
                 </div>
 
                 <div>
                   <label className={labelClass}>Empresa Contratista Ejecutora</label>
                   <Combobox
-  options={empresas.map((e: any) => ({ value: e.nombre, label: e.nombre }))}
-  value={empresaContratista}
-  onChange={(val) => setEmpresaContratista(val)}
-  placeholder="Buscar Empresa Contratista..."
-  className="mt-1"
-/>
-                </div>
-
-                <div>
-                  <label className={labelClass}>Empresa Supervisora de Obra</label>
-                  <input
-                    type="text"
-                    value={empresaSupervisora}
-                    onChange={(e) => setEmpresaSupervisora(e.target.value)}
-                    className={inputClass}
-                    placeholder="Ej: Consorcio de Ingeniería y Supervisión Vial R.L."
+                    options={empresasContratistas.map((e: any) => ({ value: e.nombre, label: e.nombre }))}
+                    value={empresaContratista}
+                    onChange={(val) => setEmpresaContratista(val)}
+                    placeholder="Buscar Empresa Contratista..."
+                    className="mt-1"
+                    emptyAction={{
+                      label: 'Crear nueva en Catálogo de Empresas',
+                      onClick: () => router.push('/dashboard/proyectos/empresas?tab=empresas-contratistas')
+                    }}
                   />
                 </div>
 
                 <div>
-                  <label className={labelClass}>Delegado Residente de Proyecto</label>
-                  <Combobox
-  options={usuariosDisponibles.filter((u: any) => u.rol?.toLowerCase() === 'administrador' || u.rol?.toLowerCase() === 'ingenieroresidente').map((u: any) => ({ value: u.nombre, label: u.nombre + ' ' + (u.apellido || '') }))}
-  value={delegadoResidente}
-  onChange={(val) => setDelegadoResidente(val)}
-  placeholder="Buscar Delegado Residente..."
-  className="mt-1"
-/>
+                  <label className={labelClass}>Empresa Supervisora de Obra (Solo Lectura - Configuración General)</label>
+                  <input
+                    type="text"
+                    value={empresaSupervisora}
+                    readOnly
+                    className={`${inputClass} bg-gray-100 font-semibold text-gray-700 cursor-not-allowed`}
+                    placeholder="Cargando configuración general..."
+                  />
                 </div>
+
+                <DelegadoResidenteSelect
+                  value={delegadoResidenteId}
+                  onChange={(val) => setDelegadoResidenteId(val)}
+                  labelClass={labelClass}
+                />
               </div>
             </div>
 
             {/* Componente Equipo Asignado al Proyecto */}
-            <EquipoAsignadoSelector equipo={equipo} setEquipo={setEquipo} usuariosDisponibles={usuariosDisponibles} />
+            <EquipoAsignadoSelector
+              equipo={equipo}
+              setEquipo={setEquipo}
+              usuariosDisponibles={usuariosDisponibles}
+              onAbrirCrearUsuario={() => setOpenCrearUsuarioDrawer(true)}
+            />
+
+            <UsuarioFormularioDrawer
+              isOpen={openCrearUsuarioDrawer}
+              onClose={() => setOpenCrearUsuarioDrawer(false)}
+              onSave={handleUsuarioCreadoEnWizard}
+            />
           </div>
         )}
 

@@ -17,7 +17,7 @@ export default function NuevoProyectoPage() {
         >
           <ArrowLeft size={15} className="text-gray-600" />
         </button>
-        <h1 className="text-[24px] font-extrabold leading-none text-[#07152B]">Nuevo Proyecto</h1>
+        <h1 className="text-[18px] font-extrabold leading-none text-[#07152B]">Nuevo Proyecto</h1>
       </div>
 
       {/* Formulario */}
