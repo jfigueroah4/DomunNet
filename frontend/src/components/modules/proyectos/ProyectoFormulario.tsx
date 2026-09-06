@@ -1,4 +1,4 @@
-﻿// @ts-nocheck
+// @ts-nocheck
 'use client'
 
 import { Satellite, Route, Loader2, useRef, useState, useMemo } from 'react'
@@ -620,6 +620,8 @@ export function ProyectoFormulario({
   const [descripcion, setDescripcion] = useState(proyectoInicial?.descripcion || '')
   const [ubicacionFisica, setUbicacionFisica] = useState(proyectoInicial?.ubicacionFisica || proyectoInicial?.ubicacion || '')
   const [direccion, setDireccion] = useState(proyectoInicial?.direccion || 'Km 22.5 CA-9 Sur')
+  const [kilometroInicio, setKilometroInicio] = useState(String((proyectoInicial as any)?.kilometroInicio ?? ''))
+  const [kilometroFin, setKilometroFin] = useState(String((proyectoInicial as any)?.kilometroFin ?? ''))
   // Catálogos
   const { empresas, fetchEmpresas } = useEmpresasStore()
   const { usuarios: usuariosDisponibles, cargarUsuarios } = useUsuariosStore()
@@ -627,8 +629,8 @@ export function ProyectoFormulario({
   const [departamentos, setDepartamentos] = useState<any[]>([])
   const [municipios, setMunicipios] = useState<any[]>([])
   const [usuarios, setUsuarios] = useState<any[]>([])
-  const [departamentoId, setDepartamentoId] = useState('')
-  const [municipioId, setMunicipioId] = useState('')
+  const [departamentoId, setDepartamentoId] = useState((proyectoInicial as any)?.departamentoId || '')
+  const [municipioId, setMunicipioId] = useState((proyectoInicial as any)?.municipioId || '')
   const [delegadoResidenteId, setDelegadoResidenteId] = useState('')
   const [empresaContratanteId, setEmpresaContratanteId] = useState('')
   
@@ -636,11 +638,20 @@ export function ProyectoFormulario({
     fetchEmpresas()
     api.get('/api/v1/mantenimiento/departamento').then(r => setDepartamentos(r.data?.data || []))
     api.get('/api/v1/mantenimiento/municipio').then(r => setMunicipios(r.data?.data || []))
-    cargarUsuarios()
+    cargarUsuarios();
+// Sync departamentoId/municipioId when proyectoInicial arrives (fix async init)
+useEffect(() => {
+  if (proyectoInicial) {
+    if (!departamentoId && proyectoInicial?.departamentoId) setDepartamentoId(proyectoInicial.departamentoId);
+    if (!municipioId && proyectoInicial?.municipioId) setMunicipioId(proyectoInicial.municipioId);
+  }
+}, [proyectoInicial]);
   }, [])
 
   const [coordenadasMapa, setCoordenadasMapa] = useState(
-    proyectoInicial?.coordenadasMapa || { lat: 14.5021, lng: -90.5841, puntoTexto: 'Tramo Obra Vial CA-9 Sur' }
+    proyectoInicial?.coordenadasMapa || ((proyectoInicial as any)?.latitud != null && (proyectoInicial as any)?.longitud != null
+      ? { lat: Number((proyectoInicial as any).latitud), lng: Number((proyectoInicial as any).longitud), puntoTexto: proyectoInicial?.direccion || 'Punto de obra' }
+      : { lat: 14.5021, lng: -90.5841, puntoTexto: 'Tramo Obra Vial CA-9 Sur' })
   )
 
   // Entidades e Instituciones
@@ -768,8 +779,10 @@ export function ProyectoFormulario({
         descripcion,
         ubicacionFisica: ubicacionFisica || direccion,
         
-        municipioId,
-        departamentoId,
+        municipioId: municipioId || null,
+        departamentoId: departamentoId || null,
+        kilometroInicio: kilometroInicio ? Number(kilometroInicio) : null,
+        kilometroFin: kilometroFin ? Number(kilometroFin) : null,
         latitud: coordenadasMapa?.lat,
         longitud: coordenadasMapa?.lng,
         direccion: direccion,
@@ -922,6 +935,34 @@ export function ProyectoFormulario({
                     placeholder="Ej: Municipio de Villa Nueva, Departamento de Guatemala, Tramo CA-9 Sur Km 20 al 25"
                   />
                 </div>
+
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <div>
+                    <label className={labelClass}>Kilómetro Inicial</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.001"
+                      value={kilometroInicio}
+                      onChange={(e) => setKilometroInicio(e.target.value)}
+                      className={errorInputClass(errors, 'kilometroInicio')}
+                      placeholder="Ej: 20.000"
+                    />
+                  </div>
+                  <div>
+                    <label className={labelClass}>Kilómetro Final</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.001"
+                      value={kilometroFin}
+                      onChange={(e) => setKilometroFin(e.target.value)}
+                      className={errorInputClass(errors, 'kilometroFin')}
+                      placeholder="Ej: 25.000"
+                    />
+                  </div>
+                </div>
+
 
                 <SelectorMapaInteractivo
                   direccion={direccion}
