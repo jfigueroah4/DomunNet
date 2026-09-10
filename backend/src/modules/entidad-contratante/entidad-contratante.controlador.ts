@@ -10,12 +10,18 @@ export async function obtener(req: Request, res: Response) {
 }
 export async function crear(req: Request, res: Response) {
   const result = entidadContratanteSchema.safeParse(req.body)
-  if (!result.success) return res.status(400).json({ error: 'Datos inválidos', details: result.error.issues })
+  if (!result.success) {
+    console.error('Validation error en crear entidad contratante:', JSON.stringify(result.error.issues, null, 2))
+    return res.status(400).json({ error: 'Datos inválidos', details: result.error.issues })
+  }
   try { return res.status(201).json({ data: await crearEntidadContratante(result.data) }) } catch (error: any) { return res.status(400).json({ error: error.message }) }
 }
 export async function actualizar(req: Request, res: Response) {
   const result = entidadContratanteSchema.safeParse(req.body)
-  if (!result.success) return res.status(400).json({ error: 'Datos inválidos', details: result.error.issues })
+  if (!result.success) {
+    console.error('Validation error en actualizar entidad contratante:', JSON.stringify(result.error.issues, null, 2))
+    return res.status(400).json({ error: 'Datos inválidos', details: result.error.issues })
+  }
   try { return res.json({ data: await actualizarEntidadContratante(req.params.id, result.data) }) } catch (error: any) { return res.status(400).json({ error: error.message }) }
 }
 export async function eliminar(req: Request, res: Response) {

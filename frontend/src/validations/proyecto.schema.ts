@@ -13,6 +13,8 @@ export const DocumentoProyectoSchema = z.object({
   tamanio: z.string(),
   fechaSubida: z.string(),
   subidoPor: z.string(),
+  categoria: z.string().optional(),
+  url: z.string().optional(),
 })
 
 export const FaseTimelineSchema = z.object({

@@ -1,11 +1,12 @@
 // @ts-nocheck
 'use client'
 
-import { Satellite, Route, Loader2, useRef, useState, useMemo } from 'react'
+import { useRef, useState, useMemo } from 'react'
 import { Combobox } from '@/components/ui/Combobox'
 import { DelegadoResidenteSelect } from './DelegadoResidenteSelect'
+import { EmpresaRelacionadaDrawer } from '@/components/modules/empresas/EmpresaRelacionadaDrawer'
 import { useRouter } from 'next/navigation'
-import { api, apiGetDeduplicado } from '@/lib/api/cliente'
+import { api, apiGetDeduplicado, limpiarCacheMemoria } from '@/lib/api/cliente'
 import { useEffect } from 'react'
 import type {
   EstadoProyecto,
@@ -28,12 +29,16 @@ import {
   FileSignature,
   FileText,
   HardHat,
+  Info,
   Layers,
+  Loader2,
   Lock,
   Map,
   MapPin,
   Navigation,
   Plus,
+  Route,
+  Satellite,
   Save,
   ShieldCheck,
   Sparkles,
@@ -67,7 +72,7 @@ const labelClass = 'mb-0.5 block text-[8px] font-extrabold uppercase tracking-wi
 
 // Helper: returns inputClass with red border if field has error
 function errorInputClass(errors: Record<string, boolean>, field: string) {
-  return `w-full rounded border ${errors[field] ? 'border-red-400' : 'border-gray-200'} bg-white px-2 py-1 text-[10px] text-gray-800 placeholder-gray-400 focus:border-[#9B0F06] focus:outline-none focus:ring-1 focus:ring-[#9B0F06] transition-colors font-medium`
+  return `w-full rounded border ${errors[field] ? 'border-red-500 ring-1 ring-red-400' : 'border-gray-200'} bg-white px-2 py-1 text-[10px] text-gray-800 placeholder-gray-400 focus:border-[#9B0F06] focus:outline-none focus:ring-1 focus:ring-[#9B0F06] transition-colors font-medium`
 }
 
 function siguienteCodigoVial() {
@@ -120,7 +125,7 @@ function EquipoAsignadoSelector({
   onAbrirCrearUsuario?: () => void
 }) {
   const [selectedUsuarioId, setSelectedUsuarioId] = useState('')
-  const { showSuccessToast, showErrorToast, showInfoToast } = useCustomToast()
+  const { showSuccessToast, showErrorToast } = useCustomToast()
 
   const handleAgregar = () => {
     if (!selectedUsuarioId) return
@@ -128,7 +133,7 @@ function EquipoAsignadoSelector({
     if (!userObj) return
 
     if (equipo.some((m) => m.nombre === userObj.nombre)) {
-      showInfoToast(`${userObj.nombre} ya forma parte del equipo`)
+      showErrorToast(`${userObj.nombre} ya forma parte del equipo`)
       return
     }
 
@@ -156,7 +161,19 @@ function EquipoAsignadoSelector({
       </label>
       <div className="flex flex-wrap gap-1.5">
         <Combobox
-          options={usuariosDisponibles.filter((u: any) => u.rol?.toLowerCase() !== 'contratante').map((u: any) => ({ value: u.id, label: u.nombre + ' - ' + (u.cargo || u.rol.toUpperCase()) }))}
+          options={usuariosDisponibles
+            .filter((u: any) => u.rol?.toLowerCase() !== 'contratante')
+            .filter((u: any) => u.activo !== false && u.estado !== 'Suspendido' && u.estado !== 'Desactivado')
+            .filter((u: any) => {
+              const nameToMatch = u.nombre || `${u.primer_nombre || ''} ${u.primer_apellido || ''}`.trim()
+              return !equipo.some((m) => m.id === u.id || (m.nombre && m.nombre === nameToMatch))
+            })
+            .map((u: any) => {
+              const labelName = u.nombre || `${u.primer_nombre || ''} ${u.primer_apellido || ''}`.trim() || u.correo
+              const labelRol = u.cargo || (u.rol ? u.rol.toUpperCase() : 'MIEMBRO')
+              return { value: u.id, label: `${labelName} - ${labelRol}` }
+            })
+          }
           value={selectedUsuarioId}
           onChange={(val) => setSelectedUsuarioId(val)}
           placeholder="Buscar profesional del Módulo de Usuarios..."
@@ -216,28 +233,77 @@ function EquipoAsignadoSelector({
   )
 }
 
-// Selector de mapa interactivo estilo Google Maps
+// // Selector de mapa interactivo estilo Google Maps con Geocodificación y Ruta de Tramo
 function SelectorMapaInteractivo({
   direccion,
   setDireccion,
+  setUbicacionFisica,
   errors,
   setErrors,
   coordenadas,
   setCoordenadas,
+  departamentoId,
+  setDepartamentoId,
+  municipioId,
+  setMunicipioId,
+  departamentos = [],
+  municipios = [],
+  kilometroInicio,
+  kilometroFin,
 }: {
   direccion: string
   setDireccion: (val: string) => void
+  setUbicacionFisica?: (val: string) => void
   errors: Record<string, boolean>
   setErrors: React.Dispatch<React.SetStateAction<Record<string, boolean>>>
   coordenadas: { lat: number; lng: number; puntoTexto?: string }
   setCoordenadas: (val: { lat: number; lng: number; puntoTexto?: string }) => void
+  departamentoId?: string
+  setDepartamentoId?: (val: string) => void
+  municipioId?: string
+  setMunicipioId?: (val: string) => void
+  departamentos?: any[]
+  municipios?: any[]
+  kilometroInicio?: string
+  kilometroFin?: string
 }) {
-  const [busquedaDireccion, setBusquedaDireccion] = useState(direccion)
   const [buscandoDireccion, setBuscandoDireccion] = useState(false)
   const [errorBusqueda, setErrorBusqueda] = useState('')
   const mapaRef = useRef<HTMLDivElement>(null)
   const instanciaMapaRef = useRef<any>(null)
   const marcadorRef = useRef<any>(null)
+  const rutaPolylineRef = useRef<any>(null)
+
+  const DEPARTAMENTOS_GT_COORDS: Record<string, { lat: number; lng: number }> = {
+    'guatemala': { lat: 14.6349, lng: -90.5069 },
+    'sacatepéquez': { lat: 14.5586, lng: -90.7295 },
+    'sacatepequez': { lat: 14.5586, lng: -90.7295 },
+    'chimaltenango': { lat: 14.6611, lng: -90.8208 },
+    'el progreso': { lat: 14.8517, lng: -90.0211 },
+    'escuintla': { lat: 14.3050, lng: -90.7850 },
+    'santa rosa': { lat: 14.2811, lng: -90.2986 },
+    'sololá': { lat: 14.7739, lng: -91.1833 },
+    'solola': { lat: 14.7739, lng: -91.1833 },
+    'totonicapán': { lat: 14.9117, lng: -91.3611 },
+    'totonicapan': { lat: 14.9117, lng: -91.3611 },
+    'quetzaltenango': { lat: 14.8347, lng: -91.5181 },
+    'suchitepéquez': { lat: 14.5342, lng: -91.5033 },
+    'suchitepequez': { lat: 14.5342, lng: -91.5033 },
+    'retalhuleu': { lat: 14.5361, lng: -91.6778 },
+    'san marcos': { lat: 14.9639, lng: -91.7944 },
+    'huehuetenango': { lat: 15.3197, lng: -91.4708 },
+    'quiché': { lat: 15.0306, lng: -91.1486 },
+    'quiche': { lat: 15.0306, lng: -91.1486 },
+    'baja verapaz': { lat: 15.1044, lng: -90.3175 },
+    'alta verapaz': { lat: 15.4764, lng: -90.3725 },
+    'petén': { lat: 16.9167, lng: -89.9000 },
+    'peten': { lat: 16.9167, lng: -89.9000 },
+    'izabal': { lat: 15.4042, lng: -88.9489 },
+    'zacapa': { lat: 14.9722, lng: -89.5306 },
+    'chiquimula': { lat: 14.7833, lng: -89.5500 },
+    'jutiapa': { lat: 14.2817, lng: -89.8958 },
+    'jalapa': { lat: 14.6347, lng: -89.9889 },
+  }
 
   const presets = [
     { label: 'Km 22.5 CA-9 Sur', lat: 14.5021, lng: -90.5841, desc: 'CA-9 Sur, Tramo Amatitlán-Palín' },
@@ -245,6 +311,46 @@ function SelectorMapaInteractivo({
     { label: 'Calzada Roosevelt', lat: 14.6284, lng: -90.5412, desc: 'Km 14.5 Calzada Roosevelt' },
     { label: 'Ruta a El Salvador', lat: 14.5621, lng: -90.4321, desc: 'Km 18.5 Carretera a El Salvador' },
   ]
+
+  // Función para auto-seleccionar Departamento y Municipio basados en datos Nominatim
+  const autodeteccionUbicacion = (address: any) => {
+    if (!address) return
+    const stateName = (address.state || address.region || address.province || '').toLowerCase().trim()
+    const cityName = (address.city || address.town || address.village || address.county || address.municipality || address.suburb || '').toLowerCase().trim()
+
+    if (stateName && setDepartamentoId && departamentos.length > 0) {
+      const foundDep = departamentos.find((d: any) => {
+        const nom = d.nombre.toLowerCase().trim()
+        return stateName.includes(nom) || nom.includes(stateName)
+      })
+
+      if (foundDep) {
+        setDepartamentoId(foundDep.id)
+
+        if (cityName && setMunicipioId && municipios.length > 0) {
+          const mData = municipios.filter((m: any) => m.departamento_id === foundDep.id)
+          const foundMun = mData.find((m: any) => {
+            const nom = m.nombre.toLowerCase().trim()
+            return cityName.includes(nom) || nom.includes(cityName)
+          })
+          if (foundMun) {
+            setMunicipioId(foundMun.id)
+          }
+        }
+      }
+    }
+  }
+
+  const [coordenadasFinManual, setCoordenadasFinManual] = useState<{ lat: number; lng: number } | null>(null)
+
+  const limpiarDireccionNominatim = (rawAddress: string): string => {
+    if (!rawAddress) return ''
+    return rawAddress
+      .replace(/,\s*\d{5}\s*/g, '')
+      .replace(/,\s*(República de\s*|Republica de\s*)?Guatemala\s*$/gi, '')
+      .replace(/,\s*,/g, ',')
+      .trim()
+  }
 
   const actualizarDireccionDesdeCoordenadas = async (lat: number, lng: number) => {
     setBuscandoDireccion(true)
@@ -258,16 +364,71 @@ function SelectorMapaInteractivo({
       const resultado = await response.json()
       if (!resultado.display_name) throw new Error('No se encontró una dirección')
 
-      setDireccion(resultado.display_name)
-      setBusquedaDireccion(resultado.display_name)
-      setCoordenadas({ lat, lng, puntoTexto: resultado.display_name })
+      const display = limpiarDireccionNominatim(resultado.display_name)
+      setDireccion(display)
+      if (setUbicacionFisica) setUbicacionFisica(display)
+      setCoordenadas({ lat, lng, puntoTexto: display })
+
+      if (resultado.address) {
+        autodeteccionUbicacion(resultado.address)
+      }
     } catch {
       setErrorBusqueda('No se pudo obtener la dirección del punto seleccionado')
-      setCoordenadas({ lat, lng, puntoTexto: `Punto seleccionado (${lat.toFixed(4)}Â°, ${lng.toFixed(4)}Â°)` })
+      setCoordenadas({ lat, lng, puntoTexto: `Punto seleccionado (${lat.toFixed(4)}°, ${lng.toFixed(4)}°)` })
     } finally {
       setBuscandoDireccion(false)
     }
   }
+
+  const buscarDireccion = async () => {
+    if (!direccion.trim()) return
+    setBuscandoDireccion(true)
+    setErrorBusqueda('')
+    try {
+      const consulta = direccion.toLowerCase().includes('guatemala') ? direccion : `${direccion}, Guatemala`
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(consulta)}`, {
+        headers: { 'Accept-Language': 'es' },
+      })
+      if (!response.ok) throw new Error('No se pudo consultar la ubicación')
+
+      const resultados = await response.json()
+      const resultado = resultados[0]
+      if (!resultado) {
+        setErrorBusqueda('No se encontró la dirección especificada en el mapa')
+        return
+      }
+
+      const lat = Number.parseFloat(resultado.lat)
+      const lng = Number.parseFloat(resultado.lon)
+      const display = limpiarDireccionNominatim(resultado.display_name)
+      setDireccion(display)
+      if (setUbicacionFisica) setUbicacionFisica(display)
+      setCoordenadas({ lat, lng, puntoTexto: display })
+
+      if (resultado.address) {
+        autodeteccionUbicacion(resultado.address)
+      }
+
+      if (instanciaMapaRef.current && marcadorRef.current) {
+        instanciaMapaRef.current.setView([lat, lng], 14)
+        marcadorRef.current.setLatLng([lat, lng])
+      }
+    } catch {
+      setErrorBusqueda('No se pudo realizar la búsqueda de dirección')
+    } finally {
+      setBuscandoDireccion(false)
+    }
+  }
+
+  // Cálculo de distancia en km si se colocan km inicial y km final
+  const distanciaTramoKm = useMemo(() => {
+    const kIni = parseFloat(kilometroInicio || '0')
+    const kFin = parseFloat(kilometroFin || '0')
+    if (!isNaN(kIni) && !isNaN(kFin) && kFin > kIni) {
+      return kFin - kIni
+    }
+    return 0
+  }, [kilometroInicio, kilometroFin])
 
   useEffect(() => {
     let activo = true
@@ -277,7 +438,20 @@ function SelectorMapaInteractivo({
       const L = await import('leaflet')
       if (!activo || !mapaRef.current) return
 
-      const mapa = L.map(mapaRef.current).setView([coordenadas.lat, coordenadas.lng], 13)
+      const guatemalaBounds: [[number, number], [number, number]] = [
+        [13.5, -92.6],
+        [18.2, -87.8]
+      ]
+
+      const mapa = L.map(mapaRef.current, {
+        center: [coordenadas.lat, coordenadas.lng],
+        zoom: 13,
+        minZoom: 7,
+        maxZoom: 19,
+        maxBounds: guatemalaBounds,
+        maxBoundsViscosity: 1.0,
+      })
+
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; OpenStreetMap contributors',
         maxZoom: 19,
@@ -286,8 +460,8 @@ function SelectorMapaInteractivo({
       const outlinePinIcon = L.divIcon({
         className: 'custom-map-pin',
         html: `<svg width="26" height="34" viewBox="0 0 24 32" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));">
-          <path d="M12 1C5.925 1 1 5.925 1 12C1 20.25 12 31 12 31C12 31 23 20.25 23 12C23 5.925 18.075 1 12 1Z" fill="#FFFFFF" stroke="#0f172a" stroke-width="2"/>
-          <circle cx="12" cy="11" r="4" fill="#0f172a"/>
+          <path d="M12 1C5.925 1 1 5.925 1 12C1 20.25 12 31 12 31C12 31 23 20.25 23 12C23 5.925 18.075 1 12 1Z" fill="#FFFFFF" stroke="#9B0F06" stroke-width="2"/>
+          <circle cx="12" cy="11" r="4" fill="#9B0F06"/>
         </svg>`,
         iconSize: [26, 34],
         iconAnchor: [13, 34],
@@ -323,83 +497,139 @@ function SelectorMapaInteractivo({
     }
   }, [])
 
+  // Actualizar marcador y trazar ruta estilo Google Maps si hay kilometraje
   useEffect(() => {
     if (!instanciaMapaRef.current || !marcadorRef.current) return
     const posicion: [number, number] = [coordenadas.lat, coordenadas.lng]
     marcadorRef.current.setLatLng(posicion)
-    instanciaMapaRef.current.setView(posicion)
-  }, [coordenadas.lat, coordenadas.lng])
 
-  const buscarDireccion = async () => {
-    const consulta = busquedaDireccion.trim()
-    if (!consulta) return
-
-    setBuscandoDireccion(true)
-    setErrorBusqueda('')
-    try {
-      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(consulta)}`, {
-        headers: { 'Accept-Language': 'es' },
-      })
-      if (!response.ok) throw new Error('No se pudo consultar la ubicación')
-
-      const resultados = await response.json()
-      const resultado = resultados[0]
-      if (!resultado) {
-        setErrorBusqueda('No se encontró la dirección')
-        return
+    const actualizarRutaPolyline = async () => {
+      const L = await import('leaflet')
+      if (rutaPolylineRef.current) {
+        instanciaMapaRef.current.removeLayer(rutaPolylineRef.current)
+        rutaPolylineRef.current = null
       }
 
-      const lat = Number.parseFloat(resultado.lat)
-      const lng = Number.parseFloat(resultado.lon)
-      setDireccion(resultado.display_name)
-      setBusquedaDireccion(resultado.display_name)
-      setCoordenadas({ lat, lng, puntoTexto: resultado.display_name })
-      showInfoToast(`Ubicación encontrada: ${lat.toFixed(4)}Â°, ${lng.toFixed(4)}Â°`)
-    } catch {
-      setErrorBusqueda('No se pudo buscar la dirección')
-    } finally {
-      setBuscandoDireccion(false)
+      if (distanciaTramoKm > 0) {
+        // Calcular punto final basado en la posición manual o en la distancia estimada
+        const offsetLat = distanciaTramoKm * 0.0075
+        const offsetLng = distanciaTramoKm * 0.0055
+        const pEnd: [number, number] = coordenadasFinManual
+          ? [coordenadasFinManual.lat, coordenadasFinManual.lng]
+          : [coordenadas.lat + offsetLat, coordenadas.lng + offsetLng]
+
+        let puntosRuta: [number, number][] = []
+
+        try {
+          // Intentar obtener la geometría de carretera real desde OSRM
+          const controller = new AbortController()
+          const timeoutId = setTimeout(() => controller.abort(), 2500)
+          const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${coordenadas.lng},${coordenadas.lat};${pEnd[1]},${pEnd[0]}?overview=full&geometries=geojson`
+          const res = await fetch(osrmUrl, { signal: controller.signal })
+          clearTimeout(timeoutId)
+          if (res.ok) {
+            const data = await res.json()
+            if (data.routes?.[0]?.geometry?.coordinates?.length) {
+              puntosRuta = data.routes[0].geometry.coordinates.map((c: [number, number]) => [c[1], c[0]])
+            }
+          }
+        } catch {
+          // Fallback a curva simulada si OSRM tarda o falla
+          const midLat = (coordenadas.lat + pEnd[0]) / 2 + 0.002 * Math.sin(distanciaTramoKm)
+          const midLng = (coordenadas.lng + pEnd[1]) / 2 + 0.003 * Math.cos(distanciaTramoKm)
+          puntosRuta = [posicion, [midLat, midLng], pEnd]
+        }
+
+        if (!puntosRuta.length) {
+          puntosRuta = [posicion, pEnd]
+        }
+
+        const grupoCapaRuta = L.layerGroup()
+
+        // Línea única sólida azul rey estilo Google Maps
+        const singlePolyline = L.polyline(puntosRuta, {
+          color: '#2563eb',
+          weight: 6,
+          opacity: 0.9,
+          lineCap: 'round',
+          lineJoin: 'round',
+        })
+        grupoCapaRuta.addLayer(singlePolyline)
+
+        // Marcador de punto de finalización (Km Fin) - ARRASTRABLE
+        const endIcon = L.divIcon({
+          className: 'custom-end-pin',
+          html: `<svg width="26" height="34" viewBox="0 0 24 32" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3)); cursor: grab;">
+            <path d="M12 1C5.925 1 1 5.925 1 12C1 20.25 12 31 12 31C12 31 23 20.25 23 12C23 5.925 18.075 1 12 1Z" fill="#2563eb" stroke="#ffffff" stroke-width="2"/>
+            <circle cx="12" cy="11" r="4" fill="#ffffff"/>
+          </svg>`,
+          iconSize: [26, 34],
+          iconAnchor: [13, 34],
+        })
+
+        const endMarker = L.marker(pEnd, { icon: endIcon, draggable: true })
+        endMarker.bindTooltip(`Km Fin: ${kilometroFin || ''} (Arrastra para ajustar punto final azul)`, { permanent: false, direction: 'top' })
+
+        endMarker.on('dragend', () => {
+          const pos = endMarker.getLatLng()
+          setCoordenadasFinManual({
+            lat: Number(pos.lat.toFixed(6)),
+            lng: Number(pos.lng.toFixed(6)),
+          })
+        })
+
+        grupoCapaRuta.addLayer(endMarker)
+
+        grupoCapaRuta.addTo(instanciaMapaRef.current)
+        rutaPolylineRef.current = grupoCapaRuta
+
+        // Ajustar zoom y encuadre del mapa para mostrar toda la ruta
+        const bounds = singlePolyline.getBounds()
+        if (bounds.isValid()) {
+          instanciaMapaRef.current.fitBounds(bounds, { padding: [35, 35], maxZoom: 15 })
+        }
+      }
     }
-  }
+
+    void actualizarRutaPolyline()
+  }, [coordenadas.lat, coordenadas.lng, distanciaTramoKm, kilometroFin, coordenadasFinManual])
 
   return (
     <div className="space-y-2 rounded-lg border border-gray-200 bg-gray-50/50 p-2.5">
       <div>
-        <label className={labelClass}>Dirección (Texto Corto) <span className="text-[#9B0F06]">*</span></label>
-        <input
-          type="text"
-          value={direccion}
-          onChange={(e) => { setDireccion(e.target.value); setBusquedaDireccion(e.target.value); setErrors(prev => ({...prev, direccion: false})) }}
-          className={errorInputClass(errors, 'direccion')}
-          placeholder="Ej: Km 22.5, Carril Izquierdo Norte-Sur"
-        />
-        <div className="mt-1.5 flex gap-1.5">
+        <label className={labelClass}>DIRECCIÓN (TEXTO CORTO) <span className="text-[#9B0F06]">*</span></label>
+        <div className="flex gap-1.5">
           <input
-            type="search"
-            value={busquedaDireccion}
-            onChange={(e) => setBusquedaDireccion(e.target.value)}
+            type="text"
+            value={direccion}
+            onChange={(e) => {
+              const val = e.target.value
+              setDireccion(val)
+              if (setUbicacionFisica) setUbicacionFisica(val)
+              setErrors(prev => ({...prev, direccion: false}))
+            }}
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void buscarDireccion() } }}
-            className="min-w-0 flex-1 rounded border border-gray-200 bg-white px-2 py-1 text-[9px] outline-none focus:border-[#9B0F06]"
-            placeholder="Buscar dirección en el mapa"
+            className={errorInputClass(errors, 'direccion')}
+            placeholder="Ej: Ciudad Santa Clara, Zona 3, Villa Nueva, Departamento de Guatemala, 01064, Guatemala"
           />
           <button
             type="button"
             onClick={() => void buscarDireccion()}
             disabled={buscandoDireccion}
-            className="rounded bg-[#9B0F06] px-2.5 py-1 text-[9px] font-semibold text-white disabled:opacity-50"
+            className="rounded bg-[#9B0F06] px-3 py-1 text-[10px] font-bold text-white hover:bg-[#5E0006] transition-colors disabled:opacity-50 shrink-0 flex items-center gap-1 shadow-2xs"
           >
             {buscandoDireccion ? 'Buscando...' : 'Buscar'}
           </button>
         </div>
-        {errorBusqueda && <p className="mt-1 text-[8px] text-red-600">{errorBusqueda}</p>}
+        {errorBusqueda && <p className="mt-1 text-[8px] text-red-600 font-semibold">{errorBusqueda}</p>}
         <p className="mt-0.5 text-[8px] text-gray-400">
-          La búsqueda actualiza la dirección y coloca el marcador en la ubicación encontrada.
+          Al presionar Buscar o marcar un punto en el mapa, se actualizará la ubicación y se autoseleccionará el Departamento y Municipio.
         </p>
       </div>
 
-      <div>
+      <div className="relative">
         <div className="mb-1 flex flex-wrap items-center justify-between gap-1.5">
-          <label className={labelClass}>Mapa OpenStreetMap (Punto exacto)</label>
+          <label className={labelClass}>MAPA OPENSTREETMAP (PUNTO EXACTO Y RUTA)</label>
         </div>
 
         <div className="mb-1.5 flex flex-wrap gap-1">
@@ -410,7 +640,8 @@ function SelectorMapaInteractivo({
               type="button"
               onClick={() => {
                 setCoordenadas({ lat: preset.lat, lng: preset.lng, puntoTexto: preset.desc })
-                if (!direccion) setDireccion(preset.label)
+                setDireccion(preset.label)
+                if (setUbicacionFisica) setUbicacionFisica(preset.label)
               }}
               className="rounded-full bg-white px-2 py-0.2 text-[8px] font-medium text-gray-700 border border-gray-200 hover:border-[#9B0F06] hover:text-[#9B0F06] transition-colors"
             >
@@ -419,10 +650,39 @@ function SelectorMapaInteractivo({
           ))}
         </div>
 
-        <div ref={mapaRef} className="h-56 w-full overflow-hidden rounded border border-gray-300" />
-        <div className="flex items-center gap-1 rounded bg-white px-1.5 py-0.5 text-[8px] font-mono font-medium text-gray-700 border border-gray-200">
+        <div className="relative overflow-hidden rounded border border-gray-300">
+          <div ref={mapaRef} className="h-64 w-full" />
+
+          {/* Tarjeta flotante de distancia de ruta estilo Google Maps sin hora */}
+          {distanciaTramoKm > 0 && (
+            <div className="absolute top-3 left-3 z-[1000] bg-white/95 backdrop-blur-md rounded-xl shadow-lg border border-gray-200 px-3.5 py-2 flex flex-col gap-1">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600 text-white font-bold text-xs shadow-xs">
+                  <Route size={14} />
+                </div>
+                <div>
+                  <p className="text-[10px] font-extrabold text-gray-900 leading-tight">Distancia del Tramo</p>
+                  <p className="text-[12px] font-black text-blue-700 leading-none mt-0.5">
+                    {distanciaTramoKm.toFixed(1)} km <span className="text-[9.5px] font-semibold text-gray-500">({(distanciaTramoKm * 1000).toLocaleString('es-GT')} m)</span>
+                  </p>
+                </div>
+              </div>
+              {coordenadasFinManual && (
+                <button
+                  type="button"
+                  onClick={() => setCoordenadasFinManual(null)}
+                  className="mt-0.5 rounded bg-blue-50 px-2 py-0.5 text-[8.5px] font-bold text-blue-700 border border-blue-200 hover:bg-blue-100 transition-colors cursor-pointer"
+                >
+                  Restablecer ubicación azul
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="mt-1 flex items-center gap-1 rounded bg-white px-1.5 py-0.5 text-[8px] font-mono font-medium text-gray-700 border border-gray-200">
           <Navigation size={9} className="text-[#9B0F06]" />
-          <span>Lat: {coordenadas.lat}Â° | Lng: {coordenadas.lng}Â°</span>
+          <span>Lat: {coordenadas.lat}° | Lng: {coordenadas.lng}°</span>
         </div>
       </div>
     </div>
@@ -632,7 +892,7 @@ export function ProyectoFormulario({
   const router = useRouter()
   const esEditar = modo === 'editar'
 
-  // Estado de Pasos para Formulario Paginado (Wizard)
+  // Estado de Pasos para Formulario Paginado (Wizard de 3 Pasos)
   const [pasoActual, setPasoActual] = useState<1 | 2 | 3>(1)
 
   // REQUERIMIENTO ESPECIAL: Modo Captura Vacía de Hoja Sábana para Nuevo Proyecto
@@ -640,16 +900,22 @@ export function ProyectoFormulario({
 
   // Campos Comunes
   const [nombreOficial, setNombreOficial] = useState(proyectoInicial?.nombreOficial || proyectoInicial?.nombre || '')
-  const { showSuccessToast, showErrorToast, showInfoToast } = useCustomToast()
+  const { showSuccessToast, showErrorToast } = useCustomToast()
   const [errors, setErrors] = useState<Record<string, boolean>>({})
   const [nombre, setNombre] = useState(proyectoInicial?.nombre || '')
   const [descripcion, setDescripcion] = useState(proyectoInicial?.descripcion || '')
   const [ubicacionFisica, setUbicacionFisica] = useState(proyectoInicial?.ubicacionFisica || proyectoInicial?.ubicacion || '')
-  const [direccion, setDireccion] = useState(proyectoInicial?.direccion || 'Km 22.5 CA-9 Sur')
+  const [direccion, setDireccion] = useState(proyectoInicial?.direccion || '')
   const [kilometroInicio, setKilometroInicio] = useState(String((proyectoInicial as any)?.kilometroInicio ?? ''))
   const [kilometroFin, setKilometroFin] = useState(String((proyectoInicial as any)?.kilometroFin ?? ''))
   // Catálogos
   const { usuarios: usuariosDisponibles, cargarUsuarios } = useUsuariosStore()
+  const usuariosIngenieroResponsable = useMemo(() => {
+    return usuariosDisponibles.filter((u: any) => {
+      const rol = (u.rol || u.rol_nombre || '').toLowerCase().trim()
+      return rol.includes('residente') || rol.includes('administrador') || rol.includes('admin') || rol.includes('director')
+    })
+  }, [usuariosDisponibles])
   const [entidadesContratantes, setEntidadesContratantes] = useState<any[]>([])
   const [empresasContratistas, setEmpresasContratistas] = useState<any[]>([])
   const [departamentos, setDepartamentos] = useState<any[]>([])
@@ -657,9 +923,61 @@ export function ProyectoFormulario({
   const [usuarios, setUsuarios] = useState<any[]>([])
   const [departamentoId, setDepartamentoId] = useState((proyectoInicial as any)?.departamentoId || '')
   const [municipioId, setMunicipioId] = useState((proyectoInicial as any)?.municipioId || '')
+  const [esMultimunicipio, setEsMultimunicipio] = useState(false)
+  const [departamentoFinId, setDepartamentoFinId] = useState('')
+  const [municipioFinId, setMunicipioFinId] = useState('')
   const [delegadoResidenteId, setDelegadoResidenteId] = useState('')
   const [empresaContratanteId, setEmpresaContratanteId] = useState('')
+  const [empresaContratistaId, setEmpresaContratistaId] = useState('')
+  const [empresaSupervisoraId, setEmpresaSupervisoraId] = useState('')
+  const [entidadContratante, setEntidadContratante] = useState(proyectoInicial?.entidadContratante || '')
+  const [empresaContratista, setEmpresaContratista] = useState(proyectoInicial?.empresaContratista || '')
+  const [empresaSupervisora, setEmpresaSupervisora] = useState(proyectoInicial?.empresaSupervisora || '')
+  const [delegadoResidente, setDelegadoResidente] = useState(proyectoInicial?.delegadoResidente || '')
   const [openCrearUsuarioDrawer, setOpenCrearUsuarioDrawer] = useState(false)
+  const [openCrearDelegadoDrawer, setOpenCrearDelegadoDrawer] = useState(false)
+  const [reloadDelegadosTrigger, setReloadDelegadosTrigger] = useState(0)
+  const [openCrearEntidadDrawer, setOpenCrearEntidadDrawer] = useState(false)
+  const [openCrearContratistaDrawer, setOpenCrearContratistaDrawer] = useState(false)
+
+  const handleEntidadCreadaEnWizard = async (payload: any) => {
+    try {
+      const res = await api.post('/entidades-contratantes', payload)
+      const nueva = res.data?.data
+      showSuccessToast('Entidad Contratante creada exitosamente')
+      limpiarCacheMemoria('/entidades-contratantes')
+      const listRes = await apiGetDeduplicado('/entidades-contratantes', { bypassCache: true })
+      const listaActualizada = listRes.data?.data || []
+      setEntidadesContratantes(listaActualizada)
+      if (nueva?.nombre) {
+        setEntidadContratante(nueva.nombre)
+        if (nueva.id) setEmpresaContratanteId(nueva.id)
+      } else if (payload.nombre) {
+        setEntidadContratante(payload.nombre)
+      }
+    } catch (e: any) {
+      showErrorToast(e.response?.data?.error || e.message || 'Error al crear la entidad contratante')
+    }
+  }
+
+  const handleContratistaCreadoEnWizard = async (payload: any) => {
+    try {
+      const res = await api.post('/empresas-contratistas', payload)
+      const nueva = res.data?.data
+      showSuccessToast('Empresa Contratista creada exitosamente')
+      limpiarCacheMemoria('/empresas-contratistas')
+      const listRes = await apiGetDeduplicado('/empresas-contratistas', { bypassCache: true })
+      const listaActualizada = listRes.data?.data || []
+      setEmpresasContratistas(listaActualizada)
+      if (nueva?.nombre) {
+        setEmpresaContratista(nueva.nombre)
+      } else if (payload.nombre) {
+        setEmpresaContratista(payload.nombre)
+      }
+    } catch (e: any) {
+      showErrorToast(e.response?.data?.error || e.message || 'Error al crear la empresa contratista')
+    }
+  }
 
   const handleUsuarioCreadoEnWizard = async (formData: any) => {
     try {
@@ -697,6 +1015,7 @@ export function ProyectoFormulario({
         }
       }
       showSuccessToast('Usuario creado exitosamente')
+      limpiarCacheMemoria('/usuarios')
       await cargarUsuarios()
       if (nuevoUsuario) {
         const nombreCompleto = `${nuevoUsuario.primer_nombre} ${nuevoUsuario.primer_apellido}`.trim()
@@ -712,46 +1031,173 @@ export function ProyectoFormulario({
       showErrorToast(error.response?.data?.message || 'Error al crear el usuario')
     }
   }
+
+  const handleDelegadoCreadoEnWizard = async (formData: any) => {
+    try {
+      const payloadApi: any = {
+        primer_nombre: formData.primer_nombre,
+        segundo_nombre: formData.segundo_nombre,
+        primer_apellido: formData.primer_apellido,
+        segundo_apellido: formData.segundo_apellido,
+        correo: formData.correo,
+        telefono: formData.telefono,
+        rol: formData.rol || 'IngenieroResidente',
+        estado: formData.estado,
+        fecha_nacimiento: formData.fecha_nacimiento,
+        direccion: formData.direccion,
+      }
+      if (formData.password && formData.password.trim().length >= 6) {
+        payloadApi.contrasena = formData.password.trim()
+      }
+      const res = await api.post('/usuarios', payloadApi)
+      const nuevoUsuario = res.data?.data
+      showSuccessToast('Delegado Residente creado exitosamente')
+      limpiarCacheMemoria('/usuarios')
+      limpiarCacheMemoria('/usuarios/delegados-residente')
+      await cargarUsuarios()
+      setReloadDelegadosTrigger((prev) => prev + 1)
+      if (nuevoUsuario?.id) {
+        setDelegadoResidenteId(nuevoUsuario.id)
+        setErrors((prev) => ({ ...prev, delegadoResidenteId: false }))
+      }
+    } catch (error: any) {
+      showErrorToast(error.response?.data?.message || 'Error al crear el Delegado Residente')
+    }
+  }
   
   useEffect(() => {
     apiGetDeduplicado('/entidades-contratantes').then(r => setEntidadesContratantes(r.data?.data || [])).catch(() => {});
     apiGetDeduplicado('/empresas-contratistas').then(r => setEmpresasContratistas(r.data?.data || [])).catch(() => {});
-    apiGetDeduplicado('/mantenimiento/departamento').then(r => setDepartamentos(r.data?.data || [])).catch(() => {});
-    apiGetDeduplicado('/mantenimiento/municipio').then(r => setMunicipios(r.data?.data || [])).catch(() => {});
+    apiGetDeduplicado('/mantenimiento/departamento?limite=500').then(r => setDepartamentos(r.data?.data || [])).catch(() => {});
+    apiGetDeduplicado('/mantenimiento/municipio?limite=500').then(r => setMunicipios(r.data?.data || [])).catch(() => {});
     cargarUsuarios();
+    const savedEmpresa = typeof window !== 'undefined' ? localStorage.getItem('config_nombre_empresa') : null;
+    if (savedEmpresa && (modo === 'crear' || !proyectoInicial?.empresaSupervisora)) {
+      setEmpresaSupervisora(savedEmpresa);
+    }
     apiGetDeduplicado('/configuracion/general').then(r => {
       const configArray = r.data?.data || [];
-      const item = configArray.find((c: any) => c.clave === 'nombre_empresa');
-      if (item?.valor) {
+      const item = configArray.find((c: any) => c.clave === 'nombre_empresa' || c.clave === 'empresa' || c.clave === 'nombre');
+      if (item?.valor && (modo === 'crear' || !proyectoInicial?.empresaSupervisora)) {
         setEmpresaSupervisora(item.valor);
+        localStorage.setItem('config_nombre_empresa', item.valor);
       }
     }).catch(() => {});
   }, []);
 
-// Sync departamentoId/municipioId/delegadoResidenteId when proyectoInicial arrives (fix async init)
+// Sync departamentoId/municipioId/delegadoResidenteId y todos los campos al recibir proyectoInicial
 useEffect(() => {
   if (proyectoInicial) {
-    if (!departamentoId && proyectoInicial?.departamentoId) setDepartamentoId(proyectoInicial.departamentoId);
-    if (!municipioId && proyectoInicial?.municipioId) setMunicipioId(proyectoInicial.municipioId);
-    if (!delegadoResidenteId && (proyectoInicial as any)?.delegadoResidenteId) setDelegadoResidenteId((proyectoInicial as any).delegadoResidenteId);
-    if (!empresaContratanteId && (proyectoInicial as any)?.empresaContratanteId) setEmpresaContratanteId((proyectoInicial as any).empresaContratanteId);
-    if (!empresaContratistaId && (proyectoInicial as any)?.empresaContratistaId) setEmpresaContratistaId((proyectoInicial as any).empresaContratistaId);
+    if (proyectoInicial.nombreOficial || proyectoInicial.nombre) {
+      setNombreOficial(proyectoInicial.nombreOficial || proyectoInicial.nombre || '')
+      setNombre(proyectoInicial.nombre || proyectoInicial.nombreOficial || '')
+    }
+    if (proyectoInicial.descripcion) setDescripcion(proyectoInicial.descripcion)
+    if (proyectoInicial.ubicacionFisica || proyectoInicial.ubicacion) setUbicacionFisica(proyectoInicial.ubicacionFisica || proyectoInicial.ubicacion || '')
+    if (proyectoInicial.direccion) setDireccion(proyectoInicial.direccion)
+    if ((proyectoInicial as any).kilometroInicio != null) setKilometroInicio(String((proyectoInicial as any).kilometroInicio))
+    if ((proyectoInicial as any).kilometroFin != null) setKilometroFin(String((proyectoInicial as any).kilometroFin))
+
+    const depId = proyectoInicial?.departamentoId || (proyectoInicial as any)?.departamento_id
+    const munId = proyectoInicial?.municipioId || (proyectoInicial as any)?.municipio_id
+
+    let currentDep = departamentoId || depId
+    if (!departamentoId && depId) setDepartamentoId(depId)
+    if (!municipioId && munId) setMunicipioId(munId)
+
+    if (munId && !currentDep && municipios.length > 0) {
+      const foundMun = municipios.find((m: any) => m.id === munId)
+      if (foundMun?.departamento_id) {
+        setDepartamentoId(foundMun.departamento_id)
+      }
+    }
+
+    if ((proyectoInicial as any)?.delegadoResidenteId) setDelegadoResidenteId((proyectoInicial as any).delegadoResidenteId)
+    if ((proyectoInicial as any)?.empresaContratanteId) setEmpresaContratanteId((proyectoInicial as any).empresaContratanteId)
+    if ((proyectoInicial as any)?.empresaContratistaId) setEmpresaContratistaId((proyectoInicial as any).empresaContratistaId)
+    if (proyectoInicial.entidadContratante) setEntidadContratante(proyectoInicial.entidadContratante)
+    if (proyectoInicial.empresaContratista) setEmpresaContratista(proyectoInicial.empresaContratista)
+
+    if (proyectoInicial.fechaAdjudicacion) setFechaAdjudicacion(proyectoInicial.fechaAdjudicacion)
+    if (proyectoInicial.numeroEscrituraPublica) setNumeroEscrituraPublica(proyectoInicial.numeroEscrituraPublica)
+    if (proyectoInicial.fechaInicioContractual || proyectoInicial.fechaInicio) setFechaInicioContractual(proyectoInicial.fechaInicioContractual || proyectoInicial.fechaInicio || '')
+    if ((proyectoInicial as any)?.fechaFinContractualPlan || (proyectoInicial as any)?.fechaFinContractual || proyectoInicial.fechaFin) {
+      setFechaFinContractualPlan((proyectoInicial as any)?.fechaFinContractualPlan || (proyectoInicial as any)?.fechaFinContractual || proyectoInicial.fechaFin || '')
+    }
+    if (proyectoInicial.montoContractualOriginal || proyectoInicial.presupuesto) setMontoContractualOriginal((proyectoInicial.montoContractualOriginal || proyectoInicial.presupuesto || '').toString())
+    if (proyectoInicial.responsable) setResponsable(proyectoInicial.responsable)
+    if (proyectoInicial.estado) setEstado(proyectoInicial.estado)
+
+    if (proyectoInicial.fechaFinalizacionReal) setFechaFinalizacionReal(proyectoInicial.fechaFinalizacionReal)
+    if (proyectoInicial.plazoEjecucionRealAmpliado) setPlazoEjecucionRealAmpliado(proyectoInicial.plazoEjecucionRealAmpliado)
+    if (proyectoInicial.montoFinancieroFinalEjecutado || (proyectoInicial as any).montoFinal) setMontoFinancieroFinalEjecutado((proyectoInicial.montoFinancieroFinalEjecutado || (proyectoInicial as any).montoFinal || '').toString())
+
+    if (Array.isArray(proyectoInicial.equipo) && proyectoInicial.equipo.length > 0) {
+      setEquipo(proyectoInicial.equipo)
+    }
   }
-}, [proyectoInicial]);
+}, [proyectoInicial, municipios]);
+
+// Sync Entidad Contratante combobox state initially
+useEffect(() => {
+  const targetId = (proyectoInicial as any)?.empresaContratanteId || (proyectoInicial as any)?.empresa_contratante_id;
+  const targetNombre = (proyectoInicial as any)?.entidadContratante || (proyectoInicial as any)?.entidad_contratante;
+  if ((targetId || targetNombre) && entidadesContratantes.length > 0) {
+    const found = entidadesContratantes.find((e: any) => (targetId && e.id === targetId) || (targetNombre && (e.nombre === targetNombre || e.siglas === targetNombre)));
+    if (found) {
+      setEntidadContratante(found.nombre);
+      setEmpresaContratanteId(found.id);
+    } else if (targetNombre) {
+      setEntidadContratante(targetNombre);
+    }
+  } else if (targetNombre && !entidadContratante) {
+    setEntidadContratante(targetNombre);
+  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [proyectoInicial?.id, entidadesContratantes.length]);
+
+// Sync Empresa Contratista combobox state initially
+useEffect(() => {
+  const targetId = (proyectoInicial as any)?.empresaContratistaId || (proyectoInicial as any)?.empresa_contratista_id;
+  const targetNombre = (proyectoInicial as any)?.empresaContratista || (proyectoInicial as any)?.empresa_contratista;
+  if ((targetId || targetNombre) && empresasContratistas.length > 0) {
+    const found = empresasContratistas.find((e: any) => (targetId && e.id === targetId) || (targetNombre && (e.nombre === targetNombre || e.razon_social === targetNombre)));
+    if (found) {
+      setEmpresaContratista(found.nombre || found.razon_social);
+      setEmpresaContratistaId(found.id);
+    } else if (targetNombre) {
+      setEmpresaContratista(targetNombre);
+    }
+  } else if (targetNombre && !empresaContratista) {
+    setEmpresaContratista(targetNombre);
+  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [proyectoInicial?.id, empresasContratistas.length]);
+
+// Auto-assign Delegado Residente to Equipo Asignado (both creation and edit mode)
+useEffect(() => {
+  if (!delegadoResidenteId || usuariosDisponibles.length === 0) return;
+  const delObj = usuariosDisponibles.find((u: any) => u.id === delegadoResidenteId);
+  if (!delObj) return;
+
+  const nombreCompleto = delObj.nombre || `${delObj.primer_nombre || ''} ${delObj.primer_apellido || ''}`.trim() || delObj.correo;
+  setEquipo((prevEquipo) => {
+    const existeIndice = prevEquipo.findIndex((m) => m.id === delObj.id || m.nombre === nombreCompleto);
+    if (existeIndice === -1) {
+      return [...prevEquipo, { id: delObj.id, nombre: nombreCompleto, rol: 'Delegado Residente' }];
+    } else {
+      const nuevoEquipo = [...prevEquipo];
+      nuevoEquipo[existeIndice] = { ...nuevoEquipo[existeIndice], rol: 'Delegado Residente' };
+      return nuevoEquipo;
+    }
+  });
+}, [delegadoResidenteId, usuariosDisponibles]);
 
   const [coordenadasMapa, setCoordenadasMapa] = useState(
     proyectoInicial?.coordenadasMapa || ((proyectoInicial as any)?.latitud != null && (proyectoInicial as any)?.longitud != null
       ? { lat: Number((proyectoInicial as any).latitud), lng: Number((proyectoInicial as any).longitud), puntoTexto: proyectoInicial?.direccion || 'Punto de obra' }
       : { lat: 14.5021, lng: -90.5841, puntoTexto: 'Tramo Obra Vial CA-9 Sur' })
   )
-
-  // Entidades e Instituciones
-  const [entidadContratante, setEntidadContratante] = useState(proyectoInicial?.entidadContratante || '') // Fallback text
-  const [empresaContratistaId, setEmpresaContratistaId] = useState('')
-  const [empresaSupervisoraId, setEmpresaSupervisoraId] = useState('')
-  const [empresaContratista, setEmpresaContratista] = useState(proyectoInicial?.empresaContratista || '')
-  const [empresaSupervisora, setEmpresaSupervisora] = useState(proyectoInicial?.empresaSupervisora || '')
-  const [delegadoResidente, setDelegadoResidente] = useState(proyectoInicial?.delegadoResidente || '')
 
   // Contrato y Fechas Contractuales
   const [fechaAdjudicacion, setFechaAdjudicacion] = useState(proyectoInicial?.fechaAdjudicacion || '')
@@ -760,7 +1206,7 @@ useEffect(() => {
     proyectoInicial?.fechaInicioContractual || proyectoInicial?.fechaInicio || ''
   )
   const [fechaFinContractualPlan, setFechaFinContractualPlan] = useState(
-    proyectoInicial?.fechaFin || ''
+    (proyectoInicial as any)?.fechaFinContractualPlan || (proyectoInicial as any)?.fechaFinContractual || proyectoInicial?.fechaFin || ''
   )
   const [errorFechaFin, setErrorFechaFin] = useState(false)
 
@@ -786,7 +1232,7 @@ useEffect(() => {
 
   // Responsable General
   const [responsable, setResponsable] = useState(proyectoInicial?.responsable || '')
-  const [estado, setEstado] = useState<EstadoProyecto>(proyectoInicial?.estado || 'borrador')
+  const [estado, setEstado] = useState<EstadoProyecto>(proyectoInicial?.estado || 'activo')
 
   // CAMPOS EXCLUSIVOS DE EDICIÓN
   const [fechaFinalizacionReal, setFechaFinalizacionReal] = useState(proyectoInicial?.fechaFinalizacionReal || '')
@@ -816,24 +1262,146 @@ useEffect(() => {
     }
   }
 
-  // Lógica de avance entre pasos con validación
+function tieneAlMenosDosLetras(texto: string): boolean {
+  if (!texto) return false
+  const matchLetras = texto.trim().match(/[a-zA-ZáéíóúÁÉÍÓÚñÑ]/g)
+  return matchLetras !== null && matchLetras.length >= 2
+}
+
+  const validarUbicacionCoherente = (): { valida: boolean; mensaje?: string } => {
+    if (esMultimunicipio) return { valida: true }
+    if (!departamentoId) return { valida: true }
+
+    const depSeleccionado = departamentos.find((d: any) => d.id === departamentoId)
+    const munSeleccionado = municipios.find((m: any) => m.id === municipioId)
+
+    if (!depSeleccionado) return { valida: true }
+
+    const normalizar = (txt: string) =>
+      (txt || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .trim()
+
+    const limpiarTexto = (txt: string) => {
+      let norm = normalizar(txt)
+      norm = norm.replace(/\b\d{5}\b/g, '')
+      norm = norm.replace(/,\s*(republica de\s*)?guatemala\s*$/g, '')
+      norm = norm.replace(/\b(republica de\s*)?guatemala\b/g, '')
+      return norm.trim()
+    }
+
+    const textoUbicacionNorm = `${limpiarTexto(ubicacionFisica)} ${limpiarTexto(direccion)}`
+
+    // 2. Verificar si menciona un departamento diferente al seleccionado
+    const otrosDeptos = departamentos.filter((d: any) => d.id !== departamentoId)
+    for (const dep of otrosDeptos) {
+      const depNombreNorm = normalizar(dep.nombre)
+      if (depNombreNorm === 'guatemala') {
+        if (textoUbicacionNorm.includes('departamento de guatemala') || textoUbicacionNorm.includes('depto de guatemala')) {
+          return {
+            valida: false,
+            mensaje: `La ubicación descrita ("Departamento de Guatemala") contradice el Departamento seleccionado (${depSeleccionado.nombre}).`,
+          }
+        }
+        continue
+      }
+
+      if (depNombreNorm.length >= 4 && textoUbicacionNorm.includes(depNombreNorm)) {
+        return {
+          valida: false,
+          mensaje: `La ubicación descrita ("${dep.nombre}") contradice el Departamento seleccionado (${depSeleccionado.nombre}).`,
+        }
+      }
+    }
+
+    // 3. Verificar si menciona un municipio perteneciente a otro departamento
+    const otrosMunicipios = municipios.filter(
+      (m: any) => m.departamento_id && m.departamento_id !== departamentoId
+    )
+    for (const mun of otrosMunicipios) {
+      const munNombreNorm = normalizar(mun.nombre)
+      if (munNombreNorm.length >= 4 && textoUbicacionNorm.includes(munNombreNorm)) {
+        const depDelMun = departamentos.find((d: any) => d.id === mun.departamento_id)
+        if (depDelMun && depDelMun.id !== departamentoId) {
+          return {
+            valida: false,
+            mensaje: `La ubicación descrita menciona "${mun.nombre}" (${depDelMun?.nombre || 'otro departamento'}), lo cual contradice la ubicación seleccionada (${munSeleccionado?.nombre ? munSeleccionado.nombre + ', ' : ''}${depSeleccionado.nombre}).`,
+          }
+        }
+      }
+    }
+
+    return { valida: true }
+  }
+
+  // Lógica de avance entre pasos con validación estricta de campos obligatorios
   const handleAvanzarPaso = (siguientePaso: 1 | 2 | 3) => {
+    // Si se navega hacia un paso anterior o al mismo paso, permitir sin bloquear
+    if (siguientePaso <= pasoActual) {
+      setPasoActual(siguientePaso)
+      return
+    }
+
+    const faltantes: string[] = []
     const newErrors: Record<string, boolean> = {}
-    let isValid = true
 
-    if (pasoActual === 1) {
-      if (!nombreOficial.trim() && !nombre.trim()) { newErrors.nombreOficial = true; isValid = false }
-      if (!descripcion.trim()) { newErrors.descripcion = true; isValid = false }
-      if (!ubicacionFisica.trim()) { newErrors.ubicacionFisica = true; isValid = false }
-        if (!departamentoId) { newErrors.departamentoId = true; isValid = false }
-        if (!municipioId) { newErrors.municipioId = true; isValid = false }
-      if (!direccion.trim()) { newErrors.direccion = true; isValid = false }
+    // Validar requerimientos de Paso 1 (Sección 1 + Sección 2) si intentamos avanzar a Paso 2 o 3
+    if (siguientePaso > 1) {
+      const nomTexto = nombreOficial || nombre
+      if (!nomTexto.trim()) { faltantes.push('Nombre Oficial'); newErrors.nombreOficial = true }
+      else if (!tieneAlMenosDosLetras(nomTexto)) { faltantes.push('Nombre Oficial (debe tener al menos 2 letras)'); newErrors.nombreOficial = true }
 
-      if (!isValid) {
-        setErrors(newErrors)
-        showErrorToast('Por favor complete todos los campos obligatorios antes de continuar')
+      if (!descripcion.trim()) { faltantes.push('Descripción del Proyecto'); newErrors.descripcion = true }
+      else if (!tieneAlMenosDosLetras(descripcion)) { faltantes.push('Descripción (debe tener al menos 2 letras)'); newErrors.descripcion = true }
+
+      if (!entidadContratante.trim()) { faltantes.push('Entidad Contratante / Propietaria'); newErrors.entidadContratante = true }
+      else if (!tieneAlMenosDosLetras(entidadContratante)) { faltantes.push('Entidad Contratante (debe tener al menos 2 letras)'); newErrors.entidadContratante = true }
+
+      if (!empresaContratista.trim()) { faltantes.push('Empresa Contratista Ejecutora'); newErrors.empresaContratista = true }
+      else if (!tieneAlMenosDosLetras(empresaContratista)) { faltantes.push('Empresa Contratista (debe tener al menos 2 letras)'); newErrors.empresaContratista = true }
+
+      if (!delegadoResidenteId) { faltantes.push('Delegado Residente de Proyecto'); newErrors.delegadoResidenteId = true }
+    }
+
+    // Validar requerimientos de Paso 2 (Sección 3: Ubicación y Ruta) si intentamos avanzar a Paso 3
+    if (siguientePaso > 2) {
+      if (!direccion.trim()) { faltantes.push('Dirección Corta'); newErrors.direccion = true }
+      else if (!tieneAlMenosDosLetras(direccion)) { faltantes.push('Dirección Corta (debe tener al menos 2 letras)'); newErrors.direccion = true }
+
+      if (!departamentoId) { faltantes.push('Departamento'); newErrors.departamentoId = true }
+      if (!municipioId) { faltantes.push('Municipio'); newErrors.municipioId = true }
+      if (!kilometroInicio) { faltantes.push('Kilómetro Inicial'); newErrors.kilometroInicio = true }
+      if (!kilometroFin) { faltantes.push('Kilómetro Final'); newErrors.kilometroFin = true }
+
+      if (kilometroInicio && kilometroFin && Number(kilometroFin) <= Number(kilometroInicio)) {
+        newErrors.kilometroFin = true
+        setErrors((prev) => ({ ...prev, ...newErrors }))
+        showErrorToast('El kilómetro final no debe ser igual o menor al kilómetro inicial')
+        setPasoActual(2)
         return
       }
+
+      const checkCoherencia = validarUbicacionCoherente()
+      if (!checkCoherencia.valida) {
+        newErrors.direccion = true
+        setErrors((prev) => ({ ...prev, ...newErrors }))
+        showErrorToast(checkCoherencia.mensaje || 'La ubicación geográfica no coincide con el departamento/municipio seleccionado.')
+        setPasoActual(2)
+        return
+      }
+    }
+
+    if (faltantes.length > 0) {
+      setErrors((prev) => ({ ...prev, ...newErrors }))
+      showErrorToast(`Para avanzar al siguiente paso, complete correctamente: ${faltantes.join(', ')}.`)
+      if (newErrors.nombreOficial || newErrors.descripcion || newErrors.entidadContratante || newErrors.empresaContratista || newErrors.delegadoResidenteId) {
+        setPasoActual(1)
+      } else {
+        setPasoActual(2)
+      }
+      return
     }
 
     setErrors({})
@@ -855,8 +1423,82 @@ useEffect(() => {
   }
 
   const handleFinalizarFormulario = async () => {
-    if (!nombreOficial.trim() && !nombre.trim()) {
-      showErrorToast('Ingrese el Nombre Oficial del Proyecto')
+    const faltantes: string[] = []
+    const newErrors: Record<string, boolean> = {}
+
+    // Campos obligatorios requeridos para Borrador (Secciones 1, 2 y 3)
+    const nomTexto = nombreOficial || nombre
+    if (!nomTexto.trim()) { faltantes.push('Nombre Oficial'); newErrors.nombreOficial = true }
+    else if (!tieneAlMenosDosLetras(nomTexto)) { faltantes.push('Nombre Oficial (debe tener al menos 2 letras)'); newErrors.nombreOficial = true }
+
+    if (!descripcion.trim()) { faltantes.push('Descripción del Proyecto'); newErrors.descripcion = true }
+    else if (!tieneAlMenosDosLetras(descripcion)) { faltantes.push('Descripción (debe tener al menos 2 letras)'); newErrors.descripcion = true }
+
+    if (!departamentoId) { faltantes.push('Departamento'); newErrors.departamentoId = true }
+    if (!municipioId) { faltantes.push('Municipio'); newErrors.municipioId = true }
+    if (!kilometroInicio) { faltantes.push('Kilómetro Inicial'); newErrors.kilometroInicio = true }
+    if (!kilometroFin) { faltantes.push('Kilómetro Final'); newErrors.kilometroFin = true }
+
+    if (!direccion.trim()) { faltantes.push('Dirección Corta'); newErrors.direccion = true }
+    else if (!tieneAlMenosDosLetras(direccion)) { faltantes.push('Dirección Corta (debe tener al menos 2 letras)'); newErrors.direccion = true }
+
+    if (!entidadContratante.trim()) { faltantes.push('Entidad Contratante / Propietaria'); newErrors.entidadContratante = true }
+    else if (!tieneAlMenosDosLetras(entidadContratante)) { faltantes.push('Entidad Contratante (debe tener al menos 2 letras)'); newErrors.entidadContratante = true }
+
+    if (!empresaContratista.trim()) { faltantes.push('Empresa Contratista Ejecutora'); newErrors.empresaContratista = true }
+    else if (!tieneAlMenosDosLetras(empresaContratista)) { faltantes.push('Empresa Contratista (debe tener al menos 2 letras)'); newErrors.empresaContratista = true }
+
+    if (!delegadoResidenteId) { faltantes.push('Delegado Residente de Proyecto'); newErrors.delegadoResidenteId = true }
+
+    if (numeroEscrituraPublica.trim() && !tieneAlMenosDosLetras(numeroEscrituraPublica)) {
+      faltantes.push('Número de Escritura Pública (debe tener al menos 2 letras)')
+      newErrors.numeroEscrituraPublica = true
+    }
+
+    // Validación de Kilómetros: el kilómetro final no debe ser igual o menor al inicial
+    if (kilometroInicio && kilometroFin && Number(kilometroFin) <= Number(kilometroInicio)) {
+      newErrors.kilometroFin = true
+      setErrors((prev) => ({ ...prev, ...newErrors }))
+      showErrorToast('El kilómetro final no debe ser igual o menor al kilómetro inicial')
+      setPasoActual(2)
+      return
+    }
+
+    const checkCoherencia = validarUbicacionCoherente()
+    if (!checkCoherencia.valida) {
+      newErrors.direccion = true
+      setErrors((prev) => ({ ...prev, ...newErrors }))
+      showErrorToast(checkCoherencia.mensaje || 'La ubicación geográfica no coincide con el departamento/municipio seleccionado.')
+      setPasoActual(2)
+      return
+    }
+
+    // Requerimientos adicionales exclusivos para guardar como ACTIVO
+    if (estado === 'activo') {
+      if (!fechaAdjudicacion) { faltantes.push('Fecha de Adjudicación'); newErrors.fechaAdjudicacion = true }
+      if (!fechaInicioContractual) { faltantes.push('Fecha Inicio Contractual'); newErrors.fechaInicioContractual = true }
+      if (!fechaFinContractualPlan) { faltantes.push('Fecha Final Contractual'); newErrors.fechaFinContractualPlan = true }
+      if (!montoContractualOriginal || Number(montoContractualOriginal) <= 0) { faltantes.push('Monto Contractual Original'); newErrors.montoContractualOriginal = true }
+      if (!responsable) { faltantes.push('Ingeniero Responsable / Director'); newErrors.responsable = true }
+    }
+
+    if (faltantes.length > 0) {
+      setErrors((prev) => ({ ...prev, ...newErrors }))
+      showErrorToast(
+        estado === 'activo'
+          ? `Para registrar el proyecto como ACTIVO, faltan completarse los campos obligatorios: ${faltantes.join(', ')}.`
+          : `Para registrar el proyecto como BORRADOR, faltan completarse los campos obligatorios: ${faltantes.join(', ')}.`
+      )
+      // Navegar automáticamente al paso que contiene el primer error para resaltar en marco rojo
+      if (newErrors.nombreOficial || newErrors.descripcion) {
+        setPasoActual(1)
+      } else if (newErrors.direccion || newErrors.departamentoId || newErrors.municipioId || newErrors.kilometroInicio || newErrors.kilometroFin) {
+        setPasoActual(2)
+      } else if (newErrors.entidadContratante || newErrors.empresaContratista || newErrors.delegadoResidenteId) {
+        setPasoActual(3)
+      } else {
+        setPasoActual(4)
+      }
       return
     }
 
@@ -864,33 +1506,47 @@ useEffect(() => {
       return
     }
 
-    const proyectoData: Partial<Proyecto> = {
+    const limpiarAux = (val?: string | null) => (!val || val.trim() === '' ? null : val.trim())
+
+    const diffDaysVal = (fechaInicioContractual && fechaFinContractualPlan)
+      ? Math.ceil(Math.abs(new Date(fechaFinContractualPlan).getTime() - new Date(fechaInicioContractual).getTime()) / (1000 * 60 * 60 * 24))
+      : null
+
+    const proyectoData: any = {
         nombreOficial: nombreOficial || nombre,
         nombre: nombre || nombreOficial,
         descripcion,
-        ubicacionFisica: ubicacionFisica || direccion,
-        
-        municipioId: municipioId || null,
-        departamentoId: departamentoId || null,
+        ubicacionFisica: direccion,
+        estado,
+        municipioId: limpiarAux(municipioId),
+        departamentoId: limpiarAux(departamentoId),
         kilometroInicio: kilometroInicio ? Number(kilometroInicio) : null,
         kilometroFin: kilometroFin ? Number(kilometroFin) : null,
         latitud: coordenadasMapa?.lat,
         longitud: coordenadasMapa?.lng,
         direccion: direccion,
-        montoFinal: parseFloat(montoFinancieroFinalEjecutado) || null,
-        empresaContratanteId,
-        empresaContratista,
-        empresaSupervisora,
-        delegadoResidenteId,
-        fechaAdjudicacion,
-        numeroEscrituraPublica,
-        fechaInicioContractual,
-        fechaInicio: fechaInicioContractual,
-        fechaFin: fechaFinContractualPlan || fechaInicioContractual,
+        entidadContratante: limpiarAux(entidadContratante),
+        empresaContratanteId: limpiarAux(empresaContratanteId),
+        empresaContratista: limpiarAux(empresaContratista),
+        empresaContratistaId: limpiarAux(empresaContratistaId || empresaContratista),
+        empresaSupervisora: limpiarAux(empresaSupervisora),
+        delegadoResidenteId: limpiarAux(delegadoResidenteId),
+        fechaAdjudicacion: limpiarAux(fechaAdjudicacion),
+        numeroEscrituraPublica: limpiarAux(numeroEscrituraPublica),
+        fechaInicioContractual: limpiarAux(fechaInicioContractual),
+        fechaInicio: limpiarAux(fechaInicioContractual),
+        fechaFinContractualPlan: limpiarAux(fechaFinContractualPlan),
+        fechaFin: limpiarAux(fechaFinContractualPlan) || limpiarAux(fechaInicioContractual),
+        plazoEjecucionOriginal: diffDaysVal,
         plazoEjecucionContractualOriginal: plazoCalculadoOriginal,
         montoContractualOriginal: Number(montoContractualOriginal) || 0,
         presupuesto: Number(montoContractualOriginal) || 0,
-        responsable,
+        responsable: limpiarAux(responsable),
+        equipo: equipo,
+        fechaFinalizacionReal: limpiarAux(fechaFinalizacionReal),
+        plazoEjecucionRealAmpliado: limpiarAux(plazoEjecucionRealAmpliado),
+        montoFinancieroFinalEjecutado: parseFloat(montoFinancieroFinalEjecutado) || null,
+        montoFinal: parseFloat(montoFinancieroFinalEjecutado) || null,
         coordenadasMapa
       }
       
@@ -903,7 +1559,8 @@ useEffect(() => {
             router.push(`/dashboard/proyectos/${proyectoInicial.id}`)
           } else {
             const res = await api.post('/proyectos', proyectoData)
-            showSuccessToast('Proyecto creado exitosamente en Borrador')
+            const msjEstado = estado === 'activo' ? 'Proyecto creado exitosamente como ACTIVO' : 'Proyecto creado exitosamente en Borrador'
+            showSuccessToast(msjEstado)
             const nuevoId = res.data?.data?.id
             if (nuevoId) {
               router.push(`/dashboard/proyectos/${nuevoId}`)
@@ -919,9 +1576,9 @@ useEffect(() => {
   }
 
   const pasosMeta = [
-    { num: 1, label: 'Identificación y Ubicación' },
-    { num: 2, label: 'Entidades y Equipo' },
-    { num: 3, label: 'Términos y Seguimiento' },
+    { num: 1, label: '1. Identificación y Entidades' },
+    { num: 2, label: '2. Ubicación y Ruta' },
+    { num: 3, label: '3. Términos Contractuales' },
   ]
 
   // REQUERIMIENTO ESPECIAL: Si está activo el modo captura sabana inicial para Nuevo Proyecto
@@ -961,7 +1618,7 @@ useEffect(() => {
               <div key={p.num} className="flex flex-1 items-center gap-1.5">
                 <button
                   type="button"
-                  onClick={() => setPasoActual(p.num as 1 | 2 | 3)}
+                  onClick={() => handleAvanzarPaso(p.num as 1 | 2 | 3)}
                   className={`flex flex-1 items-center gap-1.5 rounded-md p-1.5 text-left transition-all ${
                     esActivo
                       ? 'bg-red-50/80 border border-red-200 text-[#9B0F06]'
@@ -994,154 +1651,59 @@ useEffect(() => {
 
       {/* PASOS DEL FORMULARIO */}
       <div className="rounded-lg bg-white p-3 shadow-2xs border border-gray-200 space-y-3">
-        {/* PASO 1: Identificación y Ubicación */}
+        {/* PASO 1: Identificación y Entidades */}
         {pasoActual === 1 && (
-          <div className="space-y-3">
+          <div className="space-y-4">
             <div>
-              <SectionHeader
-                title="Sección 1: Identificación Oficial del Proyecto"
-                subtitle="Nombre oficial, descripción detallada del alcance y especificaciones"
-                icon={Building2}
-              />
-              <div className="space-y-2">
+              <div className="mb-2.5 border-b border-gray-100 pb-1.5">
+                <div className="flex items-center gap-1.5">
+                  <Building2 size={14} className="text-[#9B0F06]" />
+                  <h3 className="text-[10.5px] font-black uppercase tracking-wider text-gray-800">
+                    Sección 1: Identificación Oficial del Proyecto
+                  </h3>
+                </div>
+                <p className="mt-0.5 text-[10.5px] text-gray-400">
+                  Nombre oficial, descripción detallada del alcance y especificaciones
+                </p>
+              </div>
+
+              <div className="space-y-3">
                 <div>
-                  <label className={labelClass}>
+                  <label className="mb-1 block text-[10px] font-extrabold uppercase tracking-wider text-gray-600">
                     Nombre Oficial del Proyecto <span className="text-[#9B0F06]">*</span>
                   </label>
                   <input
                     type="text"
                     value={nombreOficial}
                     onChange={(e) => { setNombreOficial(e.target.value); setErrors(prev => ({...prev, nombreOficial: false})) }}
-                    className={errorInputClass(errors, 'nombreOficial')}
+                    className={`${errorInputClass(errors, 'nombreOficial')} !text-[12px] py-1.5`}
                     placeholder="Ej: Construcción del Paso a Desnivel e Intersección Vial CA-9 Sur Km 22.5"
                   />
                 </div>
 
                 <div>
-                  <label className={labelClass}>Descripción del Proyecto (Detalle de Alcance Vial) <span className="text-[#9B0F06]">*</span></label>
+                  <label className="mb-1 block text-[10px] font-extrabold uppercase tracking-wider text-gray-600">
+                    Descripción del Proyecto (Detalle de Alcance Vial) <span className="text-[#9B0F06]">*</span>
+                  </label>
                   <textarea
                     value={descripcion}
                     onChange={(e) => { setDescripcion(e.target.value); setErrors(prev => ({...prev, descripcion: false})) }}
-                    rows={2}
-                    className={errorInputClass(errors, 'descripcion')}
+                    rows={3}
+                    className={`${errorInputClass(errors, 'descripcion')} !text-[12px] py-1.5`}
                     placeholder="Describe a detalle el alcance físico: longitud en kilómetros, número de carriles, estructura de pavimento..."
                   />
                 </div>
               </div>
             </div>
 
-            <div>
+            {/* SECCIÓN 2 DENTRO DEL PASO 1: Entidades y Empresas Intervinientes */}
+            <div className="pt-2 border-t border-gray-200">
               <SectionHeader
-                title="Sección 2: Ubicación Física y Tramo Vial Exacto"
-                subtitle="Coordenadas GPS interactivas y dirección corta de referencia"
-                icon={MapPin}
-              />
-              <div className="space-y-2">
-                <div>
-                  <label className={labelClass}>Ubicación Física (Texto Descriptivo) <span className="text-[#9B0F06]">*</span></label>
-                  <input
-                    type="text"
-                    value={ubicacionFisica}
-                    onChange={(e) => { setUbicacionFisica(e.target.value); setErrors(prev => ({...prev, ubicacionFisica: false})) }}
-                    className={errorInputClass(errors, 'ubicacionFisica')}
-                    placeholder="Ej: Municipio de Villa Nueva, Departamento de Guatemala, Tramo CA-9 Sur Km 20 al 25"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  <div>
-                    <label className={labelClass}>
-                      Departamento <span className="text-[#9B0F06]">*</span>
-                    </label>
-                    <select
-                      value={departamentoId}
-                      onChange={(e) => {
-                        setDepartamentoId(e.target.value)
-                        setMunicipioId('')
-                        setErrors((prev) => ({ ...prev, departamentoId: false }))
-                      }}
-                      className={errorInputClass(errors, 'departamentoId')}
-                    >
-                      <option value="">Seleccione Departamento...</option>
-                      {departamentos.map((d: any) => (
-                        <option key={d.id} value={d.id}>{d.nombre}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className={labelClass}>
-                      Municipio <span className="text-[#9B0F06]">*</span>
-                    </label>
-                    <select
-                      value={municipioId}
-                      onChange={(e) => {
-                        setMunicipioId(e.target.value)
-                        setErrors((prev) => ({ ...prev, municipioId: false }))
-                      }}
-                      className={errorInputClass(errors, 'municipioId')}
-                    >
-                      <option value="">Seleccione Municipio...</option>
-                      {municipios
-                        .filter((m: any) => !departamentoId || m.departamento_id === departamentoId)
-                        .map((m: any) => (
-                          <option key={m.id} value={m.id}>{m.nombre}</option>
-                        ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  <div>
-                    <label className={labelClass}>Kilómetro Inicial</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.001"
-                      value={kilometroInicio}
-                      onChange={(e) => setKilometroInicio(e.target.value)}
-                      className={errorInputClass(errors, 'kilometroInicio')}
-                      placeholder="Ej: 20.000"
-                    />
-                  </div>
-                  <div>
-                    <label className={labelClass}>Kilómetro Final</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.001"
-                      value={kilometroFin}
-                      onChange={(e) => setKilometroFin(e.target.value)}
-                      className={errorInputClass(errors, 'kilometroFin')}
-                      placeholder="Ej: 25.000"
-                    />
-                  </div>
-                </div>
-
-
-                <SelectorMapaInteractivo
-                  direccion={direccion}
-                  setDireccion={setDireccion}
-                  errors={errors}
-                  setErrors={setErrors}
-                  coordenadas={coordenadasMapa}
-                  setCoordenadas={setCoordenadasMapa}
-                />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* PASO 2: Entidades y Equipo */}
-        {pasoActual === 2 && (
-          <div className="space-y-3">
-            <div>
-              <SectionHeader
-                title="Sección 3: Entidades y Empresas Intervinientes"
+                title="Sección 2: Entidades y Empresas Intervinientes"
                 subtitle="Propietario, Contratista Ejecutor, Empresa Supervisora y Delegado Residente"
                 icon={Users}
               />
-                <p className="text-[10px] italic text-gray-500 mb-2">Todos los campos con (*) son obligatorios</p>
+              <p className="text-[10px] italic text-gray-500 mb-2">Todos los campos con (*) son obligatorios</p>
               <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                 <div>
                   <label className={labelClass}>
@@ -1150,27 +1712,39 @@ useEffect(() => {
                   <Combobox
                     options={entidadesContratantes.map((e: any) => ({ value: e.nombre, label: e.nombre }))}
                     value={entidadContratante}
-                    onChange={(val) => setEntidadContratante(val)}
+                    hasError={errors.entidadContratante}
+                    onChange={(val) => {
+                      setEntidadContratante(val)
+                      const found = entidadesContratantes.find((e: any) => e.nombre === val || e.id === val)
+                      if (found?.id) setEmpresaContratanteId(found.id)
+                      setErrors((prev) => ({ ...prev, entidadContratante: false }))
+                    }}
                     placeholder="Buscar Entidad Contratante..."
                     className="mt-1"
                     emptyAction={{
-                      label: 'Crear nueva en Catálogo de Empresas',
-                      onClick: () => router.push('/dashboard/proyectos/empresas?tab=entidades-contratantes')
+                      label: 'Crear Nueva Entidad Contratante',
+                      onClick: () => setOpenCrearEntidadDrawer(true)
                     }}
                   />
                 </div>
 
                 <div>
-                  <label className={labelClass}>Empresa Contratista Ejecutora</label>
+                  <label className={labelClass}>Empresa Contratista Ejecutora <span className="text-[#9B0F06]">*</span></label>
                   <Combobox
-                    options={empresasContratistas.map((e: any) => ({ value: e.nombre, label: e.nombre }))}
+                    options={empresasContratistas.map((e: any) => ({ value: e.nombre || e.razon_social, label: e.nombre || e.razon_social }))}
                     value={empresaContratista}
-                    onChange={(val) => setEmpresaContratista(val)}
+                    hasError={errors.empresaContratista}
+                    onChange={(val) => {
+                      setEmpresaContratista(val)
+                      const found = empresasContratistas.find((e: any) => e.nombre === val || e.razon_social === val || e.id === val)
+                      if (found?.id) setEmpresaContratistaId(found.id)
+                      setErrors((prev) => ({ ...prev, empresaContratista: false }))
+                    }}
                     placeholder="Buscar Empresa Contratista..."
                     className="mt-1"
                     emptyAction={{
-                      label: 'Crear nueva en Catálogo de Empresas',
-                      onClick: () => router.push('/dashboard/proyectos/empresas?tab=empresas-contratistas')
+                      label: 'Crear Nueva Empresa Contratista',
+                      onClick: () => setOpenCrearContratistaDrawer(true)
                     }}
                   />
                 </div>
@@ -1188,29 +1762,260 @@ useEffect(() => {
 
                 <DelegadoResidenteSelect
                   value={delegadoResidenteId}
-                  onChange={(val) => setDelegadoResidenteId(val)}
+                  hasError={errors.delegadoResidenteId}
+                  onChange={(val) => {
+                    setDelegadoResidenteId(val)
+                    setErrors((prev) => ({ ...prev, delegadoResidenteId: false }))
+                  }}
                   labelClass={labelClass}
+                  onAbrirCrearDelegado={() => setOpenCrearDelegadoDrawer(true)}
+                  reloadTrigger={reloadDelegadosTrigger}
                 />
               </div>
+
+              {/* Componente Equipo Asignado al Proyecto */}
+              <div className="mt-3">
+                <EquipoAsignadoSelector
+                  equipo={equipo}
+                  setEquipo={setEquipo}
+                  usuariosDisponibles={usuariosDisponibles}
+                  onAbrirCrearUsuario={() => setOpenCrearUsuarioDrawer(true)}
+                />
+              </div>
+
+              <UsuarioFormularioDrawer
+                isOpen={openCrearUsuarioDrawer}
+                onClose={() => setOpenCrearUsuarioDrawer(false)}
+                onSave={handleUsuarioCreadoEnWizard}
+              />
+
+              <UsuarioFormularioDrawer
+                isOpen={openCrearDelegadoDrawer}
+                onClose={() => setOpenCrearDelegadoDrawer(false)}
+                onSave={handleDelegadoCreadoEnWizard}
+                rolesPermitidos={['Administrador', 'IngenieroResidente', 'Ingeniero Residente']}
+              />
+
+              <EmpresaRelacionadaDrawer
+                isOpen={openCrearEntidadDrawer}
+                onClose={() => setOpenCrearEntidadDrawer(false)}
+                onSave={handleEntidadCreadaEnWizard}
+                tipo="entidad"
+                mode="create"
+              />
+
+              <EmpresaRelacionadaDrawer
+                isOpen={openCrearContratistaDrawer}
+                onClose={() => setOpenCrearContratistaDrawer(false)}
+                onSave={handleContratistaCreadoEnWizard}
+                tipo="contratista"
+                mode="create"
+              />
             </div>
-
-            {/* Componente Equipo Asignado al Proyecto */}
-            <EquipoAsignadoSelector
-              equipo={equipo}
-              setEquipo={setEquipo}
-              usuariosDisponibles={usuariosDisponibles}
-              onAbrirCrearUsuario={() => setOpenCrearUsuarioDrawer(true)}
-            />
-
-            <UsuarioFormularioDrawer
-              isOpen={openCrearUsuarioDrawer}
-              onClose={() => setOpenCrearUsuarioDrawer(false)}
-              onSave={handleUsuarioCreadoEnWizard}
-            />
           </div>
         )}
 
-        {/* PASO 3: Términos Contractuales y Seguimiento */}
+        {/* PASO 2: Ubicación Geográfica, Tramo Vial y Ruta en Mapa */}
+        {pasoActual === 2 && (
+          <div className="space-y-3">
+            <div>
+              <SectionHeader
+                title="Sección 3: Ubicación Geográfica, Tramo Vial y Ruta en Mapa"
+                subtitle="Geocodificación de dirección en vivo, departamento/municipio inicial y trazado de tramo por kilómetros"
+                icon={MapPin}
+              />
+              <div className="space-y-3">
+                {/* 1. BÚSQUEDA DE DIRECCIÓN Y MAPA OPENSTREETMAP FIRST */}
+                <SelectorMapaInteractivo
+                  direccion={direccion}
+                  setDireccion={setDireccion}
+                  setUbicacionFisica={setUbicacionFisica}
+                  errors={errors}
+                  setErrors={setErrors}
+                  coordenadas={coordenadasMapa}
+                  setCoordenadas={setCoordenadasMapa}
+                  departamentoId={departamentoId}
+                  setDepartamentoId={setDepartamentoId}
+                  municipioId={municipioId}
+                  setMunicipioId={setMunicipioId}
+                  departamentos={departamentos}
+                  municipios={municipios}
+                  kilometroInicio={kilometroInicio}
+                  kilometroFin={kilometroFin}
+                />
+
+                {/* 2. DEPARTAMENTO Y MUNICIPIO INICIAL (Auto-completados en vivo) */}
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <div>
+                    <label className={labelClass}>
+                      {esMultimunicipio ? 'Departamento de Inicio' : 'Departamento'} <span className="text-[#9B0F06]">*</span>
+                    </label>
+                    <Combobox
+                      options={departamentos.map((d: any) => ({ value: d.id, label: d.nombre }))}
+                      value={departamentoId}
+                      hasError={errors.departamentoId}
+                      onChange={(val) => {
+                        setDepartamentoId(val)
+                        setErrors((prev) => ({ ...prev, departamentoId: false }))
+                        if (municipioId) {
+                          const currentMun = municipios.find((m: any) => m.id === municipioId)
+                          if (!currentMun || currentMun.departamento_id !== val) {
+                            setMunicipioId('')
+                          }
+                        }
+                      }}
+                      placeholder="Buscar o seleccionar Departamento..."
+                      className="mt-1"
+                    />
+                  </div>
+
+                  <div>
+                    <label className={labelClass}>
+                      {esMultimunicipio ? 'Municipio de Inicio' : 'Municipio'} <span className="text-[#9B0F06]">*</span>
+                    </label>
+                    <Combobox
+                      disabled={!departamentoId}
+                      options={municipios
+                        .filter((m: any) => m.departamento_id === departamentoId)
+                        .map((m: any) => ({ value: m.id, label: m.nombre }))}
+                      value={municipioId}
+                      hasError={errors.municipioId}
+                      onChange={(val) => {
+                        setMunicipioId(val)
+                        setErrors((prev) => ({ ...prev, municipioId: false }))
+                      }}
+                      placeholder={!departamentoId ? 'Seleccione primero un Departamento...' : 'Buscar o seleccionar Municipio...'}
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+
+                {/* 3. Pregunta Tramo Multimunicipio / Multidepartamento */}
+                <div className="rounded-lg border border-gray-200 bg-gray-50/70 p-2 text-[11px]">
+                  <label className="flex items-center gap-2 font-medium text-gray-700 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={esMultimunicipio}
+                      onChange={(e) => {
+                        setEsMultimunicipio(e.target.checked)
+                        if (!e.target.checked) {
+                          setDepartamentoFinId('')
+                          setMunicipioFinId('')
+                        }
+                      }}
+                      className="h-3.5 w-3.5 rounded border-gray-300 text-[#9B0F06] focus:ring-[#9B0F06]"
+                    />
+                    <span>¿El proyecto es un tramo vial que abarca múltiples Municipios o Departamentos?</span>
+                  </label>
+                </div>
+
+                {/* Campos de Finalización de Tramo (Condicionales) */}
+                {esMultimunicipio && (
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 pt-1 border-t border-gray-100">
+                    <div>
+                      <label className={labelClass}>
+                        Departamento Final (Límite Tramo) <span className="text-[#9B0F06]">*</span>
+                      </label>
+                      <Combobox
+                        options={departamentos.map((d: any) => ({ value: d.id, label: d.nombre }))}
+                        value={departamentoFinId}
+                        onChange={(val) => {
+                          setDepartamentoFinId(val)
+                          if (municipioFinId) {
+                            const currentMun = municipios.find((m: any) => m.id === municipioFinId)
+                            if (!currentMun || currentMun.departamento_id !== val) {
+                              setMunicipioFinId('')
+                            }
+                          }
+                        }}
+                        placeholder="Buscar Departamento Final..."
+                        className="mt-1"
+                      />
+                    </div>
+
+                    <div>
+                      <label className={labelClass}>
+                        Municipio Final (Límite Tramo) <span className="text-[#9B0F06]">*</span>
+                      </label>
+                      <Combobox
+                        disabled={!departamentoFinId}
+                        options={municipios
+                          .filter((m: any) => m.departamento_id === departamentoFinId)
+                          .map((m: any) => ({ value: m.id, label: m.nombre }))}
+                        value={municipioFinId}
+                        onChange={(val) => setMunicipioFinId(val)}
+                        placeholder={!departamentoFinId ? 'Seleccione primero Departamento Final...' : 'Buscar Municipio Final...'}
+                        className="mt-1"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* 4. KILÓMETRO INICIAL Y FINAL */}
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <div>
+                    <label className={labelClass}>
+                      Kilómetro Inicial <span className="text-[#9B0F06]">*</span> <span className="text-[8px] font-normal text-gray-400">(Máx. 999 km)</span>
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="999.999"
+                      step="0.001"
+                      value={kilometroInicio}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        if (Number(val) > 999.999) {
+                          showErrorToast('El kilometraje máximo es 999.999 km (ej. 20.500 representa Km 20 + 500m)')
+                          return
+                        }
+                        setKilometroInicio(val)
+                        setErrors((prev) => ({ ...prev, kilometroInicio: false }))
+                      }}
+                      className={errorInputClass(errors, 'kilometroInicio')}
+                      placeholder="Ej: 200.000 (Km 200 + 000m)"
+                    />
+                    {kilometroInicio !== '' && !isNaN(Number(kilometroInicio)) && Number(kilometroInicio) >= 0 && (
+                      <span className="text-[8px] font-bold text-[#9B0F06] mt-0.5 block">
+                        Formato DGC: Estación Km {Math.floor(Number(kilometroInicio))} + {Math.round((Number(kilometroInicio) % 1) * 1000).toString().padStart(3, '0')}m
+                      </span>
+                    )}
+                  </div>
+                  <div>
+                    <label className={labelClass}>
+                      Kilómetro Final <span className="text-[#9B0F06]">*</span> <span className="text-[8px] font-normal text-gray-400">(Máx. 999 km)</span>
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="999.999"
+                      step="0.001"
+                      value={kilometroFin}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        if (Number(val) > 999.999) {
+                          showErrorToast('El kilometraje máximo es 999.999 km (ej. 24.000 representa Km 24 + 000m)')
+                          return
+                        }
+                        setKilometroFin(val)
+                        setErrors((prev) => ({ ...prev, kilometroFin: false }))
+                      }}
+                      className={errorInputClass(errors, 'kilometroFin')}
+                      placeholder="Ej: 240.000 (Km 240 + 000m)"
+                    />
+                    {kilometroFin !== '' && !isNaN(Number(kilometroFin)) && Number(kilometroFin) >= 0 && (
+                      <span className="text-[8px] font-bold text-[#9B0F06] mt-0.5 block">
+                        Formato DGC: Estación Km {Math.floor(Number(kilometroFin))} + {Math.round((Number(kilometroFin) % 1) * 1000).toString().padStart(3, '0')}m
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* PASO 3: Términos Contractuales y Presupuesto */}
         {pasoActual === 3 && (
           <div className="space-y-3">
             <div>
@@ -1226,8 +2031,11 @@ useEffect(() => {
                     <input
                       type="date"
                       value={fechaAdjudicacion}
-                      onChange={(e) => setFechaAdjudicacion(e.target.value)}
-                      className={inputClass}
+                      onChange={(e) => {
+                        setFechaAdjudicacion(e.target.value)
+                        setErrors((prev) => ({ ...prev, fechaAdjudicacion: false }))
+                      }}
+                      className={errorInputClass(errors, 'fechaAdjudicacion')}
                     />
                   </div>
 
@@ -1251,9 +2059,10 @@ useEffect(() => {
                       value={fechaInicioContractual}
                       onChange={(e) => {
                         setFechaInicioContractual(e.target.value)
+                        setErrors((prev) => ({ ...prev, fechaInicioContractual: false }))
                         if (errorFechaFin) setErrorFechaFin(false)
                       }}
-                      className={inputClass}
+                      className={errorInputClass(errors, 'fechaInicioContractual')}
                     />
                   </div>
 
@@ -1262,23 +2071,24 @@ useEffect(() => {
                     <input
                       type="date"
                       value={fechaFinContractualPlan}
+                      min={fechaInicioContractual || undefined}
                       onChange={(e) => {
                         const nuevaFin = e.target.value
-                        setFechaFinContractualPlan(nuevaFin)
                         if (fechaInicioContractual && nuevaFin) {
                           const inicio = new Date(fechaInicioContractual)
                           const fin = new Date(nuevaFin)
                           if (fin <= inicio) {
                             setErrorFechaFin(true)
+                            setFechaFinContractualPlan('')
                             showErrorToast('La fecha de finalización debe ser posterior a la fecha de inicio')
-                          } else {
-                            setErrorFechaFin(false)
+                            return
                           }
-                        } else {
-                          setErrorFechaFin(false)
                         }
+                        setFechaFinContractualPlan(nuevaFin)
+                        setErrors((prev) => ({ ...prev, fechaFinContractualPlan: false }))
+                        setErrorFechaFin(false)
                       }}
-                      className={`${inputClass} ${errorFechaFin ? 'border-danger border-[#FF4D4F] bg-red-50/20' : ''}`}
+                      className={`${errorInputClass(errors, 'fechaFinContractualPlan')} ${errorFechaFin ? 'border-red-500 ring-1 ring-red-400 bg-red-50/20' : ''}`}
                     />
                   </div>
 
@@ -1297,7 +2107,7 @@ useEffect(() => {
                       Monto Contractual Original <span className="text-[#9B0F06]">*</span> <span className="text-[8px] font-normal text-gray-400">(SOLO LECTURA)</span>
                     </label>
                     <div className="flex gap-1">
-                      <div className="flex flex-1">
+                      <div className={`flex flex-1 rounded ${errors.montoContractualOriginal ? 'border border-red-500 ring-1 ring-red-400' : ''}`}>
                         <div className="flex items-center rounded-l border border-r-0 border-gray-200 bg-gray-100 px-2 py-1 text-[10px] font-bold text-gray-600">
                           Q
                         </div>
@@ -1332,15 +2142,21 @@ useEffect(() => {
                 </div>
 
                 <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-                  <div className="relative">
+                  <div>
                     <label className={labelClass}>Ingeniero Responsable / Director</label>
                     <Combobox
-  options={usuariosDisponibles.map((u: any) => ({ value: u.id, label: u.nombre + ' @' + (u.username || (u.correo ? u.correo.split('@')[0] : '')) + ' (' + u.rol + ')' }))}
-  value={responsable}
-  onChange={(val) => setResponsable(val)}
-  placeholder="Buscar responsable de obra..."
-/>
-                    <ChevronRight size={12} className="absolute right-2 top-6 rotate-90 text-gray-400 pointer-events-none" />
+                      options={usuariosIngenieroResponsable.map((u: any) => ({
+                        value: u.id,
+                        label: `${u.nombre} (@${u.username || (u.correo ? u.correo.split('@')[0] : '')}) - (${u.rol})`
+                      }))}
+                      value={responsable}
+                      hasError={errors.responsable}
+                      onChange={(val) => {
+                        setResponsable(val)
+                        setErrors((prev) => ({ ...prev, responsable: false }))
+                      }}
+                      placeholder="Buscar responsable de obra (Residente o Administrador)..."
+                    />
                   </div>
 
                   <div>
@@ -1352,17 +2168,14 @@ useEffect(() => {
                     >
                       <option value="borrador">Borrador</option>
                       <option value="activo">Activo</option>
-                      <option value="en_revision">En Revisión</option>
-                      <option value="completado">Completado</option>
-                      <option value="cancelado">Cancelado</option>
                     </select>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Sección 5: Campos de Seguimiento y Cierre (Exclusivos de Edición) */}
-            {esEditar ? (
+            {/* Sección 5: Campos de Seguimiento y Cierre (Exclusivos de Edición y Proyecto ACTIVO) */}
+            {esEditar && estado === 'activo' ? (
               <div className="rounded-lg border border-gray-200 bg-white p-2.5 space-y-2">
                 <SectionHeader
                   title="Sección 5: Campos de Seguimiento y Cierre (Exclusivos de Edición)"
@@ -1436,7 +2249,7 @@ useEffect(() => {
               <button
                 type="button"
                 onClick={() => setPasoActual((prev) => (prev - 1) as 1 | 2 | 3)}
-                className="inline-flex items-center gap-1 rounded-md border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+                className="inline-flex items-center gap-1 rounded-md border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
               >
                 <ArrowLeft size={12} />
                 <span>Anterior</span>
@@ -1445,7 +2258,7 @@ useEffect(() => {
               <button
                 type="button"
                 onClick={onCancelar}
-                className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+                className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer"
               >
                 Cancelar
               </button>
@@ -1457,7 +2270,7 @@ useEffect(() => {
               <button
                 type="button"
                 onClick={() => handleAvanzarPaso((pasoActual + 1) as 1 | 2 | 3)}
-                className="inline-flex items-center gap-1.5 rounded-md bg-[#9B0F06] px-4 py-1.5 text-xs font-bold text-white hover:bg-[#5E0006] transition-colors shadow-2xs"
+                className="inline-flex items-center gap-1.5 rounded-md bg-[#9B0F06] px-4 py-1.5 text-xs font-bold text-white hover:bg-[#5E0006] transition-colors shadow-2xs cursor-pointer"
               >
                 <span>Continuar</span>
                 <ArrowRight size={12} />

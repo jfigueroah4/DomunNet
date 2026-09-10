@@ -10,6 +10,9 @@ interface DelegadoResidenteSelectProps {
   onChange: (val: string) => void
   labelClass?: string
   className?: string
+  hasError?: boolean
+  onAbrirCrearDelegado?: () => void
+  reloadTrigger?: number
 }
 
 export function DelegadoResidenteSelect({
@@ -17,14 +20,17 @@ export function DelegadoResidenteSelect({
   onChange,
   labelClass = 'block text-[9px] font-bold text-gray-700 uppercase tracking-wide',
   className = '',
+  hasError = false,
+  onAbrirCrearDelegado,
+  reloadTrigger = 0,
 }: DelegadoResidenteSelectProps) {
   const router = useRouter()
   const [delegados, setDelegados] = useState<{ id: string; nombre: string }[]>([])
   const [loading, setLoading] = useState(false)
 
-  useEffect(() => {
+  const cargarDelegados = () => {
     setLoading(true)
-    apiGetDeduplicado('/usuarios/delegados-residente')
+    apiGetDeduplicado('/usuarios/delegados-residente', { bypassCache: true })
       .then((res) => {
         if (res.data && res.data.success) {
           setDelegados(res.data.data || [])
@@ -36,7 +42,11 @@ export function DelegadoResidenteSelect({
       .finally(() => {
         setLoading(false)
       })
-  }, [])
+  }
+
+  useEffect(() => {
+    cargarDelegados()
+  }, [reloadTrigger])
 
   const options = delegados.map((d) => ({
     value: d.id,
@@ -50,11 +60,18 @@ export function DelegadoResidenteSelect({
         options={options}
         value={value}
         onChange={onChange}
+        hasError={hasError}
         placeholder={loading ? 'Cargando delegados residentes...' : 'Buscar Delegado Residente...'}
         className="mt-1"
         emptyAction={{
-          label: 'Crear nuevo en Módulo de Usuarios',
-          onClick: () => router.push('/dashboard/usuarios'),
+          label: 'Crear nuevo Delegado Residente',
+          onClick: () => {
+            if (onAbrirCrearDelegado) {
+              onAbrirCrearDelegado()
+            } else {
+              router.push('/dashboard/usuarios')
+            }
+          },
         }}
       />
     </div>

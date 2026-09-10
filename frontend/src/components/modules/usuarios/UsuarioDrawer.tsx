@@ -1,6 +1,7 @@
 'use client'
 
-import { useRolesStore, RolMinimo } from '@/stores/useRolesStore';
+import { useRolesStore } from '@/stores/useRolesStore';
+import { useAuthStore } from '@/stores/useAuthStore';
 import { Portal } from '@/components/ui/Portal'
 
 
@@ -74,75 +75,41 @@ interface UsuarioDrawerProps {
 
 
 
-const defaultForm = (usuario?: Usuario) => ({
+const parseFechaNacimiento = (fechaStr?: string | null) => {
+  if (!fechaStr) return { dia: '', mes: '', ano: '' }
+  try {
+    const d = new Date(fechaStr)
+    if (!isNaN(d.getTime())) {
+      const dia = String(d.getUTCDate()).padStart(2, '0')
+      const mes = String(d.getUTCMonth() + 1).padStart(2, '0')
+      const ano = String(d.getUTCFullYear())
+      return { dia, mes, ano }
+    }
+  } catch {}
+  return { dia: '', mes: '', ano: '' }
+}
 
-
-
-  primerNombre: usuario?.primer_nombre || '',
-
-
-
-  segundoNombre: usuario?.segundo_nombre || '',
-
-
-
-  primerApellido: usuario?.primer_apellido || '',
-
-
-
-  segundoApellido: usuario?.segundo_apellido || '',
-
-
-
-  correo: usuario?.correo || '',
-
-
-
-  telefono: usuario?.telefono || '',
-
-
-
-  rol: (usuario?.rol as RolUsuario) || ('Administrador' as RolUsuario),
-
-
-
-  estado: (usuario?.estado as EstadoUsuario) || 'Activo',
-
-
-
-  contrasena: '',
-
-
-
-  contrasenaAnterior: '',
-
-
-
-  username: usuario?.username || '',
-
-
-
-  direccion: '',
-
-
-
-  diaNacimiento: '',
-
-
-
-  mesNacimiento: '',
-
-
-
-  anoNacimiento: '',
-
-
-
-  motivoBloqueo: '',
-
-
-
-})
+const defaultForm = (usuario?: Usuario) => {
+  const parsedFecha = parseFechaNacimiento(usuario?.fecha_nacimiento)
+  return {
+    primerNombre: usuario?.primer_nombre || '',
+    segundoNombre: usuario?.segundo_nombre || '',
+    primerApellido: usuario?.primer_apellido || '',
+    segundoApellido: usuario?.segundo_apellido || '',
+    correo: usuario?.correo || '',
+    telefono: usuario?.telefono || '',
+    rol: (usuario?.rol as RolUsuario) || ('Administrador' as RolUsuario),
+    estado: (usuario?.estado as EstadoUsuario) || 'Activo',
+    contrasena: '',
+    contrasenaAnterior: '',
+    username: usuario?.username || '',
+    direccion: usuario?.direccion || '',
+    diaNacimiento: parsedFecha.dia,
+    mesNacimiento: parsedFecha.mes,
+    anoNacimiento: parsedFecha.ano,
+    motivoBloqueo: '',
+  }
+}
 
 
 
@@ -152,8 +119,8 @@ const defaultForm = (usuario?: Usuario) => ({
 
 export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: UsuarioDrawerProps) {
   const { roles, fetchRoles } = useRolesStore()
-
-
+  const profile = useAuthStore((state) => state.profile)
+  const esAdmin = profile?.rol === 'Administrador' || (profile?.nivel_permisos ?? 0) >= 100
 
   const [formData, setFormData] = useState(defaultForm(usuario))
 
@@ -184,6 +151,7 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
 
 
   const [isEditingPassword, setIsEditingPassword] = useState(false)
+  const [fechaErrorMsg, setFechaErrorMsg] = useState<string | null>(null)
 
 
 
@@ -487,138 +455,74 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
 
 
 
-  const calcularEdad = (dia: string, mes: string, anio: string): number => {
+  const esFechaNacimientoValida = (dia: string, mes: string, anio: string): { valida: boolean; mensajeError?: string } => {
+    if (!dia || !mes || !anio || anio.length < 4) {
+      return { valida: false, mensajeError: 'Fecha de nacimiento incompleta' }
+    }
+    const d = parseInt(dia, 10)
+    const m = parseInt(mes, 10)
+    const y = parseInt(anio, 10)
 
+    if (isNaN(d) || isNaN(m) || isNaN(y)) {
+      return { valida: false, mensajeError: 'Valores numéricos no válidos' }
+    }
+    if (m < 1 || m > 12) {
+      return { valida: false, mensajeError: 'El mes debe estar entre 01 y 12' }
+    }
+    if (d < 1 || d > 31) {
+      return { valida: false, mensajeError: 'El día no es válido' }
+    }
 
-
-    if (!dia || !mes || !anio || dia.length < 1 || mes.length < 1 || anio.length < 4) return 0
-
-
+    const dateObj = new Date(y, m - 1, d)
+    if (dateObj.getFullYear() !== y || dateObj.getMonth() !== m - 1 || dateObj.getDate() !== d) {
+      return { valida: false, mensajeError: 'La fecha ingresada no existe en el calendario (ej. 30 de febrero)' }
+    }
 
     const hoy = new Date()
-
-
-
-    const nacimiento = new Date(parseInt(anio), parseInt(mes) - 1, parseInt(dia))
-
-
-
-    let edad = hoy.getFullYear() - nacimiento.getFullYear()
-
-
-
+    let edad = hoy.getFullYear() - y
     const mesActual = hoy.getMonth() + 1
-
-
-
-    if (mesActual < parseInt(mes) || (mesActual === parseInt(mes) && hoy.getDate() < parseInt(dia))) {
-
-
-
+    if (mesActual < m || (mesActual === m && hoy.getDate() < d)) {
       edad--
-
-
-
     }
 
+    if (edad < 18) {
+      return { valida: false, mensajeError: 'Debe ser mayor de 18 años' }
+    }
+    if (y < 1900 || edad > 120) {
+      return { valida: false, mensajeError: 'Año de nacimiento no válido' }
+    }
 
-
-    return edad
-
-
-
+    return { valida: true }
   }
-
-
-
-
-
-
 
   const handleFechaChange = (tipo: 'dia' | 'mes' | 'ano', valor: string) => {
-
-
-
-    if (/[^0-9]/.test(valor)) return;
-
-
-
-    
-
-
+    if (/[^0-9]/.test(valor)) return
 
     if (tipo === 'dia') {
-
-
-
       const num = parseInt(valor)
-
-
-
-      if (num > 31) return;
-
-
-
+      if (num > 31) return
     } else if (tipo === 'mes') {
-
-
-
       const num = parseInt(valor)
-
-
-
-      if (num > 12) return;
-
-
-
+      if (num > 12) return
     }
-
-
-
-    
-
-
 
     const nuevoForm = { ...formData, [`${tipo}Nacimiento`]: valor }
-
-
-
     setFormData(nuevoForm)
-
-
-
     setErrors({ ...errors, fechaNacimiento: false })
-
-
-
+    setFechaErrorMsg(null)
   }
 
-
-
-
-
-
-
   const handleFechaBlur = () => {
-
-
-
     if (formData.diaNacimiento && formData.mesNacimiento && formData.anoNacimiento.length === 4) {
-
-
-
-      const edad = calcularEdad(formData.diaNacimiento, formData.mesNacimiento, formData.anoNacimiento)
-
-
-
-      setErrors((prev) => ({ ...prev, fechaNacimiento: edad < 18 }))
-
-
-
+      const valRes = esFechaNacimientoValida(formData.diaNacimiento, formData.mesNacimiento, formData.anoNacimiento)
+      if (!valRes.valida) {
+        setErrors((prev) => ({ ...prev, fechaNacimiento: true }))
+        setFechaErrorMsg(valRes.mensajeError || 'Fecha inválida')
+      } else {
+        setErrors((prev) => ({ ...prev, fechaNacimiento: false }))
+        setFechaErrorMsg(null)
+      }
     }
-
-
-
   }
 
 
@@ -887,11 +791,19 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
 
 
 
-    const edad = calcularEdad(formData.diaNacimiento, formData.mesNacimiento, formData.anoNacimiento)
+    const valFecha = esFechaNacimientoValida(formData.diaNacimiento, formData.mesNacimiento, formData.anoNacimiento)
 
 
 
-    const faltaFecha = !formData.diaNacimiento || !formData.mesNacimiento || formData.anoNacimiento.length < 4
+    if (!valFecha.valida) {
+
+
+
+      setFechaErrorMsg(valFecha.mensajeError || 'Fecha de nacimiento no válida')
+
+
+
+    }
 
 
 
@@ -919,7 +831,7 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
 
 
 
-      fechaNacimiento: faltaFecha || edad < 18,
+      fechaNacimiento: !valFecha.valida,
 
 
 
@@ -1659,7 +1571,7 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
 
 
 
-              {errors.fechaNacimiento && <p className="text-[10px] text-[#FF4D4F] mt-1">Debe ser mayor de 18 anios</p>}
+              {errors.fechaNacimiento && <p className="text-[10px] text-[#FF4D4F] mt-1">{fechaErrorMsg || 'Debe ser mayor de 18 años'}</p>}
 
 
 
@@ -2084,25 +1996,44 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
 
 
                 <select
-
                 name="rol"
-
                 value={formData.rol}
-
                 onChange={handleChange}
-
-                disabled={isViewMode}
-
-                className="w-full h-8 px-3 text-xs rounded-lg border border-gray-200 bg-white focus:border-[#9B0F06] focus:outline-none disabled:bg-gray-50 transition-colors"
-
+                disabled={isViewMode || String(formData.rol).toLowerCase() === 'contratante' || String(usuario?.rol).toLowerCase() === 'contratante' || (!esAdmin && String(usuario?.rol) === 'Administrador')}
+                className={`w-full h-8 px-3 text-xs rounded-lg border border-gray-200 focus:border-[#9B0F06] focus:outline-none transition-colors ${
+                  isViewMode || String(formData.rol).toLowerCase() === 'contratante' || String(usuario?.rol).toLowerCase() === 'contratante' || (!esAdmin && String(usuario?.rol) === 'Administrador')
+                    ? 'bg-gray-100 font-semibold text-gray-700 cursor-not-allowed'
+                    : 'bg-white'
+                }`}
               >
-
                 <option value="">Seleccione un rol</option>
-
-                {roles.filter((r: RolMinimo) => (r.estado === 'Activo' || r.nombre === formData.rol) && r.nombre !== 'Contratante' && r.nombre !== 'Contratista').map((rol: RolMinimo) => (
-                  <option key={rol.id} value={rol.nombre}>{rol.nombre}</option>
-                ))}
-
+                {(String(formData.rol).toLowerCase() === 'contratante' || String(usuario?.rol).toLowerCase() === 'contratante') && (
+                  <option value="Contratante">Contratante</option>
+                )}
+                {(() => {
+                  const fallbackRoles = [
+                    { id: 'r1', nombre: 'Administrador', estado: 'Activo' },
+                    { id: 'r2', nombre: 'Gerencia', estado: 'Activo' },
+                    { id: 'r3', nombre: 'IngenieroResidente', estado: 'Activo' },
+                    { id: 'r4', nombre: 'Laboratorista', estado: 'Activo' },
+                    { id: 'r5', nombre: 'AuxiliarDeCampo', estado: 'Activo' },
+                    { id: 'r6', nombre: 'Supervisor', estado: 'Activo' },
+                    { id: 'r7', nombre: 'Inspector', estado: 'Activo' },
+                    { id: 'r8', nombre: 'Campo', estado: 'Activo' },
+                    { id: 'r9', nombre: 'Proveedor', estado: 'Activo' },
+                    { id: 'r10', nombre: 'Delegado Residente', estado: 'Activo' },
+                  ]
+                  const listaBase = roles && roles.length > 0 ? roles : fallbackRoles
+                  return listaBase
+                    .filter((r: any) => {
+                      if (String(r.nombre).toLowerCase() === 'contratante') return false
+                      if (!esAdmin && r.nombre === 'Administrador' && usuario?.rol !== 'Administrador') return false
+                      return !r.estado || r.estado === 'Activo' || r.nombre === formData.rol
+                    })
+                    .map((rol: any) => (
+                      <option key={rol.id || rol.nombre} value={rol.nombre}>{rol.nombre}</option>
+                    ))
+                })()}
               </select>
 
 
@@ -2411,11 +2342,11 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
 
 
 
-          <div className="fixed top-0 left-0 right-0 bottom-0 z-[9992] bg-black/40 backdrop-blur-[1px]" onClick={() => setDrawerProyectosAbierto(false)} />
+          <div className="fixed top-0 left-0 right-0 bottom-0 z-[10001] bg-black/40 backdrop-blur-[1px]" onClick={() => setDrawerProyectosAbierto(false)} />
 
 
 
-          <div className="fixed top-0 left-0 right-0 bottom-0 z-[9993] flex justify-end overflow-hidden pointer-events-none">
+          <div className="fixed top-0 left-0 right-0 bottom-0 z-[10002] flex justify-end overflow-hidden pointer-events-none">
 
 
 

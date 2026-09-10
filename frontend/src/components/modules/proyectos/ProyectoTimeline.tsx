@@ -1,7 +1,7 @@
 // @ts-nocheck
 'use client'
 
-import { Fragment, useState } from 'react'
+import { Fragment, useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import {
   AlertCircle,
@@ -392,11 +392,13 @@ const CATALOGO_88_RENGLONES_DGC: RenglonOficialDGC[] = [
 ]
 
 export function ProyectoTimeline({
+  proyecto,
   fases,
   avanceGeneral,
   modoCapturaInicial = false,
   onGuardarYVolver,
 }: {
+  proyecto?: any
   fases?: any[]
   avanceGeneral?: number
   modoCapturaInicial?: boolean
@@ -409,9 +411,10 @@ export function ProyectoTimeline({
 
   const [modoEstimacion] = useState<'edicion' | 'creacion'>('edicion')
 
-  // Inicializar estado según si es Captura Inicial para Nuevo Proyecto (Vacío)
+  // Inicializar estado según si es Captura Inicial para Nuevo Proyecto (Vacío) o Borrador
   const [renglones, setRenglones] = useState<RenglonOficialDGC[]>(() => {
-    if (modoCapturaInicial) {
+    const esProyBorrador = (proyecto?.estado || '').toLowerCase() === 'borrador'
+    if (modoCapturaInicial || esProyBorrador || (!proyecto?.planTrabajo && !proyecto?.renglones)) {
       return CATALOGO_88_RENGLONES_DGC.map((r) => ({
         ...r,
         cantidadContratada: 0,
@@ -423,6 +426,28 @@ export function ProyectoTimeline({
     }
     return CATALOGO_88_RENGLONES_DGC
   })
+
+  // Sincronizar renglones según el proyecto
+  useEffect(() => {
+    if (proyecto) {
+      if (proyecto.planTrabajo && proyecto.planTrabajo.length > 0) {
+        setRenglones(proyecto.planTrabajo)
+      } else if (proyecto.renglones && proyecto.renglones.length > 0) {
+        setRenglones(proyecto.renglones)
+      } else if ((proyecto.estado || '').toLowerCase() === 'borrador' || (proyecto.avance ?? 0) === 0) {
+        setRenglones(
+          CATALOGO_88_RENGLONES_DGC.map((r) => ({
+            ...r,
+            cantidadContratada: 0,
+            cantidadAjustada: 0,
+            costoUnitarioDirecto: 0,
+            cantidadEstePeriodo: 0,
+            cantidadAcumuladaAnterior: 0,
+          }))
+        )
+      }
+    }
+  }, [proyecto])
 
   // Buscador y filtros
   const [busqueda, setBusqueda] = useState('')
@@ -448,19 +473,39 @@ export function ProyectoTimeline({
   const [nuevoCostoUnitario, setNuevoCostoUnitario] = useState('')
   const [nuevoCapituloId, setNuevoCapituloId] = useState(1)
 
-  // Datos KPI
-  const anticipoRecibido20 = 3730000
-  const anticipoAmortizadoAnterior = 1492000
-  const anticipoAmortizadoEstePeriodo = 373000
-  const anticipoAmortizadoTotal = anticipoAmortizadoAnterior + anticipoAmortizadoEstePeriodo
-  const anticipoSaldoPorAmortizar = Math.max(0, anticipoRecibido20 - anticipoAmortizadoTotal)
-  const pctAmortizacionAnticipo = (anticipoAmortizadoTotal / anticipoRecibido20) * 100
+  // Datos KPI Adaptados Dinámicamente al Proyecto
+  const esBorrador = (proyecto?.estado || '').toLowerCase() === 'borrador'
+  const avanceGlobal = esBorrador ? 0 : (avanceGeneral ?? proyecto?.avance ?? 0)
 
-  const plazoTotalDias = 1080
-  const diasTranscurridos = 372
-  const diasSuspendidos = 30
-  const diasEmpleados = diasTranscurridos - diasSuspendidos
-  const diasPorEmplearse = Math.max(0, plazoTotalDias - diasEmpleados)
+  // Suma total calculada para Captura Inicial
+  const totalMontoCalculadoCaptura = renglones.reduce(
+    (acc, r) => acc + (r.cantidadContratada || 0) * (r.costoUnitarioDirecto || 0),
+    0
+  )
+
+  const montoContratadoGlobal = proyecto?.montoContractualOriginal || proyecto?.presupuesto || totalMontoCalculadoCaptura
+  const anticipoRecibido20 = esBorrador ? 0 : montoContratadoGlobal * 0.20
+  const pctAmortizacionAnticipo = (esBorrador || avanceGlobal === 0) ? 0 : Math.min(100, Math.round(avanceGlobal * 0.8))
+  const anticipoSaldoPorAmortizar = esBorrador ? 0 : Math.max(0, anticipoRecibido20 * (1 - pctAmortizacionAnticipo / 100))
+
+  const fechaInicioDefault = proyecto?.fechaInicio || (proyecto as any)?.fechaInicioContractual || ''
+  const fechaFinDefault = proyecto?.fechaFin || (proyecto as any)?.fechaFinContractualPlan || (proyecto as any)?.fecha_fin_estimada || ''
+
+  let plazoTotalDias = (proyecto as any)?.plazoTotalDias || 0
+  if (!plazoTotalDias && fechaInicioDefault && fechaFinDefault) {
+    const dInit = new Date(fechaInicioDefault).getTime()
+    const dEnd = new Date(fechaFinDefault).getTime()
+    if (!isNaN(dInit) && !isNaN(dEnd) && dEnd > dInit) {
+      plazoTotalDias = Math.round((dEnd - dInit) / 86400000)
+    }
+  }
+  if (!plazoTotalDias) plazoTotalDias = fechaInicioDefault ? 365 : 0
+
+  const diasTranscurridos = (esBorrador || !fechaInicioDefault || isNaN(new Date(fechaInicioDefault).getTime()))
+    ? 0
+    : Math.min(plazoTotalDias, Math.max(0, Math.floor((Date.now() - new Date(fechaInicioDefault).getTime()) / 86400000)))
+
+  const diasPorEmplearse = Math.max(0, plazoTotalDias - diasTranscurridos)
 
   // Lógica de edición de Renglones para Captura Inicial de Nuevo Proyecto
   const handleUpdateRenglonInicial = (
@@ -571,14 +616,10 @@ export function ProyectoTimeline({
   const subtotalAntesIva = subtotalCostoDirectoPeriodo + indirectos45
   const iva12 = subtotalAntesIva * 0.12
   const valorTotalEstimacionBruto = subtotalAntesIva + iva12
-  const amortizacionAnticipoEstePeriodo = anticipoSaldoPorAmortizar > 0 ? valorTotalEstimacionBruto * 0.20 : 0
+  const amortizacionAnticipoEstePeriodo = (esBorrador || anticipoSaldoPorAmortizar === 0) ? 0 : valorTotalEstimacionBruto * 0.20
   const montoLiquidoAPagar = Math.max(0, valorTotalEstimacionBruto - amortizacionAnticipoEstePeriodo)
-
-  // Suma total calculada para Captura Inicial
-  const totalMontoCalculadoCaptura = renglones.reduce(
-    (a, r) => a + r.cantidadContratada * r.costoUnitarioDirecto,
-    0
-  )
+  const anticipoAmortizadoAnterior = esBorrador ? 0 : Math.max(0, anticipoRecibido20 - anticipoSaldoPorAmortizar - amortizacionAnticipoEstePeriodo)
+  const anticipoAmortizadoEstePeriodo = amortizacionAnticipoEstePeriodo
 
   const handleFinalizarCapturaInicial = () => {
     if (totalMontoCalculadoCaptura <= 0) {
@@ -732,7 +773,14 @@ export function ProyectoTimeline({
           {!modoCapturaInicial && (
             <button
               type="button"
-              onClick={() => router.push(`/dashboard/proyectos/${proyectoIdParam || '1'}/hoja-sabana`)}
+              onClick={() => {
+                const targetId = proyecto?.id || proyectoIdParam
+                if (targetId) {
+                  router.push(`/dashboard/proyectos/${targetId}/hoja-sabana`)
+                } else {
+                  router.push('/dashboard/proyectos')
+                }
+              }}
               className="inline-flex items-center gap-1.5 rounded-md bg-[#9B0F06] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#5E0006] shadow-2xs cursor-pointer"
             >
               <Maximize2 size={12} />
@@ -741,12 +789,26 @@ export function ProyectoTimeline({
           )}
         </div>
 
+        {/* SECCIÓN AVANCE GENERAL DEL PROYECTO */}
+        <div className="space-y-1 bg-gray-50/80 p-2.5 rounded-lg border border-gray-200">
+          <div className="flex justify-between items-center text-xs font-bold text-gray-800">
+            <span>AVANCE GENERAL DEL PROYECTO</span>
+            <span className="font-mono text-[#9B0F06] font-black text-sm">{avanceGlobal}%</span>
+          </div>
+          <div className="w-full bg-gray-200 h-2.5 rounded-full overflow-hidden">
+            <div
+              className="bg-[#9B0F06] h-full transition-all duration-300 rounded-full"
+              style={{ width: `${avanceGlobal}%` }}
+            />
+          </div>
+        </div>
+
         {/* BARRAS DE PROGRESO POR CAPÍTULO */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[10px]">
-          {CAPITULOS_LIBRO_AZUL.map((cap, idx) => {
+          {CAPITULOS_LIBRO_AZUL.map((cap) => {
             const renglonesCap = renglones.filter((r) => r.capituloId === cap.id)
-            const subtotalCap = renglonesCap.reduce((sum, r) => sum + r.cantidadContratada * r.costoUnitarioDirecto, 0)
-            const pctAvanceCap = Math.min(100, Math.round(35 + (idx * 7) % 55))
+            const subtotalCap = renglonesCap.reduce((sum, r) => sum + (r.cantidadContratada || 0) * (r.costoUnitarioDirecto || 0), 0)
+            const pctAvanceCap = (esBorrador || avanceGlobal === 0) ? 0 : Math.min(100, Math.max(0, Math.round(avanceGlobal)))
 
             return (
               <div key={cap.id} className="rounded-lg border border-gray-200 bg-gray-50/60 p-2.5 space-y-1.5">
@@ -997,27 +1059,16 @@ export function ProyectoTimeline({
                 </div>
               </div>
 
-              {/* Bloque final destacado "Líquido a Pagar Neto al Contratista" con fondo rojo y botón "Autorizar Pago" */}
-              <div className="rounded-lg bg-[#9B0F06] p-3 text-white flex items-center justify-between shadow-xs">
+              {/* Bloque final destacado "Líquido a Pagar Neto al Contratista" con fondo gris y sin botón autorizar pago */}
+              <div className="rounded-lg bg-gray-100 p-3 text-gray-900 border border-gray-200 flex items-center justify-between shadow-xs">
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-red-200">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-600">
                     Líquido a Pagar Neto al Contratista
                   </p>
-                  <p className="text-xl font-black font-mono mt-0.5">
+                  <p className="text-xl font-bold font-mono mt-0.5 text-gray-900">
                     Q {montoLiquidoAPagar.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
                   </p>
                 </div>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    toast.success('Estimación No. 08 autorizada para pago exitosamente')
-                    setModalKpiFinancieroOpen(false)
-                  }}
-                  className="rounded-md bg-white px-3.5 py-1.5 text-xs font-black text-[#9B0F06] hover:bg-red-50 transition-colors shadow-2xs"
-                >
-                  Autorizar Pago
-                </button>
               </div>
             </div>
 
@@ -1025,7 +1076,7 @@ export function ProyectoTimeline({
               <button
                 type="button"
                 onClick={() => setModalKpiFinancieroOpen(false)}
-                className="rounded-md border border-gray-300 bg-white px-3.5 py-1 text-xs font-bold text-gray-700 hover:bg-gray-50"
+                className="rounded-md border border-gray-300 bg-white px-3.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
               >
                 Cerrar
               </button>
@@ -1040,8 +1091,8 @@ export function ProyectoTimeline({
           <div className="w-full max-w-md rounded-xl bg-white p-4 shadow-xl space-y-3 border border-gray-200">
             <div className="flex items-center justify-between border-b border-gray-100 pb-2">
               <div className="flex items-center gap-2">
-                <Banknote size={16} className="text-[#9B0F06]" />
-                <h3 className="text-xs font-black text-gray-900">Estado de Cuenta y Control de Anticipo</h3>
+                <Banknote size={16} className="text-gray-700" />
+                <h3 className="text-xs font-bold text-gray-900">Estado de Cuenta y Control de Anticipo</h3>
               </div>
               <button
                 type="button"
@@ -1054,27 +1105,27 @@ export function ProyectoTimeline({
 
             <div className="space-y-2 text-xs font-mono">
               <div className="flex justify-between py-1 border-b border-gray-100">
-                <span className="font-sans font-semibold text-gray-600">Monto Recibido (20% del Contrato):</span>
-                <span className="font-bold text-gray-900">
+                <span className="font-sans font-normal text-gray-600">Monto Recibido (20% del Contrato):</span>
+                <span className="font-normal text-gray-800">
                   Q {anticipoRecibido20.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
                 </span>
               </div>
 
               <div className="flex justify-between py-1 border-b border-gray-100">
-                <span className="font-sans font-semibold text-gray-600">Amortizado en Estimaciones Anteriores:</span>
-                <span className="font-bold text-emerald-800">
+                <span className="font-sans font-normal text-gray-600">Amortizado en Estimaciones Anteriores:</span>
+                <span className="font-normal text-gray-800">
                   Q {anticipoAmortizadoAnterior.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
                 </span>
               </div>
 
               <div className="flex justify-between py-1 border-b border-gray-100">
-                <span className="font-sans font-semibold text-gray-600">Amortizado en Este Periodo (Est. 08):</span>
-                <span className="font-bold text-emerald-800">
+                <span className="font-sans font-normal text-gray-600">Amortizado en Este Periodo (Est. 08):</span>
+                <span className="font-normal text-gray-800">
                   Q {anticipoAmortizadoEstePeriodo.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
                 </span>
               </div>
 
-              <div className="flex justify-between py-2 bg-amber-50 px-2 rounded font-black text-amber-900 border border-amber-200">
+              <div className="flex justify-between py-2 bg-gray-100 px-2 rounded font-bold text-gray-900 border border-gray-200">
                 <span className="font-sans">Saldo Restante por Amortizar:</span>
                 <span>Q {anticipoSaldoPorAmortizar.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</span>
               </div>
@@ -1084,7 +1135,7 @@ export function ProyectoTimeline({
               <button
                 type="button"
                 onClick={() => setModalKpiAnticipoOpen(false)}
-                className="rounded bg-gray-100 px-3 py-1 text-xs font-bold text-gray-700 hover:bg-gray-200"
+                className="rounded bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-200"
               >
                 Cerrar Detalle
               </button>
@@ -1099,8 +1150,8 @@ export function ProyectoTimeline({
           <div className="w-full max-w-md rounded-xl bg-white p-4 shadow-xl space-y-3 border border-gray-200">
             <div className="flex items-center justify-between border-b border-gray-100 pb-2">
               <div className="flex items-center gap-2">
-                <Clock size={16} className="text-[#9B0F06]" />
-                <h3 className="text-xs font-black text-gray-900">Control Oficial de Plazo de Ejecución</h3>
+                <Clock size={16} className="text-gray-700" />
+                <h3 className="text-xs font-bold text-gray-900">Control Oficial de Plazo de Ejecución</h3>
               </div>
               <button
                 type="button"
@@ -1113,33 +1164,37 @@ export function ProyectoTimeline({
 
             <div className="space-y-2 text-xs">
               <div className="flex justify-between py-1 border-b border-gray-100">
-                <span className="font-semibold text-gray-600">Fecha de Inicio Oficial:</span>
-                <span className="font-mono font-bold text-gray-900">20 de Enero de 2025</span>
+                <span className="font-normal text-gray-600">Fecha de Inicio Oficial:</span>
+                <span className="font-mono font-normal text-gray-800">
+                  {proyecto?.fechaInicio || (proyecto as any)?.fechaInicioContractual || 'No registrada'}
+                </span>
               </div>
 
               <div className="flex justify-between py-1 border-b border-gray-100">
-                <span className="font-semibold text-gray-600">Plazo Contractual Original:</span>
-                <span className="font-mono font-bold text-gray-900">{plazoTotalDias} Días Calendario</span>
+                <span className="font-normal text-gray-600">Plazo Contractual Original:</span>
+                <span className="font-mono font-normal text-gray-800">{plazoTotalDias} Días Calendario</span>
               </div>
 
               <div className="flex justify-between py-1 border-b border-gray-100">
-                <span className="font-semibold text-gray-600">Días Empleados Acumulados:</span>
-                <span className="font-mono font-bold text-gray-900">{diasEmpleados} Días</span>
+                <span className="font-normal text-gray-600">Días Empleados Acumulados:</span>
+                <span className="font-mono font-normal text-gray-800">{diasTranscurridos} Días</span>
               </div>
 
-              <div className="flex justify-between py-1 border-b border-gray-100 text-orange-900">
-                <span className="font-semibold">Días Suspendidos Validados por CIV:</span>
-                <span className="font-mono font-bold">{diasSuspendidos} Días</span>
+              <div className="flex justify-between py-1 border-b border-gray-100">
+                <span className="font-normal text-gray-600">Días Suspendidos Validados por CIV:</span>
+                <span className="font-mono font-normal text-gray-800">0 Días</span>
               </div>
 
-              <div className="flex justify-between py-1.5 bg-blue-50 px-2 rounded font-bold text-blue-900 border border-blue-200">
+              <div className="flex justify-between py-1.5 bg-gray-100 px-2 rounded font-bold text-gray-900 border border-gray-200">
                 <span>Días por Emplearse (Restantes):</span>
-                <span className="font-mono font-black">{diasPorEmplearse} Días</span>
+                <span className="font-mono font-bold">{diasPorEmplearse} Días</span>
               </div>
 
-              <div className="flex justify-between py-1 border-t border-gray-100 font-semibold text-gray-700">
+              <div className="flex justify-between py-1 border-t border-gray-100 font-normal text-gray-600">
                 <span>Fecha de Finalización Actualizada:</span>
-                <span className="font-mono font-bold text-[#9B0F06]">30 de Noviembre de 2026</span>
+                <span className="font-mono font-normal text-gray-800">
+                  {proyecto?.fechaFin || (proyecto as any)?.fechaFinContractualPlan || 'No registrada'}
+                </span>
               </div>
             </div>
 
@@ -1147,7 +1202,7 @@ export function ProyectoTimeline({
               <button
                 type="button"
                 onClick={() => setModalKpiPlazoOpen(false)}
-                className="rounded bg-gray-100 px-3 py-1 text-xs font-bold text-gray-700 hover:bg-gray-200"
+                className="rounded bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-200"
               >
                 Cerrar Detalle
               </button>

@@ -10,10 +10,12 @@ export interface ComboboxProps {
   placeholder?: string
   className?: string
   disabled?: boolean
+  hasError?: boolean
   emptyAction?: { label?: string; onClick: () => void }
+  allowNumbers?: boolean
 }
 
-export function Combobox({ options, value, onChange, placeholder = 'Seleccionar...', className = '', disabled, emptyAction }: ComboboxProps) {
+export function Combobox({ options, value, onChange, placeholder = 'Seleccionar...', className = '', disabled, hasError, emptyAction, allowNumbers = false }: ComboboxProps) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
   const wrapperRef = useRef<HTMLDivElement>(null)
@@ -54,9 +56,13 @@ export function Combobox({ options, value, onChange, placeholder = 'Seleccionar.
           placeholder={placeholder}
           value={search}
           onChange={(e) => {
-            setSearch(e.target.value)
+            let val = e.target.value
+            if (!allowNumbers) {
+              val = val.replace(/[0-9]/g, '')
+            }
+            setSearch(val)
             setOpen(true)
-            if (e.target.value === '') onChange('')
+            if (val === '') onChange('')
           }}
           onClick={(e) => {
             if (!disabled) {
@@ -64,7 +70,7 @@ export function Combobox({ options, value, onChange, placeholder = 'Seleccionar.
               ;(e.target as HTMLInputElement).select()
             }
           }}
-          className={`w-full rounded-xl border ${open ? 'border-[#9B0F06]' : 'border-gray-200'} bg-white px-3 py-2 text-xs text-gray-700 focus:border-[#9B0F06] focus:outline-none focus:ring-1 focus:ring-[#9B0F06] pr-8 ${disabled ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''}`}
+          className={`w-full rounded-xl border ${hasError ? 'border-red-500 ring-1 ring-red-400' : open ? 'border-[#9B0F06]' : 'border-gray-200'} ${disabled ? 'bg-gray-100/90 text-gray-400 font-medium cursor-not-allowed select-none' : 'bg-white text-gray-700'} px-3 py-2 text-[11px] focus:border-[#9B0F06] focus:outline-none focus:ring-1 focus:ring-[#9B0F06] pr-8`}
         />
         <button
           type="button"
@@ -74,7 +80,7 @@ export function Combobox({ options, value, onChange, placeholder = 'Seleccionar.
               if (!open) setSearch('')
             }
           }}
-          className="absolute inset-y-0 right-0 flex items-center px-2 text-gray-400 hover:text-gray-600"
+          className={`absolute inset-y-0 right-0 flex items-center px-2 ${disabled ? 'text-gray-300 cursor-not-allowed' : 'text-gray-400 hover:text-gray-600'}`}
         >
           <ChevronDown size={14} />
         </button>
@@ -84,7 +90,7 @@ export function Combobox({ options, value, onChange, placeholder = 'Seleccionar.
         <div className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-xl border border-gray-200 bg-white py-1 shadow-lg">
           <div className="px-1">
             {filteredOptions.length === 0 ? (
-              <div className="px-2 py-2 text-xs text-gray-500 text-center">No hay resultados.</div>
+              <div className="px-2 py-2 text-[11px] text-gray-500 text-center">No hay resultados.</div>
             ) : (
               filteredOptions.map(option => (
                 <button
@@ -95,7 +101,7 @@ export function Combobox({ options, value, onChange, placeholder = 'Seleccionar.
                     setSearch(option.label)
                     setOpen(false)
                   }}
-                  className={`flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left text-xs transition-colors hover:bg-gray-100 ${value === option.value ? 'bg-gray-50 font-bold text-[#9B0F06]' : 'text-gray-700'}`}
+                  className={`flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left text-[11px] transition-colors hover:bg-gray-100 ${value === option.value ? 'bg-gray-50 font-bold text-[#9B0F06]' : 'text-gray-700'}`}
                 >
                   {option.label}
                   {value === option.value && <Check size={12} className="text-[#9B0F06]" />}

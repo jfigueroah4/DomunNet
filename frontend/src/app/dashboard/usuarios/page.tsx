@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { Plus, Users, Shield, Search, Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
-import { useRolesStore, RolMinimo } from '@/stores/useRolesStore'
+import { useRolesStore } from '@/stores/useRolesStore'
 
 import { api } from '@/lib/api/cliente'
 
@@ -25,9 +25,11 @@ const UsuarioDeleteModal = dynamic(() => import('@/components/modules/usuarios/U
 
 
 
-export default function UsuariosPage() {
+import { useAuthStore } from '@/stores/useAuthStore'
 
+export default function UsuariosPage() {
   const { roles, fetchRoles } = useRolesStore()
+  const profile = useAuthStore((state) => state.profile)
 
 
 
@@ -115,24 +117,35 @@ export default function UsuariosPage() {
 
 
 
-  // Map "Desactivado" UI to "Suspendido" internal state and vice versa for filtering
+  // Map effective state: Activo = currently using system, Inactivo = offline/not in system, Suspendido = suspended account
+  const usuariosConEstadoEfectivo = useMemo(() => {
+    return usuarios.map((u) => {
+      const isCuentaActiva = (u as any).activo !== false && u.estado !== 'Suspendido' && (u as any).estado !== 'Desactivado'
+      if (!isCuentaActiva) {
+        return { ...u, estado: 'Suspendido' as EstadoUsuario }
+      }
+      const isCurrentlyInSystem = profile && (
+        (u.id && u.id === profile.id) ||
+        (u.correo && profile.correo && u.correo.toLowerCase() === profile.correo.toLowerCase())
+      )
+      return {
+        ...u,
+        estado: (isCurrentlyInSystem ? 'Activo' : 'Inactivo') as EstadoUsuario
+      }
+    })
+  }, [usuarios, profile])
 
   const usuariosFiltrados = useMemo(() => {
-    return usuarios.filter((usuario) => {
+    return usuariosConEstadoEfectivo.filter((usuario) => {
       const nombreCompleto = `${usuario.primer_nombre} ${usuario.segundo_nombre || ''} ${usuario.primer_apellido} ${usuario.segundo_apellido || ''}`.replace(/\s+/g, ' ').trim()
       const cumpleBusqueda =
         nombreCompleto.toLowerCase().includes(debouncedBusqueda.toLowerCase()) ||
         usuario.correo.toLowerCase().includes(debouncedBusqueda.toLowerCase())
       const cumpleRol = filtroRol === 'Todos' || usuario.rol === filtroRol
-            let estadoAFiltrar = filtroEstado;
-
-      if (filtroEstado as any === 'Desactivado') estadoAFiltrar = 'Suspendido';
-      const cumpleEstado = filtroEstado === 'Todos' || usuario.estado === estadoAFiltrar
+      const cumpleEstado = filtroEstado === 'Todos' || usuario.estado === filtroEstado
       return cumpleBusqueda && cumpleRol && cumpleEstado
-
     })
-
-  }, [usuarios, debouncedBusqueda, filtroRol, filtroEstado])
+  }, [usuariosConEstadoEfectivo, debouncedBusqueda, filtroRol, filtroEstado])
 
 
 
@@ -209,33 +222,18 @@ export default function UsuariosPage() {
     try {
 
       // Construir payload solo con los campos que el backend espera
-
       const payloadApi: Record<string, unknown> = {
-
         primer_nombre: payload.primer_nombre,
-
         segundo_nombre: payload.segundo_nombre || null,
-
         primer_apellido: payload.primer_apellido,
-
         segundo_apellido: payload.segundo_apellido || null,
-
         correo: payload.correo,
-
         telefono: payload.telefono || '',
-
         rol: payload.rol,
-
-        // El backend solo acepta 'Activo' | 'Inactivo'; 'Suspendido' se mapea a 'Inactivo'
-
-        estado: payload.estado === 'Suspendido' ? 'Inactivo' : payload.estado,
-
+        estado: payload.estado,
         username: payload.username || null,
-
         fecha_nacimiento: payload.fecha_nacimiento || null,
-
         direccion: payload.direccion || null,
-
       }
 
       // Solo incluir contrasena si tiene valor (min 6 chars requerido por el backend)
@@ -308,61 +306,63 @@ export default function UsuariosPage() {
 
 
   const handleConfirmarEliminar = async (accion: 'eliminar' | 'suspender' | 'activar') => {
-
     if (!usuarioEliminar) return
 
+    if (accion === 'eliminar' && String(usuarioEliminar.rol) === 'Administrador' && String(profile?.rol) !== 'Administrador') {
+      showErrorToast('No tienes permisos para eliminar usuarios con rol Administrador.')
+      setDeleteOpen(false)
+      setUsuarioEliminar(undefined)
+      return
+    }
+
     try {
-
-      if (accion === 'suspender') {
-
+      if (accion === 'activar' || accion === 'suspender') {
+        const nuevoEstado = accion === 'activar' ? 'Activo' : 'Suspendido'
         await api.put(`/usuarios/${usuarioEliminar.id}`, {
-
           primer_nombre: usuarioEliminar.primer_nombre,
-
           segundo_nombre: usuarioEliminar.segundo_nombre || null,
-
           primer_apellido: usuarioEliminar.primer_apellido,
-
           segundo_apellido: usuarioEliminar.segundo_apellido || null,
-
           correo: usuarioEliminar.correo,
-
           telefono: usuarioEliminar.telefono || '',
-
           rol: usuarioEliminar.rol,
-
-          estado: 'Inactivo', // El backend solo acepta 'Activo' | 'Inactivo'
-
+          estado: nuevoEstado,
         })
-
-        showSuccessToast('Usuario suspendido exitosamente')
-
+        showSuccessToast(accion === 'activar' ? 'Usuario activado exitosamente' : 'Usuario suspendido exitosamente')
       } else {
-
         await api.delete(`/usuarios/${usuarioEliminar.id}`)
-
         showSuccessToast('Usuario eliminado exitosamente')
-
       }
 
       await cargarUsuarios()
-
       fetchRoles()
-
     } catch (error) {
-
       console.error(`Error al ${accion} usuario:`, error)
-
       showErrorToast(`No se pudo ${accion} el usuario.`)
-
     } finally {
-
       setDeleteOpen(false)
-
       setUsuarioEliminar(undefined)
-
     }
+  }
 
+  const handleCerrarSesionUsuario = async (usuario: Usuario) => {
+    try {
+      await api.put(`/usuarios/${usuario.id}`, {
+        primer_nombre: usuario.primer_nombre,
+        segundo_nombre: usuario.segundo_nombre || null,
+        primer_apellido: usuario.primer_apellido,
+        segundo_apellido: usuario.segundo_apellido || null,
+        correo: usuario.correo,
+        telefono: usuario.telefono || '',
+        rol: usuario.rol,
+        estado: 'Inactivo',
+      })
+      showSuccessToast(`Sesión cerrada exitosamente para ${usuario.nombre || usuario.correo}`)
+      await cargarUsuarios()
+    } catch (error) {
+      console.error('Error al cerrar sesión del usuario:', error)
+      showErrorToast('No se pudo cerrar la sesión del usuario.')
+    }
   }
 
 
@@ -465,7 +465,7 @@ export default function UsuariosPage() {
 
           <div className="flex items-center gap-0.5 bg-gray-100 p-0.5 rounded-lg">
 
-            {['Todos', 'Activo', 'Inactivo', 'Desactivado'].map((estado) => (
+            {['Todos', 'Activo', 'Inactivo', 'Suspendido'].map((estado) => (
 
               <button
 
@@ -496,23 +496,31 @@ export default function UsuariosPage() {
 
 
           <select
-
             value={filtroRol}
-
             onChange={(e) => setFiltroRol(e.target.value as RolUsuario | 'Todos')}
-
             className="h-8 rounded-md border border-gray-200 bg-white px-2 text-[10px] text-gray-600 focus:border-[#9B0F06] focus:outline-none cursor-pointer"
-
           >
-
             <option value="Todos">Todos los roles</option>
-
-            {roles.map((rol: RolMinimo) => (
-
-              <option key={rol.id} value={rol.nombre}>{rol.nombre}</option>
-
-            ))}
-
+            {(() => {
+              const fallbackRoles = [
+                { id: 'r1', nombre: 'Administrador' },
+                { id: 'r2', nombre: 'Gerencia' },
+                { id: 'r3', nombre: 'IngenieroResidente' },
+                { id: 'r4', nombre: 'Laboratorista' },
+                { id: 'r5', nombre: 'AuxiliarDeCampo' },
+                { id: 'r6', nombre: 'Supervisor' },
+                { id: 'r7', nombre: 'Inspector' },
+                { id: 'r8', nombre: 'Campo' },
+                { id: 'r9', nombre: 'Proveedor' },
+                { id: 'r10', nombre: 'Delegado Residente' },
+              ]
+              const listaBase = roles && roles.length > 0 ? roles : fallbackRoles
+              return listaBase
+                .filter((r: any) => String(r.nombre).toLowerCase() !== 'contratante')
+                .map((rol: any) => (
+                  <option key={rol.id || rol.nombre} value={rol.nombre}>{rol.nombre}</option>
+                ))
+            })()}
           </select>
 
         </div>
@@ -544,15 +552,11 @@ export default function UsuariosPage() {
         <div className="space-y-4">
 
           <UsuarioTabla
-
             usuarios={usuariosPaginados}
-
             onVer={handleVer}
-
             onEditar={handleEditar}
-
             onEliminar={handleEliminar}
-
+            onCerrarSesion={handleCerrarSesionUsuario}
           />
 
           

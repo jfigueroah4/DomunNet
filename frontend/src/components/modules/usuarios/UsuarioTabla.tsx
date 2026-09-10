@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useMemo } from 'react'
-import { Trash2, Edit2, Eye } from 'lucide-react'
+import { Trash2, Edit2, Eye, UserX, LogOut } from 'lucide-react'
 import { Usuario } from '@/types/usuario'
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useRolesStore } from '@/stores/useRolesStore';
@@ -13,6 +13,7 @@ interface UsuarioTablaProps {
   onVer: (usuario: Usuario) => void
   onEditar: (usuario: Usuario) => void
   onEliminar: (id: string) => void
+  onCerrarSesion?: (usuario: Usuario) => void
 }
 
 export const UsuarioTabla = React.memo(function UsuarioTabla({
@@ -20,10 +21,12 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
   onVer,
   onEditar,
   onEliminar,
+  onCerrarSesion,
 }: UsuarioTablaProps) {
   const profile = useAuthStore((state) => state.profile);
   const roles = useRolesStore((state) => state.roles);
   const miNivel = profile?.nivel_permisos || 0;
+  const esGerenciaOAdmin = String(profile?.rol) === 'Administrador' || String(profile?.rol) === 'Gerencia';
 
   const [sortColumn, setSortColumn] = useState<string>('');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
@@ -125,8 +128,14 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
               else subtitle = usuario.rol || 'Sin rol asignado';
 
               const targetRole = roles.find(r => r.nombre === usuario.rol);
-              const targetNivel = targetRole?.nivel_permisos || 0;
-              const canEdit = targetNivel <= miNivel;
+              const targetNivel = targetRole?.nivel_permisos ?? (usuario.rol === 'Administrador' ? 100 : 0);
+              const miRolNombre = profile?.rol;
+              const esMiAdmin = miRolNombre === 'Administrador' || miNivel >= 100;
+              const esTargetAdmin = usuario.rol === 'Administrador' || targetNivel >= 100;
+
+              // Requerimiento Gerencia: Permite editar usuarios Administrador (pero no modificarles el rol), y prohíbe eliminarlos
+              const canEdit = true;
+              const canDelete = esMiAdmin ? true : (!esTargetAdmin && targetNivel <= miNivel);
 
               return (
                 <tr
@@ -167,12 +176,31 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
                       >
                         <Eye size={12} />
                       </button>
-                      <button onClick={() => canEdit && onEditar(usuario)} className={`p-1 transition-colors ${canEdit ? 'text-gray-400 hover:text-blue-600' : 'text-gray-200 cursor-not-allowed'}`} title={canEdit ? 'Editar' : 'Jerarquía insuficiente'} disabled={!canEdit}>
+                      <button onClick={() => canEdit && onEditar(usuario)} className={`p-1 transition-colors ${canEdit ? 'text-gray-400 hover:text-blue-600' : 'text-gray-200 cursor-not-allowed'}`} title={canEdit ? 'Editar' : 'No puedes editar un Administrador'} disabled={!canEdit}>
                         <Edit2 size={12} />
                       </button>
-                      <button onClick={() => canEdit && onEliminar(usuario.id)} className={`p-1 transition-colors ${canEdit ? 'text-gray-400 hover:text-red-600' : 'text-gray-200 cursor-not-allowed'}`} title={canEdit ? 'Eliminar' : 'Jerarquía insuficiente'} disabled={!canEdit}>
-                        <Trash2 size={12} />
-                      </button>
+                      {usuario.estado === 'Activo' && esGerenciaOAdmin && (
+                        <button
+                          onClick={() => onCerrarSesion?.(usuario)}
+                          className="p-1 text-gray-400 transition-colors hover:text-amber-600 cursor-pointer"
+                          title="Cerrar sesión activa del usuario"
+                        >
+                          <LogOut size={12} />
+                        </button>
+                      )}
+                      {(() => {
+                        const esActivo = usuario.estado === 'Activo'
+                        return (
+                          <button
+                            onClick={() => canDelete && onEliminar(usuario.id)}
+                            className={`p-1 transition-colors ${canDelete ? 'text-gray-400 hover:text-red-600' : 'text-gray-200 cursor-not-allowed'}`}
+                            title={canDelete ? (esActivo ? 'Desactivar usuario' : 'Eliminar usuario') : 'No tienes permisos para esta acción'}
+                            disabled={!canDelete}
+                          >
+                            {esActivo ? <UserX size={12} /> : <Trash2 size={12} />}
+                          </button>
+                        )
+                      })()}
                     </div>
                   </td>
                 </tr>

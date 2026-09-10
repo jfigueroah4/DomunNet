@@ -1,5 +1,5 @@
-﻿import { create } from 'zustand'
-import { api } from '@/lib/api/cliente'
+import { create } from 'zustand'
+import { apiGetDeduplicado } from '@/lib/api/cliente'
 import { Usuario } from '@/types/usuario'
 
 interface UsuariosState {
@@ -27,7 +27,7 @@ export const useUsuariosStore = create<UsuariosState>((set) => ({
     }
 
     const fetchUsuarios = async () => {
-      const res = await api.get('/usuarios')
+      const res = await apiGetDeduplicado('/usuarios')
       if (res.data?.success) {
         return res.data.data || []
       }

@@ -114,7 +114,7 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
 
   return (
     <aside
-      className={`hidden md:flex ${collapsed ? 'w-[72px]' : 'w-[185px]'} flex-col border-r border-gray-100 bg-white shadow-[2px_0_16px_-4px_rgba(0,0,0,0.08)] transition-all duration-300 relative z-30`}
+      className={`hidden md:flex ${collapsed ? 'w-[72px]' : 'w-[185px]'} h-screen shrink-0 flex-col border-r border-gray-100 bg-white shadow-[2px_0_16px_-4px_rgba(0,0,0,0.08)] transition-all duration-300 relative z-30`}
     >
       <div className="flex items-center justify-center border-b border-gray-100 px-3 py-4">
         <Link href="/" className="inline-flex items-center justify-center" aria-label="Ir al inicio">
@@ -206,10 +206,10 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
           onClick={() => {
             window.location.href = '/login'
           }}
-          className="flex w-full items-center justify-center gap-2 rounded-[10px] bg-[#D53E0F] py-2.5 text-[11px] font-medium text-white transition-colors hover:bg-[#B53000]"
+          className="flex w-full items-center justify-center gap-2 rounded-[10px] bg-transparent py-2.5 text-[11px] font-bold text-[#9B0F06] hover:bg-red-50/60 transition-colors cursor-pointer"
           title={collapsed ? 'Cerrar sesión' : undefined}
         >
-          <LogOut size={13} />
+          <LogOut size={13} className="text-[#9B0F06]" />
           {!collapsed && <span>Cerrar sesión</span>}
         </button>
       </div>

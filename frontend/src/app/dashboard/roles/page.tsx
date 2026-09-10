@@ -1,8 +1,8 @@
-﻿'use client'
+'use client'
 
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
-import { Plus, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Plus, ChevronLeft, ChevronRight, ArrowLeft } from 'lucide-react'
 
 import { type RoleDrawerMode } from '@/components/modules/roles/RoleDrawer'
 import { showSuccessToast } from '@/hooks/useCustomToast'
@@ -178,7 +178,8 @@ export default function RolesPage() {
             href="/dashboard/usuarios"
             className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-[11px] font-semibold rounded-lg transition-colors shadow-2xs"
           >
-            ← Volver a Usuarios
+            <ArrowLeft size={14} />
+            <span>Volver a Usuarios</span>
           </Link>
           <button
             onClick={() => abrirDrawer('create')}

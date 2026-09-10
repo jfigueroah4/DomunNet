@@ -12,7 +12,7 @@ import {
 
 const router = Router()
 
-router.get('/', autenticarSolicitud, requierePermisos('roles.read'), listarRolesControlador)
+router.get('/', autenticarSolicitud, listarRolesControlador)
 router.get('/:id', autenticarSolicitud, requierePermisos('roles.read'), obtenerRolControlador)
 router.post('/', autenticarSolicitud, requierePermisos('roles.write'), crearRolControlador)
 router.put('/:id', autenticarSolicitud, requierePermisos('roles.write'), actualizarRolControlador)

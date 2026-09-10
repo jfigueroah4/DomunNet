@@ -40,38 +40,48 @@ export async function obtenerEntidadContratante(id: string) {
   return { ...data, contactos, proyectos_vinculados: await contarProyectos(id, contactos.map(c => c.id)) }
 }
 
-function contactoUsuario(payload: EntidadContratantePayload['contacto']) {
+function contactoUsuario(c: NonNullable<EntidadContratantePayload['contacto']>) {
   return {
-    primer_nombre: payload.primer_nombre,
-    segundo_nombre: payload.segundo_nombre || '',
-    primer_apellido: payload.primer_apellido,
-    segundo_apellido: payload.segundo_apellido || '',
-    correo: payload.correo,
-    telefono: payload.telefono,
+    primer_nombre: c.primer_nombre,
+    segundo_nombre: c.segundo_nombre || '',
+    primer_apellido: c.primer_apellido,
+    segundo_apellido: c.segundo_apellido || '',
+    correo: c.correo,
+    telefono: c.telefono,
     rol: 'Contratante',
     estado: 'Activo' as const,
-    username: payload.username,
-    contrasena: payload.password,
-    fecha_nacimiento: payload.fecha_nacimiento,
-    direccion: payload.direccion,
+    username: c.username,
+    contrasena: c.password || undefined,
+    fecha_nacimiento: c.fecha_nacimiento,
+    direccion: c.direccion,
   }
 }
 
 export async function crearEntidadContratante(payload: EntidadContratantePayload) {
-  const usuario = await crearUsuario(contactoUsuario(payload.contacto))
-  if (!usuario) throw new Error('No se pudo crear el usuario del contacto')
+  let usuarioId: string | null = null
+  if (payload.contacto && payload.contacto.primer_nombre && payload.contacto.correo) {
+    const usuario = await crearUsuario(contactoUsuario(payload.contacto))
+    if (!usuario) throw new Error('No se pudo crear el usuario del contacto')
+    usuarioId = usuario.id
+  }
   try {
     const { data, error } = await clienteSupabase.from('entidad_contratante').insert({
       nombre: payload.nombre, nit: payload.nit, direccion: payload.direccion,
       telefono: payload.telefono, correo_institucional: payload.correo_institucional, activo: payload.activo,
     }).select('id').single()
     if (error) throw new Error(error.message)
-    const nombre = [payload.contacto.primer_nombre, payload.contacto.segundo_nombre, payload.contacto.primer_apellido, payload.contacto.segundo_apellido].filter(Boolean).join(' ')
-    const contacto = await clienteSupabase.from('contacto_entidad').insert({ entidad_contratante_id: data.id, usuario_id: usuario.id, cargo: payload.contacto.cargo }).select('id').single()
-    if (contacto.error) throw new Error(contacto.error.message)
+
+    if (usuarioId && payload.contacto) {
+      const contacto = await clienteSupabase.from('contacto_entidad').insert({
+        entidad_contratante_id: data.id,
+        usuario_id: usuarioId,
+        cargo: payload.contacto.cargo || 'Representante'
+      }).select('id').single()
+      if (contacto.error) throw new Error(contacto.error.message)
+    }
     return obtenerEntidadContratante(data.id)
   } catch (error) {
-    await eliminarUsuario(usuario.id)
+    if (usuarioId) await eliminarUsuario(usuarioId)
     throw error
   }
 }
@@ -85,21 +95,21 @@ export async function actualizarEntidadContratante(id: string, payload: EntidadC
   if (error) throw new Error(error.message)
   const actual = await obtenerEntidadContratante(id)
   const contacto = actual.contactos[0]
-  if (contacto?.usuario_id) {
+  if (contacto?.usuario_id && payload.contacto) {
     await actualizarContacto(contacto.usuario_id, contacto.id, id, payload.contacto)
   }
   return obtenerEntidadContratante(id)
 }
 
-async function actualizarContacto(usuarioId: string, contactoId: string, entidadId: string, payload: EntidadContratantePayload['contacto']) {
+async function actualizarContacto(usuarioId: string, contactoId: string, entidadId: string, c: NonNullable<EntidadContratantePayload['contacto']>) {
   const { error: usuarioError } = await clienteSupabase.from('dato_usuario').update({
-    primer_nombre: payload.primer_nombre, segundo_nombre: payload.segundo_nombre || null,
-    primer_apellido: payload.primer_apellido, segundo_apellido: payload.segundo_apellido || null,
-    telefono: payload.telefono, email: payload.correo, username: payload.username,
-    fecha_nacimiento: payload.fecha_nacimiento, direccion: payload.direccion, updated_at: new Date().toISOString(),
+    primer_nombre: c.primer_nombre, segundo_nombre: c.segundo_nombre || null,
+    primer_apellido: c.primer_apellido, segundo_apellido: c.segundo_apellido || null,
+    telefono: c.telefono, email: c.correo, username: c.username,
+    fecha_nacimiento: c.fecha_nacimiento, direccion: c.direccion, updated_at: new Date().toISOString(),
   }).eq('usuario_id', usuarioId)
   if (usuarioError) throw new Error(usuarioError.message)
-  const { error } = await clienteSupabase.from('contacto_entidad').update({ cargo: payload.cargo, updated_at: new Date().toISOString() }).eq('id', contactoId).eq('entidad_contratante_id', entidadId)
+  const { error } = await clienteSupabase.from('contacto_entidad').update({ cargo: c.cargo, updated_at: new Date().toISOString() }).eq('id', contactoId).eq('entidad_contratante_id', entidadId)
   if (error) throw new Error(error.message)
 }
 

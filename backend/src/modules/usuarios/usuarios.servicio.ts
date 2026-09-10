@@ -3,7 +3,7 @@ import { clienteSupabase } from '@/configuracion/cliente-supabase'
 export interface FiltrosUsuarios {
   busqueda?: string
   rol?: string
-  estado?: 'Activo' | 'Inactivo' | 'Todos'
+  estado?: 'Activo' | 'Inactivo' | 'Suspendido' | 'Todos'
 }
 
 export interface DatosUsuario {
@@ -14,7 +14,7 @@ export interface DatosUsuario {
   correo: string
   telefono: string
   rol: string
-  estado: 'Activo' | 'Inactivo'
+  estado: 'Activo' | 'Inactivo' | 'Suspendido'
   contrasena?: string
   proyectosAsignados?: string[]
   username?: string | null
@@ -78,6 +78,13 @@ export function mapearUsuario(fila: FilaUsuarioJoin, nombreRol: string | null) {
         .filter(Boolean)
         .join(' ') || 'Sin Nombre'
     : 'Sin Nombre'
+
+  let estadoCalculado: 'Activo' | 'Inactivo' | 'Suspendido' = 'Suspendido'
+  if (fila.activo) {
+    const haIngresado = fila.ultimo_acceso !== null && fila.ultimo_acceso !== undefined && fila.ultimo_acceso !== ''
+    estadoCalculado = haIngresado ? 'Activo' : 'Inactivo'
+  }
+
   return {
     id: fila.id,
     primer_nombre: dato?.primer_nombre || '',
@@ -91,7 +98,7 @@ export function mapearUsuario(fila: FilaUsuarioJoin, nombreRol: string | null) {
     direccion: dato?.direccion || '',
     fecha_nacimiento: dato?.fecha_nacimiento || null,
     rol: nombreRol || 'Sin asignar',
-    estado: fila.activo ? 'Activo' : 'Inactivo',
+    estado: estadoCalculado,
     proyectosAsignados: [],
     ultimoAcceso: formatearFecha(fila.ultimo_acceso),
     fechaCreacion: formatearFecha(fila.fecha_registro),
@@ -133,7 +140,12 @@ export async function listarUsuarios(filtros: FiltrosUsuarios = {}) {
     const dato = Array.isArray(usuario.dato_usuario) ? usuario.dato_usuario[0] : usuario.dato_usuario
     const nombreCompleto = dato ? `${dato.primer_nombre} ${dato.segundo_nombre || ''} ${dato.primer_apellido} ${dato.segundo_apellido || ''}`.replace(/\s+/g, ' ').trim() : ''
     const nombreRol = usuario.rol_id ? mapaRoles.get(usuario.rol_id) || 'Sin asignar' : 'Sin asignar'
-    const estadoStr = usuario.activo ? 'Activo' : 'Inactivo'
+    
+    let estadoStr: 'Activo' | 'Inactivo' | 'Suspendido' = 'Suspendido'
+    if (usuario.activo) {
+      const haIngresado = usuario.ultimo_acceso !== null && usuario.ultimo_acceso !== undefined && usuario.ultimo_acceso !== ''
+      estadoStr = haIngresado ? 'Activo' : 'Inactivo'
+    }
 
     const cumpleBusqueda =
       !busqueda ||
@@ -292,7 +304,7 @@ export async function crearUsuario(datos: DatosUsuario) {
       auth_user_id: cuentaAuth.user.id,
       correo: datos.correo,
       rol_id: rol.id,
-      activo: datos.estado === 'Activo',
+      activo: datos.estado !== 'Suspendido',
     })
     .select('id')
     .single()
@@ -387,7 +399,7 @@ export async function actualizarUsuario(id: string, datos: DatosUsuario) {
   const payloadUsuario: Record<string, unknown> = {
     correo: datos.correo,
     rol_id: rol.id,
-    activo: datos.estado === 'Activo',
+    activo: datos.estado !== 'Suspendido',
     updated_at: new Date().toISOString()
   }
 

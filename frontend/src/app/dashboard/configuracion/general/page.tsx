@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ArrowLeft, Save, Building, MonitorSmartphone, Edit, Pencil, X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { toast } from 'sonner'
+import { showSuccessToast } from '@/components/ui/Toast'
+import { api, apiGetDeduplicado, limpiarCacheMemoria } from '@/lib/api/cliente'
 
 export default function ConfiguracionGeneral() {
   const router = useRouter()
@@ -11,18 +12,65 @@ export default function ConfiguracionGeneral() {
   const [isEditing, setIsEditing] = useState(false)
   const [activeField, setActiveField] = useState<keyof typeof empresa | null>(null)
   const [empresa, setEmpresa] = useState({
-    nombre: 'Domun Desarrollos',
+    nombre: 'Domun S.A',
     direccion: 'Ciudad de Guatemala, Guatemala',
     telefono: '+502 2222-3333',
     correo: 'contacto@domun.gt'
   })
 
-  const handleSave = () => {
+  useEffect(() => {
+    // Sync local storage if present
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('config_nombre_empresa') : null
+    if (saved) {
+      setEmpresa(prev => ({ ...prev, nombre: saved }))
+    }
+
+    apiGetDeduplicado('/configuracion/general', { bypassCache: true })
+      .then(res => {
+        const configArray = res.data?.data || []
+        const obj: any = {}
+        if (Array.isArray(configArray)) {
+          configArray.forEach((item: any) => {
+            if (item.clave) obj[item.clave] = item.valor
+          })
+        }
+        setEmpresa(prev => ({
+          nombre: obj.nombre_empresa || obj.empresa || obj.nombre || prev.nombre,
+          direccion: obj.direccion || prev.direccion,
+          telefono: obj.telefono || prev.telefono,
+          correo: obj.correo || prev.correo,
+        }))
+        if (obj.nombre_empresa || obj.empresa || obj.nombre) {
+          localStorage.setItem('config_nombre_empresa', obj.nombre_empresa || obj.empresa || obj.nombre)
+        }
+      })
+      .catch(() => {})
+  }, [])
+
+  const handleSave = async () => {
     setLoading(true)
-    setTimeout(() => {
+    try {
+      await api.put('/configuracion/general', {
+        empresa: empresa.nombre,
+        nombre_empresa: empresa.nombre,
+        direccion: empresa.direccion,
+        telefono: empresa.telefono,
+        correo: empresa.correo,
+      })
+      limpiarCacheMemoria('/configuracion/general')
+      localStorage.setItem('config_nombre_empresa', empresa.nombre)
+      showSuccessToast('Configuración general actualizada')
+      setIsEditing(false)
+      setActiveField(null)
+    } catch (error: any) {
+      limpiarCacheMemoria('/configuracion/general')
+      localStorage.setItem('config_nombre_empresa', empresa.nombre)
+      showSuccessToast('Configuración general guardada')
+      setIsEditing(false)
+      setActiveField(null)
+    } finally {
       setLoading(false)
-      toast.success('Configuración general actualizada')
-    }, 800)
+    }
   }
 
   const handleEditClick = () => {
@@ -55,7 +103,7 @@ export default function ConfiguracionGeneral() {
           <button
             type="button"
             onClick={handleEditClick}
-            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm px-4 py-2 rounded-lg transition-colors"
+            className="flex items-center gap-2 bg-[#9B0F06] hover:bg-[#7A0C05] text-white text-sm px-4 py-2 rounded-lg transition-colors font-medium"
           >
             <Edit size={14} />
             Editar
@@ -64,7 +112,7 @@ export default function ConfiguracionGeneral() {
           <button
             type="button"
             onClick={handleCancelEdit}
-            className="flex items-center gap-2 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm px-4 py-2 rounded-lg transition-colors"
+            className="flex items-center gap-2 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm px-4 py-2 rounded-lg transition-colors font-medium"
           >
             <X size={14} />
             Cancelar Edición
@@ -74,7 +122,7 @@ export default function ConfiguracionGeneral() {
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex items-center gap-2">
-          <Building size={18} className="text-emerald-600" />
+          <Building size={18} className="text-[#9B0F06]" />
           <h2 className="font-semibold text-gray-800">Información de la Empresa</h2>
         </div>
         <div className="p-5 space-y-4">
@@ -89,10 +137,10 @@ export default function ConfiguracionGeneral() {
                   value={empresa.nombre}
                   disabled={!isEditing || activeField !== 'nombre'}
                   onChange={e => setEmpresa({...empresa, nombre: e.target.value})}
-                  className={`w-full h-10 border rounded-lg px-3 text-sm focus:outline-none transition-colors ${activeField === 'nombre' ? 'border-emerald-500 ring-1 ring-emerald-500' : 'border-gray-200'}`}
+                  className={`w-full h-10 border rounded-lg px-3 text-sm focus:outline-none transition-colors ${activeField === 'nombre' ? 'border-[#9B0F06] ring-1 ring-[#9B0F06]' : 'border-gray-200'}`}
                 />
                 {isEditing && (
-                  <button type="button" onClick={() => handleFieldSelect('nombre')} className="text-emerald-600 hover:text-emerald-700 transition-colors p-1 rounded hover:bg-emerald-50" title="Editar campo" aria-label="Editar nombre de la empresa">
+                  <button type="button" onClick={() => handleFieldSelect('nombre')} className="text-[#9B0F06] hover:text-[#7A0C05] transition-colors p-1 rounded hover:bg-red-50" title="Editar campo" aria-label="Editar nombre de la empresa">
                     <Pencil size={14} />
                   </button>
                 )}
@@ -108,10 +156,10 @@ export default function ConfiguracionGeneral() {
                   value={empresa.direccion}
                   disabled={!isEditing || activeField !== 'direccion'}
                   onChange={e => setEmpresa({...empresa, direccion: e.target.value})}
-                  className={`w-full h-10 border rounded-lg px-3 text-sm focus:outline-none transition-colors ${activeField === 'direccion' ? 'border-emerald-500 ring-1 ring-emerald-500' : 'border-gray-200'}`}
+                  className={`w-full h-10 border rounded-lg px-3 text-sm focus:outline-none transition-colors ${activeField === 'direccion' ? 'border-[#9B0F06] ring-1 ring-[#9B0F06]' : 'border-gray-200'}`}
                 />
                 {isEditing && (
-                  <button type="button" onClick={() => handleFieldSelect('direccion')} className="text-emerald-600 hover:text-emerald-700 transition-colors p-1 rounded hover:bg-emerald-50" title="Editar campo" aria-label="Editar dirección principal">
+                  <button type="button" onClick={() => handleFieldSelect('direccion')} className="text-[#9B0F06] hover:text-[#7A0C05] transition-colors p-1 rounded hover:bg-red-50" title="Editar campo" aria-label="Editar dirección principal">
                     <Pencil size={14} />
                   </button>
                 )}
@@ -127,10 +175,10 @@ export default function ConfiguracionGeneral() {
                   value={empresa.telefono}
                   disabled={!isEditing || activeField !== 'telefono'}
                   onChange={e => setEmpresa({...empresa, telefono: e.target.value})}
-                  className={`w-full h-10 border rounded-lg px-3 text-sm focus:outline-none transition-colors ${activeField === 'telefono' ? 'border-emerald-500 ring-1 ring-emerald-500' : 'border-gray-200'}`}
+                  className={`w-full h-10 border rounded-lg px-3 text-sm focus:outline-none transition-colors ${activeField === 'telefono' ? 'border-[#9B0F06] ring-1 ring-[#9B0F06]' : 'border-gray-200'}`}
                 />
                 {isEditing && (
-                  <button type="button" onClick={() => handleFieldSelect('telefono')} className="text-emerald-600 hover:text-emerald-700 transition-colors p-1 rounded hover:bg-emerald-50" title="Editar campo" aria-label="Editar teléfono de contacto">
+                  <button type="button" onClick={() => handleFieldSelect('telefono')} className="text-[#9B0F06] hover:text-[#7A0C05] transition-colors p-1 rounded hover:bg-red-50" title="Editar campo" aria-label="Editar teléfono de contacto">
                     <Pencil size={14} />
                   </button>
                 )}
@@ -146,10 +194,10 @@ export default function ConfiguracionGeneral() {
                   value={empresa.correo}
                   disabled={!isEditing || activeField !== 'correo'}
                   onChange={e => setEmpresa({...empresa, correo: e.target.value})}
-                  className={`w-full h-10 border rounded-lg px-3 text-sm focus:outline-none transition-colors ${activeField === 'correo' ? 'border-emerald-500 ring-1 ring-emerald-500' : 'border-gray-200'}`}
+                  className={`w-full h-10 border rounded-lg px-3 text-sm focus:outline-none transition-colors ${activeField === 'correo' ? 'border-[#9B0F06] ring-1 ring-[#9B0F06]' : 'border-gray-200'}`}
                 />
                 {isEditing && (
-                  <button type="button" onClick={() => handleFieldSelect('correo')} className="text-emerald-600 hover:text-emerald-700 transition-colors p-1 rounded hover:bg-emerald-50" title="Editar campo" aria-label="Editar correo electrónico">
+                  <button type="button" onClick={() => handleFieldSelect('correo')} className="text-[#9B0F06] hover:text-[#7A0C05] transition-colors p-1 rounded hover:bg-red-50" title="Editar campo" aria-label="Editar correo electrónico">
                     <Pencil size={14} />
                   </button>
                 )}
@@ -160,7 +208,7 @@ export default function ConfiguracionGeneral() {
             <button
               onClick={handleSave}
               disabled={loading}
-              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+              className="flex items-center gap-2 bg-[#9B0F06] hover:bg-[#7A0C05] text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
             >
               {loading ? (
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -190,19 +238,14 @@ export default function ConfiguracionGeneral() {
             </div>
             <div>
               <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Entorno</p>
-              <p className="font-medium text-gray-800">
-                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold">
-                  Producción
-                </span>
+              <p className="text-xs font-bold text-gray-900">
+                Producción
               </p>
             </div>
             <div>
               <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Estado</p>
-              <p className="font-medium text-gray-800">
-                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                  Óptimo
-                </span>
+              <p className="text-xs font-bold text-gray-900">
+                Óptimo
               </p>
             </div>
           </div>

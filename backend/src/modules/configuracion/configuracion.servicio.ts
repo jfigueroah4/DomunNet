@@ -6,7 +6,6 @@ export async function obtenerConfiguracionGeneral() {
   const { data, error } = await clienteSupabase
     .from('configuracion_general')
     .select('id, clave, valor, categoria, updated_at, cambiado_por')
-    .eq('categoria', 'empresa')
 
   if (error) throw new Error(error.message)
 
@@ -15,11 +14,24 @@ export async function obtenerConfiguracionGeneral() {
 
 export async function actualizarConfiguracionGeneral(datos: Record<string, string>) {
   for (const [clave, valor] of Object.entries(datos)) {
-    const { error } = await clienteSupabase
+    const { data: updated } = await clienteSupabase
       .from('configuracion_general')
-      .upsert({ clave, valor, categoria: 'empresa' })
+      .update({ valor })
+      .eq('clave', clave)
+      .select()
 
-    if (error) throw new Error(error.message)
+    if (!updated || updated.length === 0) {
+      await clienteSupabase
+        .from('configuracion_general')
+        .insert({ clave, valor, categoria: 'empresa' })
+    }
+  }
+
+  const nombreVal = datos.empresa || datos.nombre_empresa || datos.nombre
+  if (nombreVal) {
+    await clienteSupabase.from('configuracion_general').update({ valor: nombreVal }).eq('clave', 'nombre_empresa')
+    await clienteSupabase.from('configuracion_general').update({ valor: nombreVal }).eq('clave', 'empresa')
+    await clienteSupabase.from('configuracion_general').update({ valor: nombreVal }).eq('clave', 'nombre')
   }
 
   return obtenerConfiguracionGeneral()

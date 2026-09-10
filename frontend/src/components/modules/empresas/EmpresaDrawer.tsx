@@ -160,7 +160,7 @@ export function EmpresaDrawer({ isOpen, onClose, onSave, mode = 'create', empres
  if (!formData.direccion_empresa) { newErrors.direccion_empresa = true; isValid = false; }
 
  if (formData.telefono_empresa) {
- if (formData.telefono_empresa.length < 4 || formData.telefono_empresa.length > 8) {
+ if (formData.telefono_empresa.length !== 8) {
  newErrors.telefono_empresa_invalido = true; isValid = false;
  }
  }
@@ -208,9 +208,9 @@ export function EmpresaDrawer({ isOpen, onClose, onSave, mode = 'create', empres
  if (formData.primer_apellido && !regexLetras.test(formData.primer_apellido)) { newErrors.primer_apellido_invalido = true; isValid = false; }
  if (formData.segundo_apellido && !regexLetras.test(formData.segundo_apellido)) { newErrors.segundo_apellido_invalido = true; isValid = false; }
 
- if (formData.telefono_contacto && (formData.telefono_contacto.length < 4 || formData.telefono_contacto.length > 8)) { 
- newErrors.telefono_contacto_invalido = true; isValid = false; 
- }
+ if (formData.telefono_contacto && formData.telefono_contacto.length !== 8) { 
+  newErrors.telefono_contacto_invalido = true; isValid = false; 
+  }
 
  if (formData.password && formData.password.length < 8) { newErrors.password_invalido = true; isValid = false; }
 
@@ -368,7 +368,7 @@ export function EmpresaDrawer({ isOpen, onClose, onSave, mode = 'create', empres
  className={`w-full rounded-xl border ${(errors.telefono_empresa || errors.telefono_empresa_invalido) ? 'border-red-400 bg-white' : 'border-gray-200 bg-white'} px-3.5 py-2 text-xs focus:border-[#9B0F06] focus:ring-1 focus:ring-[#9B0F06] disabled:bg-gray-100 disabled:text-gray-500`}
  disabled={mode === 'view'} />
  {errors.telefono_empresa && <p className="mt-1 text-[8px] font-medium text-red-500">El teléfono es obligatorio</p>}
- {errors.telefono_empresa_invalido && <p className="mt-1 text-[8px] font-medium text-red-500">Debe tener entre 4 y 8 dígitos</p>}
+ {errors.telefono_empresa_invalido && <p className="mt-1 text-[8px] font-medium text-red-500">Debe tener 8 dígitos</p>}
  </div>
  </div>
 

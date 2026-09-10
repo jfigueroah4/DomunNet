@@ -16,6 +16,7 @@ import { api } from '@/lib/api/cliente'
 import { toast } from 'sonner'
 import { proyectoService } from '@/services/proyectos/proyecto.service'
 import { useEffect, useState } from 'react'
+import { useCustomToast } from '@/hooks/useCustomToast'
 
 
 
@@ -37,6 +38,7 @@ export function ProyectoEditorView({
 
   const { profile: user } = useAuthStore()
 
+  const { showSuccessToast, showErrorToast } = useCustomToast()
   const esEditar = modo === 'editar'
   const [proyectoReal, setProyectoReal] = useState<any>(proyectoInicial)
 
@@ -166,54 +168,43 @@ export function ProyectoEditorView({
             </h1>
 
             <p className="mt-0.5 text-[11px] text-gray-500">
-
               {esEditar
-
-                ? 'Actualice la informaciÃƒÂ³n contractual, plazos y montos del proyecto paso a paso.'
-
+                ? 'Actualice la información contractual, plazos y montos del proyecto paso a paso.'
                 : 'Ingrese los datos contractuales iniciales para el alta del proyecto en DomunNet.'}
-
             </p>
-
           </div>
-
         </div>
 
-
-
         {esEditar && (
-
           <div className="flex items-center gap-1.5 rounded-md border border-gray-200 bg-gray-100 px-2.5 py-1 font-mono text-[10px] font-medium text-gray-700 shadow-sm">
-
             <Lock size={10} className="text-gray-500" />
-
-            <span>CÃƒÂ³digo: {proyectoActual?.codigo || 'DOM-VIAL-001'}</span>
-
+            <span>Código: {proyectoActual?.codigo || 'DOM-VIAL-001'}</span>
           </div>
-
         )}
-
       </div>
 
-
-
-            <ProyectoFormulario
+      <ProyectoFormulario
         modo={modo}
         proyectoInicial={proyectoActual as any}
         onGuardar={async (proyectoData) => {
           try {
             if (modo === 'crear') {
-              const res = await api.post('/api/v1/proyectos', proyectoData)
-              toast.success('Proyecto creado y guardado en Borrador')
-              router.push('/dashboard/proyectos')
+              const res = await api.post('/proyectos', proyectoData)
+              showSuccessToast('Proyecto creado exitosamente')
+              const nuevoId = res.data?.data?.id
+              if (nuevoId) {
+                router.push(`/dashboard/proyectos/${nuevoId}`)
+              } else {
+                router.push('/dashboard/proyectos')
+              }
             } else {
-              await api.put(`/api/v1/proyectos/${proyectoActual?.id}`, proyectoData)
-              toast.success('Proyecto actualizado')
-              router.push('/dashboard/proyectos')
+              await api.put(`/proyectos/${proyectoActual?.id}`, proyectoData)
+              showSuccessToast('Proyecto actualizado exitosamente')
+              router.push(`/dashboard/proyectos/${proyectoActual?.id}`)
             }
           } catch (err: any) {
             console.error(err)
-            toast.error(err.response?.data?.message || err.message || 'Error al guardar el proyecto')
+            showErrorToast(err.response?.data?.message || err.response?.data?.error || err.message || 'Error al guardar el proyecto')
           }
         }}
       />

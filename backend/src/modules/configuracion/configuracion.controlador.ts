@@ -7,11 +7,16 @@ import {
 } from '@/modules/configuracion/configuracion.servicio';
 
 const esquemaConfiguracionGeneral = z.object({
-  empresa: z.string().min(2),
-  zonaHoraria: z.string().min(2),
-  idioma: z.string().min(2),
-  tema: z.enum(['claro', 'oscuro'])
-});
+  empresa: z.string().optional(),
+  nombre: z.string().optional(),
+  nombre_empresa: z.string().optional(),
+  direccion: z.string().optional(),
+  telefono: z.string().optional(),
+  correo: z.string().optional(),
+  zonaHoraria: z.string().optional(),
+  idioma: z.string().optional(),
+  tema: z.enum(['claro', 'oscuro']).optional(),
+}).passthrough();
 
 export async function obtenerConfiguracionGeneralControlador(
   _req: Request,
@@ -41,6 +46,6 @@ export async function actualizarConfiguracionGeneralControlador(
       }))
     );
   }
-  const configuracion = await actualizarConfiguracionGeneral(resultado.data);
+  const configuracion = await actualizarConfiguracionGeneral(resultado.data as Record<string, string>);
   return sendResponse(res, 200, configuracion, 'Configuración empresa actualizada');
 }

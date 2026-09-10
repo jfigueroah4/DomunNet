@@ -29,6 +29,12 @@ export async function obtenerEstadoIdPorCodigo(codigo: string): Promise<string> 
   return data.id
 }
 
+export function esUuidValido(val: any): string | null {
+  if (typeof val !== 'string' || !val) return null
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+  return uuidRegex.test(val.trim()) ? val.trim() : null
+}
+
 export async function actualizarEstadoProyecto(proyectoId: string, nuevoEstadoCodigo: string) {
   // 1. Validaciones de Negocio si el nuevo estado es 'activo'
   if (nuevoEstadoCodigo === 'activo') {
@@ -86,6 +92,50 @@ export async function actualizarEstadoProyecto(proyectoId: string, nuevoEstadoCo
   return true
 }
 
+async function resolverEmpresaContratanteId(val: any): Promise<string | null> {
+  if (!val || typeof val !== 'string') return null
+  const uuid = esUuidValido(val)
+  if (uuid) return uuid
+
+  const { data: ent } = await clienteSupabase
+    .from('entidad_contratante')
+    .select('id')
+    .eq('nombre', val.trim())
+    .maybeSingle()
+  if (ent?.id) return ent.id
+
+  const { data: entRel } = await clienteSupabase
+    .from('empresa_relacionada')
+    .select('id')
+    .eq('nombre', val.trim())
+    .maybeSingle()
+  if (entRel?.id) return entRel.id
+
+  return null
+}
+
+async function resolverEmpresaContratistaId(val: any): Promise<string | null> {
+  if (!val || typeof val !== 'string') return null
+  const uuid = esUuidValido(val)
+  if (uuid) return uuid
+
+  const { data: emp } = await clienteSupabase
+    .from('empresa_contratista')
+    .select('id')
+    .or(`nombre.eq.${val.trim()},razon_social.eq.${val.trim()}`)
+    .maybeSingle()
+  if (emp?.id) return emp.id
+
+  const { data: empRel } = await clienteSupabase
+    .from('empresa_relacionada')
+    .select('id')
+    .eq('nombre', val.trim())
+    .maybeSingle()
+  if (empRel?.id) return empRel.id
+
+  return null
+}
+
 export async function obtenerProyectoPorId(proyectoId: string) {
   const { data: proyecto, error: proyectoError } = await clienteSupabase
     .from('proyecto')
@@ -97,7 +147,7 @@ export async function obtenerProyectoPorId(proyectoId: string) {
 
   const { data: detalle, error: detalleError } = await clienteSupabase
     .from('proyecto_detalle')
-    .select('nombre_oficial, descripcion_proyecto, tramo, direccion, latitud, longitud, municipio_id, departamento_id, kilometro_inicio, kilometro_fin, empresa_contratante_id, empresa_contratista_id, empresa_supervisora, delegado_residente_id, fecha_adjudicacion, fecha_inicio_contractual, numero_escritura_publica, monto_original')
+    .select('nombre_oficial, descripcion_proyecto, tramo, direccion, latitud, longitud, municipio_id, departamento_id, kilometro_inicio, kilometro_fin, empresa_contratante_id, empresa_contratista_id, empresa_supervisora, delegado_residente_id, fecha_adjudicacion, fecha_inicio_contractual, numero_escritura_publica, monto_original, plazo_ejecucion_original, plazo_ejecucion_ampliado, fecha_finalizacion_real, monto_final')
     .eq('proyecto_id', proyectoId)
     .single()
 
@@ -105,14 +155,84 @@ export async function obtenerProyectoPorId(proyectoId: string) {
 
   const { data: equipoRows } = await clienteSupabase
     .from('proyecto_usuario')
-    .select('usuario_id, rol_proyecto, usuario(id, primer_nombre, primer_apellido, correo)')
+    .select('usuario_id, rol_proyecto, usuario:usuario_id(id, correo, dato_usuario(primer_nombre, primer_apellido))')
     .eq('proyecto_id', proyectoId)
 
-  const equipo = (equipoRows || []).map((row: any) => ({
-    id: row.usuario_id,
-    nombre: row.usuario ? `${row.usuario.primer_nombre || ''} ${row.usuario.primer_apellido || ''}`.trim() || row.usuario.correo : 'Usuario',
-    rol: row.rol_proyecto || 'Miembro'
-  }))
+  const equipo = (equipoRows || []).map((row: any) => {
+    const u = row.usuario
+    const dato = u?.dato_usuario
+    const nombre = dato
+      ? `${dato.primer_nombre || ''} ${dato.primer_apellido || ''}`.trim() || u?.correo
+      : u?.correo || 'Usuario'
+    return {
+      id: row.usuario_id,
+      nombre: nombre || 'Usuario',
+      rol: row.rol_proyecto || 'Miembro',
+    }
+  })
+
+  let entidadContratanteNombre = ''
+  if (detalle.empresa_contratante_id) {
+    const { data: ent0 } = await clienteSupabase
+      .from('entidad_contratante')
+      .select('nombre')
+      .eq('id', detalle.empresa_contratante_id)
+      .maybeSingle()
+    if (ent0?.nombre) {
+      entidadContratanteNombre = ent0.nombre
+    } else {
+      const { data: ent } = await clienteSupabase
+        .from('empresa_relacionada')
+        .select('nombre')
+        .eq('id', detalle.empresa_contratante_id)
+        .maybeSingle()
+      if (ent?.nombre) {
+        entidadContratanteNombre = ent.nombre
+      } else {
+        const { data: ent2 } = await clienteSupabase
+          .from('empresa_contratante')
+          .select('nombre')
+          .eq('id', detalle.empresa_contratante_id)
+          .maybeSingle()
+        if (ent2?.nombre) entidadContratanteNombre = ent2.nombre
+      }
+    }
+  }
+
+  let empresaContratistaNombre = ''
+  if (detalle.empresa_contratista_id) {
+    const { data: emp0 } = await clienteSupabase
+      .from('empresa_contratista')
+      .select('nombre')
+      .eq('id', detalle.empresa_contratista_id)
+      .maybeSingle()
+    if (emp0?.nombre) {
+      empresaContratistaNombre = emp0.nombre
+    } else {
+      const { data: emp } = await clienteSupabase
+        .from('empresa_relacionada')
+        .select('nombre')
+        .eq('id', detalle.empresa_contratista_id)
+        .maybeSingle()
+      if (emp?.nombre) {
+        empresaContratistaNombre = emp.nombre
+      }
+    }
+  }
+
+  let delegadoResidenteNombre = ''
+  if (detalle.delegado_residente_id) {
+    const { data: del } = await clienteSupabase
+      .from('usuario')
+      .select('correo, dato_usuario(primer_nombre, primer_apellido)')
+      .eq('id', detalle.delegado_residente_id)
+      .maybeSingle()
+    if (del) {
+      const dato = (del as any).dato_usuario
+      const full = dato ? `${dato.primer_nombre || ''} ${dato.primer_apellido || ''}`.trim() : ''
+      delegadoResidenteNombre = full || del.correo || ''
+    }
+  }
 
   return {
     id: proyecto.id,
@@ -133,23 +253,177 @@ export async function obtenerProyectoPorId(proyectoId: string) {
     kilometroInicio: detalle.kilometro_inicio,
     kilometroFin: detalle.kilometro_fin,
     empresaContratanteId: detalle.empresa_contratante_id ?? null,
+    entidadContratante: entidadContratanteNombre,
     empresaContratistaId: detalle.empresa_contratista_id ?? null,
+    empresaContratista: empresaContratistaNombre,
     empresaSupervisora: detalle.empresa_supervisora ?? '',
     delegadoResidenteId: detalle.delegado_residente_id ?? null,
+    delegadoResidente: delegadoResidenteNombre,
+    responsable: delegadoResidenteNombre || 'No asignado',
     fechaAdjudicacion: detalle.fecha_adjudicacion ?? '',
     fechaInicioContractual: detalle.fecha_inicio_contractual ?? '',
+    fechaInicio: proyecto.fecha_inicio ?? detalle.fecha_inicio_contractual ?? '',
+    fechaFin: proyecto.fecha_fin_estimada ?? '',
+    fechaFinContractualPlan: proyecto.fecha_fin_estimada ?? '',
     numeroEscrituraPublica: detalle.numero_escritura_publica ?? '',
     montoContractualOriginal: detalle.monto_original ?? null,
+    presupuesto: detalle.monto_original ?? 0,
+    plazoEjecucionOriginal: detalle.plazo_ejecucion_original ?? null,
+    plazoEjecucionContractualOriginal: detalle.plazo_ejecucion_original ? `${detalle.plazo_ejecucion_original} días` : '',
+    fechaFinalizacionReal: detalle.fecha_finalizacion_real ?? '',
+    plazoEjecucionRealAmpliado: detalle.plazo_ejecucion_ampliado ? `${detalle.plazo_ejecucion_ampliado} días` : '',
+    montoFinancieroFinalEjecutado: detalle.monto_final ?? null,
+    montoFinal: detalle.monto_final ?? null,
     equipo,
-    estado: 'borrador',
+    estado: await resolverCodigoEstado(proyecto.estado_id),
     paso2: {},
     paso3: {},
   }
 }
 
+async function resolverCodigoEstado(estadoId: string | null): Promise<string> {
+  if (!estadoId) return 'borrador'
+  const { data } = await clienteSupabase
+    .from('catalogo_item')
+    .select('codigo')
+    .eq('id', estadoId)
+    .maybeSingle()
+  return (data?.codigo || 'borrador').toLowerCase()
+}
+
+export async function obtenerProyectos() {
+  const [proyectosRes, estadoItemsRes] = await Promise.all([
+    clienteSupabase
+      .from('proyecto')
+      .select(`
+        id,
+        codigo,
+        nombre,
+        descripcion,
+        ubicacion,
+        responsable_id,
+        fecha_inicio,
+        fecha_fin_estimada,
+        estado_id,
+        proyecto_detalle (
+          nombre_oficial,
+          descripcion_proyecto,
+          tramo,
+          direccion,
+          municipio_id,
+          departamento_id,
+          departamento:departamento_id(id, nombre),
+          municipio:municipio_id(id, nombre),
+          kilometro_inicio,
+          kilometro_fin,
+          monto_original,
+          empresa_contratante_id,
+          empresa_contratista_id,
+          delegado_residente_id,
+          fecha_adjudicacion,
+          fecha_inicio_contractual,
+          fecha_finalizacion_real
+        )
+      `)
+      .order('created_at', { ascending: false }),
+    clienteSupabase
+      .from('catalogo_item')
+      .select('id, codigo, catalogo!inner(codigo)')
+      .eq('catalogo.codigo', 'estado_proyecto'),
+  ])
+
+  if (proyectosRes.error) {
+    console.error('Error obteniendo lista de proyectos:', proyectosRes.error)
+    return []
+  }
+
+  const estadoMapa = new Map<string, string>()
+  if (estadoItemsRes.data) {
+    for (const item of estadoItemsRes.data) {
+      estadoMapa.set(item.id, item.codigo.toLowerCase())
+    }
+  }
+
+  const delegadoIds = Array.from(
+    new Set(
+      (proyectosRes.data || [])
+        .map((p: any) => {
+          const d = Array.isArray(p.proyecto_detalle) ? p.proyecto_detalle[0] : p.proyecto_detalle || {}
+          return d.delegado_residente_id
+        })
+        .filter(Boolean)
+    )
+  )
+
+  const delegadoMapa = new Map<string, string>()
+  if (delegadoIds.length > 0) {
+    const { data: usuariosDel } = await clienteSupabase
+      .from('usuario')
+      .select('id, correo, dato_usuario(primer_nombre, primer_apellido)')
+      .in('id', delegadoIds)
+
+    if (usuariosDel) {
+      for (const u of usuariosDel) {
+        const dato = (u as any).dato_usuario
+        const full = dato ? `${dato.primer_nombre || ''} ${dato.primer_apellido || ''}`.trim() : ''
+        delegadoMapa.set(u.id, full || u.correo || '')
+      }
+    }
+  }
+
+  return (proyectosRes.data || []).map((p: any) => {
+    const d = Array.isArray(p.proyecto_detalle) ? p.proyecto_detalle[0] : p.proyecto_detalle || {}
+    const fInicio = d.fecha_inicio_contractual || p.fecha_inicio || d.fecha_adjudicacion || ''
+    const fFin = d.fecha_finalizacion_real || p.fecha_fin_estimada || ''
+    const estadoCod = p.estado_id ? (estadoMapa.get(p.estado_id) || 'borrador') : 'borrador'
+    const delegadoNombre = d.delegado_residente_id ? (delegadoMapa.get(d.delegado_residente_id) || '') : ''
+    const responsableNombre = delegadoNombre || 'No asignado'
+
+    return {
+      id: p.id,
+      codigo: p.codigo,
+      nombre: p.nombre,
+      nombreOficial: d.nombre_oficial || p.nombre,
+      descripcion: d.descripcion_proyecto || p.descripcion || '',
+      ubicacionFisica: d.tramo || d.direccion || p.ubicacion || '',
+      direccion: d.direccion || '',
+      presupuesto: d.monto_original || 0,
+      montoContractualOriginal: d.monto_original || 0,
+      fechaInicio: fInicio,
+      fechaInicioContractual: d.fecha_inicio_contractual || fInicio,
+      fechaFin: fFin,
+      fechaFinalContractual: d.fecha_finalizacion_real || fFin,
+      departamento_id: d.departamento_id,
+      municipio_id: d.municipio_id,
+      departamentoId: d.departamento_id,
+      municipioId: d.municipio_id,
+      departamentoNombre: d.departamento?.nombre || '',
+      municipioNombre: d.municipio?.nombre || '',
+      estado: estadoCod,
+      delegadoResidenteId: d.delegado_residente_id || null,
+      delegadoResidente: delegadoNombre,
+      delegado_residente: delegadoNombre,
+      responsable: responsableNombre,
+    }
+  })
+}
+
 export async function crearProyecto(datosFormulario: any) {
-  // 1. Resolver estado 'borrador' por default para nuevos proyectos
-  const estadoBorradorId = await obtenerEstadoIdPorCodigo('borrador')
+  // 1. Resolver estado ('borrador', 'activo', etc.) desde datosFormulario
+  const estadoCodigo = (datosFormulario.estado || 'borrador').toLowerCase()
+  const estadoId = await obtenerEstadoIdPorCodigo(estadoCodigo)
+
+  const fechaInicio = datosFormulario.fechaInicioContractual || datosFormulario.fechaInicio || new Date().toISOString().split('T')[0]
+  let fechaFinEstimada = datosFormulario.fechaFinContractualPlan || datosFormulario.fechaFin
+  if (!fechaFinEstimada) {
+    const dt = new Date(fechaInicio)
+    if (isNaN(dt.getTime())) {
+      fechaFinEstimada = new Date().toISOString().split('T')[0]
+    } else {
+      dt.setDate(dt.getDate() + 30)
+      fechaFinEstimada = dt.toISOString().split('T')[0]
+    }
+  }
 
   // 2. Insertar en tabla base `proyecto`
   const { data: proyecto, error: errorProyecto } = await clienteSupabase
@@ -158,13 +432,11 @@ export async function crearProyecto(datosFormulario: any) {
       codigo: datosFormulario.codigo || `PROY-${Math.floor(Math.random()*10000)}`, // Provisional
       nombre: datosFormulario.nombreOficial,
       descripcion: datosFormulario.descripcion,
-      // Se replica el mismo texto para conservar la ubicación resumida del proyecto
-      // y el tramo técnico de su ficha de detalle sincronizados durante la creación.
       ubicacion: datosFormulario.ubicacionFisica,
-      fecha_inicio: datosFormulario.fechaInicioContractual || null,
-      fecha_fin_estimada: datosFormulario.fechaFinContractualPlan || datosFormulario.fechaInicioContractual || null,
+      fecha_inicio: fechaInicio,
+      fecha_fin_estimada: fechaFinEstimada,
       responsable_id: datosFormulario.responsable || null,
-      estado_id: estadoBorradorId,
+      estado_id: estadoId,
       empresa_id: datosFormulario.empresa_id || (await clienteSupabase.from('empresa').select('id').limit(1).single()).data?.id
     })
     .select('id')
@@ -175,6 +447,12 @@ export async function crearProyecto(datosFormulario: any) {
     throw new Error('No se pudo crear el registro base del proyecto')
   }
 
+  const muniId = esUuidValido(datosFormulario.municipioId)
+  const depaId = esUuidValido(datosFormulario.departamentoId)
+  const empContratanteId = await resolverEmpresaContratanteId(datosFormulario.empresaContratanteId || datosFormulario.entidadContratante)
+  const empContratistaId = await resolverEmpresaContratistaId(datosFormulario.empresaContratistaId || datosFormulario.empresaContratista)
+  const delegadoResId = esUuidValido(datosFormulario.delegadoResidenteId)
+
   // 3. Insertar en `proyecto_detalle`
   const { error: errorDetalle } = await clienteSupabase
     .from('proyecto_detalle')
@@ -184,8 +462,8 @@ export async function crearProyecto(datosFormulario: any) {
       descripcion_proyecto: datosFormulario.descripcion,
       tramo: datosFormulario.ubicacionFisica,
       
-      municipio_id: datosFormulario.municipioId || null,
-      departamento_id: datosFormulario.departamentoId || null,
+      municipio_id: muniId,
+      departamento_id: depaId,
       kilometro_inicio: datosFormulario.kilometroInicio ?? null,
       kilometro_fin: datosFormulario.kilometroFin ?? null,
       latitud: datosFormulario.latitud || null,
@@ -193,10 +471,10 @@ export async function crearProyecto(datosFormulario: any) {
       direccion: datosFormulario.direccion || null,
       monto_final: datosFormulario.montoFinal || null,
 
-      empresa_contratante_id: datosFormulario.empresaContratanteId || null,
-      empresa_contratista_id: datosFormulario.empresaContratista || null,
+      empresa_contratante_id: empContratanteId,
+      empresa_contratista_id: empContratistaId,
       empresa_supervisora: datosFormulario.empresaSupervisora || null,
-      delegado_residente_id: datosFormulario.delegadoResidenteId || null,
+      delegado_residente_id: delegadoResId,
       fecha_adjudicacion: datosFormulario.fechaAdjudicacion || null,
       fecha_inicio_contractual: datosFormulario.fechaInicioContractual || null,
       numero_escritura_publica: datosFormulario.numeroEscrituraPublica || null,
@@ -206,8 +484,8 @@ export async function crearProyecto(datosFormulario: any) {
       fecha_finalizacion_real: datosFormulario.fechaFinalizacionReal || null
     })
 
-  if (errorDetalle) { console.error("SUPABASE ERROR:", errorDetalle); console.error("SUPABASE ERROR:", errorDetalle);
-    // Manejo de error: idealmente hacer rollback (delete) del proyecto base en un entorno sin transacciones RPC
+  if (errorDetalle) {
+    console.error("SUPABASE ERROR:", errorDetalle);
     await clienteSupabase.from('proyecto').delete().eq('id', proyecto.id)
     throw new Error('Error al insertar detalles del proyecto')
   }
@@ -215,10 +493,10 @@ export async function crearProyecto(datosFormulario: any) {
   // 4. Insertar equipo en `proyecto_usuario`
   const usuariosAInsertar: any[] = [];
   
-  if (datosFormulario.delegadoResidenteId) {
+  if (delegadoResId) {
     usuariosAInsertar.push({
       proyecto_id: proyecto.id,
-      usuario_id: datosFormulario.delegadoResidenteId,
+      usuario_id: delegadoResId,
       rol_proyecto: 'Delegado Residente'
     });
   }
@@ -256,7 +534,6 @@ export async function actualizarProyecto(proyectoId: string, datosFormulario: Re
     detalleUpdates.descripcion_proyecto = datosFormulario.descripcion
   }
   if ('ubicacionFisica' in datosFormulario) {
-    // Mantener sincronizados proyecto.ubicacion y proyecto_detalle.tramo.
     proyectoUpdates.ubicacion = datosFormulario.ubicacionFisica
     detalleUpdates.tramo = datosFormulario.ubicacionFisica
   }
@@ -267,10 +544,65 @@ export async function actualizarProyecto(proyectoId: string, datosFormulario: Re
   if ('direccion' in datosFormulario) detalleUpdates.direccion = datosFormulario.direccion
   if ('kilometroInicio' in datosFormulario) detalleUpdates.kilometro_inicio = datosFormulario.kilometroInicio
   if ('kilometroFin' in datosFormulario) detalleUpdates.kilometro_fin = datosFormulario.kilometroFin
-  if ('empresaContratanteId' in datosFormulario) detalleUpdates.empresa_contratante_id = datosFormulario.empresaContratanteId
-  if ('empresaContratista' in datosFormulario) detalleUpdates.empresa_contratista_id = datosFormulario.empresaContratista
+  if ('empresaContratanteId' in datosFormulario || 'entidadContratante' in datosFormulario) {
+    const val = await resolverEmpresaContratanteId(datosFormulario.empresaContratanteId || datosFormulario.entidadContratante)
+    if (val) detalleUpdates.empresa_contratante_id = val
+  }
+  if ('empresaContratista' in datosFormulario || 'empresaContratistaId' in datosFormulario) {
+    const val = await resolverEmpresaContratistaId(datosFormulario.empresaContratistaId || datosFormulario.empresaContratista)
+    if (val) detalleUpdates.empresa_contratista_id = val
+  }
   if ('empresaSupervisora' in datosFormulario) detalleUpdates.empresa_supervisora = datosFormulario.empresaSupervisora
-  if ('delegadoResidenteId' in datosFormulario) detalleUpdates.delegado_residente_id = datosFormulario.delegadoResidenteId
+  if ('delegadoResidenteId' in datosFormulario) {
+    const val = esUuidValido(datosFormulario.delegadoResidenteId)
+    if (val) detalleUpdates.delegado_residente_id = val
+  }
+  if ('fechaAdjudicacion' in datosFormulario && datosFormulario.fechaAdjudicacion) {
+    detalleUpdates.fecha_adjudicacion = datosFormulario.fechaAdjudicacion
+  }
+  const inicioVal = datosFormulario.fechaInicioContractual || datosFormulario.fechaInicio
+  if (inicioVal && typeof inicioVal === 'string' && inicioVal.trim() !== '') {
+    detalleUpdates.fecha_inicio_contractual = inicioVal.trim()
+    proyectoUpdates.fecha_inicio = inicioVal.trim()
+  }
+  const finVal = datosFormulario.fechaFinContractualPlan || datosFormulario.fechaFin
+  if (finVal && typeof finVal === 'string' && finVal.trim() !== '') {
+    proyectoUpdates.fecha_fin_estimada = finVal.trim()
+  }
+  if ('numeroEscrituraPublica' in datosFormulario) detalleUpdates.numero_escritura_publica = datosFormulario.numeroEscrituraPublica
+  if ('montoContractualOriginal' in datosFormulario) detalleUpdates.monto_original = datosFormulario.montoContractualOriginal
+  if ('plazoEjecucionOriginal' in datosFormulario || 'plazoEjecucionContractualOriginal' in datosFormulario) {
+    let p: number | null = null
+    const orig = datosFormulario.plazoEjecucionOriginal
+    if (typeof orig === 'number' && !isNaN(orig)) {
+      p = orig
+    } else if (typeof orig === 'string' && orig.trim() !== '' && !isNaN(parseInt(orig, 10))) {
+      p = parseInt(orig, 10)
+    } else if (typeof datosFormulario.plazoEjecucionContractualOriginal === 'string') {
+      const match = datosFormulario.plazoEjecucionContractualOriginal.match(/\((\d+)\s*días\)/i)
+      if (match && match[1]) {
+        p = parseInt(match[1], 10)
+      }
+    }
+    if (p !== null && !isNaN(p)) {
+      detalleUpdates.plazo_ejecucion_original = p
+    }
+  }
+  if ('responsable' in datosFormulario) proyectoUpdates.responsable_id = datosFormulario.responsable
+  if ('estado' in datosFormulario && datosFormulario.estado) {
+    const estadoId = await obtenerEstadoIdPorCodigo(datosFormulario.estado as string)
+    if (estadoId) proyectoUpdates.estado_id = estadoId
+  }
+  if ('fechaFinalizacionReal' in datosFormulario) {
+    detalleUpdates.fecha_finalizacion_real = datosFormulario.fechaFinalizacionReal || null
+  }
+  if ('plazoEjecucionRealAmpliado' in datosFormulario) {
+    const p = parseInt(datosFormulario.plazoEjecucionRealAmpliado as string, 10)
+    detalleUpdates.plazo_ejecucion_ampliado = isNaN(p) ? null : p
+  }
+  if ('montoFinancieroFinalEjecutado' in datosFormulario || 'montoFinal' in datosFormulario) {
+    detalleUpdates.monto_final = datosFormulario.montoFinancieroFinalEjecutado || datosFormulario.montoFinal || null
+  }
 
   if (Object.keys(proyectoUpdates).length > 0) {
     const { error } = await clienteSupabase.from('proyecto').update(proyectoUpdates).eq('id', proyectoId)
@@ -284,11 +616,13 @@ export async function actualizarProyecto(proyectoId: string, datosFormulario: Re
 
   if (Array.isArray(datosFormulario.equipo)) {
     await clienteSupabase.from('proyecto_usuario').delete().eq('proyecto_id', proyectoId)
-    const usuariosAInsertar = (datosFormulario.equipo as any[]).map((miembro) => ({
-      proyecto_id: proyectoId,
-      usuario_id: miembro.id,
-      rol_proyecto: miembro.rol || 'Miembro'
-    }))
+    const usuariosAInsertar = (datosFormulario.equipo as any[])
+      .filter((miembro) => miembro && (miembro.id || miembro.usuarioId))
+      .map((miembro) => ({
+        proyecto_id: proyectoId,
+        usuario_id: miembro.id || miembro.usuarioId,
+        rol_proyecto: miembro.rol || 'Miembro'
+      }))
     if (usuariosAInsertar.length > 0) {
       const { error: errEq } = await clienteSupabase.from('proyecto_usuario').insert(usuariosAInsertar)
       if (errEq) console.error('Error actualizando equipo proyecto_usuario:', errEq)
@@ -296,6 +630,14 @@ export async function actualizarProyecto(proyectoId: string, datosFormulario: Re
   }
 
   return { id: proyectoId }
+}
+
+export async function eliminarProyecto(id: string) {
+  await clienteSupabase.from('proyecto_detalle').delete().eq('proyecto_id', id)
+  await clienteSupabase.from('proyecto_usuario').delete().eq('proyecto_id', id)
+  const { error } = await clienteSupabase.from('proyecto').delete().eq('id', id)
+  if (error) throw new Error(error.message)
+  return true
 }
 
 

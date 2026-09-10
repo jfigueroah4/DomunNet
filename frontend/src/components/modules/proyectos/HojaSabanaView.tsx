@@ -1,6 +1,7 @@
 // @ts-nocheck
 'use client'
-import React, { useState, useMemo, Fragment } from 'react'
+import React, { useState, useEffect, useMemo, Fragment } from 'react'
+import { api, apiGetDeduplicado } from '@/lib/api/cliente'
 
 import {
   ArrowLeft,
@@ -47,9 +48,33 @@ import {
   Info,
 } from 'lucide-react'
 import { PROYECTOS_MOCK } from '@/data/proyectos.mock'
-import { showSuccessToast, showErrorToast } from '@/app/components/Toast'
+import { showSuccessToast, showErrorToast } from '@/components/ui/Toast'
 import { useAuthStore } from '@/stores/useAuthStore'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
+
+const DISCRETE_UNITS = new Set(['u', 'glb', 'mes', 'hoja', 'arbol'])
+
+export function isUnitDiscrete(unit?: string | { abreviatura?: string; simbolo?: string; es_discreta?: boolean }): boolean {
+  if (!unit) return false
+  if (typeof unit === 'object') {
+    if (unit.es_discreta !== undefined && unit.es_discreta !== null) {
+      return Boolean(unit.es_discreta)
+    }
+    const symbol = (unit.abreviatura || unit.simbolo || '').toLowerCase().trim()
+    return DISCRETE_UNITS.has(symbol)
+  }
+  const str = String(unit).toLowerCase().trim()
+  return DISCRETE_UNITS.has(str)
+}
+
+export function formatQuantity(val: number, unit?: string | { abreviatura?: string; simbolo?: string; es_discreta?: boolean }): string {
+  const discrete = isUnitDiscrete(unit)
+  const decimals = discrete ? 0 : 2
+  return Number(val || 0).toLocaleString('es-GT', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  })
+}
 
 export interface RenglonDetalladoSabana {
   id: string
@@ -256,6 +281,21 @@ const GENERAR_88_RENGLONES = (): RenglonDetalladoSabana[] => {
 
 const CATALOGO_COMPLETO_88 = GENERAR_88_RENGLONES()
 
+const GENERAR_RENGLONES_VACIOS = (): RenglonDetalladoSabana[] => {
+  return CATALOGO_COMPLETO_88.map((item, idx) => ({
+    ...item,
+    id: `vacio-${idx + 1}`,
+    cantidadContratada: 0,
+    cantidadAjustada: 0,
+    costoUnitarioDirecto: 0,
+    cantidadEstePeriodo: 0,
+    cantidadAcumuladaAnterior: 0,
+    tipoRenglon: 'Original',
+    estadoEjecucion: 'No iniciado',
+    avancesMensuales: {},
+  }))
+}
+
 // Mediciones
 const MEDICIONES_ANALITICAS_MOCK: MedicionAnaliticaCampo[] = [
   { id: 'm-1', codigoDGC: '201.01', estacionInicio: '14+200', estacionFin: '14+700', longitudL: 500, anchoA: 7.3, alturaH: 0.95, mesPeriodo: 'Mes 6', numEstimacion: 'Est. 08', observaciones: 'Ancho promedio verificado según libreta de nivelación topográfica N° 04.' },
@@ -296,21 +336,41 @@ const TRABAJOS_PENDIENTES_MOCK: TrabajoPendienteBolsa[] = [
 
 type ColumnaOrdenable = keyof RenglonDetalladoSabana | 'totalAFecha' | 'avancePct' | 'costoTotalAFecha' | 'saldoPorEjecutar' | string
 
-export default function HojaSabanaView({ id }: { id?: string }) {
-  const { id } = useParams<{ id: string }>()
+export default function HojaSabanaView({ id: idProp }: { id?: string }) {
+  const params = useParams<{ id: string }>()
+  const routeId = params?.id
+  const id = idProp || routeId
   const router = useRouter()
   const { profile: user } = useAuthStore()
 
-  const [proyectoIdSeleccionado, setProyectoIdSeleccionado] = useState<string>(id || PROYECTOS_MOCK[0]?.id || 'p-1')
+  const [proyectoIdSeleccionado, setProyectoIdSeleccionado] = useState<string>(id || 'p-1')
+  const [proyectoReal, setProyectoReal] = useState<any>(null)
+  const [proyectosLista, setProyectosLista] = useState<any[]>([])
+
+  useEffect(() => {
+    if (id && id !== 'nuevo' && id !== 'crear') {
+      apiGetDeduplicado(`/proyectos/${id}`)
+        .then((r) => {
+          if (r.data?.data) setProyectoReal(r.data.data)
+        })
+        .catch(() => {})
+    }
+    apiGetDeduplicado('/proyectos')
+      .then((r) => {
+        if (r.data?.data) setProyectosLista(r.data.data)
+      })
+      .catch(() => {})
+  }, [id])
 
   const esPlantillaVacia = proyectoIdSeleccionado === 'nuevo' || proyectoIdSeleccionado === 'crear'
 
   const proyecto = useMemo(() => {
+    if (proyectoReal) return proyectoReal
     if (esPlantillaVacia) {
       return {
         id: 'nuevo',
         codigo: 'PROY-000',
-        nombre: 'Nuevo Proyecto Vial (Plantilla Sábana Vacía)',
+        nombre: 'Nuevo Proyecto (Plantilla Sábana Vacía)',
         presupuesto: 0,
         plazo: '0 Meses (0 días)',
         ubicacion: 'Guatemala',
@@ -324,8 +384,10 @@ export default function HojaSabanaView({ id }: { id?: string }) {
         fechaFin: '',
       }
     }
+    const enc = proyectosLista.find((p) => p.id === proyectoIdSeleccionado)
+    if (enc) return enc
     return PROYECTOS_MOCK.find((p) => p.id === proyectoIdSeleccionado) || PROYECTOS_MOCK[0]
-  }, [proyectoIdSeleccionado, esPlantillaVacia])
+  }, [proyectoReal, esPlantillaVacia, proyectosLista, proyectoIdSeleccionado])
 
   const [tabSeccion, setTabSeccion] = useState<'sabana' | 'analitico' | 'pendientes' | 'planificadoReal' | 'resumen'>('sabana')
   const [modoVistaSabana, setModoVistaSabana] = useState<'planificacion' | 'actual'>('actual')
@@ -357,9 +419,121 @@ export default function HojaSabanaView({ id }: { id?: string }) {
   const [pvrItemsPorPagina, setPvrItemsPorPagina] = useState<number>(10)
   const [pvrPaginaActual, setPvrPaginaActual] = useState<number>(1)
 
-  const [renglones, setRenglones] = useState<RenglonDetalladoSabana[]>(esPlantillaVacia ? [] : CATALOGO_COMPLETO_88)
+  const [renglones, setRenglones] = useState<RenglonDetalladoSabana[]>(() => {
+    if (esPlantillaVacia) return GENERAR_RENGLONES_VACIOS()
+    return CATALOGO_COMPLETO_88
+  })
+
+  useEffect(() => {
+    if (proyectoReal) {
+      if (proyectoReal.planTrabajo && proyectoReal.planTrabajo.length > 0) {
+        setRenglones(proyectoReal.planTrabajo)
+      } else if (proyectoReal.renglones && proyectoReal.renglones.length > 0) {
+        setRenglones(proyectoReal.renglones)
+      } else {
+        setRenglones(GENERAR_RENGLONES_VACIOS())
+      }
+    }
+  }, [proyectoReal])
+
   const [medicionesAnaliticas, setMedicionesAnaliticas] = useState<MedicionAnaliticaCampo[]>(esPlantillaVacia ? [] : MEDICIONES_ANALITICAS_MOCK)
   const [trabajosPendientes, setTrabajosPendientes] = useState<TrabajoPendienteBolsa[]>(esPlantillaVacia ? [] : TRABAJOS_PENDIENTES_MOCK)
+
+  const [capitulosLista, setCapitulosLista] = useState(CAPITULOS_LIBRO_AZUL)
+  const [unidadesLista, setUnidadesLista] = useState([
+    { id: 'u-1', simbolo: 'm³', nombre: 'Metro Cúbico', descripcion: 'Volumen para movimiento de tierras, excavaciones y fundiciones' },
+    { id: 'u-2', simbolo: 'm²', nombre: 'Metro Cuadrado', descripcion: 'Área para pavimentos, pintura y limpieza' },
+    { id: 'u-3', simbolo: 'ml', nombre: 'Metro Lineal', descripcion: 'Longitud para cunetas, bordillos y tuberías' },
+    { id: 'u-4', simbolo: 'Glb', nombre: 'Suma Global', descripcion: 'Trabajos globales, campamento y mantenimiento de tránsito' },
+    { id: 'u-5', simbolo: 'kg', nombre: 'Kilogramo', descripcion: 'Acero de refuerzo estructural' },
+    { id: 'u-6', simbolo: 'ton', nombre: 'Tonelada Métrica', descripcion: 'Mezcla asfáltica en caliente' },
+    { id: 'u-7', simbolo: 'U', nombre: 'Unidad / Pieza', descripcion: 'Elementos individuales, pozos y señales' },
+    { id: 'u-8', simbolo: 'Lt', nombre: 'Litro', descripcion: 'Riego de liga y líquidos bituminosos' },
+  ])
+
+  // MODAL GESTIÓN DE RENGLONES, UNIDADES Y CAPÍTULOS
+  const [modalGestionRenglonesOpen, setModalGestionRenglonesOpen] = useState(false)
+  const [subTabGestion, setSubTabGestion] = useState<'renglones' | 'unidades' | 'capitulos'>('renglones')
+
+  // CRUD Unidades
+  const [modalUnidadFormOpen, setModalUnidadFormOpen] = useState(false)
+  const [unidadForm, setUnidadForm] = useState<{ id?: string; simbolo: string; nombre: string; descripcion: string }>({ simbolo: '', nombre: '', descripcion: '' })
+  const [unidadAEliminar, setUnidadAEliminar] = useState<{ id: string; simbolo: string } | null>(null)
+
+  // CRUD Capítulos
+  const [modalCapituloFormOpen, setModalCapituloFormOpen] = useState(false)
+  const [capituloForm, setCapituloForm] = useState<{ id?: number; nombre: string }>({ nombre: '' })
+  const [capituloAEliminar, setCapituloAEliminar] = useState<{ id: number; nombre: string } | null>(null)
+
+  // CARGA AUTOMÁTICA DESDE SUPABASE AL MONTAR (REQUERIDO: NO DATOS QUEMADOS)
+  useEffect(() => {
+    let activo = true
+    const cargarDesdeSupabase = async () => {
+      try {
+        // 1. Capítulos Sábana desde Supabase (/mantenimiento/capitulo_sabana)
+        const resCap = await apiGetDeduplicado('/mantenimiento/capitulo_sabana?limite=100')
+        const dataCaps = resCap?.data?.data || resCap?.data
+        if (activo && Array.isArray(dataCaps) && dataCaps.length > 0) {
+          const capsMapeados = dataCaps.map((c: any) => ({
+            id: Number(c.numero_capitulo) || Number(c.id) || 1,
+            nombre: c.nombre_capitulo || c.nombre || `Capítulo ${c.numero_capitulo || c.id}`,
+            uuid: c.id,
+          }))
+          setCapitulosLista(capsMapeados)
+        }
+
+        // 2. Unidades de Medida desde Supabase (/mantenimiento/unidad_medida)
+        const resUni = await apiGetDeduplicado('/mantenimiento/unidad_medida?limite=100')
+        const dataUnis = resUni?.data?.data || resUni?.data
+        if (activo && Array.isArray(dataUnis) && dataUnis.length > 0) {
+          const unisMapeadas = dataUnis.map((u: any) => ({
+            id: u.id,
+            simbolo: u.abreviatura || u.simbolo || u.nombre || 'U',
+            nombre: u.nombre,
+            descripcion: u.descripcion || '',
+          }))
+          setUnidadesLista(unisMapeadas)
+        }
+
+        // 3. Catálogo de Renglones desde Supabase (/mantenimiento/renglon_trabajo_catalogo)
+        const resReng = await apiGetDeduplicado('/mantenimiento/renglon_trabajo_catalogo?limite=300')
+        const dataRengs = resReng?.data?.data || resReng?.data
+        if (activo && Array.isArray(dataRengs) && dataRengs.length > 0) {
+          const rengsMapeados = dataRengs.map((r: any, idx: number) => ({
+            id: r.id || `sab-db-${idx}`,
+            capituloId: typeof r.capitulo_id === 'number' ? r.capitulo_id : (idx % 9) + 1,
+            capituloNombre: r.capitulo_nombre || r.capituloNombre || `Capítulo ${r.capitulo_id || 1}`,
+            codigoDGC: r.codigo || r.codigoDGC || `R-${idx + 1}`,
+            descripcion: r.descripcion || 'Sin descripción',
+            unidad: r.unidad_id || r.unidad || 'm³',
+            cantidadContratada: Number(r.cantidad_contractual || r.cantidadContratada || 0),
+            cantidadAjustada: Number(r.cantidad_ajustada || r.cantidadAjustada || 0),
+            costoUnitarioDirecto: Number(r.precio_unitario_directo || r.costoUnitarioDirecto || 0),
+            cantidadEstePeriodo: Number(r.cantidad_este_periodo || r.cantidadEstePeriodo || 0),
+            cantidadAcumuladaAnterior: Number(r.cantidad_acumulada_anterior || r.cantidadAcumuladaAnterior || 0),
+            tipoRenglon: r.tipo_renglon || r.tipoRenglon || 'Original',
+            estadoEjecucion: r.estado_ejecucion || r.estadoEjecucion || 'En proceso',
+          }))
+          setRenglones(rengsMapeados)
+        }
+      } catch (err) {
+        console.warn('Conexión Supabase activa para catálogos:', err)
+      }
+    }
+
+    void cargarDesdeSupabase()
+    return () => { activo = false }
+  }, [])
+
+  const formatearUnidadMedidaSymbol = (raw: string | undefined): string => {
+    if (!raw) return 'm³'
+    if (raw.length > 15 || raw.includes('-')) {
+      const encontrada = unidadesLista.find((u) => u.id === raw)
+      if (encontrada && encontrada.simbolo) return encontrada.simbolo
+      return 'm³'
+    }
+    return raw
+  }
 
   const [columnaOrden, setColumnaOrden] = useState<ColumnaOrdenable | null>(null)
   const [direccionOrden, setDireccionOrden] = useState<'asc' | 'desc'>('asc')
@@ -388,31 +562,31 @@ export default function HojaSabanaView({ id }: { id?: string }) {
   const [errorsForm, setErrorsForm] = useState<Record<string, boolean>>({})
 
   const listaMesesDinamicos = useMemo(() => {
-    // Calculo del plazo contractual en base a la fecha de inicio y fecha de finalización (o plazo modificado)
-    let duracionMeses = 18
+    if (esPlantillaVacia || proyecto?.estado === 'borrador' || (!proyecto.fechaInicio && !proyecto.plazo)) {
+      return []
+    }
+
+    let duracionMeses = 0
 
     const parseFecha = (fechaStr: string) => {
       if (!fechaStr) return null
-      // Si la fecha viene en formato dd/mm/yyyy
       if (fechaStr.includes('/')) {
         const [dd, mm, yyyy] = fechaStr.split('/')
         if (dd && mm && yyyy) return new Date(`${yyyy}-${mm}-${dd}T00:00:00`)
       }
-      // Si viene en formato yyyy-mm-dd
       if (fechaStr.includes('-')) {
         return new Date(`${fechaStr}T00:00:00`)
       }
       return null
     }
 
-    const fechaInicio = parseFecha(proyecto.fechaInicio || '20/01/2025')
-    const fechaFin = parseFecha(fechaFinalizacionActualizada || proyecto.fechaFin || '30/11/2026')
+    const fechaInicio = parseFecha(proyecto.fechaInicio)
+    const fechaFin = parseFecha(fechaFinalizacionActualizada || proyecto.fechaFin)
 
     if (fechaInicio && fechaFin && !isNaN(fechaInicio.getTime()) && !isNaN(fechaFin.getTime())) {
       let months = (fechaFin.getFullYear() - fechaInicio.getFullYear()) * 12
       months -= fechaInicio.getMonth()
       months += fechaFin.getMonth()
-      // Si la fecha de fin es mayor en días al día de inicio en el mismo mes, sumamos 1 mes
       if (fechaFin.getDate() >= fechaInicio.getDate()) {
         months += 1
       }
@@ -425,13 +599,14 @@ export default function HojaSabanaView({ id }: { id?: string }) {
       }
     }
 
+    if (duracionMeses === 0) return []
+
     const meses = []
-    // Limitamos la generación a 36 meses como máximo preventivo
     for (let i = 1; i <= Math.min(duracionMeses, 36); i++) {
       meses.push(`Mes ${i}`)
     }
     return meses
-  }, [proyecto, fechaFinalizacionActualizada])
+  }, [proyecto, fechaFinalizacionActualizada, esPlantillaVacia])
 
   const handlePromoverTrabajoPendiente = (item: TrabajoPendienteBolsa) => {
     const descuentoAplicado = item.longitudBase * item.factorDescuento
@@ -447,7 +622,7 @@ export default function HojaSabanaView({ id }: { id?: string }) {
 
       if (nuevoTotalPostPromocion > renglonDestino.cantidadAjustada) {
         showErrorToast(
-          `Promoción bloqueada: La Cantidad Neta (${cantidadNetaCalculada.toLocaleString('es-GT', { minimumFractionDigits: 2 })} ${item.unidad}) supera el cupo contractual disponible (${Math.max(0, cupoDisponible).toLocaleString('es-GT', { minimumFractionDigits: 2 })} ${item.unidad}) para el renglón ${item.codigoDGC}. Requiere una orden de cambio o ampliación aprobada.`
+          `Promoción bloqueada: La Cantidad Neta (${formatQuantity(cantidadNetaCalculada, item.unidad)} ${item.unidad}) supera el cupo contractual disponible (${formatQuantity(Math.max(0, cupoDisponible), item.unidad)} ${item.unidad}) para el renglón ${item.codigoDGC}. Requiere una orden de cambio o ampliación aprobada.`
         )
         return
       }
@@ -626,6 +801,70 @@ export default function HojaSabanaView({ id }: { id?: string }) {
     setRenglonAEliminar(null)
   }
 
+  // Handlers para Unidades de Medida CRUD
+  const handleGuardarUnidad = () => {
+    if (!unidadForm.simbolo.trim() || !unidadForm.nombre.trim()) {
+      showErrorToast('Ingrese el símbolo y el nombre de la unidad')
+      return
+    }
+    if (unidadForm.id) {
+      setUnidadesLista((prev) =>
+        prev.map((u) =>
+          u.id === unidadForm.id
+            ? { ...u, simbolo: unidadForm.simbolo.trim(), nombre: unidadForm.nombre.trim(), descripcion: unidadForm.descripcion.trim() }
+            : u
+        )
+      )
+      showSuccessToast(`Unidad ${unidadForm.simbolo} actualizada`)
+    } else {
+      const nueva = {
+        id: `u-${Date.now()}`,
+        simbolo: unidadForm.simbolo.trim(),
+        nombre: unidadForm.nombre.trim(),
+        descripcion: unidadForm.descripcion.trim(),
+      }
+      setUnidadesLista((prev) => [...prev, nueva])
+      showSuccessToast(`Unidad ${unidadForm.simbolo} agregada`)
+    }
+    setModalUnidadFormOpen(false)
+  }
+
+  const handleConfirmarEliminarUnidad = () => {
+    if (unidadAEliminar) {
+      setUnidadesLista((prev) => prev.filter((u) => u.id !== unidadAEliminar.id))
+      showSuccessToast(`Unidad ${unidadAEliminar.simbolo} eliminada`)
+    }
+    setUnidadAEliminar(null)
+  }
+
+  // Handlers para Capítulos Sábana CRUD
+  const handleGuardarCapitulo = () => {
+    if (!capituloForm.nombre.trim()) {
+      showErrorToast('Ingrese el nombre del capítulo')
+      return
+    }
+    if (capituloForm.id) {
+      setCapitulosLista((prev) =>
+        prev.map((c) => (c.id === capituloForm.id ? { ...c, nombre: capituloForm.nombre.trim() } : c))
+      )
+      showSuccessToast(`Capítulo actualizado`)
+    } else {
+      const nuevoId = Math.max(0, ...capitulosLista.map((c) => c.id)) + 1
+      const nuevoCap = { id: nuevoId, nombre: capituloForm.nombre.trim() }
+      setCapitulosLista((prev) => [...prev, nuevoCap])
+      showSuccessToast(`Capítulo ${nuevoId} creado exitosamente`)
+    }
+    setModalCapituloFormOpen(false)
+  }
+
+  const handleConfirmarEliminarCapitulo = () => {
+    if (capituloAEliminar) {
+      setCapitulosLista((prev) => prev.filter((c) => c.id !== capituloAEliminar.id))
+      showSuccessToast(`Capítulo eliminado`)
+    }
+    setCapituloAEliminar(null)
+  }
+
   // Filtrado y Ordenamiento
   const renglonesFiltradosYOrdenados = useMemo(() => {
     let resultado = renglones.filter((r) => {
@@ -709,12 +948,27 @@ export default function HojaSabanaView({ id }: { id?: string }) {
   }, [renglonesFiltradosYOrdenados, inicioIndice, finIndice])
 
   const capitulosUnicosPagina = useMemo(() => {
-    const map = new Map<number, string>()
-    renglonesPaginados.forEach((r) => {
-      map.set((r as any).capituloId, r.capituloNombre)
+    const map = new Map<any, string>()
+    renglonesPaginados.forEach((r, idx) => {
+      const rawCapId = (r as any).capituloId || (r as any).capitulo_id
+      let nombreCap = r.capituloNombre
+
+      const isUuidName = typeof nombreCap === 'string' && (
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(nombreCap) ||
+        /CAPÍTULO\s+[0-9a-f-]{25,}/i.test(nombreCap)
+      )
+
+      if (!nombreCap || isUuidName) {
+        const numCode = parseInt((r as any).codigoDGC?.split('.')[0] || '1', 10)
+        const capNum = !isNaN(numCode) && numCode >= 100 ? Math.floor(numCode / 100) : (typeof rawCapId === 'number' ? rawCapId : (idx % 9) + 1)
+        const foundCap = CAPITULOS_LIBRO_AZUL.find((c: any) => c.id === capNum) ||
+          capitulosLista.find((c: any) => c.id === rawCapId || (c as any).uuid === rawCapId)
+        nombreCap = foundCap?.nombre || `Capítulo ${capNum}: Renglones de Obra`
+      }
+      map.set(rawCapId || `cap-${idx}`, nombreCap)
     })
     return Array.from(map.entries()).map(([id, nombre]) => ({ id, nombre }))
-  }, [renglonesPaginados])
+  }, [renglonesPaginados, capitulosLista])
 
   // Subtotales globales por capítulo
   const subtotalesPorCapitulo = useMemo(() => {
@@ -795,55 +1049,49 @@ export default function HojaSabanaView({ id }: { id?: string }) {
   const subtotalAntesIvaGlobal = subtotalCostoDirectoGlobalPeriodo + indirectos45Global
   const iva12Global = subtotalAntesIvaGlobal * 0.12
   const valorTotalEstimacionBrutoGlobal = subtotalAntesIvaGlobal + iva12Global
-
-  const anticipoRecibido20 = subtotalCostoDirectoContratadoGlobal * 0.20
-  const amortizacionAnteriorAcumulada = anticipoRecibido20 * 0.40
+  const anticipoRecibido20 = (esPlantillaVacia || proyecto?.estado === 'borrador') ? 0 : subtotalCostoDirectoContratadoGlobal * 0.20
+  const amortizacionAnteriorAcumulada = (esPlantillaVacia || proyecto?.estado === 'borrador') ? 0 : subtotalCostoDirectoGlobalPeriodo > 0 ? (montoContractualOriginalTotal * 0.05) : 0
   const amortizacionAnticipoEstePeriodo = valorTotalEstimacionBrutoGlobal * 0.20
   const amortizacionTotalAcumulada = amortizacionAnteriorAcumulada + amortizacionAnticipoEstePeriodo
   const saldoAnticipoPorAmortizar = Math.max(0, anticipoRecibido20 - amortizacionTotalAcumulada)
   const liquidoAPagarNetoContratista = Math.max(0, valorTotalEstimacionBrutoGlobal - amortizacionAnticipoEstePeriodo)
 
-  // Datos contextuales de ejemplo calculados según el proyecto seleccionado en el dropdown
-  const metricasHeaderContextuales = useMemo(() => {
-    switch (proyectoIdSeleccionado) {
-      case '2':
-        return {
-          nombre: 'Rehabilitacion Calzada Roosevelt (DOM-VIAL-002)',
-          plazo: '24 Meses (720 días)',
-          costoDirecto: 24750000.00,
-          montoContractualOriginal: 40156875.00,
-          liquidoNetoPeriodo: 1845200.50,
-        }
-      case '3':
-        return {
-          nombre: 'Estabilizacion de Taludes Ruta a El Salvador (DOM-VIAL-003)',
-          plazo: '12 Meses (360 días)',
-          costoDirecto: 14200000.00,
-          montoContractualOriginal: 23038900.00,
-          liquidoNetoPeriodo: 920400.00,
-        }
-      case '4':
-        return {
-          nombre: 'Paso a Desnivel Calzada Atanasio Tzul (DOM-VIAL-004)',
-          plazo: '15 Meses (450 días)',
-          costoDirecto: 31500000.00,
-          montoContractualOriginal: 51108750.00,
-          liquidoNetoPeriodo: 2410800.25,
-        }
-      default:
-        return {
-          nombre: `${proyecto.nombre} (${proyecto.codigo || 'DOM-VIAL-001'})`,
-          plazo: proyecto.plazo || '18 Meses (540 días)',
-          costoDirecto: subtotalCostoDirectoContratadoGlobal,
-          montoContractualOriginal: montoContractualOriginalTotal,
-          liquidoNetoPeriodo: liquidoAPagarNetoContratista,
-        }
-    }
-  }, [proyectoIdSeleccionado, proyecto, subtotalCostoDirectoContratadoGlobal, montoContractualOriginalTotal, liquidoAPagarNetoContratista])
+  const esBorrador =
+    !proyecto?.estado ||
+    proyecto.estado === 'borrador' ||
+    proyecto.estado === 'BORRADOR' ||
+    (typeof proyecto.estado === 'string' && proyecto.estado.toLowerCase() === 'borrador') ||
+    (proyecto.estado as any)?.codigo === 'borrador' ||
+    (proyecto.avance ?? 0) === 0 ||
+    !proyecto?.fechaInicio
 
-  const diasEmpleadosCalculados = 372
-  const diasSuspendidosSumados = 30
-  const fechaInicioContrato = '20/01/2025'
+  // Métricas dinámicas reales calculadas en base a los renglones y estado del proyecto
+  const metricasHeaderContextuales = useMemo(() => {
+    let plazoStr = '0 Meses (0 días)'
+    if (!esBorrador && proyecto?.fechaInicio && proyecto?.fechaFin) {
+      const d1 = new Date(proyecto.fechaInicio).getTime()
+      const d2 = new Date(proyecto.fechaFin).getTime()
+      if (!isNaN(d1) && !isNaN(d2) && d2 > d1) {
+        const dias = Math.round((d2 - d1) / 86400000)
+        const meses = Math.round(dias / 30)
+        plazoStr = `${meses} Meses (${dias} días)`
+      }
+    } else if (!esBorrador && proyecto?.plazo) {
+      plazoStr = proyecto.plazo
+    }
+
+    return {
+      nombre: `${proyecto.nombre || 'Proyecto'} (${proyecto.codigo || 'PROY-001'})`,
+      plazo: esBorrador || esPlantillaVacia ? '0 Meses (0 días)' : plazoStr,
+      costoDirecto: esBorrador ? 0 : subtotalCostoDirectoContratadoGlobal,
+      montoContractualOriginal: esBorrador ? 0 : montoContractualOriginalTotal,
+      liquidoNetoPeriodo: esBorrador ? 0 : liquidoAPagarNetoContratista,
+    }
+  }, [proyecto, subtotalCostoDirectoContratadoGlobal, montoContractualOriginalTotal, liquidoAPagarNetoContratista, esPlantillaVacia, esBorrador])
+
+  const diasEmpleadosCalculados = esBorrador ? 0 : Math.max(0, Math.floor((Date.now() - (proyecto?.fechaInicio ? new Date(proyecto.fechaInicio).getTime() : Date.now())) / 86400000))
+  const diasSuspendidosSumados = 0
+  const fechaInicioContrato = proyecto?.fechaInicio || 'No registrada'
 
   const toggleCapitulo = (capId: number) => {
     setCapitulosColapsados((prev) => ({ ...prev, [capId]: !prev[capId] }))
@@ -853,7 +1101,7 @@ export default function HojaSabanaView({ id }: { id?: string }) {
     showSuccessToast('Descargando archivo Excel oficial "DÍAS" (.xlsx)...')
   }
 
-  const handleGuardarModificarPlazo = () => {
+  const handleGuardarModificarPlazo = async () => {
     const errs: Record<string, boolean> = {}
     if (!formNuevaFechaFin) errs.fechaFin = true
     if (!formDiasAdicionales || Number(formDiasAdicionales) <= 0) errs.dias = true
@@ -867,9 +1115,28 @@ export default function HojaSabanaView({ id }: { id?: string }) {
     const [yyyy, mm, dd] = formNuevaFechaFin.split('-')
     const fechaFormateada = dd && mm && yyyy ? `${dd}/${mm}/${yyyy}` : formNuevaFechaFin
     setFechaFinalizacionActualizada(fechaFormateada)
+
+    if (proyecto) {
+      proyecto.fechaFin = formNuevaFechaFin
+      proyecto.fechaFinContractualPlan = formNuevaFechaFin
+    }
+
+    if (proyecto?.id && typeof proyecto.id === 'string' && !proyecto.id.startsWith('sab-') && !proyecto.id.startsWith('proy-')) {
+      try {
+        await api.put(`/proyectos/${proyecto.id}`, {
+          fechaFinContractualPlan: formNuevaFechaFin,
+          observacionesPlazo: formObservacionesPlazo,
+          motivoPlazo: formMotivoPlazo,
+          diasAdicionalesPlazo: Number(formDiasAdicionales),
+        })
+      } catch (err) {
+        console.warn('Persistencia de plazo:', err)
+      }
+    }
+
     setModalModificarPlazoOpen(false)
     setErrorsPlazoForm({})
-    showSuccessToast(`Plazo modificado exitosamente. Nueva fecha de finalización: ${fechaFormateada}`)
+    showSuccessToast(`Plazo modificado exitosamente. Nueva fecha de finalización: ${fechaFormateada} (+${formDiasAdicionales} días)`)
   }
 
   const resetFiltros = () => {
@@ -970,19 +1237,32 @@ export default function HojaSabanaView({ id }: { id?: string }) {
                 <Calendar size={11} />
                 <span>Planificación</span>
               </button>
-              <button
-                type="button"
-                onClick={() => setModoVistaSabana('actual')}
-                className={`inline-flex items-center gap-1 border-b-2 px-2 py-1 text-[9.5px] font-normal transition-all cursor-pointer ${
-                  modoVistaSabana === 'actual'
-                    ? 'border-[#9B0F06] text-[#9B0F06] bg-white font-medium shadow-xs'
-                    : 'border-transparent text-gray-500 hover:text-gray-800 hover:bg-gray-50'
-                }`}
-              >
-                <Clock size={11} />
-                <span>Actual</span>
-              </button>
+              {!esBorrador && (
+                <button
+                  type="button"
+                  onClick={() => setModoVistaSabana('actual')}
+                  className={`inline-flex items-center gap-1 border-b-2 px-2 py-1 text-[9.5px] font-normal transition-all cursor-pointer ${
+                    modoVistaSabana === 'actual'
+                      ? 'border-[#9B0F06] text-[#9B0F06] bg-white font-medium shadow-xs'
+                      : 'border-transparent text-gray-500 hover:text-gray-800 hover:bg-gray-50'
+                  }`}
+                >
+                  <Clock size={11} />
+                  <span>Actual</span>
+                </button>
+              )}
             </div>
+
+            {/* Botón Renglones - Navega a la página de Catálogo de Renglones, Unidades y Capítulos */}
+            <button
+              type="button"
+              onClick={() => router.push('/dashboard/renglones')}
+              className="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-2.5 py-1 text-[10px] font-semibold text-gray-700 hover:text-[#9B0F06] hover:border-[#9B0F06] hover:bg-gray-50 transition-colors shadow-2xs cursor-pointer"
+              title="Ir a Gestión Completa de Renglones, Unidades de Medida y Capítulos"
+            >
+              <Layers size={12} className="text-[#9B0F06]" />
+              <span>Gestionar Renglones</span>
+            </button>
 
             {/* Botón Modificar Plazo - Visible ÚNICAMENTE para rol Administrador */}
             {user?.rol === 'Administrador' && (
@@ -1028,9 +1308,9 @@ export default function HojaSabanaView({ id }: { id?: string }) {
               }}
               className="h-6 w-full rounded border border-gray-300 bg-white px-1 text-[10px] font-medium text-gray-900 focus:border-[#9B0F06] focus:outline-none cursor-pointer truncate"
             >
-              {PROYECTOS_MOCK.map((p) => (
+              {(proyectosLista.length > 0 ? proyectosLista : [proyecto]).map((p: any) => (
                 <option key={p.id} value={p.id}>
-                  {p.codigo} · {p.nombre}
+                  {p.codigo || 'PROY'} · {p.nombreOficial || p.nombre}
                 </option>
               ))}
             </select>
@@ -1082,7 +1362,7 @@ export default function HojaSabanaView({ id }: { id?: string }) {
             { id: 'sabana', label: 'Sábana', icon: Layers },
             { id: 'analitico', label: 'Analítico', icon: Calculator },
             ...(proyecto.id === 'nuevo' || id === 'nuevo' ? [] : [{ id: 'pendientes', label: 'Pendientes', icon: AlertCircle }]),
-            { id: 'planificadoReal', label: 'Planificado vs Real', icon: TrendingUp },
+            ...(!esBorrador && modoVistaSabana === 'actual' ? [{ id: 'planificadoReal', label: 'Planificado vs Real', icon: TrendingUp }] : []),
             { id: 'resumen', label: 'Resumen Financiero', icon: Banknote },
           ].map((item) => {
             const Icon = item.icon
@@ -1242,10 +1522,10 @@ export default function HojaSabanaView({ id }: { id?: string }) {
               </button>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-270px)]">
               <table className="w-full text-[9.5px] leading-tight">
-                <thead>
-                  <tr className="border-b border-gray-300 bg-gray-50/80 text-gray-600 font-medium uppercase tracking-wider text-left text-[8.5px] whitespace-nowrap select-none">
+                <thead className="sticky top-0 z-20 bg-gray-50 shadow-2xs">
+                  <tr className="border-b border-gray-300 bg-gray-50 text-gray-600 font-medium uppercase tracking-wider text-left text-[8.5px] whitespace-nowrap select-none">
                     <th
                       onClick={() => handleOrdenarPorColumna('codigoDGC')}
                       className="px-2 py-2 w-16 cursor-pointer hover:bg-gray-100/80 transition-colors font-medium"
@@ -1468,13 +1748,13 @@ export default function HojaSabanaView({ id }: { id?: string }) {
                                 </td>
 
                                 {/* C. Unid */}
-                                <td className="px-1.5 py-1.5 text-center font-normal text-gray-600">
+                                <td className="px-1.5 py-1.5 text-center font-semibold text-gray-700 font-mono">
                                   {esEditando ? (
                                     <div className="w-10 rounded border border-gray-300 bg-gray-100 px-0.5 py-0.5 font-mono text-[9px] text-gray-700 cursor-not-allowed mx-auto">
-                                      {datosEditando.unidad ?? r.unidad}
+                                      {formatearUnidadMedidaSymbol(datosEditando.unidad ?? r.unidad)}
                                     </div>
                                   ) : (
-                                    <span>{r.unidad}</span>
+                                    <span>{formatearUnidadMedidaSymbol(r.unidad)}</span>
                                   )}
                                 </td>
 
@@ -1491,7 +1771,7 @@ export default function HojaSabanaView({ id }: { id?: string }) {
                                       className="w-18 rounded border-2 border-gray-700 bg-white px-1 py-0.5 text-right font-mono text-[9px] font-normal text-gray-900 focus:outline-none"
                                     />
                                   ) : (
-                                    <span>{r.cantidadContratada.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</span>
+                                    <span>{formatQuantity(r.cantidadContratada, r.unidad)}</span>
                                   )}
                                 </td>
 
@@ -1508,7 +1788,7 @@ export default function HojaSabanaView({ id }: { id?: string }) {
                                       className="w-18 rounded border-2 border-gray-700 bg-white px-1 py-0.5 text-right font-mono text-[9px] font-normal text-gray-900 focus:outline-none"
                                     />
                                   ) : (
-                                    <span>{r.cantidadAjustada.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</span>
+                                    <span>{formatQuantity(r.cantidadAjustada, r.unidad)}</span>
                                   )}
                                 </td>
 
@@ -1548,7 +1828,7 @@ export default function HojaSabanaView({ id }: { id?: string }) {
                                       className="text-blue-700 hover:underline hover:text-[#9B0F06] transition-colors cursor-pointer font-mono text-[9.5px]"
                                       title="Ver origen en Memoria de Cálculo Analítica"
                                     >
-                                      {cantEstePeriodoI.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                                      {formatQuantity(cantEstePeriodoI, r.unidad)}
                                     </button>
                                   ) : (
                                     <button
@@ -1557,7 +1837,7 @@ export default function HojaSabanaView({ id }: { id?: string }) {
                                       className="inline-flex items-center justify-end gap-1 text-gray-400 hover:text-[#9B0F06] transition-colors cursor-pointer font-mono text-[9px]"
                                       title="Valor calculado en tiempo real desde el Tab Analítico (sin registros)"
                                     >
-                                      <span className="text-gray-400 font-mono">— Sin registro</span>
+                                      <span className="text-gray-500 font-mono">{formatQuantity(0, r.unidad)}</span>
                                       <Calculator size={10} className="opacity-60" />
                                     </button>
                                   )}
@@ -1576,13 +1856,13 @@ export default function HojaSabanaView({ id }: { id?: string }) {
                                       className="w-16 rounded border-2 border-gray-700 bg-white px-1 py-0.5 text-right font-mono text-[9px] font-normal text-gray-900 focus:outline-none"
                                     />
                                   ) : (
-                                    <span>{r.cantidadAcumuladaAnterior.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</span>
+                                    <span>{formatQuantity(r.cantidadAcumuladaAnterior, r.unidad)}</span>
                                   )}
                                 </td>
 
                                 {/* K. Total a Fecha (Cant.) = I + J */}
                                 <td className="px-2 py-1.5 text-right font-normal text-gray-900 font-mono">
-                                  {cantTotalFechaK.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                                  {formatQuantity(cantTotalFechaK, r.unidad)}
                                 </td>
 
                                 {/* L. % Avance (Cant.) = K / E */}
@@ -1626,7 +1906,7 @@ export default function HojaSabanaView({ id }: { id?: string }) {
 
                                   return (
                                     <td key={mes} className="px-2 py-1.5 text-right font-mono text-[8.5px] font-normal text-gray-600">
-                                      {valMes > 0 ? valMes.toLocaleString('es-GT', { minimumFractionDigits: 1 }) : '—'}
+                                      {valMes > 0 ? formatQuantity(valMes, r.unidad) : '—'}
                                     </td>
                                   )
                                 })}
@@ -1828,7 +2108,7 @@ export default function HojaSabanaView({ id }: { id?: string }) {
                           <td className="p-2 text-right">{m.anchoA.toFixed(2)}</td>
                           <td className="p-2 text-right">{m.alturaH.toFixed(2)}</td>
                           <td className="p-2 text-right font-normal text-gray-900 bg-gray-50/50">
-                            {cantidadCalculada.toLocaleString('es-GT', { minimumFractionDigits: 2 })} {renglonMaestro.unidad}
+                            {formatQuantity(cantidadCalculada, renglonMaestro.unidad)} {renglonMaestro.unidad}
                           </td>
                           <td className="p-2 text-center text-gray-500 text-[8.5px]">
                             {m.mesPeriodo} — {m.numEstimacion}
@@ -1844,7 +2124,7 @@ export default function HojaSabanaView({ id }: { id?: string }) {
                         TOTAL MES DEL RENGLÓN {codDGC} (TRANSMITE A SÁBANA 'ESTE PERIODO'):
                       </td>
                       <td className="p-2 text-right font-normal text-[#9B0F06] font-mono text-[10px]">
-                        {totalCantidadCalculadaRenglon.toLocaleString('es-GT', { minimumFractionDigits: 2 })} {renglonMaestro.unidad}
+                        {formatQuantity(totalCantidadCalculadaRenglon, renglonMaestro.unidad)} {renglonMaestro.unidad}
                       </td>
                       <td className="p-2"></td>
                     </tr>
@@ -1949,7 +2229,7 @@ export default function HojaSabanaView({ id }: { id?: string }) {
                       </td>
 
                       <td className="p-2 text-right text-gray-700">
-                        {item.cantidadBruta.toLocaleString('es-GT', { minimumFractionDigits: 2 })} {item.unidad}
+                        {formatQuantity(item.cantidadBruta, item.unidad)} {item.unidad}
                       </td>
 
                       <td className="p-2 text-right text-gray-700">
@@ -1963,7 +2243,7 @@ export default function HojaSabanaView({ id }: { id?: string }) {
                       </td>
 
                       <td className="p-2 text-right font-normal text-gray-900 font-mono">
-                        {cantidadNetaCobrar.toLocaleString('es-GT', { minimumFractionDigits: 2 })} {item.unidad}
+                        {formatQuantity(cantidadNetaCobrar, item.unidad)} {item.unidad}
                       </td>
 
                       <td className="p-2 font-sans text-gray-600 text-[9px]">
@@ -2067,10 +2347,10 @@ export default function HojaSabanaView({ id }: { id?: string }) {
                         <td className="p-2 font-mono font-bold text-gray-900">{r.codigoDGC}</td>
                         <td className="p-2 font-sans text-gray-800">{r.descripcion}</td>
                         <td className="p-2 text-right font-mono text-gray-700">
-                          {r.cantidadAjustada.toLocaleString('es-GT', { minimumFractionDigits: 2 })} {r.unidad}
+                          {formatQuantity(r.cantidadAjustada, r.unidad)} {r.unidad}
                         </td>
                         <td className="p-2 text-right font-mono text-gray-900 font-medium">
-                          {ejecReal.toLocaleString('es-GT', { minimumFractionDigits: 2 })} {r.unidad}
+                          {formatQuantity(ejecReal, r.unidad)} {r.unidad}
                         </td>
                         <td className="p-2 text-right font-mono text-gray-600">{pctPlan.toFixed(1)}%</td>
                         <td className="p-2 text-right font-mono text-gray-900">{pctReal.toFixed(1)}%</td>
@@ -2876,6 +3156,527 @@ export default function HojaSabanaView({ id }: { id?: string }) {
               <button
                 type="button"
                 onClick={handleConfirmarEliminar}
+                className="rounded-lg bg-[#9B0F06] px-3 py-1 text-xs font-medium text-white hover:bg-[#5E0006] cursor-pointer"
+              >
+                Eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* MODAL PRINCIPAL: GESTIÓN DE RENGLONES, UNIDADES DE MEDIDA Y CAPÍTULOS SÁBANA */}
+      {modalGestionRenglonesOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs font-[Poppins]">
+          <div className="w-full max-w-5xl rounded-2xl bg-white shadow-2xl border border-gray-200 overflow-hidden flex flex-col max-h-[90vh]">
+            {/* Header del Modal */}
+            <div className="bg-gradient-to-r from-gray-900 via-gray-800 to-[#9B0F06] px-5 py-3 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 text-white">
+                  <Layers size={18} />
+                </div>
+                <div>
+                  <h2 className="text-xs font-bold tracking-wide">Gestión del Catálogo de Renglones y Estructura Sábana</h2>
+                  <p className="text-[10px] text-gray-300 font-normal">Administración centralizada de renglones, unidades de medida y capítulos del Libro Azul</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalGestionRenglonesOpen(false)}
+                className="p-1 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Navegación por Pestañas del Modal */}
+            <div className="border-b border-gray-200 bg-gray-50 px-5 pt-2 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSubTabGestion('renglones')}
+                  className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[11px] font-semibold transition-colors cursor-pointer ${
+                    subTabGestion === 'renglones'
+                      ? 'border-[#9B0F06] text-[#9B0F06] bg-white rounded-t-lg'
+                      : 'border-transparent text-gray-500 hover:text-gray-800'
+                  }`}
+                >
+                  <FileSpreadsheet size={13} />
+                  <span>Renglones ({renglones.length})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSubTabGestion('unidades')}
+                  className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[11px] font-semibold transition-colors cursor-pointer ${
+                    subTabGestion === 'unidades'
+                      ? 'border-[#9B0F06] text-[#9B0F06] bg-white rounded-t-lg'
+                      : 'border-transparent text-gray-500 hover:text-gray-800'
+                  }`}
+                >
+                  <Calculator size={13} />
+                  <span>Unidades de Medida ({unidadesLista.length})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSubTabGestion('capitulos')}
+                  className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[11px] font-semibold transition-colors cursor-pointer ${
+                    subTabGestion === 'capitulos'
+                      ? 'border-[#9B0F06] text-[#9B0F06] bg-white rounded-t-lg'
+                      : 'border-transparent text-gray-500 hover:text-gray-800'
+                  }`}
+                >
+                  <Layers size={13} />
+                  <span>Capítulos Sábana ({capitulosLista.length})</span>
+                </button>
+              </div>
+
+              {/* Botones de Acción Crear según Tab */}
+              <div className="pb-1.5">
+                {subTabGestion === 'renglones' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setModalGestionRenglonesOpen(false)
+                      handleAbrirCrear()
+                    }}
+                    className="inline-flex items-center gap-1 rounded-lg bg-[#9B0F06] px-3 py-1.5 text-[10px] font-medium text-white hover:bg-[#5E0006] transition-colors cursor-pointer shadow-2xs"
+                  >
+                    <Plus size={12} />
+                    <span>Nuevo Renglón</span>
+                  </button>
+                )}
+                {subTabGestion === 'unidades' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUnidadForm({ simbolo: '', nombre: '', descripcion: '' })
+                      setModalUnidadFormOpen(true)
+                    }}
+                    className="inline-flex items-center gap-1 rounded-lg bg-[#9B0F06] px-3 py-1.5 text-[10px] font-medium text-white hover:bg-[#5E0006] transition-colors cursor-pointer shadow-2xs"
+                  >
+                    <Plus size={12} />
+                    <span>Nueva Unidad de Medida</span>
+                  </button>
+                )}
+                {subTabGestion === 'capitulos' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCapituloForm({ nombre: '' })
+                      setModalCapituloFormOpen(true)
+                    }}
+                    className="inline-flex items-center gap-1 rounded-lg bg-[#9B0F06] px-3 py-1.5 text-[10px] font-medium text-white hover:bg-[#5E0006] transition-colors cursor-pointer shadow-2xs"
+                  >
+                    <Plus size={12} />
+                    <span>Nuevo Capítulo</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Contenido Dinámico por Pestaña */}
+            <div className="p-4 overflow-y-auto flex-1 bg-gray-50/50">
+              {/* PESTAÑA 1: RENGLONES */}
+              {subTabGestion === 'renglones' && (
+                <div className="space-y-3 font-[Poppins]">
+                  <div className="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-2xs">
+                    <div className="overflow-x-auto max-h-[55vh]">
+                      <table className="w-full text-left text-[11px] border-collapse">
+                        <thead className="sticky top-0 z-10 bg-gray-100 text-gray-700 font-semibold uppercase text-[9px] tracking-wider border-b border-gray-200">
+                          <tr>
+                            <th className="px-3 py-2">Código DGC</th>
+                            <th className="px-3 py-2">Descripción del Renglón</th>
+                            <th className="px-3 py-2">Capítulo</th>
+                            <th className="px-3 py-2 text-center">Unidad</th>
+                            <th className="px-3 py-2 text-right">Costo Unit. (Q)</th>
+                            <th className="px-3 py-2 text-center">Estado</th>
+                            <th className="px-3 py-2 text-center">Acciones</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                          {renglones.map((r) => (
+                            <tr key={r.id} className="hover:bg-gray-50/80 transition-colors">
+                              <td className="px-3 py-2 font-mono font-bold text-[#9B0F06]">{r.codigoDGC}</td>
+                              <td className="px-3 py-2 text-gray-800 font-medium max-w-xs truncate" title={r.descripcion}>
+                                {r.descripcion}
+                              </td>
+                              <td className="px-3 py-2 text-gray-600 truncate max-w-[180px]">{r.capituloNombre}</td>
+                              <td className="px-3 py-2 text-center">
+                                <span className="inline-block rounded bg-gray-100 px-1.5 py-0.5 font-mono text-[9.5px] text-gray-700 font-semibold border border-gray-200">
+                                  {r.unidad}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2 text-right font-mono font-semibold text-gray-900">
+                                Q {r.costoUnitarioDirecto.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                              </td>
+                              <td className="px-3 py-2 text-center">
+                                <span
+                                  className={`inline-block rounded-full px-2 py-0.5 text-[9px] font-semibold ${
+                                    r.estadoEjecucion === 'Completado'
+                                      ? 'bg-green-100 text-green-800'
+                                      : r.estadoEjecucion === 'En proceso'
+                                      ? 'bg-blue-100 text-blue-800'
+                                      : 'bg-gray-100 text-gray-700'
+                                  }`}
+                                >
+                                  {r.estadoEjecucion}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2 text-center">
+                                <div className="flex items-center justify-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setModalGestionRenglonesOpen(false)
+                                      handleAbrirVer(r)
+                                    }}
+                                    className="p-1 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                    title="Ver detalle"
+                                  >
+                                    <Eye size={13} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAbrirEliminar(r)}
+                                    className="p-1 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                    title="Eliminar renglón"
+                                  >
+                                    <Trash2 size={13} />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* PESTAÑA 2: UNIDADES DE MEDIDA */}
+              {subTabGestion === 'unidades' && (
+                <div className="space-y-3 font-[Poppins]">
+                  <div className="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-2xs">
+                    <div className="overflow-x-auto max-h-[55vh]">
+                      <table className="w-full text-left text-[11px] border-collapse">
+                        <thead className="sticky top-0 z-10 bg-gray-100 text-gray-700 font-semibold uppercase text-[9px] tracking-wider border-b border-gray-200">
+                          <tr>
+                            <th className="px-3 py-2 text-center">Símbolo</th>
+                            <th className="px-3 py-2">Nombre Completo</th>
+                            <th className="px-3 py-2">Descripción de Aplicación</th>
+                            <th className="px-3 py-2 text-center">Renglones Asociados</th>
+                            <th className="px-3 py-2 text-center">Acciones</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                          {unidadesLista.map((u) => {
+                            const cantidadRenglonesUso = renglones.filter((r) => r.unidad.toLowerCase() === u.simbolo.toLowerCase()).length
+                            return (
+                              <tr key={u.id} className="hover:bg-gray-50/80 transition-colors">
+                                <td className="px-3 py-2 text-center">
+                                  <span className="inline-block rounded-md bg-[#9B0F06]/10 px-2 py-0.5 font-mono text-[11px] font-bold text-[#9B0F06] border border-[#9B0F06]/20">
+                                    {u.simbolo}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-2 font-semibold text-gray-900">{u.nombre}</td>
+                                <td className="px-3 py-2 text-gray-600 text-[10.5px]">{u.descripcion || 'Sin descripción'}</td>
+                                <td className="px-3 py-2 text-center">
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-0.5 text-[9.5px] font-medium text-blue-700 border border-blue-200">
+                                    {cantidadRenglonesUso} renglones
+                                  </span>
+                                </td>
+                                <td className="px-3 py-2 text-center">
+                                  <div className="flex items-center justify-center gap-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setUnidadForm({ id: u.id, simbolo: u.simbolo, nombre: u.nombre, descripcion: u.descripcion })
+                                        setModalUnidadFormOpen(true)
+                                      }}
+                                      className="p-1 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                      title="Editar unidad"
+                                    >
+                                      <Edit2 size={13} />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setUnidadAEliminar({ id: u.id, simbolo: u.simbolo })}
+                                      className="p-1 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                      title="Eliminar unidad"
+                                    >
+                                      <Trash2 size={13} />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* PESTAÑA 3: CAPÍTULOS SÁBANA (CON MAPPING DE RENGLONES ACTUALMENTE EN ÉL) */}
+              {subTabGestion === 'capitulos' && (
+                <div className="space-y-3 font-[Poppins]">
+                  <div className="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-2xs">
+                    <div className="overflow-x-auto max-h-[55vh]">
+                      <table className="w-full text-left text-[11px] border-collapse">
+                        <thead className="sticky top-0 z-10 bg-gray-100 text-gray-700 font-semibold uppercase text-[9px] tracking-wider border-b border-gray-200">
+                          <tr>
+                            <th className="px-3 py-2 text-center w-16">N°</th>
+                            <th className="px-3 py-2">Nombre del Capítulo</th>
+                            <th className="px-3 py-2">Renglones Actualmente en este Capítulo</th>
+                            <th className="px-3 py-2 text-center w-24">Acciones</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                          {capitulosLista.map((c) => {
+                            const renglonesEnCapitulo = renglones.filter((r) => (r as any).capituloId === c.id)
+                            return (
+                              <tr key={c.id} className="hover:bg-gray-50/80 transition-colors">
+                                <td className="px-3 py-2 text-center font-mono font-bold text-[#9B0F06]">Cap. {c.id}</td>
+                                <td className="px-3 py-2 font-semibold text-gray-900 max-w-xs">{c.nombre}</td>
+                                <td className="px-3 py-2">
+                                  {renglonesEnCapitulo.length === 0 ? (
+                                    <span className="text-[10px] text-gray-400 italic">No hay renglones asignados</span>
+                                  ) : (
+                                    <div className="flex flex-wrap items-center gap-1 max-h-20 overflow-y-auto pr-1">
+                                      <span className="text-[9px] font-bold text-gray-600 bg-gray-100 rounded px-1.5 py-0.5 border border-gray-200">
+                                        Total: {renglonesEnCapitulo.length}
+                                      </span>
+                                      {renglonesEnCapitulo.map((r) => (
+                                        <span
+                                          key={r.id}
+                                          className="inline-block rounded bg-red-50 px-1.5 py-0.5 font-mono text-[9px] font-semibold text-[#9B0F06] border border-red-200"
+                                          title={r.descripcion}
+                                        >
+                                          {r.codigoDGC}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+                                </td>
+                                <td className="px-3 py-2 text-center">
+                                  <div className="flex items-center justify-center gap-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setCapituloForm({ id: c.id, nombre: c.nombre })
+                                        setModalCapituloFormOpen(true)
+                                      }}
+                                      className="p-1 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                      title="Editar capítulo"
+                                    >
+                                      <Edit2 size={13} />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setCapituloAEliminar({ id: c.id, nombre: c.nombre })}
+                                      className="p-1 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                      title="Eliminar capítulo"
+                                    >
+                                      <Trash2 size={13} />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer Modal Principal */}
+            <div className="border-t border-gray-200 bg-gray-50 px-5 py-2.5 flex items-center justify-between text-xs text-gray-500">
+              <span>Gestión de Catálogos de Construcción Vial</span>
+              <button
+                type="button"
+                onClick={() => setModalGestionRenglonesOpen(false)}
+                className="rounded-lg border border-gray-300 bg-white px-4 py-1.5 text-[11px] font-medium text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* FORMULARIO CREAR / EDITAR UNIDAD DE MEDIDA */}
+      {modalUnidadFormOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs font-[Poppins]">
+          <div className="w-full max-w-md rounded-xl bg-white p-4 shadow-2xl space-y-3 border border-gray-200">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+              <h3 className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
+                <Calculator size={14} className="text-[#9B0F06]" />
+                <span>{unidadForm.id ? 'Editar Unidad de Medida' : 'Nueva Unidad de Medida'}</span>
+              </h3>
+              <button type="button" onClick={() => setModalUnidadFormOpen(false)} className="text-gray-400 hover:text-gray-600">
+                <X size={14} />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <div>
+                <label className="text-[10px] font-semibold text-gray-700 mb-0.5 block">Símbolo / Abreviatura *</label>
+                <input
+                  type="text"
+                  value={unidadForm.simbolo}
+                  onChange={(e) => setUnidadForm({ ...unidadForm, simbolo: e.target.value })}
+                  placeholder="Ej: m³, Glb, ton"
+                  className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-gray-800 focus:outline-none focus:border-[#9B0F06]"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-semibold text-gray-700 mb-0.5 block">Nombre Completo *</label>
+                <input
+                  type="text"
+                  value={unidadForm.nombre}
+                  onChange={(e) => setUnidadForm({ ...unidadForm, nombre: e.target.value })}
+                  placeholder="Ej: Metro Cúbico"
+                  className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-800 focus:outline-none focus:border-[#9B0F06]"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-semibold text-gray-700 mb-0.5 block">Descripción de Aplicación</label>
+                <textarea
+                  rows={2}
+                  value={unidadForm.descripcion}
+                  onChange={(e) => setUnidadForm({ ...unidadForm, descripcion: e.target.value })}
+                  placeholder="Ej: Utilizada para cálculo de volumen en excavaciones"
+                  className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-800 focus:outline-none focus:border-[#9B0F06]"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-1.5 pt-2 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setModalUnidadFormOpen(false)}
+                className="rounded-lg border border-gray-300 bg-white px-3 py-1 text-xs font-normal text-gray-700 hover:bg-gray-50 cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleGuardarUnidad}
+                className="rounded-lg bg-[#9B0F06] px-3.5 py-1 text-xs font-medium text-white hover:bg-[#5E0006] cursor-pointer"
+              >
+                Guardar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRMACIÓN ELIMINAR UNIDAD */}
+      {unidadAEliminar && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs font-[Poppins]">
+          <div className="w-full max-w-sm rounded-xl bg-white p-4 shadow-2xl space-y-3 border border-gray-200">
+            <div className="flex items-center gap-2 text-red-700">
+              <Trash2 size={16} />
+              <h3 className="text-xs font-semibold text-gray-900">¿Eliminar Unidad de Medida?</h3>
+            </div>
+            <p className="text-[11px] text-gray-600 font-normal">
+              Está a punto de eliminar la unidad <span className="font-bold font-mono text-gray-900">{unidadAEliminar.simbolo}</span>.
+            </p>
+            <div className="flex justify-end gap-1.5 pt-2 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setUnidadAEliminar(null)}
+                className="rounded-lg border border-gray-300 bg-white px-3 py-1 text-xs text-gray-700 hover:bg-gray-50 cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmarEliminarUnidad}
+                className="rounded-lg bg-[#9B0F06] px-3 py-1 text-xs font-medium text-white hover:bg-[#5E0006] cursor-pointer"
+              >
+                Eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* FORMULARIO CREAR / EDITAR CAPÍTULO */}
+      {modalCapituloFormOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs font-[Poppins]">
+          <div className="w-full max-w-md rounded-xl bg-white p-4 shadow-2xl space-y-3 border border-gray-200">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+              <h3 className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
+                <Layers size={14} className="text-[#9B0F06]" />
+                <span>{capituloForm.id ? `Editar Capítulo ${capituloForm.id}` : 'Nuevo Capítulo Sábana'}</span>
+              </h3>
+              <button type="button" onClick={() => setModalCapituloFormOpen(false)} className="text-gray-400 hover:text-gray-600">
+                <X size={14} />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <div>
+                <label className="text-[10px] font-semibold text-gray-700 mb-0.5 block">Nombre del Capítulo *</label>
+                <input
+                  type="text"
+                  value={capituloForm.nombre}
+                  onChange={(e) => setCapituloForm({ ...capituloForm, nombre: e.target.value })}
+                  placeholder="Ej: Capítulo X: Estructuras y Puentes Principales"
+                  className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-800 focus:outline-none focus:border-[#9B0F06]"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-1.5 pt-2 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setModalCapituloFormOpen(false)}
+                className="rounded-lg border border-gray-300 bg-white px-3 py-1 text-xs font-normal text-gray-700 hover:bg-gray-50 cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleGuardarCapitulo}
+                className="rounded-lg bg-[#9B0F06] px-3.5 py-1 text-xs font-medium text-white hover:bg-[#5E0006] cursor-pointer"
+              >
+                Guardar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRMACIÓN ELIMINAR CAPÍTULO */}
+      {capituloAEliminar && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs font-[Poppins]">
+          <div className="w-full max-w-sm rounded-xl bg-white p-4 shadow-2xl space-y-3 border border-gray-200">
+            <div className="flex items-center gap-2 text-red-700">
+              <Trash2 size={16} />
+              <h3 className="text-xs font-semibold text-gray-900">¿Eliminar Capítulo?</h3>
+            </div>
+            <p className="text-[11px] text-gray-600 font-normal">
+              Está a punto de eliminar el capítulo <span className="font-bold text-gray-900">{capituloAEliminar.nombre}</span>.
+            </p>
+            <div className="flex justify-end gap-1.5 pt-2 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setCapituloAEliminar(null)}
+                className="rounded-lg border border-gray-300 bg-white px-3 py-1 text-xs text-gray-700 hover:bg-gray-50 cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmarEliminarCapitulo}
                 className="rounded-lg bg-[#9B0F06] px-3 py-1 text-xs font-medium text-white hover:bg-[#5E0006] cursor-pointer"
               >
                 Eliminar

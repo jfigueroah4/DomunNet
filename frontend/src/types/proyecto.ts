@@ -18,6 +18,8 @@ export interface DocumentoProyecto {
   tamanio: string
   fechaSubida: string
   subidoPor: string
+  categoria?: string
+  url?: string
 }
 
 export interface FotografiaProyecto {
@@ -60,7 +62,10 @@ export interface Proyecto {
   montoContractualOriginal?: number;
   fechaFinalizacionReal?: string;
   plazoEjecucionRealAmpliado?: number;
-  montoFinancieroFinalEjecutado?: number;
+  departamentoNombre?: string;
+  municipioNombre?: string;
+  departamentoId?: string;
+  municipioId?: string;
   id: string
   codigo?: string
   nombre: string

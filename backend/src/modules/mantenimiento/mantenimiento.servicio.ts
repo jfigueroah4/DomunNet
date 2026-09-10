@@ -22,8 +22,16 @@ export async function listarRegistros(config: TablaConfig, pagina: number, limit
   const { data, error, count } = await query;
   if (error) throw new Error(error.message);
   
-  // Fake dependenciasCount to avoid mapping manually for now (can be optimized later)
-  const enrichedData = data.map((d: any) => ({...d, dependenciasCount: 0}));
+  const discreteUnits = ['u', 'Glb', 'mes', 'hoja', 'arbol'];
+  const enrichedData = data.map((d: any) => {
+    const item = { ...d, dependenciasCount: 0 };
+    if (config.nombreTablaDb === 'unidad_medida') {
+      item.es_discreta = d.es_discreta !== undefined && d.es_discreta !== null
+        ? Boolean(d.es_discreta)
+        : discreteUnits.includes(d.abreviatura);
+    }
+    return item;
+  });
   
   return { data: enrichedData, total: count || 0, columnasVisibles: config.columnasVisibles, columnasFiltroMenu: config.columnasFiltroMenu || [] };
 }
@@ -31,7 +39,14 @@ export async function listarRegistros(config: TablaConfig, pagina: number, limit
 export async function obtenerRegistro(config: TablaConfig, id: string) {
   const { data, error } = await clienteSupabase.from(config.nombreTablaDb).select(config.columnasVisibles).eq('id', id).single();
   if (error) throw new Error(error.message);
-  return data;
+  const record: any = data;
+  if (config.nombreTablaDb === 'unidad_medida' && record) {
+    const discreteUnits = ['u', 'Glb', 'mes', 'hoja', 'arbol'];
+    record.es_discreta = record.es_discreta !== undefined && record.es_discreta !== null
+      ? Boolean(record.es_discreta)
+      : discreteUnits.includes(record.abreviatura);
+  }
+  return record;
 }
 
 export async function crearRegistro(config: TablaConfig, payload: any, usuario_id?: string) {

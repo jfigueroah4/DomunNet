@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { Usuario } from '@/types/usuario'
 import { AccionEstadoModal } from '@/components/ui/AccionEstadoModal'
@@ -16,7 +16,7 @@ export function UsuarioDeleteModal({
   onConfirm,
   usuario,
 }: UsuarioDeleteModalProps) {
-  const isSuspended = usuario?.estado === 'Suspendido' || usuario?.estado === 'Inactivo'
+  const isSuspended = usuario?.estado === 'Suspendido' || (usuario as any)?.activo === false
 
   return (
     <AccionEstadoModal

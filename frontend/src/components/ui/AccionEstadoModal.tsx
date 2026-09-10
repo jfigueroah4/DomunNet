@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { Trash2, X, CheckCircle, PowerOff } from 'lucide-react'
 
@@ -28,17 +28,18 @@ export function AccionEstadoModal({
   return (
     <>
       <div className="fixed inset-0 z-40 bg-black/45 backdrop-blur-[1px]" onClick={onClose} />
-      <div className="fixed left-1/2 top-1/2 z-50 w-full max-w-sm -translate-x-1/2 -translate-y-1/2">
+      <div className="fixed left-1/2 top-1/2 z-50 w-full max-w-[420px] -translate-x-1/2 -translate-y-1/2">
         <div className="relative overflow-hidden rounded-2xl bg-white p-6 shadow-2xl">
           <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-red-500 to-[#9B0F06]" />
           
-          <div className="mb-4 flex items-center justify-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-red-500 ring-4 ring-red-50/50">
-              <Trash2 size={24} strokeWidth={1.5} />
+          <div className="mb-4 flex items-center justify-center relative">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-[#9B0F06] ring-4 ring-red-50/50">
+              <Trash2 size={22} strokeWidth={1.75} />
             </div>
             <button
               onClick={onClose}
               className="absolute right-0 top-0 rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+              title="Cerrar"
             >
               <X size={16} />
             </button>
@@ -59,26 +60,26 @@ export function AccionEstadoModal({
             {!isSuspended ? (
               <button
                 onClick={() => onConfirm('suspender')}
-                className="w-full flex items-center justify-center gap-2 rounded-xl py-2.5 text-[12px] font-semibold text-white transition-colors bg-[#9B0F06] hover:bg-[#5E0006]"
+                className="w-full flex items-center justify-center gap-2 rounded-xl py-2.5 text-[12px] font-semibold text-white transition-colors bg-[#9B0F06] hover:bg-[#5E0006] cursor-pointer"
               >
                 <PowerOff size={16} />
                 Inactivar temporalmente
               </button>
             ) : (
-              <div className="flex w-full gap-2">
+              <div className="flex w-full gap-2 items-center">
                 <button
                   onClick={() => onConfirm('activar')}
-                  className="flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-[12px] font-semibold text-white transition-colors bg-yellow-500 hover:bg-yellow-600"
+                  className="flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-[11.5px] font-bold text-white transition-colors bg-orange-500 hover:bg-orange-600 cursor-pointer whitespace-nowrap px-3"
                 >
-                  <CheckCircle size={16} />
-                  Activar
+                  <CheckCircle size={15} />
+                  <span>Activar</span>
                 </button>
                 <button
                   onClick={() => onConfirm('eliminar')}
-                  className="flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-[12px] font-semibold text-white transition-colors bg-[#9B0F06] hover:bg-[#5E0006]"
+                  className="flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-[11.5px] font-bold text-white transition-colors bg-[#9B0F06] hover:bg-[#5E0006] cursor-pointer whitespace-nowrap px-3"
                 >
-                  <Trash2 size={16} />
-                  Eliminar definitivamente
+                  <Trash2 size={15} />
+                  <span>Eliminar definitivamente</span>
                 </button>
               </div>
             )}

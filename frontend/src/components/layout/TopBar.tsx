@@ -158,22 +158,22 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
   return (
     <header className="flex items-center justify-between h-12 bg-white border-b border-gray-100 px-4">
       {/* Left Section - Menu & Section */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 sm:gap-3">
         <button
           onClick={onToggle}
-          className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors text-gray-700 hover:text-gray-900"
+          className="hidden md:flex p-1.5 hover:bg-gray-100 rounded-lg transition-colors text-gray-700 hover:text-gray-900"
         >
           <Menu size={15} />
         </button>
         <div className="flex flex-col leading-tight">
-          <span className="text-[8px] text-gray-300 uppercase tracking-widest">Sección</span>
-          <span className="text-[10px] text-gray-700 font-semibold uppercase tracking-wide">{section}</span>
+          <span className="text-[8px] text-gray-300 uppercase tracking-widest hidden sm:block">Sección</span>
+          <span className="text-[10px] text-gray-700 font-semibold uppercase tracking-wide truncate max-w-[110px] sm:max-w-none">{section}</span>
         </div>
       </div>
 
       {/* Center Section - Search */}
-      <div id="search-bar-container" className="flex-1 mx-8 max-w-[420px] relative">
-        <div className="flex items-center gap-2 bg-gray-100 rounded-full px-4 py-1.5" style={{ height: '32px' }}>
+      <div id="search-bar-container" className="flex-1 mx-2 sm:mx-8 max-w-[420px] relative">
+        <div className="flex items-center gap-2 bg-gray-100 rounded-full px-3 sm:px-4 py-1.5" style={{ height: '32px' }}>
           <Search size={15} className="text-gray-400 flex-shrink-0" />
           <input
             type="text"
@@ -211,11 +211,11 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
       </div>
 
       {/* Right Section */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 sm:gap-4">
         {/* AI Button */}
         <button
           onClick={() => setIsAIOpen(true)}
-          className="p-2 rounded-full hover:bg-gray-100 transition-colors text-gray-600 hover:text-gray-800"
+          className="p-1.5 sm:p-2 rounded-full hover:bg-gray-100 transition-colors text-gray-600 hover:text-gray-800"
           title="Asistente IA"
         >
           <Bot size={15} />
@@ -224,7 +224,7 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
         {/* Tickets Button */}
         <Link
           href="/dashboard/tickets"
-          className="p-2 rounded-full hover:bg-gray-100 transition-colors text-gray-600 hover:text-gray-800 relative"
+          className="p-1.5 sm:p-2 rounded-full hover:bg-gray-100 transition-colors text-gray-600 hover:text-gray-800 relative hidden sm:flex"
           title="Tickets"
         >
           <Ticket size={15} />
@@ -235,7 +235,7 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
         <div id="notifications-menu" className="relative">
           <button
             onClick={() => (notificationsOpen ? closeNotifications() : openNotifications())}
-            className="relative bg-[#EED9B9]/30 p-2 rounded-2xl cursor-pointer hover:bg-[#EED9B9]/50 transition-all duration-300 flex items-center justify-center"
+            className="relative bg-[#EED9B9]/30 p-1.5 sm:p-2 rounded-2xl cursor-pointer hover:bg-[#EED9B9]/50 transition-all duration-300 flex items-center justify-center"
           >
             <Bell size={15} className="text-[#9B0F06]" />
             {unreadCount > 0 && (
@@ -287,7 +287,7 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
                 {profile ? `${profile.nombre ? profile.nombre.charAt(0) : ''}${profile.apellido ? profile.apellido.charAt(0) : ''}`.toUpperCase() : 'U'}
               </span>
             </div>
-            <div className="flex items-baseline gap-1">
+            <div className="hidden sm:flex items-baseline gap-1">
               <span className="text-[10px] text-gray-500">Hola,</span>
               <span className="text-[10px] font-semibold text-gray-800">
                 {getShortName(profile)}

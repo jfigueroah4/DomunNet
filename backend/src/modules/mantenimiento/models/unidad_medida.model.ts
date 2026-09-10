@@ -3,11 +3,19 @@ import { TablaConfig } from '../mantenimiento.types';
 export const unidadMedidaConfig: TablaConfig = {
   "nombreTablaDb": "unidad_medida",
   "permisoRequerido": "catalogos.write",
-  "columnasVisibles": "id, nombre, abreviatura",
+  "columnasVisibles": "id, nombre, abreviatura, es_discreta",
   "columnasFiltroOrden": [
     "id",
     "nombre",
-    "abreviatura"
+    "abreviatura",
+    "es_discreta"
   ],
-  "columnasFiltroMenu": []
+  "columnasFiltroMenu": [
+    {
+      "columna": "es_discreta",
+      "tipo": "boolean",
+      "opciones": ["true", "false"]
+    }
+  ]
 };
+

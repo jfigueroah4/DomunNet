@@ -81,11 +81,11 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="flex min-h-screen bg-[#F3F4F7]">
+    <div className="flex h-screen overflow-hidden bg-[#F3F4F7]">
       <Sidebar collapsed={collapsed} />
-      <main className="flex min-w-0 flex-1 flex-col bg-[#F3F4F7]">
+      <main className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden bg-[#F3F4F7]">
         <TopBar section={section} onToggle={() => setCollapsed(!collapsed)} />
-        <div className="flex-1 overflow-auto px-4 pt-4 pb-20 md:pb-4 xl:px-5">
+        <div className="flex-1 overflow-y-auto px-4 pt-4 pb-20 md:pb-4 xl:px-5">
           <div className="mx-auto w-full max-w-[1600px]">
             {autorizado ? children : <AccessDenied />}
           </div>

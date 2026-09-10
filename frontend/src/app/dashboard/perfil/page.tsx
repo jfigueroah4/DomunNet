@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Edit, UserCheck, User, Mail, Calendar, Pencil, X, AlertTriangle } from 'lucide-react'
-import { api } from '@/lib/api/cliente'
+import { api, limpiarCacheMemoria } from '@/lib/api/cliente'
 import { UsuarioFormularioDrawer } from '@/components/modules/usuarios/UsuarioFormularioDrawer'
 import { Usuario, RolUsuario, EstadoUsuario } from '@/types/usuario'
 import { useCustomToast } from '@/hooks/useCustomToast'
@@ -30,14 +30,15 @@ export default function PerfilPage() {
   }, [fetchProfile])
 
   const formatearFecha = (fechaStr?: string | null) => {
-    if (!fechaStr) return 'Nunca'
+    if (!fechaStr) return 'No registrada'
     try {
       const fecha = new Date(fechaStr)
       if (isNaN(fecha.getTime())) return fechaStr
       return fecha.toLocaleDateString('es-GT', {
         day: '2-digit',
         month: 'long',
-        year: 'numeric'
+        year: 'numeric',
+        timeZone: 'UTC',
       })
     } catch {
       return fechaStr
@@ -87,7 +88,9 @@ export default function PerfilPage() {
         primer_apellido: formData.primer_apellido,
         segundo_apellido: formData.segundo_apellido || null,
         correo: formData.correo,
+        username: formData.username || null,
         telefono: formData.telefono || '',
+        direccion: formData.direccion || null,
         rol: formData.rol,
         estado: formData.estado,
         fecha_nacimiento: formData.fecha_nacimiento,
@@ -97,6 +100,7 @@ export default function PerfilPage() {
       
       if (res.status === 200 || res.data?.success) {
          showSuccessToast('Perfil actualizado correctamente');
+         limpiarCacheMemoria();
          fetchProfile();
       } else {
          toast.error('Error al actualizar el perfil');
@@ -118,7 +122,9 @@ export default function PerfilPage() {
           primer_apellido: pendingData.primer_apellido,
           segundo_apellido: pendingData.segundo_apellido || null,
           correo: pendingData.correo,
+          username: pendingData.username || null,
           telefono: pendingData.telefono || '',
+          direccion: pendingData.direccion || null,
           rol: pendingData.rol,
           estado: pendingData.estado,
           fecha_nacimiento: pendingData.fecha_nacimiento,
@@ -170,6 +176,7 @@ export default function PerfilPage() {
     fechaCreacion: profile.fechaRegistro,
     ultimoAcceso: profile.ultimoAcceso || undefined,
     telefono: profile.telefono,
+    direccion: profile.direccion,
     fecha_nacimiento: profile.fechaNacimiento,
   }
 
@@ -327,6 +334,7 @@ export default function PerfilPage() {
         onClose={() => setIsDrawerOpen(false)} 
         usuario={usuarioMapped} 
         onSave={handleSaveUsuario}
+        isPerfilEdit={true}
       />
 
       {/* Modal Confirmación de Desactivación */}

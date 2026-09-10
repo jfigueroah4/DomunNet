@@ -1,19 +1,31 @@
 import { Request, Response } from 'express'
 import { z } from 'zod'
 import { sendError, sendResponse } from '@/shared/response'
-import { actualizarEstadoProyecto, actualizarProyecto, obtenerProyectoPorId, ValidationError } from './proyectos.servicio'
+import { actualizarEstadoProyecto, actualizarProyecto, obtenerProyectoPorId, obtenerProyectos, ValidationError } from './proyectos.servicio'
 
 const cambiarEstadoSchema = z.object({
   estado_codigo: z.string().min(1)
 })
+
+const uuidOpcional = z.preprocess(
+  (val) => {
+    if (!val || val === '') return null
+    if (typeof val === 'string') {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(val.trim())
+      return isUuid ? val.trim() : null
+    }
+    return val
+  },
+  z.string().uuid().optional().nullable()
+)
 
 const actualizarProyectoSchema = z.object({
   // Paso 1: Identificación y Ubicación.
   nombreOficial: z.string().min(1).optional(),
   descripcion: z.string().optional().nullable(),
   ubicacionFisica: z.string().optional().nullable(),
-  municipioId: z.string().uuid().optional().nullable(),
-  departamentoId: z.string().uuid().optional().nullable(),
+  municipioId: uuidOpcional,
+  departamentoId: uuidOpcional,
   latitud: z.number().optional().nullable(),
   longitud: z.number().optional().nullable(),
   direccion: z.string().optional().nullable(),
@@ -21,19 +33,22 @@ const actualizarProyectoSchema = z.object({
   kilometroFin: z.number().optional().nullable(),
 
   // Paso 2 & 3: Entidades y Seguimiento
-  empresaContratanteId: z.string().uuid().optional().nullable(),
+  empresaContratanteId: uuidOpcional,
+  empresaContratistaId: uuidOpcional,
   empresaContratista: z.string().optional().nullable(),
   empresaSupervisora: z.string().optional().nullable(),
-  delegadoResidenteId: z.string().uuid().optional().nullable(),
+  delegadoResidenteId: uuidOpcional,
   fechaAdjudicacion: z.string().optional().nullable(),
   fechaInicioContractual: z.string().optional().nullable(),
   numeroEscrituraPublica: z.string().optional().nullable(),
   montoContractualOriginal: z.number().optional().nullable(),
-  equipo: z.array(z.object({ id: z.string().uuid().optional(), rol: z.string().optional() })).optional().nullable(),
+  responsable: uuidOpcional,
+  estado: z.string().optional().nullable(),
+  equipo: z.array(z.object({ id: uuidOpcional, rol: z.string().optional() })).optional().nullable(),
 
   paso2: z.record(z.unknown()).optional(),
   paso3: z.record(z.unknown()).optional(),
-}).strict()
+}).passthrough()
 
 export async function cambiarEstadoControlador(req: Request, res: Response) {
   try {
@@ -81,36 +96,58 @@ export async function obtenerProyectoControlador(req: Request, res: Response) {
   }
 }
 
+export async function obtenerProyectosControlador(req: Request, res: Response) {
+  try {
+    const proyectos = await obtenerProyectos()
+    return sendResponse(res, 200, proyectos, 'Proyectos obtenidos correctamente')
+  } catch (error: any) {
+    console.error('Error en obtenerProyectosControlador:', error)
+    return sendError(res, 500, error.message || 'Error interno del servidor')
+  }
+}
+
 import { crearProyecto } from './proyectos.servicio'
 
 const crearProyectoSchema = z.object({
   nombreOficial: z.string().min(1, "Nombre es requerido"),
+  nombre: z.string().optional().nullable(),
   descripcion: z.string().optional().nullable(),
   ubicacionFisica: z.string().optional().nullable(),
-  responsable: z.string().uuid().optional().nullable(),
+  ubicacion: z.string().optional().nullable(),
+  responsable: uuidOpcional,
+  estado: z.string().optional().nullable(),
   
-    municipioId: z.string().uuid().optional().nullable(),
-    departamentoId: z.string().uuid().optional().nullable(),
-    latitud: z.number().optional().nullable(),
-    longitud: z.number().optional().nullable(),
-    direccion: z.string().optional().nullable(),
-    kilometroInicio: z.number().optional().nullable(),
-    kilometroFin: z.number().optional().nullable(),
-    montoFinal: z.number().optional().nullable(),
+  municipioId: uuidOpcional,
+  departamentoId: uuidOpcional,
+  latitud: z.number().optional().nullable(),
+  longitud: z.number().optional().nullable(),
+  direccion: z.string().optional().nullable(),
+  kilometroInicio: z.number().optional().nullable(),
+  kilometroFin: z.number().optional().nullable(),
+  montoFinal: z.number().optional().nullable(),
 
-  empresaContratanteId: z.string().uuid().optional().nullable(),
+  empresaContratanteId: uuidOpcional,
+  entidadContratante: z.string().optional().nullable(),
+  empresaContratistaId: uuidOpcional,
   empresaContratista: z.string().optional().nullable(),
   empresaSupervisora: z.string().optional().nullable(),
-  delegadoResidenteId: z.string().uuid().optional().nullable(),
+  delegadoResidenteId: uuidOpcional,
   fechaAdjudicacion: z.string().optional().nullable(),
   fechaInicioContractual: z.string().optional().nullable(),
+  fechaInicio: z.string().optional().nullable(),
+  fechaFinContractualPlan: z.string().optional().nullable(),
+  fechaFin: z.string().optional().nullable(),
   numeroEscrituraPublica: z.string().optional().nullable(),
   montoContractualOriginal: z.number().optional().nullable(),
-  plazoEjecucionOriginal: z.string().optional().nullable(),
-  plazoEjecucionRealAmpliado: z.string().optional().nullable(),
+  presupuesto: z.number().optional().nullable(),
+  plazoEjecucionOriginal: z.union([z.string(), z.number()]).optional().nullable(),
+  plazoEjecucionContractualOriginal: z.string().optional().nullable(),
+  plazoEjecucionRealAmpliado: z.union([z.string(), z.number()]).optional().nullable(),
   fechaFinalizacionReal: z.string().optional().nullable(),
-  equipo: z.array(z.object({ id: z.string().uuid().optional(), rol: z.string().optional() })).optional().nullable()
-})
+  montoFinancieroFinalEjecutado: z.number().optional().nullable(),
+  equipo: z.array(z.object({ id: uuidOpcional, rol: z.string().optional() })).optional().nullable(),
+  coordenadasMapa: z.any().optional().nullable()
+}).passthrough()
 
 export async function crearProyectoControlador(req: Request, res: Response) {
   try {
@@ -123,5 +160,17 @@ export async function crearProyectoControlador(req: Request, res: Response) {
     }
     console.error('Error en crearProyectoControlador:', error)
     return sendError(res, 500, error.message || 'Error interno del servidor')
+  }
+}
+
+import { eliminarProyecto } from './proyectos.servicio'
+
+export async function eliminarProyectoControlador(req: Request, res: Response) {
+  try {
+    await eliminarProyecto(req.params.id)
+    return sendResponse(res, 200, { success: true }, 'Proyecto eliminado exitosamente')
+  } catch (error: any) {
+    console.error('Error en eliminarProyectoControlador:', error)
+    return sendError(res, 500, error.message || 'Error al eliminar el proyecto')
   }
 }

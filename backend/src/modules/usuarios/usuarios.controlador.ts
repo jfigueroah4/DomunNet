@@ -21,7 +21,7 @@ export const esquemaUsuario = z.object({
   correo: z.string().email(),
   telefono: z.string().min(4),
   rol: z.string().min(2),
-  estado: z.enum(['Activo', 'Inactivo']),
+  estado: z.enum(['Activo', 'Inactivo', 'Suspendido']),
   contrasena: z.string().min(6).optional(),
   proyectosAsignados: z.array(z.string()).optional(),
   username: z.string().regex(/^[a-zA-Z0-9_.-]+$/, 'Nombre de usuario inválido (sin espacios ni @)').min(3).max(30).optional().nullable().or(z.literal('')),
@@ -34,8 +34,8 @@ export async function listarUsuariosControlador(req: Request, res: Response) {
     busqueda: typeof req.query.busqueda === 'string' ? req.query.busqueda : undefined,
     rol: typeof req.query.rol === 'string' ? req.query.rol : undefined,
     estado:
-      req.query.estado === 'Activo' || req.query.estado === 'Inactivo' || req.query.estado === 'Todos'
-        ? req.query.estado
+      req.query.estado === 'Activo' || req.query.estado === 'Inactivo' || req.query.estado === 'Suspendido' || req.query.estado === 'Todos'
+        ? (req.query.estado as 'Activo' | 'Inactivo' | 'Suspendido' | 'Todos')
         : undefined,
   })
 

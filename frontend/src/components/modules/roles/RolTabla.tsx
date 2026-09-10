@@ -113,9 +113,7 @@ export const RolTabla = React.memo(function RolTabla({
                         <Eye size={12} />
                       </button>
                       <button
-                        onClick={() => role.name !== 'Contratante' && onEditar(role)}
-                        disabled={role.name === 'Contratante'}
-                        style={{ opacity: role.name === 'Contratante' ? 0.3 : 1, cursor: role.name === 'Contratante' ? 'not-allowed' : 'pointer' }}
+                        onClick={() => onEditar(role)}
                         className="p-1 text-gray-400 transition-colors hover:text-[#9B0F06]"
                         title="Editar"
                       >
@@ -129,9 +127,7 @@ export const RolTabla = React.memo(function RolTabla({
                         <UserPlus size={12} />
                       </button>
                       <button
-                        onClick={() => role.name !== 'Contratante' && onEliminar(role)}
-                        disabled={role.name === 'Contratante'}
-                        style={{ opacity: role.name === 'Contratante' ? 0.3 : 1, cursor: role.name === 'Contratante' ? 'not-allowed' : 'pointer' }}
+                        onClick={() => onEliminar(role)}
                         className="p-1 text-gray-400 transition-colors hover:text-red-600"
                         title="Eliminar"
                       >

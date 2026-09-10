@@ -204,7 +204,8 @@ const capituloSabanaSchema = z.object({
 
 const unidadMedidaSchema = z.object({
   nombre: z.string().max(100),
-  abreviatura: z.string().max(20)
+  abreviatura: z.string().max(20),
+  es_discreta: z.boolean().optional().default(false)
 }).strict()
 
 const renglonTrabajoSchema = z.object({
