@@ -97,6 +97,7 @@ export default function LoginPage() {
     });
 
     showSuccessToast("¡Sesión iniciada correctamente!");
+    localStorage.removeItem('domun_failed_login_attempts');
 
     if (rememberMe) {
       localStorage.setItem('domun_remembered_username', identificador);
@@ -116,6 +117,18 @@ export default function LoginPage() {
       return;
     }
 
+    // Verificar si la cuenta está bloqueada por excesivos intentos fallidos (1 hora)
+    try {
+      const storedLock = localStorage.getItem('domun_failed_login_attempts');
+      if (storedLock) {
+        const { lockUntil } = JSON.parse(storedLock);
+        if (lockUntil && Date.now() < lockUntil) {
+          showErrorToast(`Demasiados intentos fallidos. Su cuenta está bloqueada temporalmente durante 1 hora.`);
+          return;
+        }
+      }
+    } catch {}
+
     if (!username.trim() || !password.trim()) {
       if (!username.trim()) setEmailError(true);
       if (!password.trim()) setPasswordError(true);
@@ -131,7 +144,31 @@ export default function LoginPage() {
     } catch (error) {
       setEmailError(true);
       setPasswordError(true);
-      showErrorToast("Credenciales incorrectas. Verifica tu usuario y contraseña.");
+
+      let attempts = 1;
+      let lockUntil: number | null = null;
+      try {
+        const stored = localStorage.getItem('domun_failed_login_attempts');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed.lockUntil && Date.now() >= parsed.lockUntil) {
+            attempts = 1;
+          } else {
+            attempts = (parsed.attempts || 0) + 1;
+          }
+        }
+      } catch {
+        attempts = 1;
+      }
+
+      if (attempts >= 5) {
+        lockUntil = Date.now() + 3600 * 1000; // 1 hora de bloqueo
+        localStorage.setItem('domun_failed_login_attempts', JSON.stringify({ attempts, lockUntil }));
+        showErrorToast("Demasiados intentos fallidos. Su cuenta está bloqueada temporalmente durante 1 hora.");
+      } else {
+        localStorage.setItem('domun_failed_login_attempts', JSON.stringify({ attempts, lockUntil: null }));
+        showErrorToast(`Credenciales incorrectas. Intento ${attempts} de 5.`);
+      }
     } finally {
       setIsSubmitting(false);
     }

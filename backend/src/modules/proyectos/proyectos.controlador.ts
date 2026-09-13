@@ -1,7 +1,7 @@
 import { Request, Response } from 'express'
 import { z } from 'zod'
 import { sendError, sendResponse } from '@/shared/response'
-import { actualizarEstadoProyecto, actualizarProyecto, obtenerProyectoPorId, obtenerProyectos, ValidationError } from './proyectos.servicio'
+import { actualizarEstadoProyecto, actualizarProyecto, obtenerProyectoPorId, obtenerProyectos, obtenerPendientesPorProyecto, ValidationError } from './proyectos.servicio'
 
 const cambiarEstadoSchema = z.object({
   estado_codigo: z.string().min(1)
@@ -103,6 +103,16 @@ export async function obtenerProyectosControlador(req: Request, res: Response) {
   } catch (error: any) {
     console.error('Error en obtenerProyectosControlador:', error)
     return sendError(res, 500, error.message || 'Error interno del servidor')
+  }
+}
+
+export async function obtenerPendientesControlador(req: Request, res: Response) {
+  try {
+    const pendientes = await obtenerPendientesPorProyecto(req.params.id)
+    return sendResponse(res, 200, pendientes, 'Pendientes obtenidos correctamente')
+  } catch (error: any) {
+    console.error('Error en obtenerPendientesControlador:', error)
+    return sendError(res, 500, error.message || 'Error al obtener pendientes')
   }
 }
 

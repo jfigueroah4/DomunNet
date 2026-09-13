@@ -74,14 +74,62 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [notificationsVisible, setNotificationsVisible] = useState(false)
   const [unreadCount] = useState(0) // Default 0 to match empty state
+  const [openTicketsCount, setOpenTicketsCount] = useState<number>(0)
   const { profile } = useAuthStore()
   
   // Search suggestion state
   const [searchQuery, setSearchQuery] = useState('')
-  const [suggestions, setSuggestions] = useState<typeof systemRoutes>([])
+  const [suggestions, setSuggestions] = useState<{ name: string; path: string; category?: string; keywords?: string[] }[]>([])
   const [showSearchDropdown, setShowSearchDropdown] = useState(false)
+  const [realProjects, setRealProjects] = useState<{ name: string; path: string; category: string; keywords: string[] }[]>([])
 
-  
+  useEffect(() => {
+    const fetchProyectos = async () => {
+      try {
+        const res = await api.get('/mantenimiento/proyecto?limite=100')
+        const items = res.data?.data || res.data || []
+        if (Array.isArray(items)) {
+          const projectRoutes = items.map((p: any) => ({
+            name: p.nombre_proyecto || p.codigo_proyecto || 'Proyecto',
+            path: `/dashboard/proyectos/hoja-sabana?slug=${p.slug || p.id}`,
+            category: 'Proyecto Real',
+            keywords: [p.codigo_proyecto, p.nombre_proyecto, p.tramo_vial, p.departamento].filter(Boolean)
+          }))
+          setRealProjects(projectRoutes)
+        }
+      } catch {
+        // Fallback en caso de error
+      }
+    }
+    fetchProyectos()
+  }, [])
+
+  useEffect(() => {
+    const updateTicketsCount = () => {
+      try {
+        const stored = localStorage.getItem('domun_support_tickets');
+        if (stored) {
+          const tickets = JSON.parse(stored);
+          const count = Array.isArray(tickets)
+            ? tickets.filter((t: any) => t.status !== 'cerrado').length
+            : 0;
+          setOpenTicketsCount(count);
+        } else {
+          setOpenTicketsCount(2);
+        }
+      } catch {
+        setOpenTicketsCount(0);
+      }
+    };
+
+    updateTicketsCount();
+    window.addEventListener('storage', updateTicketsCount);
+    const interval = setInterval(updateTicketsCount, 2000);
+    return () => {
+      window.removeEventListener('storage', updateTicketsCount);
+      clearInterval(interval);
+    };
+  }, []);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -131,7 +179,8 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
     }
 
     const lowerQuery = query.toLowerCase()
-    const filtered = systemRoutes.filter(route =>
+    const allRoutes = [...realProjects, ...systemRoutes]
+    const filtered = allRoutes.filter(route =>
       route.name.toLowerCase().includes(lowerQuery) ||
       route.path.toLowerCase().includes(lowerQuery) ||
       route.category?.toLowerCase().includes(lowerQuery) ||
@@ -225,10 +274,14 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
         <Link
           href="/dashboard/tickets"
           className="p-1.5 sm:p-2 rounded-full hover:bg-gray-100 transition-colors text-gray-600 hover:text-gray-800 relative hidden sm:flex"
-          title="Tickets"
+          title="Tickets de soporte"
         >
           <Ticket size={15} />
-          <span className="absolute -top-0.5 -right-0.5 bg-red-600 text-white text-[7px] font-bold w-3.5 h-3.5 rounded-full flex items-center justify-center">2</span>
+          {openTicketsCount > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 bg-[#9B0F06] text-white text-[8px] font-bold w-3.5 h-3.5 rounded-full flex items-center justify-center animate-pulse">
+              {openTicketsCount}
+            </span>
+          )}
         </Link>
 
         {/* Notifications Button & Dropdown */}

@@ -3,7 +3,7 @@ import { TablaConfig } from '../mantenimiento.types';
 export const renglonTrabajoCatalogoConfig: TablaConfig = {
   "nombreTablaDb": "renglon_trabajo_catalogo",
   "permisoRequerido": "catalogos.write",
-  "columnasVisibles": "id, capitulo_id, unidad_id, codigo, descripcion, tipo_renglon, aplica_indirectos, aplica_iva, activo, created_at",
+  "columnasVisibles": "id, capitulo_id, unidad_id, codigo, descripcion, tipo_renglon, aplica_indirectos, aplica_iva, activo, created_at, capitulo_sabana(id, nombre_capitulo, numero_capitulo)",
   "columnasFiltroOrden": [
     "id",
     "capitulo_id",

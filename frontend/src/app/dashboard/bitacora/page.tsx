@@ -25,11 +25,14 @@ export default function BitacoraPage() {
   const [proyectoId, setProyectoId] = useState('')
   const [estado, setEstado] = useState<EstadoBitacora | 'todos'>('todos')
   const [fechaDesde, setFechaDesde] = useState('')
-  const [fechaHasta, setFechaHasta] = useState('')
+  const [fechaHasta, setFechaHasta] = useState('')
+  const [rolFiltro, setRolFiltro] = useState('todos')
+  const [usuarioFiltro, setUsuarioFiltro] = useState('')
 
   // Filtrado
   const registrosFiltrados = useMemo(() => {
-    return BITACORA_MOCK.filter((registro) => {
+    const registrosBase: any[] = [];
+    return registrosBase.filter((registro: any) => {
       const matchBusqueda =
         busqueda === '' ||
         registro.titulo.toLowerCase().includes(busqueda.toLowerCase()) ||
@@ -62,7 +65,7 @@ export default function BitacoraPage() {
         matchFechaHasta
       )
     })
-  }, [busqueda, tipo, proyectoId, estado, fechaDesde, fechaHasta, vistaOperativa])
+  }, [busqueda, tipo, proyectoId, estado, fechaDesde, fechaHasta, vistaOperativa, rolFiltro, usuarioFiltro])
 
   // Agrupar por fecha
   const registrosAgrupados = useMemo(() => {
@@ -281,104 +284,110 @@ export default function BitacoraPage() {
                 </button>
               </div>
 
-              {/* Drawer Body - Scrollable Content */}
-              <div className="p-4 space-y-4 overflow-y-auto flex-1 text-xs">
-                {/* Metadatos Capturados */}
-                <div className="rounded-xl bg-gray-50 p-3 border border-gray-200 space-y-2.5">
-                  <p className="text-[9px] font-black uppercase tracking-wider text-gray-400 border-b border-gray-200 pb-1">
-                    Información del Registro
-                  </p>
-                  <div className="grid grid-cols-2 gap-2 text-[10.5px]">
-                    <div>
-                      <span className="text-gray-400 font-bold block text-[8px] uppercase">Proyecto:</span>
-                      <span className="font-bold text-gray-900">{drawerRegistro.proyectoNombre}</span>
-                    </div>
-
-                    <div>
-                      <span className="text-gray-400 font-bold block text-[8px] uppercase">Responsable (Autor):</span>
-                      <span className="font-bold text-gray-900">{drawerRegistro.autor}</span>
-                    </div>
-
-                    <div>
-                      <span className="text-gray-400 font-bold block text-[8px] uppercase">Tipo de Ingreso:</span>
-                      <span className="font-bold text-gray-800 capitalize">
-                        {drawerRegistro.tipoIngreso || 'Campo'}
-                      </span>
-                    </div>
-
-                    <div>
-                      <span className="text-gray-400 font-bold block text-[8px] uppercase">Turno de Trabajo:</span>
-                      <span className="font-bold text-gray-800">Diurno</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Fotografía(s) Adjuntas con ampliado o Estado Vacío */}
-                <div className="space-y-1.5">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-gray-700 flex items-center gap-1">
-                    <Camera size={12} className="text-[#9B0F06]" />
-                    <span>Evidencia Fotográfica</span>
-                  </p>
-
-                  {drawerRegistro.adjuntos && drawerRegistro.adjuntos.length > 0 ? (
-                    <div className="grid grid-cols-2 gap-2">
-                      {drawerRegistro.adjuntos.map((adj) => (
-                        <div
-                          key={adj.id}
-                          onClick={() => setFotoExpandida(adj.url)}
-                          className="group relative h-28 overflow-hidden rounded-lg border border-gray-200 bg-black cursor-pointer shadow-2xs"
-                        >
-                          <img
-                            src={adj.url}
-                            alt={adj.nombre}
-                            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105 opacity-90 group-hover:opacity-100"
-                          />
-                          <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
-                            <Maximize2 size={16} />
-                          </div>
-                          <span className="absolute bottom-1 left-1 rounded bg-black/60 px-1.5 py-0.2 text-[8px] text-white font-mono">
-                            {adj.nombre}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    /* Estado Vacío de Fotos per estados-vacio-error-carga skill */
-                    <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50/80 p-4 text-center space-y-1">
-                      <Camera size={20} className="mx-auto text-gray-300" />
-                      <p className="text-[11px] font-bold text-gray-600">Sin Fotografías Adjuntas</p>
-                      <p className="text-[9px] text-gray-400">No se adjuntaron fotografías en este registro de obra.</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Ubicación GPS o Estado Vacío */}
-                <div className="space-y-1.5">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-gray-700 flex items-center gap-1">
-                    <MapPin size={12} className="text-[#9B0F06]" />
-                    <span>Ubicación GPS de Campo</span>
-                  </p>
-
-                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-2.5 text-xs space-y-1">
-                    <p className="font-bold text-gray-800">{drawerRegistro.ubicacion}</p>
-                    <p className="font-mono text-[9.5px] text-gray-500">
-                      GPS: Lat 14.5021Â° N | Lng -90.5841Â° W (Verificado)
-                    </p>
-                  </div>
-                </div>
-
-                {/* Observaciones */}
-                <div className="space-y-1.5">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-gray-700 flex items-center gap-1">
-                    <MessageSquare size={12} className="text-[#9B0F06]" />
-                    <span>Observaciones Técnicas</span>
-                  </p>
-                  <p className="rounded-lg border border-gray-200 bg-white p-3 text-xs text-gray-700 leading-relaxed font-sans">
-                    {drawerRegistro.descripcion}
-                  </p>
-                </div>
-              </div>
-
+              {/* Drawer Body - Scrollable Content */}
+              <div className="p-4 space-y-5 overflow-y-auto flex-1 text-xs">
+                
+                {/* 1. Información General */}
+                <div className="rounded-xl bg-gray-50 p-3 border border-gray-200 space-y-2.5">
+                  <p className="text-[9px] font-black uppercase tracking-wider text-[#9B0F06] border-b border-gray-200 pb-1">
+                    Información General
+                  </p>
+                  <div className="grid grid-cols-2 gap-3 text-[10.5px]">
+                    <div>
+                      <span className="text-gray-400 font-bold block text-[8px] uppercase">Tipo de Ingreso *</span>
+                      <span className="font-bold text-gray-800 capitalize">
+                        {drawerRegistro.tipoIngreso || 'Campo'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 font-bold block text-[8px] uppercase">Proyecto:</span>
+                      <span className="font-bold text-gray-900">{drawerRegistro.proyectoNombre}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 font-bold block text-[8px] uppercase">Fecha del Registro</span>
+                      <span className="font-bold text-gray-900">{drawerRegistro.fecha}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 font-bold block text-[8px] uppercase">Turno</span>
+                      <span className="font-bold text-gray-800">Diurno</span>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-gray-400 font-bold block text-[8px] uppercase">Responsable</span>
+                      <span className="font-bold text-gray-900">{drawerRegistro.autor}</span>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-gray-400 font-bold block text-[8px] uppercase">Ubicación / Estación del día *</span>
+                      <span className="font-bold text-gray-900">{drawerRegistro.ubicacion || 'Estación Central'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Condiciones Climáticas */}
+                <div className="rounded-xl bg-gray-50 p-3 border border-gray-200 space-y-2.5">
+                  <p className="text-[9px] font-black uppercase tracking-wider text-[#9B0F06] border-b border-gray-200 pb-1">
+                    Condiciones Climáticas
+                  </p>
+                  <div className="grid grid-cols-1 gap-3 text-[10.5px]">
+                    <div>
+                      <span className="text-gray-400 font-bold block text-[8px] uppercase">Condición Climática</span>
+                      <span className="font-bold text-gray-900">Soleado</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 font-bold block text-[8px] uppercase">Observación / ¿Se suspendió por clima?</span>
+                      <span className="text-gray-700">Ninguna observación relevante. No hubo suspensión.</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Renglones (Detalle) */}
+                <div className="space-y-2">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-[#9B0F06] flex items-center gap-1 border-b border-gray-200 pb-1">
+                    Renglones Ejecutados
+                  </p>
+                  <div className="rounded-lg border border-gray-200 bg-white p-3 text-xs space-y-3">
+                    {/* Mocked Renglón Item */}
+                    <div className="border-b border-gray-100 pb-2 last:border-0 last:pb-0">
+                      <p className="font-bold text-gray-800 mb-1">Renglón: Excavación estructural</p>
+                      <div className="grid grid-cols-2 gap-2 text-[10px] mb-2">
+                        <div>
+                          <span className="text-gray-400 font-bold block text-[8px] uppercase">Estación Inicio</span>
+                          <span>0+000</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-400 font-bold block text-[8px] uppercase">Estación Fin</span>
+                          <span>0+100</span>
+                        </div>
+                      </div>
+                      
+                      <div className="mb-2">
+                        <span className="text-gray-400 font-bold block text-[8px] uppercase mb-1">Evidencia Fotográfica</span>
+                        {drawerRegistro.adjuntos && drawerRegistro.adjuntos.length > 0 ? (
+                          <div className="flex gap-2 overflow-x-auto">
+                            {drawerRegistro.adjuntos.map((adj: any) => (
+                              <div
+                                key={adj.id}
+                                onClick={() => setFotoExpandida(adj.url)}
+                                className="relative h-16 w-16 shrink-0 overflow-hidden rounded-md border border-gray-200 cursor-pointer hover:opacity-80"
+                              >
+                                <img src={adj.url} alt={adj.nombre} className="h-full w-full object-cover" />
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-gray-500 italic text-[10px]">Sin fotografías</span>
+                        )}
+                      </div>
+
+                      <div>
+                        <span className="text-gray-400 font-bold block text-[8px] uppercase">Observaciones</span>
+                        <p className="text-gray-700">{drawerRegistro.descripcion}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
               {/* Drawer Footer */}
               <div className="p-3 border-t border-gray-200 bg-gray-50 flex items-center justify-end">
                 <button

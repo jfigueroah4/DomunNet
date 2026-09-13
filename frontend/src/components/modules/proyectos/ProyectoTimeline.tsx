@@ -477,6 +477,18 @@ export function ProyectoTimeline({
   const esBorrador = (proyecto?.estado || '').toLowerCase() === 'borrador'
   const avanceGlobal = esBorrador ? 0 : (avanceGeneral ?? proyecto?.avance ?? 0)
 
+  // Parámetros de proyecto dinámicos con fallbacks (0.45, 0.12, 0.20)
+  const paramsProj = (proyecto as any)?.parametro_proyecto || (proyecto as any)?.parametroProyecto || (proyecto as any)?.parametro || {}
+  const pctIndirectos = typeof paramsProj.porcentaje_indirectos === 'number'
+    ? paramsProj.porcentaje_indirectos
+    : (Number(paramsProj.porcentaje_indirectos) || 0.45)
+  const pctIva = typeof paramsProj.porcentaje_iva === 'number'
+    ? paramsProj.porcentaje_iva
+    : (Number(paramsProj.porcentaje_iva) || 0.12)
+  const pctAnticipo = typeof paramsProj.porcentaje_amortizacion_anticipo === 'number'
+    ? paramsProj.porcentaje_amortizacion_anticipo
+    : (Number(paramsProj.porcentaje_amortizacion_anticipo) || 0.20)
+
   // Suma total calculada para Captura Inicial
   const totalMontoCalculadoCaptura = renglones.reduce(
     (acc, r) => acc + (r.cantidadContratada || 0) * (r.costoUnitarioDirecto || 0),
@@ -484,7 +496,7 @@ export function ProyectoTimeline({
   )
 
   const montoContratadoGlobal = proyecto?.montoContractualOriginal || proyecto?.presupuesto || totalMontoCalculadoCaptura
-  const anticipoRecibido20 = esBorrador ? 0 : montoContratadoGlobal * 0.20
+  const anticipoRecibido20 = esBorrador ? 0 : montoContratadoGlobal * pctAnticipo
   const pctAmortizacionAnticipo = (esBorrador || avanceGlobal === 0) ? 0 : Math.min(100, Math.round(avanceGlobal * 0.8))
   const anticipoSaldoPorAmortizar = esBorrador ? 0 : Math.max(0, anticipoRecibido20 * (1 - pctAmortizacionAnticipo / 100))
 
@@ -612,11 +624,11 @@ export function ProyectoTimeline({
     (acc, r) => acc + (modoEstimacion === 'creacion' ? 0 : r.cantidadEstePeriodo) * r.costoUnitarioDirecto,
     0
   )
-  const indirectos45 = subtotalCostoDirectoPeriodo * 0.45
+  const indirectos45 = subtotalCostoDirectoPeriodo * pctIndirectos
   const subtotalAntesIva = subtotalCostoDirectoPeriodo + indirectos45
-  const iva12 = subtotalAntesIva * 0.12
+  const iva12 = subtotalAntesIva * pctIva
   const valorTotalEstimacionBruto = subtotalAntesIva + iva12
-  const amortizacionAnticipoEstePeriodo = (esBorrador || anticipoSaldoPorAmortizar === 0) ? 0 : valorTotalEstimacionBruto * 0.20
+  const amortizacionAnticipoEstePeriodo = (esBorrador || anticipoSaldoPorAmortizar === 0) ? 0 : valorTotalEstimacionBruto * pctAnticipo
   const montoLiquidoAPagar = Math.max(0, valorTotalEstimacionBruto - amortizacionAnticipoEstePeriodo)
   const anticipoAmortizadoAnterior = esBorrador ? 0 : Math.max(0, anticipoRecibido20 - anticipoSaldoPorAmortizar - amortizacionAnticipoEstePeriodo)
   const anticipoAmortizadoEstePeriodo = amortizacionAnticipoEstePeriodo

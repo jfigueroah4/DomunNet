@@ -213,13 +213,36 @@ export async function iniciarSesion(identificador: string, contrasena: string, i
     throw new Error(errorAcceso.message)
   }
 
+  // LÍMITE DE CONCURRENCIA: Máximo 2 equipos / sesiones activas simultáneamente por usuario
+  const ochoHorasAtras = new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString()
+  const { data: sesionesActivas } = await clienteSupabase
+    .from('seguridad_log')
+    .select('id, created_at')
+    .eq('usuario_id', usuarioFila.id)
+    .eq('accion', 'login')
+    .eq('exitoso', true)
+    .gte('created_at', ochoHorasAtras)
+    .order('created_at', { ascending: true })
+
+  if (sesionesActivas && sesionesActivas.length >= 2) {
+    // Si ya existen 2 o más sesiones activas, invalidar la más antigua para mantener máximo 2
+    const exceso = sesionesActivas.length - 1
+    const idsAInactivar = sesionesActivas.slice(0, exceso).map((s) => s.id)
+    if (idsAInactivar.length > 0) {
+      await clienteSupabase
+        .from('seguridad_log')
+        .update({ exitoso: false, detalles: { estado: 'sesion_desplazada_limite_concurrencia_2_dispositivos' } })
+        .in('id', idsAInactivar)
+    }
+  }
+
   const { error: errorLog } = await clienteSupabase.from('seguridad_log').insert({
     usuario_id: usuarioFila.id,
     accion: 'login',
     ip: ipAddress || null,
     user_agent: userAgent || null,
     exitoso: true,
-    detalles: {},
+    detalles: { limite_sesiones: 'max_2_equipos' },
   })
 
   if (errorLog) {

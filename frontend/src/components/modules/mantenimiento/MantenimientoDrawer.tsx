@@ -572,24 +572,31 @@ export default function MantenimientoDrawer({ isOpen, onClose, mode, table, reco
                       </label>
 
                       {field.type === 'boolean' ? (
-                        <div className="flex items-center gap-2 mt-1.5 h-8">
-                          <button
-                            type="button"
-                            onClick={() => !isDisabled && handleChange(field.name, !formData[field.name])}
-                            disabled={isDisabled}
-                            className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors focus:outline-none ${
-                              formData[field.name] ? 'bg-[#9B0F06]' : 'bg-gray-200'
-                            } ${isDisabled ? 'opacity-70 cursor-not-allowed' : ''}`}
-                          >
-                            <span
-                              className={`inline-block h-2.5 w-2.5 transform rounded-full bg-white transition-transform ${
-                                formData[field.name] ? 'translate-x-3.5' : 'translate-x-1'
-                              }`}
-                            />
-                          </button>
-                          <span className="text-[11px] text-gray-600 font-medium">
-                            {formData[field.name] ? 'Activo' : 'Inactivo'}
-                          </span>
+                        <div className="flex flex-col gap-1 mt-1">
+                          <div className="flex items-center gap-2 h-7">
+                            <button
+                              type="button"
+                              onClick={() => !isDisabled && handleChange(field.name, !formData[field.name])}
+                              disabled={isDisabled}
+                              className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors focus:outline-none ${
+                                formData[field.name] ? 'bg-[#9B0F06]' : 'bg-gray-200'
+                              } ${isDisabled ? 'opacity-70 cursor-not-allowed' : ''}`}
+                            >
+                              <span
+                                className={`inline-block h-2.5 w-2.5 transform rounded-full bg-white transition-transform ${
+                                  formData[field.name] ? 'translate-x-3.5' : 'translate-x-1'
+                                }`}
+                              />
+                            </button>
+                            <span className="text-[11px] text-gray-600 font-medium">
+                              {formData[field.name] ? 'Activo' : 'Inactivo'}
+                            </span>
+                          </div>
+                          {(field.name === 'aplica_indirectos' || field.name === 'aplica_iva') && (
+                            <p className="text-[9.5px] text-amber-700 font-sans leading-snug bg-amber-50 p-1.5 rounded border border-amber-200 col-span-2">
+                              ⚠️ Actualmente el cálculo global de Indirectos/IVA no distingue por renglón — desmarcar esto no tiene efecto en los totales todavía
+                            </p>
+                          )}
                         </div>
                       ) : field.type === 'select' ? (
                         <select

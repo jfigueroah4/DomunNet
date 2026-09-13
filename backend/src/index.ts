@@ -1,4 +1,4 @@
-﻿import express from 'express'
+import express from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
 import morgan from 'morgan'
@@ -19,6 +19,7 @@ import { auditoriaRutas } from '@/modules/auditoria/auditoria.rutas'
 import proyectosRutas from '@/modules/proyectos/proyectos.rutas'
 import entidadContratanteRutas from '@/modules/entidad-contratante/entidad-contratante.rutas'
 import empresaContratistaRutas from '@/modules/empresa-contratista/empresa-contratista.rutas'
+import bitacoraGcsRutas from '@/modules/bitacora/bitacora-gcs.rutas'
 
 const app = express()
 const PORT = entorno.puerto
@@ -63,6 +64,7 @@ app.use('/api/v1/entidades-contratantes', entidadContratanteRutas)
 app.use('/api/v1/empresas-contratistas', empresaContratistaRutas)
 app.use('/api/v1/auditoria', auditoriaRutas)
 app.use('/api/v1/proyectos', proyectosRutas)
+app.use('/api/v1/bitacora/gcs', bitacoraGcsRutas)
 
 app.use((_req, res) => sendError(res, 404, 'Endpoint no encontrado'))
 app.use((error: Error, _req: express.Request, res: express.Response) => {

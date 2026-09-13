@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
-import { Plus, Users, Shield, Search, Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Plus, Users, Shield, Search, Loader2, ChevronLeft, ChevronRight, LogOut, X } from 'lucide-react'
 import { useRolesStore } from '@/stores/useRolesStore'
 
 import { api } from '@/lib/api/cliente'
@@ -345,23 +345,40 @@ export default function UsuariosPage() {
     }
   }
 
-  const handleCerrarSesionUsuario = async (usuario: Usuario) => {
+  const [closeSessionModalOpen, setCloseSessionModalOpen] = useState(false)
+  const [usuarioCerrarSesion, setUsuarioCerrarSesion] = useState<Usuario | undefined>()
+
+  const handleCerrarSesionUsuario = (usuario: Usuario) => {
+    const isSelf = (usuario.id && usuario.id === profile?.id) || (usuario.correo && profile?.correo && usuario.correo.toLowerCase() === profile?.correo.toLowerCase());
+    if (isSelf) {
+      showErrorToast('No puedes cerrar tu propia sesión activa desde esta sección.');
+      return;
+    }
+    setUsuarioCerrarSesion(usuario);
+    setCloseSessionModalOpen(true);
+  }
+
+  const handleConfirmarCerrarSesion = async () => {
+    if (!usuarioCerrarSesion) return;
     try {
-      await api.put(`/usuarios/${usuario.id}`, {
-        primer_nombre: usuario.primer_nombre,
-        segundo_nombre: usuario.segundo_nombre || null,
-        primer_apellido: usuario.primer_apellido,
-        segundo_apellido: usuario.segundo_apellido || null,
-        correo: usuario.correo,
-        telefono: usuario.telefono || '',
-        rol: usuario.rol,
+      await api.put(`/usuarios/${usuarioCerrarSesion.id}`, {
+        primer_nombre: usuarioCerrarSesion.primer_nombre,
+        segundo_nombre: usuarioCerrarSesion.segundo_nombre || null,
+        primer_apellido: usuarioCerrarSesion.primer_apellido,
+        segundo_apellido: usuarioCerrarSesion.segundo_apellido || null,
+        correo: usuarioCerrarSesion.correo,
+        telefono: usuarioCerrarSesion.telefono || '',
+        rol: usuarioCerrarSesion.rol,
         estado: 'Inactivo',
-      })
-      showSuccessToast(`Sesión cerrada exitosamente para ${usuario.nombre || usuario.correo}`)
-      await cargarUsuarios()
+      });
+      showSuccessToast(`Sesión cerrada exitosamente para ${usuarioCerrarSesion.primer_nombre} ${usuarioCerrarSesion.primer_apellido}`);
+      await cargarUsuarios();
     } catch (error) {
-      console.error('Error al cerrar sesión del usuario:', error)
-      showErrorToast('No se pudo cerrar la sesión del usuario.')
+      console.error('Error al cerrar sesión del usuario:', error);
+      showErrorToast('No se pudo cerrar la sesión del usuario.');
+    } finally {
+      setCloseSessionModalOpen(false);
+      setUsuarioCerrarSesion(undefined);
     }
   }
 
@@ -672,25 +689,69 @@ export default function UsuariosPage() {
 
 
       <UsuarioDeleteModal
-
         isOpen={deleteOpen}
-
         onClose={() => {
-
           setDeleteOpen(false)
-
           setUsuarioEliminar(undefined)
-
         }}
-
         onConfirm={handleConfirmarEliminar}
-
         usuario={usuarioEliminar}
-
       />
 
-    </div>
+      {closeSessionModalOpen && usuarioCerrarSesion && (
+        <>
+          <div className="fixed inset-0 z-[10000] bg-black/45 backdrop-blur-[1px]" onClick={() => setCloseSessionModalOpen(false)} />
+          <div className="fixed left-1/2 top-1/2 z-[10001] w-full max-w-[420px] -translate-x-1/2 -translate-y-1/2 font-[Poppins]">
+            <div className="relative overflow-hidden rounded-2xl bg-white p-6 shadow-2xl">
+              <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-amber-500 to-[#9B0F06]" />
 
+              <div className="mb-4 flex items-center justify-center relative">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-50 text-amber-600 ring-4 ring-amber-50/50">
+                  <LogOut size={22} strokeWidth={1.75} />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setCloseSessionModalOpen(false)}
+                  className="absolute right-0 top-0 rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 cursor-pointer"
+                  title="Cerrar"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <h3 className="text-[18px] font-bold text-gray-800 text-center">¿Cerrar sesión activa?</h3>
+              <p className="mt-2 text-[12px] leading-relaxed text-gray-500 text-center">
+                ¿Estás seguro de que deseas desconectar la sesión activa de <span className="font-semibold text-gray-800">{usuarioCerrarSesion.primer_nombre} {usuarioCerrarSesion.primer_apellido}</span>?
+              </p>
+
+              <div className="mt-5 bg-gray-50 p-3 rounded-xl border border-gray-100">
+                <p className="text-[12px] font-semibold text-gray-800">{usuarioCerrarSesion.primer_nombre} {usuarioCerrarSesion.primer_apellido}</p>
+                <p className="text-[10px] text-gray-500">{usuarioCerrarSesion.correo} • {usuarioCerrarSesion.rol}</p>
+              </div>
+
+              <div className="mt-5 flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={handleConfirmarCerrarSesion}
+                  className="w-full flex items-center justify-center gap-2 rounded-xl py-2.5 text-[12px] font-semibold text-white transition-colors bg-[#9B0F06] hover:bg-[#5E0006] cursor-pointer shadow-sm"
+                >
+                  <LogOut size={16} />
+                  <span>Cerrar sesión activa</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setCloseSessionModalOpen(false)}
+                  className="w-full rounded-xl border border-gray-200 py-2.5 text-[12px] font-medium text-gray-600 transition-colors hover:bg-gray-50 cursor-pointer mt-1"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
   )
 
 }

@@ -237,7 +237,7 @@ export default function ProyectoFiltros({
           }}
           className="h-[32px] w-[140px] rounded-md border border-gray-200 bg-white px-2 text-[11px] font-medium text-gray-800 focus:border-[#9B0F06] focus:outline-none cursor-pointer"
         >
-          <option value="">Departamento ▼</option>
+          <option value="">Todos los Departamentos</option>
           {departamentosConProyectos.map(d => (
             <option key={d.id} value={d.nombre}>{d.nombre}</option>
           ))}
@@ -250,7 +250,7 @@ export default function ProyectoFiltros({
           disabled={!filtroDepa}
           className="h-[32px] w-[140px] rounded-md border border-gray-200 bg-white px-2 text-[11px] font-medium text-gray-800 focus:border-[#9B0F06] focus:outline-none disabled:bg-gray-100 disabled:opacity-50 cursor-pointer"
         >
-          <option value="">Municipio ▼</option>
+          <option value="">Todos los Municipios</option>
           {municipios.map(m => (
             <option key={m.id} value={m.nombre}>{m.nombre}</option>
           ))}

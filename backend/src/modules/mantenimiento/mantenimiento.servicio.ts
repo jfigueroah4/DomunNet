@@ -32,6 +32,30 @@ export async function listarRegistros(config: TablaConfig, pagina: number, limit
     }
     return item;
   });
+
+  if (config.nombreTablaDb === 'renglon_trabajo' || config.nombreTablaDb === 'renglon_trabajo_catalogo') {
+    const renglonIds = enrichedData.map((d: any) => d.id).filter(Boolean);
+    if (renglonIds.length > 0) {
+      const { data: avances } = await clienteSupabase
+        .from('bitacora_avance')
+        .select('renglon_id, cantidad_calculada, cantidad_periodo')
+        .in('renglon_id', renglonIds);
+
+      const avanceMapa = new Map<string, number>();
+      if (avances) {
+        for (const a of avances) {
+          const cant = Number(a.cantidad_calculada ?? a.cantidad_periodo ?? 0);
+          if (a.renglon_id) {
+            avanceMapa.set(a.renglon_id, (avanceMapa.get(a.renglon_id) || 0) + cant);
+          }
+        }
+      }
+
+      for (const item of enrichedData) {
+        item.cantidad_este_periodo = avanceMapa.get(item.id) || 0;
+      }
+    }
+  }
   
   return { data: enrichedData, total: count || 0, columnasVisibles: config.columnasVisibles, columnasFiltroMenu: config.columnasFiltroMenu || [] };
 }
@@ -45,6 +69,20 @@ export async function obtenerRegistro(config: TablaConfig, id: string) {
     record.es_discreta = record.es_discreta !== undefined && record.es_discreta !== null
       ? Boolean(record.es_discreta)
       : discreteUnits.includes(record.abreviatura);
+  }
+  if ((config.nombreTablaDb === 'renglon_trabajo' || config.nombreTablaDb === 'renglon_trabajo_catalogo') && record) {
+    const { data: avances } = await clienteSupabase
+      .from('bitacora_avance')
+      .select('cantidad_calculada, cantidad_periodo')
+      .eq('renglon_id', id);
+
+    let totalEstePeriodo = 0;
+    if (avances) {
+      for (const a of avances) {
+        totalEstePeriodo += Number(a.cantidad_calculada ?? a.cantidad_periodo ?? 0);
+      }
+    }
+    record.cantidad_este_periodo = totalEstePeriodo;
   }
   return record;
 }

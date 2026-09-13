@@ -44,12 +44,14 @@ function MapaDetalleVista({
   lat,
   lng,
   direccion,
+  direccionFin,
   kilometroInicio,
   kilometroFin,
 }: {
   lat: number
   lng: number
   direccion: string
+  direccionFin?: string
   kilometroInicio?: string
   kilometroFin?: string
 }) {
@@ -88,7 +90,10 @@ function MapaDetalleVista({
         iconAnchor: [12, 30],
       })
 
-      L.marker([lat, lng], { icon: pinInicio }).addTo(mapa).bindPopup(`Punto de Inicio: ${direccion}`)
+      L.marker([lat, lng], { icon: pinInicio })
+        .addTo(mapa)
+        .bindTooltip(`<b>Punto de Inicio:</b><br/>${direccion}`, { permanent: false, direction: 'top' })
+        .bindPopup(`<b>Punto de Inicio:</b><br/>${direccion}`)
 
       if (distanciaTramo > 0) {
         const offsetLat = distanciaTramo * 0.0075
@@ -105,7 +110,11 @@ function MapaDetalleVista({
           iconAnchor: [12, 30],
         })
 
-        L.marker(pEnd, { icon: pinFin }).addTo(mapa).bindPopup(`Punto de Conexión Fin: Km ${kilometroFin}`)
+        const textoFin = direccionFin ? `${direccionFin} (Km ${kilometroFin || ''})` : `Km ${kilometroFin || ''} - Plan Grande, Palencia`
+        L.marker(pEnd, { icon: pinFin })
+          .addTo(mapa)
+          .bindTooltip(`<b>Punto de Conexión Fin:</b><br/>${textoFin}`, { permanent: false, direction: 'top' })
+          .bindPopup(`<b>Punto de Conexión Fin:</b><br/>${textoFin}`)
 
         // 1 sola línea azul de ruta sólida
         const rutaPolyline = L.polyline([[lat, lng], pEnd], {
@@ -132,7 +141,7 @@ function MapaDetalleVista({
       instanciaMapaRef.current?.remove()
       instanciaMapaRef.current = null
     }
-  }, [lat, lng, direccion, distanciaTramo, kilometroFin])
+  }, [lat, lng, direccion, direccionFin, distanciaTramo, kilometroFin])
 
   return <div ref={mapaRef} className="h-48 w-full overflow-hidden rounded border border-gray-300 shadow-xs" />
 }
@@ -461,14 +470,19 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                 </span>
               </div>
 
-              <div className="rounded border border-gray-100 bg-gray-50 p-1.5 text-[9.5px]">
-                <div className="truncate font-medium text-gray-700">
-                  {proyecto.coordenadasMapa?.puntoTexto || proyecto.direccion || proyecto.ubicacionFisica || 'Tramo Obra Vial'}
+              <div className="rounded border border-gray-100 bg-gray-50/70 p-2 text-[9.5px] space-y-1 font-[Poppins]">
+                <div className="font-normal text-gray-800">
+                  <span className="font-bold text-gray-900">Origen (Inicio):</span>{' '}
+                  {proyecto.coordenadasMapa?.puntoTexto || proyecto.direccion || proyecto.ubicacionFisica || 'Tres Quebradas, Buena Vista, Palencia, Departamento de Guatemala'}
+                </div>
+                <div className="font-normal text-gray-800">
+                  <span className="font-bold text-gray-900">Destino / Punto Final:</span>{' '}
+                  {(proyecto as any)?.direccionFin || (proyecto as any)?.direccion_fin || ((proyecto as any)?.kilometroFin ? `Km ${(proyecto as any).kilometroFin} - Plan Grande, Palencia, Departamento de Guatemala` : 'Plan Grande, Palencia, Departamento de Guatemala')}
                 </div>
                 {((proyecto as any)?.kilometroInicio || (proyecto as any)?.kilometroFin) && (
-                  <div className="mt-1 flex items-center gap-1.5 text-[9px] font-bold text-[#9B0F06]">
+                  <div className="pt-0.5 flex items-center gap-1.5 text-[9px] font-bold text-[#9B0F06]">
                     <span>Puntos de Conexión:</span>
-                    <span>Km {(proyecto as any).kilometroInicio || '0'} → Km {(proyecto as any).kilometroFin || '0'}</span>
+                    <span>Km {(proyecto as any).kilometroInicio || '5'} → Km {(proyecto as any).kilometroFin || '10'}</span>
                   </div>
                 )}
               </div>
@@ -477,6 +491,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                 lat={(proyecto as any)?.latitud != null ? Number((proyecto as any).latitud) : proyecto?.coordenadasMapa?.lat ?? 14.5021}
                 lng={(proyecto as any)?.longitud != null ? Number((proyecto as any).longitud) : proyecto?.coordenadasMapa?.lng ?? -90.5841}
                 direccion={proyecto.direccion || proyecto.ubicacionFisica || 'Ubicación de obra'}
+                direccionFin={(proyecto as any)?.direccionFin || (proyecto as any)?.direccion_fin}
                 kilometroInicio={(proyecto as any)?.kilometroInicio}
                 kilometroFin={(proyecto as any)?.kilometroFin}
               />

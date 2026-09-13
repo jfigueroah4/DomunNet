@@ -5,6 +5,7 @@ import type { LucideIcon } from 'lucide-react'
 import { Eye, PencilLine, Shield, Trash2, Users, UserPlus } from 'lucide-react'
 import { Role } from '@/data/roles'
 import { Usuario } from '@/types/usuario'
+import { useAuthStore } from '@/stores/useAuthStore'
 
 const iconPorRol: Record<string, LucideIcon> = {
   Administrador: Shield,
@@ -37,6 +38,7 @@ export const RolTabla = React.memo(function RolTabla({
   onAsignarUsuarios,
   onEliminar,
 }: RolTablaProps) {
+  const profile = useAuthStore((state) => state.profile)
   return (
     <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-2xs">
       <div className="overflow-x-auto">
@@ -54,6 +56,15 @@ export const RolTabla = React.memo(function RolTabla({
           <tbody>
             {roles.map((role) => {
               const Icon = iconPorRol[role.name] ?? Shield
+              const miRolNorm = String(profile?.rol || '').toLowerCase().trim()
+              const roleNorm = String(role.name || '').toLowerCase().trim()
+
+              let canDeleteRole = true
+              if (miRolNorm === 'administrador') {
+                canDeleteRole = roleNorm !== 'administrador'
+              } else if (miRolNorm === 'gerencia') {
+                canDeleteRole = roleNorm !== 'gerencia' && roleNorm !== 'administrador'
+              }
 
               return (
                 <tr key={role.id} className="hover:bg-gray-50 border-t border-gray-50 transition-colors">
@@ -127,9 +138,10 @@ export const RolTabla = React.memo(function RolTabla({
                         <UserPlus size={12} />
                       </button>
                       <button
-                        onClick={() => onEliminar(role)}
-                        className="p-1 text-gray-400 transition-colors hover:text-red-600"
-                        title="Eliminar"
+                        onClick={() => canDeleteRole && onEliminar(role)}
+                        className={`p-1 transition-colors ${canDeleteRole ? 'text-gray-400 hover:text-red-600 cursor-pointer' : 'text-gray-200 cursor-not-allowed'}`}
+                        title={canDeleteRole ? 'Eliminar' : 'No puedes eliminar este rol protegido'}
+                        disabled={!canDeleteRole}
                       >
                         <Trash2 size={12} />
                       </button>

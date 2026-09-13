@@ -130,12 +130,28 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
               const targetRole = roles.find(r => r.nombre === usuario.rol);
               const targetNivel = targetRole?.nivel_permisos ?? (usuario.rol === 'Administrador' ? 100 : 0);
               const miRolNombre = profile?.rol;
-              const esMiAdmin = miRolNombre === 'Administrador' || miNivel >= 100;
-              const esTargetAdmin = usuario.rol === 'Administrador' || targetNivel >= 100;
+              const isSelf = (usuario.id && usuario.id === profile?.id) || (usuario.correo && profile?.correo && usuario.correo.toLowerCase() === profile?.correo.toLowerCase());
 
-              // Requerimiento Gerencia: Permite editar usuarios Administrador (pero no modificarles el rol), y prohíbe eliminarlos
+              const miRolNorm = String(miRolNombre || '').toLowerCase().trim();
+              const targetRolNorm = String(usuario.rol || '').toLowerCase().trim();
+
+              // Reglas de protección de roles y usuario en sesión:
+              // - No se puede eliminar ni inactivar al propio usuario en sesión.
+              // - Un Administrador no puede eliminar a otro Administrador ni al rol Administrador.
+              // - Gerencia no puede eliminar a otro Gerencia ni a Administrador.
+              let canDelete = true;
+              if (isSelf) {
+                canDelete = false;
+              } else if (miRolNorm === 'administrador') {
+                canDelete = targetRolNorm !== 'administrador';
+              } else if (miRolNorm === 'gerencia') {
+                canDelete = targetRolNorm !== 'gerencia' && targetRolNorm !== 'administrador';
+              } else {
+                canDelete = miNivel >= 100 ? true : (targetRolNorm !== 'administrador' && targetNivel <= miNivel);
+              }
+
               const canEdit = true;
-              const canDelete = esMiAdmin ? true : (!esTargetAdmin && targetNivel <= miNivel);
+              const canCloseSession = !isSelf && esGerenciaOAdmin && usuario.estado === 'Activo';
 
               return (
                 <tr
@@ -181,9 +197,10 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
                       </button>
                       {usuario.estado === 'Activo' && esGerenciaOAdmin && (
                         <button
-                          onClick={() => onCerrarSesion?.(usuario)}
-                          className="p-1 text-gray-400 transition-colors hover:text-amber-600 cursor-pointer"
-                          title="Cerrar sesión activa del usuario"
+                          onClick={() => canCloseSession && onCerrarSesion?.(usuario)}
+                          className={`p-1 transition-colors ${canCloseSession ? 'text-gray-400 hover:text-amber-600 cursor-pointer' : 'text-gray-200 cursor-not-allowed'}`}
+                          title={isSelf ? 'No puedes cerrar tu propia sesión desde esta tabla' : 'Cerrar sesión activa del usuario'}
+                          disabled={!canCloseSession}
                         >
                           <LogOut size={12} />
                         </button>
@@ -193,8 +210,8 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
                         return (
                           <button
                             onClick={() => canDelete && onEliminar(usuario.id)}
-                            className={`p-1 transition-colors ${canDelete ? 'text-gray-400 hover:text-red-600' : 'text-gray-200 cursor-not-allowed'}`}
-                            title={canDelete ? (esActivo ? 'Desactivar usuario' : 'Eliminar usuario') : 'No tienes permisos para esta acción'}
+                            className={`p-1 transition-colors ${canDelete ? 'text-gray-400 hover:text-red-600 cursor-pointer' : 'text-gray-200 cursor-not-allowed'}`}
+                            title={isSelf ? 'No puedes desactivar o eliminar tu propio usuario' : canDelete ? (esActivo ? 'Desactivar usuario' : 'Eliminar usuario') : 'No tienes permisos para esta acción en este rol'}
                             disabled={!canDelete}
                           >
                             {esActivo ? <UserX size={12} /> : <Trash2 size={12} />}

@@ -44,6 +44,7 @@ export async function actualizarEstadoProyecto(proyectoId: string, nuevoEstadoCo
         id, 
         proyecto_detalle (
           monto_original,
+          empresa_contratista_id,
           empresa_contratista_ejecutora,
           fecha_inicio_contractual,
           fecha_adjudicacion
@@ -67,7 +68,12 @@ export async function actualizarEstadoProyecto(proyectoId: string, nuevoEstadoCo
       throw new ValidationError('No se puede activar: El Monto Contractual Original es requerido y debe ser mayor a 0.', 'monto_original')
     }
 
-    if (!detalle.empresa_contratista_ejecutora || detalle.empresa_contratista_ejecutora.trim() === '') {
+    const tieneContratista = Boolean(
+      (detalle.empresa_contratista_id && String(detalle.empresa_contratista_id).trim() !== '') ||
+      (detalle.empresa_contratista_ejecutora && String(detalle.empresa_contratista_ejecutora).trim() !== '')
+    )
+
+    if (!tieneContratista) {
       throw new ValidationError('No se puede activar: Debe asignar una Empresa Contratista Ejecutora.', 'empresa_contratista_ejecutora')
     }
 
@@ -158,6 +164,12 @@ export async function obtenerProyectoPorId(proyectoId: string) {
     .select('usuario_id, rol_proyecto, usuario:usuario_id(id, correo, dato_usuario(primer_nombre, primer_apellido))')
     .eq('proyecto_id', proyectoId)
 
+  const { data: paramRow } = await clienteSupabase
+    .from('parametro_proyecto')
+    .select('porcentaje_indirectos, porcentaje_iva, porcentaje_amortizacion_anticipo, porcentaje_retencion_garantia, monto_anticipo_total')
+    .eq('proyecto_id', proyectoId)
+    .maybeSingle()
+
   const equipo = (equipoRows || []).map((row: any) => {
     const u = row.usuario
     const dato = u?.dato_usuario
@@ -234,52 +246,70 @@ export async function obtenerProyectoPorId(proyectoId: string) {
     }
   }
 
-  return {
-    id: proyecto.id,
-    codigo: proyecto.codigo,
-    nombre: proyecto.nombre,
-    descripcion: detalle.descripcion_proyecto ?? proyecto.descripcion ?? '',
-    ubicacion: detalle.tramo ?? proyecto.ubicacion ?? '',
-    nombreOficial: detalle.nombre_oficial ?? proyecto.nombre,
-    ubicacionFisica: detalle.tramo ?? proyecto.ubicacion ?? '',
-    direccion: detalle.direccion ?? '',
-    latitud: detalle.latitud,
-    longitud: detalle.longitud,
-    coordenadasMapa: detalle.latitud != null && detalle.longitud != null
-      ? { lat: Number(detalle.latitud), lng: Number(detalle.longitud), puntoTexto: detalle.direccion ?? 'Punto de obra' }
-      : undefined,
-    municipioId: detalle.municipio_id,
-    departamentoId: detalle.departamento_id,
-    kilometroInicio: detalle.kilometro_inicio,
-    kilometroFin: detalle.kilometro_fin,
-    empresaContratanteId: detalle.empresa_contratante_id ?? null,
-    entidadContratante: entidadContratanteNombre,
-    empresaContratistaId: detalle.empresa_contratista_id ?? null,
-    empresaContratista: empresaContratistaNombre,
-    empresaSupervisora: detalle.empresa_supervisora ?? '',
-    delegadoResidenteId: detalle.delegado_residente_id ?? null,
-    delegadoResidente: delegadoResidenteNombre,
-    responsable: delegadoResidenteNombre || 'No asignado',
-    fechaAdjudicacion: detalle.fecha_adjudicacion ?? '',
-    fechaInicioContractual: detalle.fecha_inicio_contractual ?? '',
-    fechaInicio: proyecto.fecha_inicio ?? detalle.fecha_inicio_contractual ?? '',
-    fechaFin: proyecto.fecha_fin_estimada ?? '',
-    fechaFinContractualPlan: proyecto.fecha_fin_estimada ?? '',
-    numeroEscrituraPublica: detalle.numero_escritura_publica ?? '',
-    montoContractualOriginal: detalle.monto_original ?? null,
-    presupuesto: detalle.monto_original ?? 0,
-    plazoEjecucionOriginal: detalle.plazo_ejecucion_original ?? null,
-    plazoEjecucionContractualOriginal: detalle.plazo_ejecucion_original ? `${detalle.plazo_ejecucion_original} días` : '',
-    fechaFinalizacionReal: detalle.fecha_finalizacion_real ?? '',
-    plazoEjecucionRealAmpliado: detalle.plazo_ejecucion_ampliado ? `${detalle.plazo_ejecucion_ampliado} días` : '',
-    montoFinancieroFinalEjecutado: detalle.monto_final ?? null,
-    montoFinal: detalle.monto_final ?? null,
-    equipo,
-    estado: await resolverCodigoEstado(proyecto.estado_id),
-    paso2: {},
-    paso3: {},
+    const fInicioCalc = detalle.fecha_inicio_contractual || proyecto.fecha_inicio || detalle.fecha_adjudicacion || ''
+    const plazoNumCalc = detalle.plazo_ejecucion_original || detalle.plazo_ejecucion_ampliado || null
+    let fFinCalc = detalle.fecha_finalizacion_real || proyecto.fecha_fin_estimada || ''
+    if (!fFinCalc && fInicioCalc && plazoNumCalc) {
+      const dInicio = new Date(fInicioCalc)
+      if (!isNaN(dInicio.getTime())) {
+        const dFin = new Date(dInicio.getTime() + (plazoNumCalc * 86400000))
+        fFinCalc = dFin.toISOString().split('T')[0]
+      }
+    }
+    const plazoStrCalc = plazoNumCalc ? `${plazoNumCalc} días` : (fInicioCalc && fFinCalc ? `${Math.round((new Date(fFinCalc).getTime() - new Date(fInicioCalc).getTime()) / 86400000)} días` : '')
+
+    return {
+      id: proyecto.id,
+      codigo: proyecto.codigo,
+      nombre: proyecto.nombre,
+      descripcion: detalle.descripcion_proyecto ?? proyecto.descripcion ?? '',
+      ubicacion: detalle.tramo ?? proyecto.ubicacion ?? '',
+      nombreOficial: detalle.nombre_oficial ?? proyecto.nombre,
+      ubicacionFisica: detalle.tramo ?? proyecto.ubicacion ?? '',
+      direccion: detalle.direccion ?? '',
+      latitud: detalle.latitud,
+      longitud: detalle.longitud,
+      coordenadasMapa: detalle.latitud != null && detalle.longitud != null
+        ? { lat: Number(detalle.latitud), lng: Number(detalle.longitud), puntoTexto: detalle.direccion ?? 'Punto de obra' }
+        : undefined,
+      municipioId: detalle.municipio_id,
+      departamentoId: detalle.departamento_id,
+      kilometroInicio: detalle.kilometro_inicio,
+      kilometroFin: detalle.kilometro_fin,
+      empresaContratanteId: detalle.empresa_contratante_id ?? null,
+      entidadContratante: entidadContratanteNombre,
+      empresaContratistaId: detalle.empresa_contratista_id ?? null,
+      empresaContratista: empresaContratistaNombre,
+      empresaSupervisora: detalle.empresa_supervisora ?? '',
+      delegadoResidenteId: detalle.delegado_residente_id ?? null,
+      delegadoResidente: delegadoResidenteNombre,
+      responsable: delegadoResidenteNombre || 'No asignado',
+      fechaAdjudicacion: detalle.fecha_adjudicacion ?? '',
+      fechaInicioContractual: detalle.fecha_inicio_contractual ?? fInicioCalc,
+      fechaInicio: fInicioCalc,
+      fechaFin: fFinCalc,
+      fechaFinContractualPlan: fFinCalc,
+      fechaFinalContractual: fFinCalc,
+      numeroEscrituraPublica: detalle.numero_escritura_publica ?? '',
+      montoContractualOriginal: detalle.monto_original ?? null,
+      presupuesto: detalle.monto_original ?? 0,
+      plazo: plazoStrCalc,
+      plazoContractual: plazoStrCalc,
+      plazo_ejecucion_original: detalle.plazo_ejecucion_original ?? null,
+      plazoEjecucionOriginal: detalle.plazo_ejecucion_original ?? null,
+      plazoEjecucionContractualOriginal: plazoStrCalc,
+      fechaFinalizacionReal: detalle.fecha_finalizacion_real ?? '',
+      plazoEjecucionRealAmpliado: detalle.plazo_ejecucion_ampliado ? `${detalle.plazo_ejecucion_ampliado} días` : '',
+      montoFinancieroFinalEjecutado: detalle.monto_final ?? null,
+      montoFinal: detalle.monto_final ?? null,
+      equipo,
+      estado: await resolverCodigoEstado(proyecto.estado_id),
+      parametro_proyecto: paramRow || null,
+      parametroProyecto: paramRow || null,
+      paso2: {},
+      paso3: {},
+    }
   }
-}
 
 async function resolverCodigoEstado(estadoId: string | null): Promise<string> {
   if (!estadoId) return 'borrador'
@@ -317,6 +347,8 @@ export async function obtenerProyectos() {
           kilometro_inicio,
           kilometro_fin,
           monto_original,
+          plazo_ejecucion_original,
+          plazo_ejecucion_ampliado,
           empresa_contratante_id,
           empresa_contratista_id,
           delegado_residente_id,
@@ -374,7 +406,16 @@ export async function obtenerProyectos() {
   return (proyectosRes.data || []).map((p: any) => {
     const d = Array.isArray(p.proyecto_detalle) ? p.proyecto_detalle[0] : p.proyecto_detalle || {}
     const fInicio = d.fecha_inicio_contractual || p.fecha_inicio || d.fecha_adjudicacion || ''
-    const fFin = d.fecha_finalizacion_real || p.fecha_fin_estimada || ''
+    const plazoNum = d.plazo_ejecucion_original || d.plazo_ejecucion_ampliado || null
+    let fFin = d.fecha_finalizacion_real || p.fecha_fin_estimada || ''
+    if (!fFin && fInicio && plazoNum) {
+      const dInicio = new Date(fInicio)
+      if (!isNaN(dInicio.getTime())) {
+        const dFin = new Date(dInicio.getTime() + (plazoNum * 86400000))
+        fFin = dFin.toISOString().split('T')[0]
+      }
+    }
+    const plazoStr = plazoNum ? `${plazoNum} días` : (fInicio && fFin ? `${Math.round((new Date(fFin).getTime() - new Date(fInicio).getTime()) / 86400000)} días` : '')
     const estadoCod = p.estado_id ? (estadoMapa.get(p.estado_id) || 'borrador') : 'borrador'
     const delegadoNombre = d.delegado_residente_id ? (delegadoMapa.get(d.delegado_residente_id) || '') : ''
     const responsableNombre = delegadoNombre || 'No asignado'
@@ -392,7 +433,11 @@ export async function obtenerProyectos() {
       fechaInicio: fInicio,
       fechaInicioContractual: d.fecha_inicio_contractual || fInicio,
       fechaFin: fFin,
-      fechaFinalContractual: d.fecha_finalizacion_real || fFin,
+      fechaFinalContractual: fFin,
+      plazo: plazoStr,
+      plazoContractual: plazoStr,
+      plazo_ejecucion_original: plazoNum,
+      plazoEjecucionOriginal: plazoNum,
       departamento_id: d.departamento_id,
       municipio_id: d.municipio_id,
       departamentoId: d.departamento_id,
@@ -518,6 +563,18 @@ export async function crearProyecto(datosFormulario: any) {
     if (errorEq) console.error('EQUIPO ERROR:', errorEq);
   }
 
+  // 5. Insertar parámetros por defecto en `parametro_proyecto`
+  const { error: errorParam } = await clienteSupabase
+    .from('parametro_proyecto')
+    .insert({
+      proyecto_id: proyecto.id,
+      porcentaje_indirectos: typeof datosFormulario.porcentajeIndirectos === 'number' ? datosFormulario.porcentajeIndirectos : 0.45,
+      porcentaje_iva: typeof datosFormulario.porcentajeIva === 'number' ? datosFormulario.porcentajeIva : 0.12,
+      porcentaje_amortizacion_anticipo: typeof datosFormulario.porcentajeAnticipo === 'number' ? datosFormulario.porcentajeAnticipo : 0.20,
+      monto_anticipo_total: 0
+    });
+  if (errorParam) console.error('PARAMETRO_PROYECTO AUTO-INSERT ERROR:', errorParam);
+
   return proyecto.id
 }
 
@@ -638,6 +695,81 @@ export async function eliminarProyecto(id: string) {
   const { error } = await clienteSupabase.from('proyecto').delete().eq('id', id)
   if (error) throw new Error(error.message)
   return true
+}
+
+export async function obtenerPendientesPorProyecto(proyectoId: string) {
+  const { data, error } = await clienteSupabase
+    .from('bitacora_pendiente')
+    .select(`
+      id,
+      proyecto_id,
+      renglon_id,
+      fecha_medicion,
+      estacion_inicial,
+      estacion_final,
+      longitud_medida,
+      ancho,
+      altura_espesor,
+      volumen_area_bruto,
+      descuento_aplicado_id,
+      cantidad_neta_cobrar,
+      estado_conciliacion,
+      observaciones,
+      ubicacion_especifica,
+      lado_via,
+      renglon:renglon_id(
+        id,
+        descripcion,
+        unidad_id,
+        unidad:unidad_id(abreviatura, nombre)
+      ),
+      descuento:descuento_aplicado_id(id, descripcion, factor_seccion_transversal)
+    `)
+    .eq('proyecto_id', proyectoId)
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    console.error('Error al obtener bitacora_pendiente:', error)
+    return []
+  }
+
+  return (data || []).map((row: any) => {
+    const renglon = row.renglon || {}
+    const unidadObj = renglon.unidad || {}
+    const descObj = row.descuento || {}
+
+    const codigoDGC = '201.03(b)'
+    const descripcion = renglon.descripcion || 'Trabajo pendiente en campo'
+    const unidadSimbolo = unidadObj.abreviatura || unidadObj.nombre || 'm³'
+    const factorDescuento = descObj.factor_seccion_transversal || 0
+    const descuentoNombre = descObj.descripcion || ''
+
+    return {
+      id: row.id,
+      codigoDGC,
+      descripcion,
+      unidad: unidadSimbolo,
+      estacionInicio: row.estacion_inicial != null ? `Km ${row.estacion_inicial}` : '',
+      estacionFin: row.estacion_final != null ? `Km ${row.estacion_final}` : '',
+      estacionInicialNum: row.estacion_inicial ?? 0,
+      estacionFinalNum: row.estacion_final ?? 0,
+      longitudL: Number(row.longitud_medida) || 0,
+      anchoA: Number(row.ancho) || 0,
+      alturaH: Number(row.altura_espesor) || 0,
+      cantidadBruta: Number(row.volumen_area_bruto) || 0,
+      volumenAreaBruto: Number(row.volumen_area_bruto) || 0,
+      descuentoMonto: Number(row.longitud_medida * factorDescuento) || 0,
+      factorDescuento,
+      descuentoNombre,
+      cantidadNetaCobrar: Number(row.cantidad_neta_cobrar) || 0,
+      estado: row.estado_conciliacion || 'Pendiente',
+      observaciones: row.observaciones || '',
+      ubicacionEspecifica: row.ubicacion_especifica || '',
+      ladoVia: row.lado_via || '',
+      fechaMedicion: row.fecha_medicion || '',
+      mesesAntiguedad: row.fecha_medicion ? Math.floor((new Date().getTime() - new Date(row.fecha_medicion).getTime()) / (1000 * 60 * 60 * 24 * 30)) : 0
+    }
+  })
 }
 
 

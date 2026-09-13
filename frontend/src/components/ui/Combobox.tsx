@@ -114,7 +114,15 @@ export function Combobox({ options, value, onChange, placeholder = 'Seleccionar.
             <div className="mt-1 border-t border-gray-100 pt-1 px-1">
               <button
                 type="button"
-                onClick={() => {
+                onMouseDown={(e) => {
+                  e.stopPropagation()
+                  e.preventDefault()
+                  setOpen(false)
+                  emptyAction.onClick()
+                }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  e.preventDefault()
                   setOpen(false)
                   emptyAction.onClick()
                 }}

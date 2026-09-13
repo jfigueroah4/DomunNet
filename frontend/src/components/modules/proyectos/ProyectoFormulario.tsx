@@ -4,6 +4,7 @@
 import { useRef, useState, useMemo } from 'react'
 import { Combobox } from '@/components/ui/Combobox'
 import { DelegadoResidenteSelect } from './DelegadoResidenteSelect'
+import { IngenieroResponsableSelect } from './IngenieroResponsableSelect'
 import { EmpresaRelacionadaDrawer } from '@/components/modules/empresas/EmpresaRelacionadaDrawer'
 import { useRouter } from 'next/navigation'
 import { api, apiGetDeduplicado, limpiarCacheMemoria } from '@/lib/api/cliente'
@@ -238,6 +239,8 @@ function SelectorMapaInteractivo({
   direccion,
   setDireccion,
   setUbicacionFisica,
+  direccionFin,
+  setDireccionFin,
   errors,
   setErrors,
   coordenadas,
@@ -246,6 +249,10 @@ function SelectorMapaInteractivo({
   setDepartamentoId,
   municipioId,
   setMunicipioId,
+  departamentoFinId,
+  setDepartamentoFinId,
+  municipioFinId,
+  setMunicipioFinId,
   departamentos = [],
   municipios = [],
   kilometroInicio,
@@ -254,6 +261,8 @@ function SelectorMapaInteractivo({
   direccion: string
   setDireccion: (val: string) => void
   setUbicacionFisica?: (val: string) => void
+  direccionFin?: string
+  setDireccionFin?: (val: string) => void
   errors: Record<string, boolean>
   setErrors: React.Dispatch<React.SetStateAction<Record<string, boolean>>>
   coordenadas: { lat: number; lng: number; puntoTexto?: string }
@@ -262,6 +271,10 @@ function SelectorMapaInteractivo({
   setDepartamentoId?: (val: string) => void
   municipioId?: string
   setMunicipioId?: (val: string) => void
+  departamentoFinId?: string
+  setDepartamentoFinId?: (val: string) => void
+  municipioFinId?: string
+  setMunicipioFinId?: (val: string) => void
   departamentos?: any[]
   municipios?: any[]
   kilometroInicio?: string
@@ -314,30 +327,59 @@ function SelectorMapaInteractivo({
 
   // Función para auto-seleccionar Departamento y Municipio basados en datos Nominatim
   const autodeteccionUbicacion = (address: any) => {
-    if (!address) return
-    const stateName = (address.state || address.region || address.province || '').toLowerCase().trim()
-    const cityName = (address.city || address.town || address.village || address.county || address.municipality || address.suburb || '').toLowerCase().trim()
+    if (!address || municipios.length === 0) return
+    const posNombres = [
+      address.municipality,
+      address.city,
+      address.town,
+      address.village,
+      address.county,
+      address.suburb,
+      address.city_district,
+      address.state
+    ].filter(Boolean).map((s: string) => s.toLowerCase().trim())
 
-    if (stateName && setDepartamentoId && departamentos.length > 0) {
-      const foundDep = departamentos.find((d: any) => {
-        const nom = d.nombre.toLowerCase().trim()
-        return stateName.includes(nom) || nom.includes(stateName)
+    let foundMun: any = null
+    for (const nombreBusqueda of posNombres) {
+      foundMun = municipios.find((m: any) => {
+        const nom = m.nombre.toLowerCase().trim()
+        return nombreBusqueda.includes(nom) || nom.includes(nombreBusqueda)
       })
+      if (foundMun) break
+    }
 
-      if (foundDep) {
-        setDepartamentoId(foundDep.id)
+    if (foundMun) {
+      if (setMunicipioId) setMunicipioId(foundMun.id)
+      if (setDepartamentoId && foundMun.departamento_id) setDepartamentoId(foundMun.departamento_id)
+    }
+  }
 
-        if (cityName && setMunicipioId && municipios.length > 0) {
-          const mData = municipios.filter((m: any) => m.departamento_id === foundDep.id)
-          const foundMun = mData.find((m: any) => {
-            const nom = m.nombre.toLowerCase().trim()
-            return cityName.includes(nom) || nom.includes(cityName)
-          })
-          if (foundMun) {
-            setMunicipioId(foundMun.id)
-          }
-        }
-      }
+  // Función para auto-seleccionar Departamento y Municipio Finales basados en datos Nominatim
+  const autodeteccionUbicacionFin = (address: any) => {
+    if (!address || municipios.length === 0) return
+    const posNombres = [
+      address.municipality,
+      address.city,
+      address.town,
+      address.village,
+      address.county,
+      address.suburb,
+      address.city_district,
+      address.state
+    ].filter(Boolean).map((s: string) => s.toLowerCase().trim())
+
+    let foundMun: any = null
+    for (const nombreBusqueda of posNombres) {
+      foundMun = municipios.find((m: any) => {
+        const nom = m.nombre.toLowerCase().trim()
+        return nombreBusqueda.includes(nom) || nom.includes(nombreBusqueda)
+      })
+      if (foundMun) break
+    }
+
+    if (foundMun) {
+      if (setMunicipioFinId) setMunicipioFinId(foundMun.id)
+      if (setDepartamentoFinId && foundMun.departamento_id) setDepartamentoFinId(foundMun.departamento_id)
     }
   }
 
@@ -350,6 +392,25 @@ function SelectorMapaInteractivo({
       .replace(/,\s*(República de\s*|Republica de\s*)?Guatemala\s*$/gi, '')
       .replace(/,\s*,/g, ',')
       .trim()
+  }
+
+  const actualizarDireccionFinDesdeCoordenadas = async (lat: number, lng: number) => {
+    try {
+      const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=18&lat=${lat}&lon=${lng}`, {
+        headers: { 'Accept-Language': 'es' },
+      })
+      if (!response.ok) return
+      const resultado = await response.json()
+      if (resultado.display_name) {
+        const display = limpiarDireccionNominatim(resultado.display_name)
+        if (setDireccionFin) setDireccionFin(display)
+        if (resultado.address) {
+          autodeteccionUbicacionFin(resultado.address)
+        }
+      }
+    } catch {
+      // Ignorar error de red secundario
+    }
   }
 
   const actualizarDireccionDesdeCoordenadas = async (lat: number, lng: number) => {
@@ -375,6 +436,40 @@ function SelectorMapaInteractivo({
     } catch {
       setErrorBusqueda('No se pudo obtener la dirección del punto seleccionado')
       setCoordenadas({ lat, lng, puntoTexto: `Punto seleccionado (${lat.toFixed(4)}°, ${lng.toFixed(4)}°)` })
+    } finally {
+      setBuscandoDireccion(false)
+    }
+  }
+
+  const buscarDireccionFin = async () => {
+    if (!direccionFin?.trim()) return
+    setBuscandoDireccion(true)
+    setErrorBusqueda('')
+    try {
+      const consulta = direccionFin.toLowerCase().includes('guatemala') ? direccionFin : `${direccionFin}, Guatemala`
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(consulta)}`, {
+        headers: { 'Accept-Language': 'es' },
+      })
+      if (!response.ok) throw new Error('No se pudo consultar la ubicación final')
+
+      const resultados = await response.json()
+      const resultado = resultados[0]
+      if (!resultado) {
+        setErrorBusqueda('No se encontró la dirección final especificada en el mapa')
+        return
+      }
+
+      const lat = Number.parseFloat(resultado.lat)
+      const lng = Number.parseFloat(resultado.lon)
+      const display = limpiarDireccionNominatim(resultado.display_name)
+      if (setDireccionFin) setDireccionFin(display)
+      setCoordenadasFinManual({ lat, lng })
+
+      if (resultado.address) {
+        autodeteccionUbicacionFin(resultado.address)
+      }
+    } catch {
+      setErrorBusqueda('No se pudo realizar la búsqueda de la dirección final')
     } finally {
       setBuscandoDireccion(false)
     }
@@ -468,6 +563,7 @@ function SelectorMapaInteractivo({
       })
 
       const marcador = L.marker([coordenadas.lat, coordenadas.lng], { draggable: true, icon: outlinePinIcon }).addTo(mapa)
+      marcador.bindPopup(`<b>Punto de Inicio:</b><br/>${direccion || 'Punto de Inicio'}`)
       marcador.on('dragend', () => {
         const posicion = marcador.getLatLng()
         void actualizarDireccionDesdeCoordenadas(
@@ -569,14 +665,19 @@ function SelectorMapaInteractivo({
 
         const endMarker = L.marker(pEnd, { icon: endIcon, draggable: true })
         endMarker.bindTooltip(`Km Fin: ${kilometroFin || ''} (Arrastra para ajustar punto final azul)`, { permanent: false, direction: 'top' })
+        endMarker.bindPopup(`<b>Punto de Conexión Fin:</b><br/>${direccionFin || 'Km Fin ' + (kilometroFin || '')}`)
 
         endMarker.on('dragend', () => {
           const pos = endMarker.getLatLng()
-          setCoordenadasFinManual({
-            lat: Number(pos.lat.toFixed(6)),
-            lng: Number(pos.lng.toFixed(6)),
-          })
+          const lat = Number(pos.lat.toFixed(6))
+          const lng = Number(pos.lng.toFixed(6))
+          setCoordenadasFinManual({ lat, lng })
+          void actualizarDireccionFinDesdeCoordenadas(lat, lng)
         })
+
+        if (!coordenadasFinManual && pEnd) {
+          void actualizarDireccionFinDesdeCoordenadas(pEnd[0], pEnd[1])
+        }
 
         grupoCapaRuta.addLayer(endMarker)
 
@@ -597,7 +698,7 @@ function SelectorMapaInteractivo({
   return (
     <div className="space-y-2 rounded-lg border border-gray-200 bg-gray-50/50 p-2.5">
       <div>
-        <label className={labelClass}>DIRECCIÓN (TEXTO CORTO) <span className="text-[#9B0F06]">*</span></label>
+        <label className={labelClass}>DIRECCIÓN INICIAL / ORIGEN (TEXTO CORTO) <span className="text-[#9B0F06]">*</span></label>
         <div className="flex gap-1.5">
           <input
             type="text"
@@ -705,7 +806,7 @@ function PantallaConfiguracionPlanInicial({
   renglonesIniciales,
 }: {
   onVolver: () => void
-  onGuardar: (montoTotalCalculado: number) => void
+  onGuardar: (montoTotalCalculado: number, renglones: RenglonPlanInicial[]) => void
   renglonesIniciales: RenglonPlanInicial[]
 }) {
   const [list, setList] = useState<RenglonPlanInicial[]>(renglonesIniciales)
@@ -872,7 +973,7 @@ function PantallaConfiguracionPlanInicial({
       <div className="flex justify-end pt-3 border-t border-gray-200">
         <button
           type="button"
-          onClick={() => onGuardar(totalCalculado)}
+          onClick={() => onGuardar(totalCalculado, list)}
           className="inline-flex items-center gap-1.5 rounded-lg bg-[#9B0F06] px-5 py-2 text-xs font-bold text-white hover:bg-[#5E0006] shadow-sm transition-colors"
         >
           <Save size={14} /> Guardar Plan y Finalizar
@@ -897,6 +998,7 @@ export function ProyectoFormulario({
 
   // REQUERIMIENTO ESPECIAL: Modo Captura Vacía de Hoja Sábana para Nuevo Proyecto
   const [modoCapturaSabanaInicial, setModoCapturaSabanaInicial] = useState(false)
+  const [renglonesPlan, setRenglonesPlan] = useState<any[]>([])
 
   // Campos Comunes
   const [nombreOficial, setNombreOficial] = useState(proyectoInicial?.nombreOficial || proyectoInicial?.nombre || '')
@@ -906,6 +1008,7 @@ export function ProyectoFormulario({
   const [descripcion, setDescripcion] = useState(proyectoInicial?.descripcion || '')
   const [ubicacionFisica, setUbicacionFisica] = useState(proyectoInicial?.ubicacionFisica || proyectoInicial?.ubicacion || '')
   const [direccion, setDireccion] = useState(proyectoInicial?.direccion || '')
+  const [direccionFin, setDireccionFin] = useState(proyectoInicial?.direccionFin || (proyectoInicial as any)?.direccion_fin || '')
   const [kilometroInicio, setKilometroInicio] = useState(String((proyectoInicial as any)?.kilometroInicio ?? ''))
   const [kilometroFin, setKilometroFin] = useState(String((proyectoInicial as any)?.kilometroFin ?? ''))
   // Catálogos
@@ -936,9 +1039,41 @@ export function ProyectoFormulario({
   const [delegadoResidente, setDelegadoResidente] = useState(proyectoInicial?.delegadoResidente || '')
   const [openCrearUsuarioDrawer, setOpenCrearUsuarioDrawer] = useState(false)
   const [openCrearDelegadoDrawer, setOpenCrearDelegadoDrawer] = useState(false)
+  const [openCrearIngenieroDrawer, setOpenCrearIngenieroDrawer] = useState(false)
   const [reloadDelegadosTrigger, setReloadDelegadosTrigger] = useState(0)
+  const [reloadIngenierosTrigger, setReloadIngenierosTrigger] = useState(0)
   const [openCrearEntidadDrawer, setOpenCrearEntidadDrawer] = useState(false)
   const [openCrearContratistaDrawer, setOpenCrearContratistaDrawer] = useState(false)
+
+  const handleIngenieroCreadoEnWizard = async (formData: any) => {
+    try {
+      const payloadApi: any = {
+        primer_nombre: formData.primer_nombre,
+        segundo_nombre: formData.segundo_nombre,
+        primer_apellido: formData.primer_apellido,
+        segundo_apellido: formData.segundo_apellido,
+        correo: formData.correo,
+        telefono: formData.telefono,
+        rol: formData.rol || 'Ingeniero Residente',
+        estado: formData.estado,
+        fecha_nacimiento: formData.fecha_nacimiento,
+        direccion: formData.direccion,
+      }
+      if (formData.password && formData.password.trim().length >= 6) {
+        payloadApi.contrasena = formData.password.trim()
+      }
+      const res = await api.post('/usuarios', payloadApi)
+      const nuevoUsuario = res.data?.data
+      showSuccessToast('Ingeniero Responsable creado exitosamente')
+      limpiarCacheMemoria('/usuarios')
+      setReloadIngenierosTrigger((prev) => prev + 1)
+      if (nuevoUsuario?.id) {
+        setResponsable(nuevoUsuario.id)
+      }
+    } catch (error: any) {
+      showErrorToast(error.response?.data?.message || 'Error al crear el ingeniero')
+    }
+  }
 
   const handleEntidadCreadaEnWizard = async (payload: any) => {
     try {
@@ -1095,20 +1230,32 @@ useEffect(() => {
     if (proyectoInicial.descripcion) setDescripcion(proyectoInicial.descripcion)
     if (proyectoInicial.ubicacionFisica || proyectoInicial.ubicacion) setUbicacionFisica(proyectoInicial.ubicacionFisica || proyectoInicial.ubicacion || '')
     if (proyectoInicial.direccion) setDireccion(proyectoInicial.direccion)
+    const dirFin = (proyectoInicial as any)?.direccionFin || (proyectoInicial as any)?.direccion_fin
+    if (dirFin) setDireccionFin(dirFin)
     if ((proyectoInicial as any).kilometroInicio != null) setKilometroInicio(String((proyectoInicial as any).kilometroInicio))
     if ((proyectoInicial as any).kilometroFin != null) setKilometroFin(String((proyectoInicial as any).kilometroFin))
 
     const depId = proyectoInicial?.departamentoId || (proyectoInicial as any)?.departamento_id
     const munId = proyectoInicial?.municipioId || (proyectoInicial as any)?.municipio_id
+    const depFinId = (proyectoInicial as any)?.departamentoFinId || (proyectoInicial as any)?.departamento_fin_id
+    const munFinId = (proyectoInicial as any)?.municipioFinId || (proyectoInicial as any)?.municipio_fin_id
 
-    let currentDep = departamentoId || depId
-    if (!departamentoId && depId) setDepartamentoId(depId)
-    if (!municipioId && munId) setMunicipioId(munId)
+    if (depId) setDepartamentoId(depId)
+    if (munId) setMunicipioId(munId)
+    if (depFinId) setDepartamentoFinId(depFinId)
+    if (munFinId) setMunicipioFinId(munFinId)
 
-    if (munId && !currentDep && municipios.length > 0) {
-      const foundMun = municipios.find((m: any) => m.id === munId)
+    if (munId && (!depId || !departamentoId) && municipios.length > 0) {
+      const foundMun = municipios.find((m: any) => m.id === munId || m.id === String(munId))
       if (foundMun?.departamento_id) {
         setDepartamentoId(foundMun.departamento_id)
+      }
+    }
+
+    if (munFinId && (!depFinId || !departamentoFinId) && municipios.length > 0) {
+      const foundMunFin = municipios.find((m: any) => m.id === munFinId || m.id === String(munFinId))
+      if (foundMunFin?.departamento_id) {
+        setDepartamentoFinId(foundMunFin.departamento_id)
       }
     }
 
@@ -1136,7 +1283,7 @@ useEffect(() => {
       setEquipo(proyectoInicial.equipo)
     }
   }
-}, [proyectoInicial, municipios]);
+}, [proyectoInicial, municipios, departamentos]);
 
 // Sync Entidad Contratante combobox state initially
 useEffect(() => {
@@ -1475,6 +1622,9 @@ function tieneAlMenosDosLetras(texto: string): boolean {
 
     // Requerimientos adicionales exclusivos para guardar como ACTIVO
     if (estado === 'activo') {
+      if (!empresaSupervisora.trim()) { faltantes.push('Empresa Supervisora'); newErrors.empresaSupervisora = true }
+      if (!numeroEscrituraPublica.trim()) { faltantes.push('Número de Escritura Pública'); newErrors.numeroEscrituraPublica = true }
+      if (equipo.length === 0) { faltantes.push('Al menos un miembro en el Equipo Asignado (Paso 4)'); newErrors.equipo = true }
       if (!fechaAdjudicacion) { faltantes.push('Fecha de Adjudicación'); newErrors.fechaAdjudicacion = true }
       if (!fechaInicioContractual) { faltantes.push('Fecha Inicio Contractual'); newErrors.fechaInicioContractual = true }
       if (!fechaFinContractualPlan) { faltantes.push('Fecha Final Contractual'); newErrors.fechaFinContractualPlan = true }
@@ -1525,6 +1675,10 @@ function tieneAlMenosDosLetras(texto: string): boolean {
         latitud: coordenadasMapa?.lat,
         longitud: coordenadasMapa?.lng,
         direccion: direccion,
+        direccionFin: limpiarAux(direccionFin),
+        direccion_fin: limpiarAux(direccionFin),
+        departamentoFinId: limpiarAux(departamentoFinId),
+        municipioFinId: limpiarAux(municipioFinId),
         entidadContratante: limpiarAux(entidadContratante),
         empresaContratanteId: limpiarAux(empresaContratanteId),
         empresaContratista: limpiarAux(empresaContratista),
@@ -1547,7 +1701,8 @@ function tieneAlMenosDosLetras(texto: string): boolean {
         plazoEjecucionRealAmpliado: limpiarAux(plazoEjecucionRealAmpliado),
         montoFinancieroFinalEjecutado: parseFloat(montoFinancieroFinalEjecutado) || null,
         montoFinal: parseFloat(montoFinancieroFinalEjecutado) || null,
-        coordenadasMapa
+        coordenadasMapa,
+        renglones_sabana: renglonesPlan.length > 0 ? renglonesPlan : undefined
       }
       
       onGuardar?.(proyectoData)
@@ -1597,18 +1752,20 @@ function tieneAlMenosDosLetras(texto: string): boolean {
       { id: 'p-dgc-10', codigoDGC: '608.01', descripcion: 'Cuneta de concreto revestida triangular', unidad: 'ml', cant: '2400', costo: '310' },
     ]
 
-    return <PantallaConfiguracionPlanInicial onVolver={() => setModoCapturaSabanaInicial(false)} onGuardar={(montoTotal) => {
+    return <PantallaConfiguracionPlanInicial onVolver={() => setModoCapturaSabanaInicial(false)} onGuardar={(montoTotal, renglonesCapturados) => {
       setMontoContractualOriginal(montoTotal.toString())
+      setRenglonesPlan(renglonesCapturados)
       setModoCapturaSabanaInicial(false)
-      setPasoActual(3)
+      // Avanzar al último paso y establecer estado activo si todo está listo
       showSuccessToast(`Monto Contractual Original autocompletado con Q ${montoTotal.toLocaleString('es-GT', { minimumFractionDigits: 2 })}`)
+
     }} renglonesIniciales={renglonesPrecargadosDGC} />
   }
 
   return (
     <div className="space-y-2.5 text-[11px]">
       {/* Stepper Indicator */}
-      <div className="rounded-lg border border-gray-200 bg-white p-2 shadow-2xs">
+      <div className="sticky top-0 z-30 bg-white rounded-lg border border-gray-200 p-2 shadow-2xs">
         <div className="flex items-center justify-between gap-1.5">
           {pasosMeta.map((p, idx) => {
             const esActivo = pasoActual === p.num
@@ -1796,6 +1953,13 @@ function tieneAlMenosDosLetras(texto: string): boolean {
                 rolesPermitidos={['Administrador', 'IngenieroResidente', 'Ingeniero Residente']}
               />
 
+              <UsuarioFormularioDrawer
+                isOpen={openCrearIngenieroDrawer}
+                onClose={() => setOpenCrearIngenieroDrawer(false)}
+                onSave={handleIngenieroCreadoEnWizard}
+                rolesPermitidos={['Administrador', 'IngenieroResidente', 'Ingeniero Residente', 'Director']}
+              />
+
               <EmpresaRelacionadaDrawer
                 isOpen={openCrearEntidadDrawer}
                 onClose={() => setOpenCrearEntidadDrawer(false)}
@@ -1830,6 +1994,8 @@ function tieneAlMenosDosLetras(texto: string): boolean {
                   direccion={direccion}
                   setDireccion={setDireccion}
                   setUbicacionFisica={setUbicacionFisica}
+                  direccionFin={direccionFin}
+                  setDireccionFin={setDireccionFin}
                   errors={errors}
                   setErrors={setErrors}
                   coordenadas={coordenadasMapa}
@@ -1838,17 +2004,21 @@ function tieneAlMenosDosLetras(texto: string): boolean {
                   setDepartamentoId={setDepartamentoId}
                   municipioId={municipioId}
                   setMunicipioId={setMunicipioId}
+                  departamentoFinId={departamentoFinId}
+                  setDepartamentoFinId={setDepartamentoFinId}
+                  municipioFinId={municipioFinId}
+                  setMunicipioFinId={setMunicipioFinId}
                   departamentos={departamentos}
                   municipios={municipios}
                   kilometroInicio={kilometroInicio}
                   kilometroFin={kilometroFin}
                 />
 
-                {/* 2. DEPARTAMENTO Y MUNICIPIO INICIAL (Auto-completados en vivo) */}
+                {/* 2. DEPARTAMENTO Y MUNICIPIO INICIAL */}
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   <div>
                     <label className={labelClass}>
-                      {esMultimunicipio ? 'Departamento de Inicio' : 'Departamento'} <span className="text-[#9B0F06]">*</span>
+                      DEPARTAMENTO INICIAL (ORIGEN) <span className="text-[#9B0F06]">*</span>
                     </label>
                     <Combobox
                       options={departamentos.map((d: any) => ({ value: d.id, label: d.nombre }))}
@@ -1864,14 +2034,14 @@ function tieneAlMenosDosLetras(texto: string): boolean {
                           }
                         }
                       }}
-                      placeholder="Buscar o seleccionar Departamento..."
+                      placeholder="Buscar o seleccionar Departamento Inicial..."
                       className="mt-1"
                     />
                   </div>
 
                   <div>
                     <label className={labelClass}>
-                      {esMultimunicipio ? 'Municipio de Inicio' : 'Municipio'} <span className="text-[#9B0F06]">*</span>
+                      MUNICIPIO INICIAL (ORIGEN) <span className="text-[#9B0F06]">*</span>
                     </label>
                     <Combobox
                       disabled={!departamentoId}
@@ -1884,74 +2054,13 @@ function tieneAlMenosDosLetras(texto: string): boolean {
                         setMunicipioId(val)
                         setErrors((prev) => ({ ...prev, municipioId: false }))
                       }}
-                      placeholder={!departamentoId ? 'Seleccione primero un Departamento...' : 'Buscar o seleccionar Municipio...'}
+                      placeholder={!departamentoId ? 'Seleccione primero un Departamento...' : 'Buscar o seleccionar Municipio Inicial...'}
                       className="mt-1"
                     />
                   </div>
                 </div>
 
-                {/* 3. Pregunta Tramo Multimunicipio / Multidepartamento */}
-                <div className="rounded-lg border border-gray-200 bg-gray-50/70 p-2 text-[11px]">
-                  <label className="flex items-center gap-2 font-medium text-gray-700 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={esMultimunicipio}
-                      onChange={(e) => {
-                        setEsMultimunicipio(e.target.checked)
-                        if (!e.target.checked) {
-                          setDepartamentoFinId('')
-                          setMunicipioFinId('')
-                        }
-                      }}
-                      className="h-3.5 w-3.5 rounded border-gray-300 text-[#9B0F06] focus:ring-[#9B0F06]"
-                    />
-                    <span>¿El proyecto es un tramo vial que abarca múltiples Municipios o Departamentos?</span>
-                  </label>
-                </div>
-
-                {/* Campos de Finalización de Tramo (Condicionales) */}
-                {esMultimunicipio && (
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 pt-1 border-t border-gray-100">
-                    <div>
-                      <label className={labelClass}>
-                        Departamento Final (Límite Tramo) <span className="text-[#9B0F06]">*</span>
-                      </label>
-                      <Combobox
-                        options={departamentos.map((d: any) => ({ value: d.id, label: d.nombre }))}
-                        value={departamentoFinId}
-                        onChange={(val) => {
-                          setDepartamentoFinId(val)
-                          if (municipioFinId) {
-                            const currentMun = municipios.find((m: any) => m.id === municipioFinId)
-                            if (!currentMun || currentMun.departamento_id !== val) {
-                              setMunicipioFinId('')
-                            }
-                          }
-                        }}
-                        placeholder="Buscar Departamento Final..."
-                        className="mt-1"
-                      />
-                    </div>
-
-                    <div>
-                      <label className={labelClass}>
-                        Municipio Final (Límite Tramo) <span className="text-[#9B0F06]">*</span>
-                      </label>
-                      <Combobox
-                        disabled={!departamentoFinId}
-                        options={municipios
-                          .filter((m: any) => m.departamento_id === departamentoFinId)
-                          .map((m: any) => ({ value: m.id, label: m.nombre }))}
-                        value={municipioFinId}
-                        onChange={(val) => setMunicipioFinId(val)}
-                        placeholder={!departamentoFinId ? 'Seleccione primero Departamento Final...' : 'Buscar Municipio Final...'}
-                        className="mt-1"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {/* 4. KILÓMETRO INICIAL Y FINAL */}
+                {/* 3. KILÓMETRO INICIAL Y FINAL (PRIMERO, ANTES DE DEPARTAMENTO/MUNICIPIO FINAL) */}
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   <div>
                     <label className={labelClass}>
@@ -1973,7 +2082,7 @@ function tieneAlMenosDosLetras(texto: string): boolean {
                         setErrors((prev) => ({ ...prev, kilometroInicio: false }))
                       }}
                       className={errorInputClass(errors, 'kilometroInicio')}
-                      placeholder="Ej: 200.000 (Km 200 + 000m)"
+                      placeholder="Ej: 5.000 (Km 5 + 000m)"
                     />
                     {kilometroInicio !== '' && !isNaN(Number(kilometroInicio)) && Number(kilometroInicio) >= 0 && (
                       <span className="text-[8px] font-bold text-[#9B0F06] mt-0.5 block">
@@ -2001,13 +2110,85 @@ function tieneAlMenosDosLetras(texto: string): boolean {
                         setErrors((prev) => ({ ...prev, kilometroFin: false }))
                       }}
                       className={errorInputClass(errors, 'kilometroFin')}
-                      placeholder="Ej: 240.000 (Km 240 + 000m)"
+                      placeholder="Ej: 10.000 (Km 10 + 000m)"
                     />
                     {kilometroFin !== '' && !isNaN(Number(kilometroFin)) && Number(kilometroFin) >= 0 && (
                       <span className="text-[8px] font-bold text-[#9B0F06] mt-0.5 block">
                         Formato DGC: Estación Km {Math.floor(Number(kilometroFin))} + {Math.round((Number(kilometroFin) % 1) * 1000).toString().padStart(3, '0')}m
                       </span>
                     )}
+                  </div>
+                </div>
+
+                {/* 4. DIRECCIÓN FINAL / DESTINO CON DEPARTAMENTO FINAL Y MUNICIPIO FINAL */}
+                <div className="rounded-xl p-3 space-y-2.5 bg-white">
+                  <div className="flex items-center gap-2 text-[9.5px] font-bold text-gray-800 uppercase tracking-wider">
+                    <MapPin size={14} className="text-blue-600" />
+                    <span>Ubicación Final / Destino del Tramo (Punto Azul)</span>
+                  </div>
+
+                  <div>
+                    <label className={labelClass}>
+                      Dirección Final / Destino (Texto Corto)
+                    </label>
+                    <div className="flex gap-1.5">
+                      <input
+                        type="text"
+                        value={direccionFin}
+                        onChange={(e) => setDireccionFin(e.target.value)}
+                        className={inputClass}
+                        placeholder="Ej: Plan Grande, Palencia, Departamento de Guatemala"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void buscarDireccionFin()}
+                        className="rounded bg-blue-600 px-3 py-1 text-[10px] font-bold text-white hover:bg-blue-700 transition-colors shrink-0 flex items-center gap-1 shadow-2xs cursor-pointer"
+                      >
+                        Buscar
+                      </button>
+                    </div>
+                    <p className="mt-0.5 text-[8px] text-gray-400">
+                      Ubicación del icono azul en el mapa donde finalizará el tramo del proyecto.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 pt-1 border-t border-blue-100/60">
+                    <div>
+                      <label className={labelClass}>
+                        Departamento Final (Límite Tramo)
+                      </label>
+                      <Combobox
+                        options={departamentos.map((d: any) => ({ value: d.id, label: d.nombre }))}
+                        value={departamentoFinId}
+                        onChange={(val) => {
+                          setDepartamentoFinId(val)
+                          if (municipioFinId) {
+                            const currentMun = municipios.find((m: any) => m.id === municipioFinId)
+                            if (!currentMun || currentMun.departamento_id !== val) {
+                              setMunicipioFinId('')
+                            }
+                          }
+                        }}
+                        placeholder="Buscar Departamento Final..."
+                        className="mt-1"
+                      />
+                    </div>
+
+                    <div>
+                      <label className={labelClass}>
+                        Municipio Final (Límite Tramo)
+                      </label>
+                      <Combobox
+                        disabled={!departamentoFinId}
+                        options={municipios
+                          .filter((m: any) => m.departamento_id === departamentoFinId)
+                          .map((m: any) => ({ value: m.id, label: m.nombre }))}
+                        value={municipioFinId}
+                        onChange={(val) => setMunicipioFinId(val)}
+                        placeholder={!departamentoFinId ? 'Seleccione primero Departamento Final...' : 'Buscar Municipio Final...'}
+                        className="mt-1"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -2142,22 +2323,17 @@ function tieneAlMenosDosLetras(texto: string): boolean {
                 </div>
 
                 <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-                  <div>
-                    <label className={labelClass}>Ingeniero Responsable / Director</label>
-                    <Combobox
-                      options={usuariosIngenieroResponsable.map((u: any) => ({
-                        value: u.id,
-                        label: `${u.nombre} (@${u.username || (u.correo ? u.correo.split('@')[0] : '')}) - (${u.rol})`
-                      }))}
-                      value={responsable}
-                      hasError={errors.responsable}
-                      onChange={(val) => {
-                        setResponsable(val)
-                        setErrors((prev) => ({ ...prev, responsable: false }))
-                      }}
-                      placeholder="Buscar responsable de obra (Residente o Administrador)..."
-                    />
-                  </div>
+                  <IngenieroResponsableSelect
+                    value={responsable}
+                    hasError={errors.responsable}
+                    onChange={(val) => {
+                      setResponsable(val)
+                      setErrors((prev) => ({ ...prev, responsable: false }))
+                    }}
+                    labelClass={labelClass}
+                    onAbrirCrearIngeniero={() => setOpenCrearIngenieroDrawer(true)}
+                    reloadTrigger={reloadIngenierosTrigger}
+                  />
 
                   <div>
                     <label className={labelClass}>Estado Inicial del Proyecto <span className="text-[8px] font-normal text-gray-400">(AUTOMÁTICO)</span></label>
@@ -2167,7 +2343,13 @@ function tieneAlMenosDosLetras(texto: string): boolean {
                       className={inputClass}
                     >
                       <option value="borrador">Borrador</option>
-                      <option value="activo">Activo</option>
+                      <option 
+                        value="activo" 
+                        disabled={!montoContractualOriginal || Number(montoContractualOriginal) <= 0}
+                        title={(!montoContractualOriginal || Number(montoContractualOriginal) <= 0) ? 'Debe cargar la Hoja Sábana (Plan de Trabajo) para activar el proyecto' : ''}
+                      >
+                        Activo {(!montoContractualOriginal || Number(montoContractualOriginal) <= 0) && '(Requiere Hoja Sábana)'}
+                      </option>
                     </select>
                   </div>
                 </div>
