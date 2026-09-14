@@ -492,8 +492,8 @@ export async function crearProyecto(datosFormulario: any) {
     throw new Error('No se pudo crear el registro base del proyecto')
   }
 
-  const muniId = esUuidValido(datosFormulario.municipioId)
-  const depaId = esUuidValido(datosFormulario.departamentoId)
+  const muniId = datosFormulario.municipioId ? Number(datosFormulario.municipioId) : null
+  const depaId = datosFormulario.departamentoId ? Number(datosFormulario.departamentoId) : null
   const empContratanteId = await resolverEmpresaContratanteId(datosFormulario.empresaContratanteId || datosFormulario.entidadContratante)
   const empContratistaId = await resolverEmpresaContratistaId(datosFormulario.empresaContratistaId || datosFormulario.empresaContratista)
   const delegadoResId = esUuidValido(datosFormulario.delegadoResidenteId)
@@ -594,8 +594,8 @@ export async function actualizarProyecto(proyectoId: string, datosFormulario: Re
     proyectoUpdates.ubicacion = datosFormulario.ubicacionFisica
     detalleUpdates.tramo = datosFormulario.ubicacionFisica
   }
-  if ('municipioId' in datosFormulario) detalleUpdates.municipio_id = datosFormulario.municipioId
-  if ('departamentoId' in datosFormulario) detalleUpdates.departamento_id = datosFormulario.departamentoId
+  if ('municipioId' in datosFormulario) detalleUpdates.municipio_id = datosFormulario.municipioId ? Number(datosFormulario.municipioId) : null
+  if ('departamentoId' in datosFormulario) detalleUpdates.departamento_id = datosFormulario.departamentoId ? Number(datosFormulario.departamentoId) : null
   if ('latitud' in datosFormulario) detalleUpdates.latitud = datosFormulario.latitud
   if ('longitud' in datosFormulario) detalleUpdates.longitud = datosFormulario.longitud
   if ('direccion' in datosFormulario) detalleUpdates.direccion = datosFormulario.direccion

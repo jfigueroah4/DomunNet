@@ -1,0 +1,1 @@
+ALTER TABLE proyecto_detalle ADD COLUMN IF NOT EXISTS departamento_fin_id INTEGER REFERENCES departamentos(id) ON DELETE SET NULL, ADD COLUMN IF NOT EXISTS municipio_fin_id INTEGER REFERENCES municipios(id) ON DELETE SET NULL, ADD COLUMN IF NOT EXISTS direccion_fin TEXT;

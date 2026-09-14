@@ -2142,7 +2142,7 @@ function tieneAlMenosDosLetras(texto: string): boolean {
                       <button
                         type="button"
                         onClick={() => void buscarDireccionFin()}
-                        className="rounded bg-blue-600 px-3 py-1 text-[10px] font-bold text-white hover:bg-blue-700 transition-colors shrink-0 flex items-center gap-1 shadow-2xs cursor-pointer"
+                        className="rounded bg-[#9B0F06] px-3 py-1 text-[10px] font-bold text-white hover:bg-[#7a0c05] transition-colors shrink-0 flex items-center gap-1 shadow-2xs cursor-pointer"
                       >
                         Buscar
                       </button>

@@ -1,4 +1,4 @@
-// @ts-nocheck
+﻿// @ts-nocheck
 'use client'
 import React, { useState, useEffect, useMemo, Fragment } from 'react'
 import { api, apiGetDeduplicado } from '@/lib/api/cliente'
@@ -52,158 +52,6 @@ import { showSuccessToast, showErrorToast } from '@/components/ui/Toast'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { useRouter, useParams } from 'next/navigation'
 
-function parseFechaRobust(fechaStr?: string | Date | null): Date | null {
-  if (!fechaStr) return null
-  if (fechaStr instanceof Date) return isNaN(fechaStr.getTime()) ? null : fechaStr
-  const str = String(fechaStr).trim()
-  if (!str) return null
-
-  if (str.includes('/')) {
-    const parts = str.split('/')
-    if (parts.length === 3) {
-      const d = parseInt(parts[0], 10)
-      const m = parseInt(parts[1], 10) - 1
-      const y = parseInt(parts[2], 10)
-      const parsed = new Date(y, m, d)
-      return isNaN(parsed.getTime()) ? null : parsed
-    }
-  }
-
-  if (str.includes('-')) {
-    const clean = str.split('T')[0]
-    const parts = clean.split('-')
-    if (parts.length === 3) {
-      const y = parseInt(parts[0], 10)
-      const m = parseInt(parts[1], 10) - 1
-      const d = parseInt(parts[2], 10)
-      const parsed = new Date(y, m, d)
-      return isNaN(parsed.getTime()) ? null : parsed
-    }
-  }
-
-  const defaultParsed = new Date(str)
-  return isNaN(defaultParsed.getTime()) ? null : defaultParsed
-}
-
-const TOOLTIPS_COLUMNAS_SABANA: Record<string, { title: string; formula?: string; desc: string }> = {
-  A: {
-    title: 'A. CÓDIGO DGC',
-    desc: 'Código oficial normalizado de la partida de obra vial según el Libro de Especificaciones de la DGC.',
-  },
-  B: {
-    title: 'B. DESCRIPCIÓN',
-    desc: 'Nombre y descripción técnica detallada del alcance físico de la partida o renglón de trabajo.',
-  },
-  C: {
-    title: 'C. UNIDAD DE MEDIDA',
-    desc: 'Unidad física de medición contractual de la obra (m³, m², ml, kg, ton, Glb, U, Lt).',
-  },
-  D: {
-    title: 'D. CANTIDAD CONTRATADA',
-    desc: 'Volumen o cantidad física original establecida en el contrato de obra pública.',
-  },
-  E: {
-    title: 'E. CANTIDAD AJUSTADA',
-    desc: 'Cantidad modificada oficial según Órdenes de Cambio, Acuerdos Suplementarios o Cuadros de Excedentes.',
-  },
-  F: {
-    title: 'F. COSTO UNITARIO DIRECTO',
-    formula: 'Q (Precio Unitario)',
-    desc: 'Precio unitario directo de oferta pactado por unidad de medida, antes de indirectos e IVA.',
-  },
-  G: {
-    title: 'G. COSTO TOTAL DIRECTO',
-    formula: 'D × F',
-    desc: 'Monto de costo directo original del renglón (Cantidad Contratada D × Costo Unitario Directo F).',
-  },
-  H: {
-    title: 'H. COSTO TOTAL AJUSTADO',
-    formula: 'E × F',
-    desc: 'Monto de costo directo ajustado vigente del renglón (Cantidad Ajustada E × Costo Unitario Directo F).',
-  },
-  I: {
-    title: 'I. ESTE PERIODO (CANTIDAD)',
-    formula: 'Sum(Analítico)',
-    desc: 'Cantidad ejecutada calculada en tiempo real en la Memoria de Cálculo Analítica para la estimación activa.',
-  },
-  J: {
-    title: 'J. ACUMULADO ANTERIOR (CANTIDAD)',
-    desc: 'Suma de cantidades físicas aprobadas y pagadas en todas las estimaciones mensuales previas.',
-  },
-  K: {
-    title: 'K. TOTAL A FECHA (CANTIDAD)',
-    formula: 'I + J',
-    desc: 'Cantidad total acumulada ejecutada desde el inicio de la obra hasta el corte del periodo actual.',
-  },
-  L: {
-    title: 'L. % AVANCE (CANTIDAD)',
-    formula: '(K / E) × 100',
-    desc: 'Porcentaje físico ejecutado con relación a la Cantidad Ajustada (E) vigente.',
-  },
-  M: {
-    title: 'M. ESTE PERIODO (COSTO)',
-    formula: 'I × F',
-    desc: 'Monto en Quetzales de costo directo a cobrar en la estimación del periodo actual.',
-  },
-  N: {
-    title: 'N. ACUMULADO ANTERIOR (COSTO)',
-    formula: 'J × F',
-    desc: 'Monto acumulado en Quetzales de costo directo cobrado en periodos anteriores.',
-  },
-  O: {
-    title: 'O. TOTAL A FECHA (COSTO)',
-    formula: 'M + N',
-    desc: 'Monto total en Quetzales de costo directo ejecutado a la fecha.',
-  },
-  P: {
-    title: 'P. % AVANCE (COSTO)',
-    formula: '(O / H) × 100',
-    desc: 'Porcentaje de ejecución financiera acumulada con respecto al Costo Total Ajustado H.',
-  },
-  Saldo: {
-    title: 'SALDO POR EJECUTAR',
-    formula: 'H − O',
-    desc: 'Monto financiero remanente de costo directo disponible por ejecutar en la partida.',
-  },
-}
-
-function HeaderTooltip({
-  colKey,
-  children,
-}: {
-  colKey: string
-  children: React.ReactNode
-}) {
-  const [hovered, setHovered] = useState(false)
-  const info = TOOLTIPS_COLUMNAS_SABANA[colKey]
-
-  if (!info) return <>{children}</>
-
-  return (
-    <div
-      className="relative inline-block cursor-help"
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
-      {children}
-      {hovered && (
-        <div className="absolute top-full left-1/2 z-[9999] mt-1.5 w-60 -translate-x-1/2 rounded-xl border border-gray-200 bg-white p-2.5 text-left font-sans shadow-xl backdrop-blur-md transition-all">
-          <div className="flex items-center gap-1.5 border-b border-gray-100 pb-1">
-            <Info size={11} className="text-[#9B0F06] shrink-0" />
-            <span className="text-[10px] font-extrabold text-gray-900 leading-tight">{info.title}</span>
-          </div>
-          {info.formula && (
-            <div className="my-1 rounded bg-red-50/80 px-1.5 py-0.5 font-mono text-[9px] font-bold text-[#9B0F06] border border-red-100">
-              Fórmula: {info.formula}
-            </div>
-          )}
-          <p className="text-[9px] font-normal leading-normal text-gray-600">{info.desc}</p>
-        </div>
-      )}
-    </div>
-  )
-}
-
 const DISCRETE_UNITS = new Set(['u', 'glb', 'mes', 'hoja', 'arbol'])
 
 export function isUnitDiscrete(unit?: string | { abreviatura?: string; simbolo?: string; es_discreta?: boolean }): boolean {
@@ -228,22 +76,6 @@ export function formatQuantity(val: number, unit?: string | { abreviatura?: stri
   })
 }
 
-export function obtenerAvanceMensual(
-  avancesMensuales: Record<string, number> | undefined,
-  mesHeader: string,
-  index: number
-): number {
-  if (!avancesMensuales) return 0
-  if (avancesMensuales[mesHeader] !== undefined && avancesMensuales[mesHeader] !== null) {
-    return Number(avancesMensuales[mesHeader]) || 0
-  }
-  const legacyKey = `Mes ${index + 1}`
-  if (avancesMensuales[legacyKey] !== undefined && avancesMensuales[legacyKey] !== null) {
-    return Number(avancesMensuales[legacyKey]) || 0
-  }
-  return 0
-}
-
 export interface RenglonDetalladoSabana {
   id: string
   capituloId: number
@@ -263,7 +95,7 @@ export interface RenglonDetalladoSabana {
   fechaFinPlan?: string
 }
 
-// Estructura de Medición de Campo para el Tab Analítico
+// Estructura de Medici├│n de Campo para el Tab Anal├¡tico
 export interface MedicionAnaliticaCampo {
   id: string
   codigoDGC: string
@@ -283,36 +115,25 @@ export interface TrabajoPendienteBolsa {
   codigoDGC: string
   descripcion: string
   unidad: string
-  origenTrazabilidad?: string
-  longitudBase?: number
-  factorDescuento?: number
-  cantidadBruta?: number
-  costoUnitario?: number
-  estacionInicio?: string
-  estacionFin?: string
-  longitudL?: number
-  anchoA?: number
-  alturaH?: number
-  volumenAreaBruto?: number
-  descuentoMonto?: number
-  descuentoNombre?: string
-  cantidadNetaCobrar?: number
-  ubicacionEspecifica?: string
-  ladoVia?: string
+  origenTrazabilidad: string
+  longitudBase: number
+  factorDescuento: number
+  cantidadBruta: number
+  costoUnitario: number
   estado: 'Pendiente' | 'Aprobado' | 'Trasladado'
   mesesAntiguedad: number
 }
 
 const CAPITULOS_LIBRO_AZUL = [
-  { id: 1, nombre: 'Capítulo I: Estudios, Mantenimiento y Trabajos Preliminares' },
-  { id: 2, nombre: 'Capítulo II: Movimiento de Tierras y Excavación' },
-  { id: 3, nombre: 'Capítulo III: Terraplenes Estructurales y Capas de Soporte' },
-  { id: 4, nombre: 'Capítulo IV: Subbases y Bases Granulares' },
-  { id: 5, nombre: 'Capítulo V: Pavimentos Asfálticos y Concreto' },
-  { id: 6, nombre: 'Capítulo VI: Estructuras de Drenaje Pluvial' },
-  { id: 7, nombre: 'Capítulo VII: Bóvedas Metálicas y Obras de Arte' },
-  { id: 8, nombre: 'Capítulo VIII: Construcciones Complementarias y Señalización' },
-  { id: 9, nombre: 'Capítulo IX: Aspectos Ambientales y Gestión de Riesgo' },
+  { id: 1, nombre: 'Cap├¡tulo I: Estudios, Mantenimiento y Trabajos Preliminares' },
+  { id: 2, nombre: 'Cap├¡tulo II: Movimiento de Tierras y Excavaci├│n' },
+  { id: 3, nombre: 'Cap├¡tulo III: Terraplenes Estructurales y Capas de Soporte' },
+  { id: 4, nombre: 'Cap├¡tulo IV: Subbases y Bases Granulares' },
+  { id: 5, nombre: 'Cap├¡tulo V: Pavimentos Asf├ílticos y Concreto' },
+  { id: 6, nombre: 'Cap├¡tulo VI: Estructuras de Drenaje Pluvial' },
+  { id: 7, nombre: 'Cap├¡tulo VII: B├│vedas Met├ílicas y Obras de Arte' },
+  { id: 8, nombre: 'Cap├¡tulo VIII: Construcciones Complementarias y Se├▒alizaci├│n' },
+  { id: 9, nombre: 'Cap├¡tulo IX: Aspectos Ambientales y Gesti├│n de Riesgo' },
 ]
 
 // 88 RENGLONES OFICIALES
@@ -320,9 +141,9 @@ const CATALOGO_DETALLADO_88_RENGLONES: RenglonDetalladoSabana[] = [
   {
     id: 'sab-1',
     capituloId: 1,
-    capituloNombre: 'Capítulo I: Estudios, Mantenimiento y Trabajos Preliminares',
+    capituloNombre: 'Cap├¡tulo I: Estudios, Mantenimiento y Trabajos Preliminares',
     codigoDGC: '101.01',
-    descripcion: 'Mantenimiento del tránsito y construcción de desvíos provisionales',
+    descripcion: 'Mantenimiento del tr├ínsito y construcci├│n de desv├¡os provisionales',
     unidad: 'Glb',
     cantidadContratada: 1,
     cantidadAjustada: 1,
@@ -336,9 +157,9 @@ const CATALOGO_DETALLADO_88_RENGLONES: RenglonDetalladoSabana[] = [
   {
     id: 'sab-2',
     capituloId: 1,
-    capituloNombre: 'Capítulo I: Estudios, Mantenimiento y Trabajos Preliminares',
+    capituloNombre: 'Cap├¡tulo I: Estudios, Mantenimiento y Trabajos Preliminares',
     codigoDGC: '102.03',
-    descripcion: 'Clechado, chapeo, destronque y limpieza del derecho de vía',
+    descripcion: 'Clechado, chapeo, destronque y limpieza del derecho de v├¡a',
     unidad: 'Ha',
     cantidadContratada: 18.5,
     cantidadAjustada: 18.5,
@@ -352,10 +173,10 @@ const CATALOGO_DETALLADO_88_RENGLONES: RenglonDetalladoSabana[] = [
   {
     id: 'sab-3',
     capituloId: 1,
-    capituloNombre: 'Capítulo I: Estudios, Mantenimiento y Trabajos Preliminares',
+    capituloNombre: 'Cap├¡tulo I: Estudios, Mantenimiento y Trabajos Preliminares',
     codigoDGC: '103.01',
-    descripcion: 'Demolición de estructuras existentes de concreto y mampostería',
-    unidad: 'm³',
+    descripcion: 'Demolici├│n de estructuras existentes de concreto y mamposter├¡a',
+    unidad: 'm┬│',
     cantidadContratada: 1200,
     cantidadAjustada: 1200,
     costoUnitarioDirecto: 280,
@@ -368,10 +189,10 @@ const CATALOGO_DETALLADO_88_RENGLONES: RenglonDetalladoSabana[] = [
   {
     id: 'sab-11',
     capituloId: 2,
-    capituloNombre: 'Capítulo II: Movimiento de Tierras y Excavación',
+    capituloNombre: 'Cap├¡tulo II: Movimiento de Tierras y Excavaci├│n',
     codigoDGC: '201.01',
-    descripcion: 'Excavación no clasificada para corte en vía',
-    unidad: 'm³',
+    descripcion: 'Excavaci├│n no clasificada para corte en v├¡a',
+    unidad: 'm┬│',
     cantidadContratada: 45000,
     cantidadAjustada: 48000,
     costoUnitarioDirecto: 68,
@@ -384,10 +205,10 @@ const CATALOGO_DETALLADO_88_RENGLONES: RenglonDetalladoSabana[] = [
   {
     id: 'sab-12',
     capituloId: 2,
-    capituloNombre: 'Capítulo II: Movimiento de Tierras y Excavación',
+    capituloNombre: 'Cap├¡tulo II: Movimiento de Tierras y Excavaci├│n',
     codigoDGC: '201.03(b)',
-    descripcion: 'Excavación en roca mediante perforación y voladura controlada',
-    unidad: 'm³',
+    descripcion: 'Excavaci├│n en roca mediante perforaci├│n y voladura controlada',
+    unidad: 'm┬│',
     cantidadContratada: 12500,
     cantidadAjustada: 14000,
     costoUnitarioDirecto: 210,
@@ -400,10 +221,10 @@ const CATALOGO_DETALLADO_88_RENGLONES: RenglonDetalladoSabana[] = [
   {
     id: 'sab-38',
     capituloId: 5,
-    capituloNombre: 'Capítulo V: Pavimentos Asfálticos y Concreto',
+    capituloNombre: 'Cap├¡tulo V: Pavimentos Asf├ílticos y Concreto',
     codigoDGC: '551.03',
-    descripcion: 'Pavimento de concreto hidráulico MR=48 e=25cm para tramos de carga pesada',
-    unidad: 'm²',
+    descripcion: 'Pavimento de concreto hidr├íulico MR=48 e=25cm para tramos de carga pesada',
+    unidad: 'm┬▓',
     cantidadContratada: 18000,
     cantidadAjustada: 18000,
     costoUnitarioDirecto: 460,
@@ -432,8 +253,8 @@ const GENERAR_88_RENGLONES = (): RenglonDetalladoSabana[] => {
         capituloId: cap.id,
         capituloNombre: cap.nombre,
         codigoDGC: codSub,
-        descripcion: `Renglón complementario de ${cap.nombre.split(':')[1]?.trim() || 'Obra Vial'} No. ${i}`,
-        unidad: i % 2 === 0 ? 'm³' : i % 3 === 0 ? 'ml' : 'm²',
+        descripcion: `Rengl├│n complementario de ${cap.nombre.split(':')[1]?.trim() || 'Obra Vial'} No. ${i}`,
+        unidad: i % 2 === 0 ? 'm┬│' : i % 3 === 0 ? 'ml' : 'm┬▓',
         cantidadContratada: 1000 + i * 250,
         cantidadAjustada: 1000 + i * 250,
         costoUnitarioDirecto: 120 + i * 15,
@@ -477,10 +298,10 @@ const GENERAR_RENGLONES_VACIOS = (): RenglonDetalladoSabana[] => {
 
 // Mediciones
 const MEDICIONES_ANALITICAS_MOCK: MedicionAnaliticaCampo[] = [
-  { id: 'm-1', codigoDGC: '201.01', estacionInicio: '14+200', estacionFin: '14+700', longitudL: 500, anchoA: 7.3, alturaH: 0.95, mesPeriodo: 'Mes 6', numEstimacion: 'Est. 08', observaciones: 'Ancho promedio verificado según libreta de nivelación topográfica N° 04.' },
-  { id: 'm-2', codigoDGC: '201.01', estacionInicio: '14+700', estacionFin: '15+100', longitudL: 400, anchoA: 7.3, alturaH: 0.95, mesPeriodo: 'Mes 6', numEstimacion: 'Est. 08', observaciones: 'Alineamiento ajustado por presencia de talud de corte cóncavo.' },
-  { id: 'm-3', codigoDGC: '201.03(b)', estacionInicio: '15+200', estacionFin: '15+500', longitudL: 300, anchoA: 4.0, alturaH: 1.0, mesPeriodo: 'Mes 6', numEstimacion: 'Est. 08', observaciones: 'Volumen derivado de perforación y voladura en banco de material rocoso duro.' },
-  { id: 'm-4', codigoDGC: '551.03', estacionInicio: '14+200', estacionFin: '14+600', longitudL: 400, anchoA: 3.65, alturaH: 0.25, mesPeriodo: 'Mes 6', numEstimacion: 'Est. 08', observaciones: 'Espesor verificado con reglas de nivel durante la fundición continua de carril derecho.' },
+  { id: 'm-1', codigoDGC: '201.01', estacionInicio: '14+200', estacionFin: '14+700', longitudL: 500, anchoA: 7.3, alturaH: 0.95, mesPeriodo: 'Mes 6', numEstimacion: 'Est. 08', observaciones: 'Ancho promedio verificado seg├║n libreta de nivelaci├│n topogr├ífica N┬░ 04.' },
+  { id: 'm-2', codigoDGC: '201.01', estacionInicio: '14+700', estacionFin: '15+100', longitudL: 400, anchoA: 7.3, alturaH: 0.95, mesPeriodo: 'Mes 6', numEstimacion: 'Est. 08', observaciones: 'Alineamiento ajustado por presencia de talud de corte c├│ncavo.' },
+  { id: 'm-3', codigoDGC: '201.03(b)', estacionInicio: '15+200', estacionFin: '15+500', longitudL: 300, anchoA: 4.0, alturaH: 1.0, mesPeriodo: 'Mes 6', numEstimacion: 'Est. 08', observaciones: 'Volumen derivado de perforaci├│n y voladura en banco de material rocoso duro.' },
+  { id: 'm-4', codigoDGC: '551.03', estacionInicio: '14+200', estacionFin: '14+600', longitudL: 400, anchoA: 3.65, alturaH: 0.25, mesPeriodo: 'Mes 6', numEstimacion: 'Est. 08', observaciones: 'Espesor verificado con reglas de nivel durante la fundici├│n continua de carril derecho.' },
 ]
 
 // Trabajos Pendientes
@@ -488,9 +309,9 @@ const TRABAJOS_PENDIENTES_MOCK: TrabajoPendienteBolsa[] = [
   {
     id: 'p-1',
     codigoDGC: '201.03(b)',
-    descripcion: 'Excavación en roca mediante voladura en talud inestable',
-    unidad: 'm³',
-    origenTrazabilidad: 'Volumen excede cupo contractual acumulado (48,000 m³ max)',
+    descripcion: 'Excavaci├│n en roca mediante voladura en talud inestable',
+    unidad: 'm┬│',
+    origenTrazabilidad: 'Volumen excede cupo contractual acumulado (48,000 m┬│ max)',
     longitudBase: 500,
     factorDescuento: 0.657,
     cantidadBruta: 1500,
@@ -501,8 +322,8 @@ const TRABAJOS_PENDIENTES_MOCK: TrabajoPendienteBolsa[] = [
   {
     id: 'p-2',
     codigoDGC: '504.01',
-    descripcion: 'Pavimento de concreto hidráulico MR=45 tramo auxiliar',
-    unidad: 'm²',
+    descripcion: 'Pavimento de concreto hidr├íulico MR=45 tramo auxiliar',
+    unidad: 'm┬▓',
     origenTrazabilidad: 'Control de Calidad: Prueba de resistencia en corazones de concreto pendiente',
     longitudBase: 350,
     factorDescuento: 0.15,
@@ -514,27 +335,6 @@ const TRABAJOS_PENDIENTES_MOCK: TrabajoPendienteBolsa[] = [
 ]
 
 type ColumnaOrdenable = keyof RenglonDetalladoSabana | 'totalAFecha' | 'avancePct' | 'costoTotalAFecha' | 'saldoPorEjecutar' | string
-
-function sanitizePositivo(raw: string): number {
-  const cleaned = raw.replace(/[^\d.]/g, '')
-  const parts = cleaned.split('.')
-  const formatted = parts.length > 1 ? `${parts[0]}.${parts.slice(1).join('')}` : cleaned
-  const num = parseFloat(formatted)
-  return isNaN(num) || num < 0 ? 0 : num
-}
-
-function handleKeyDownNumericOnly(e: React.KeyboardEvent<HTMLInputElement>) {
-  if (
-    ['Backspace', 'Delete', 'Tab', 'Escape', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', '.'].includes(e.key) ||
-    e.ctrlKey ||
-    e.metaKey
-  ) {
-    return
-  }
-  if (!/\d/.test(e.key)) {
-    e.preventDefault()
-  }
-}
 
 export default function HojaSabanaView({ id: idProp }: { id?: string }) {
   const params = useParams<{ id: string }>()
@@ -548,45 +348,31 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
   const [proyectosLista, setProyectosLista] = useState<any[]>([])
 
   useEffect(() => {
-    const targetId = proyectoIdSeleccionado || id
-    if (targetId && targetId !== 'nuevo' && targetId !== 'crear') {
-      apiGetDeduplicado(`/proyectos/${targetId}`)
+    if (id && id !== 'nuevo' && id !== 'crear') {
+      apiGetDeduplicado(`/proyectos/${id}`)
         .then((r) => {
-          if (r.data?.data) {
-            console.log('[HojaSabanaView] OBJETO PROYECTO RECIBIDO DEL BACKEND:', r.data.data)
-            setProyectoReal(r.data.data)
-          }
+          if (r.data?.data) setProyectoReal(r.data.data)
         })
-        .catch((err) => {
-          console.warn('[HojaSabanaView] Error cargando detalle de proyecto:', err)
-        })
+        .catch(() => {})
     }
-  }, [proyectoIdSeleccionado, id])
-
-  useEffect(() => {
     apiGetDeduplicado('/proyectos')
       .then((r) => {
         if (r.data?.data) setProyectosLista(r.data.data)
       })
       .catch(() => {})
-  }, [])
+  }, [id])
 
   const esPlantillaVacia = proyectoIdSeleccionado === 'nuevo' || proyectoIdSeleccionado === 'crear'
 
   const proyecto = useMemo(() => {
-    if (proyectoReal && (proyectoReal.id === proyectoIdSeleccionado || proyectoReal.codigo === proyectoIdSeleccionado || proyectoReal.slug === proyectoIdSeleccionado)) {
-      return proyectoReal
-    }
-    const enc = proyectosLista.find((p) => p.id === proyectoIdSeleccionado || p.codigo === proyectoIdSeleccionado || p.slug === proyectoIdSeleccionado)
-    if (enc) return enc
     if (proyectoReal) return proyectoReal
     if (esPlantillaVacia) {
       return {
         id: 'nuevo',
         codigo: 'PROY-000',
-        nombre: 'Nuevo Proyecto (Plantilla Sábana Vacía)',
+        nombre: 'Nuevo Proyecto (Plantilla S├íbana Vac├¡a)',
         presupuesto: 0,
-        plazo: '0 Meses (0 días)',
+        plazo: '0 Meses (0 d├¡as)',
         ubicacion: 'Guatemala',
         responsable: 'Sin Asignar',
         estado: 'borrador' as const,
@@ -598,6 +384,8 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
         fechaFin: '',
       }
     }
+    const enc = proyectosLista.find((p) => p.id === proyectoIdSeleccionado)
+    if (enc) return enc
     return PROYECTOS_MOCK.find((p) => p.id === proyectoIdSeleccionado) || PROYECTOS_MOCK[0]
   }, [proyectoReal, esPlantillaVacia, proyectosLista, proyectoIdSeleccionado])
 
@@ -612,31 +400,8 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
   const [formObservacionesPlazo, setFormObservacionesPlazo] = useState('')
   const [errorsPlazoForm, setErrorsPlazoForm] = useState<Record<string, boolean>>({})
 
-  // FECHA FINALIZACIÓN ACTUALIZADA
-  const [fechaFinalizacionActualizada, setFechaFinalizacionActualizada] = useState('')
-
-  // APERTURA DE ESTIMACIÓN DINÁMICA DE PERIODO
-  const [modalAperturaEstimacionOpen, setModalAperturaEstimacionOpen] = useState(false)
-  const [listaEstimaciones, setListaEstimaciones] = useState<Array<{ id: string; numero: string; mes: string; fechaInicio: string; fechaCorte: string; estado: 'actual' | 'cerrada' }>>([
-    { id: 'est-1', numero: 'Estimación 01', mes: 'Septiembre 2026', fechaInicio: '2026-09-01', fechaCorte: '2026-09-30', estado: 'cerrada' },
-    { id: 'est-2', numero: 'Estimación 02', mes: 'Octubre 2026', fechaInicio: '2026-10-01', fechaCorte: '2026-10-31', estado: 'cerrada' },
-    { id: 'est-3', numero: 'Estimación 05', mes: 'Noviembre 2026', fechaInicio: '2026-11-01', fechaCorte: '2026-11-30', estado: 'cerrada' },
-    { id: 'est-4', numero: 'Estimación 08 (Actual)', mes: 'Diciembre 2026', fechaInicio: '2026-12-01', fechaCorte: '2026-12-31', estado: 'actual' },
-  ])
-  const [formEstNumero, setFormEstNumero] = useState('Estimación 09')
-  const [formEstMes, setFormEstMes] = useState('Enero 2027')
-  const [formEstFechaInicio, setFormEstFechaInicio] = useState('2027-01-01')
-  const [formEstFechaCorte, setFormEstFechaCorte] = useState('2027-01-31')
-  const [formEstNotas, setFormEstNotas] = useState('')
-
-  // REGISTRAR MEDICIÓN EN TAB ANALÍTICO
-  const [modalAgregarMedicionOpen, setModalAgregarMedicionOpen] = useState(false)
-  const [formMedCodigoDGC, setFormMedCodigoDGC] = useState('201.01')
-  const [formMedEstacionInicio, setFormMedEstacionInicio] = useState('15+000')
-  const [formMedEstacionFin, setFormMedEstacionFin] = useState('15+500')
-  const [formMedLongitud, setFormMedLongitud] = useState('500')
-  const [formMedAncho, setFormMedAncho] = useState('7.30')
-  const [formMedAltura, setFormMedAltura] = useState('0.85')
+  // FECHA FINALIZACI├ôN ACTUALIZADA
+  const [fechaFinalizacionActualizada, setFechaFinalizacionActualizada] = useState('30/11/2026')
 
   const [capituloFiltro, setCapituloFiltro] = useState<number | 'todos'>('todos')
   const [mesFiltro, setMesFiltro] = useState<string | 'todos'>('todos')
@@ -650,7 +415,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
   const [itemsPorPagina, setItemsPorPagina] = useState<number>(12)
   const [paginaActual, setPaginaActual] = useState<number>(1)
 
-  // Paginación para Tab "Planificado vs Real"
+  // Paginaci├│n para Tab "Planificado vs Real"
   const [pvrItemsPorPagina, setPvrItemsPorPagina] = useState<number>(10)
   const [pvrPaginaActual, setPvrPaginaActual] = useState<number>(1)
 
@@ -676,17 +441,17 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
 
   const [capitulosLista, setCapitulosLista] = useState(CAPITULOS_LIBRO_AZUL)
   const [unidadesLista, setUnidadesLista] = useState([
-    { id: 'u-1', simbolo: 'm³', nombre: 'Metro Cúbico', descripcion: 'Volumen para movimiento de tierras, excavaciones y fundiciones' },
-    { id: 'u-2', simbolo: 'm²', nombre: 'Metro Cuadrado', descripcion: 'Área para pavimentos, pintura y limpieza' },
-    { id: 'u-3', simbolo: 'ml', nombre: 'Metro Lineal', descripcion: 'Longitud para cunetas, bordillos y tuberías' },
-    { id: 'u-4', simbolo: 'Glb', nombre: 'Suma Global', descripcion: 'Trabajos globales, campamento y mantenimiento de tránsito' },
+    { id: 'u-1', simbolo: 'm┬│', nombre: 'Metro C├║bico', descripcion: 'Volumen para movimiento de tierras, excavaciones y fundiciones' },
+    { id: 'u-2', simbolo: 'm┬▓', nombre: 'Metro Cuadrado', descripcion: '├ürea para pavimentos, pintura y limpieza' },
+    { id: 'u-3', simbolo: 'ml', nombre: 'Metro Lineal', descripcion: 'Longitud para cunetas, bordillos y tuber├¡as' },
+    { id: 'u-4', simbolo: 'Glb', nombre: 'Suma Global', descripcion: 'Trabajos globales, campamento y mantenimiento de tr├ínsito' },
     { id: 'u-5', simbolo: 'kg', nombre: 'Kilogramo', descripcion: 'Acero de refuerzo estructural' },
-    { id: 'u-6', simbolo: 'ton', nombre: 'Tonelada Métrica', descripcion: 'Mezcla asfáltica en caliente' },
-    { id: 'u-7', simbolo: 'U', nombre: 'Unidad / Pieza', descripcion: 'Elementos individuales, pozos y señales' },
-    { id: 'u-8', simbolo: 'Lt', nombre: 'Litro', descripcion: 'Riego de liga y líquidos bituminosos' },
+    { id: 'u-6', simbolo: 'ton', nombre: 'Tonelada M├®trica', descripcion: 'Mezcla asf├íltica en caliente' },
+    { id: 'u-7', simbolo: 'U', nombre: 'Unidad / Pieza', descripcion: 'Elementos individuales, pozos y se├▒ales' },
+    { id: 'u-8', simbolo: 'Lt', nombre: 'Litro', descripcion: 'Riego de liga y l├¡quidos bituminosos' },
   ])
 
-  // MODAL GESTIÓN DE RENGLONES, UNIDADES Y CAPÍTULOS
+  // MODAL GESTI├ôN DE RENGLONES, UNIDADES Y CAP├ìTULOS
   const [modalGestionRenglonesOpen, setModalGestionRenglonesOpen] = useState(false)
   const [subTabGestion, setSubTabGestion] = useState<'renglones' | 'unidades' | 'capitulos'>('renglones')
 
@@ -695,23 +460,23 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
   const [unidadForm, setUnidadForm] = useState<{ id?: string; simbolo: string; nombre: string; descripcion: string }>({ simbolo: '', nombre: '', descripcion: '' })
   const [unidadAEliminar, setUnidadAEliminar] = useState<{ id: string; simbolo: string } | null>(null)
 
-  // CRUD Capítulos
+  // CRUD Cap├¡tulos
   const [modalCapituloFormOpen, setModalCapituloFormOpen] = useState(false)
   const [capituloForm, setCapituloForm] = useState<{ id?: number; nombre: string }>({ nombre: '' })
   const [capituloAEliminar, setCapituloAEliminar] = useState<{ id: number; nombre: string } | null>(null)
 
-  // CARGA AUTOMÁTICA DESDE SUPABASE AL MONTAR (REQUERIDO: NO DATOS QUEMADOS)
+  // CARGA AUTOM├üTICA DESDE SUPABASE AL MONTAR (REQUERIDO: NO DATOS QUEMADOS)
   useEffect(() => {
     let activo = true
     const cargarDesdeSupabase = async () => {
       try {
-        // 1. Capítulos Sábana desde Supabase (/mantenimiento/capitulo_sabana)
+        // 1. Cap├¡tulos S├íbana desde Supabase (/mantenimiento/capitulo_sabana)
         const resCap = await apiGetDeduplicado('/mantenimiento/capitulo_sabana?limite=100')
         const dataCaps = resCap?.data?.data || resCap?.data
         if (activo && Array.isArray(dataCaps) && dataCaps.length > 0) {
           const capsMapeados = dataCaps.map((c: any) => ({
             id: Number(c.numero_capitulo) || Number(c.id) || 1,
-            nombre: c.nombre_capitulo || c.nombre || `Capítulo ${c.numero_capitulo || c.id}`,
+            nombre: c.nombre_capitulo || c.nombre || `Cap├¡tulo ${c.numero_capitulo || c.id}`,
             uuid: c.id,
           }))
           setCapitulosLista(capsMapeados)
@@ -730,37 +495,29 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
           setUnidadesLista(unisMapeadas)
         }
 
-        // 3. Catálogo de Renglones desde Supabase (/mantenimiento/renglon_trabajo_catalogo)
+        // 3. Cat├ílogo de Renglones desde Supabase (/mantenimiento/renglon_trabajo_catalogo)
         const resReng = await apiGetDeduplicado('/mantenimiento/renglon_trabajo_catalogo?limite=300')
         const dataRengs = resReng?.data?.data || resReng?.data
         if (activo && Array.isArray(dataRengs) && dataRengs.length > 0) {
-          const rengsMapeados = dataRengs.map((r: any, idx: number) => {
-            const foundCap = r.capitulo_sabana || (Array.isArray(dataCaps) ? dataCaps.find((c: any) => c.id === r.capitulo_id || Number(c.numero_capitulo) === Number(r.capitulo_id)) : null)
-            const capIdNum = foundCap ? (Number(foundCap.numero_capitulo) || Number(foundCap.id) || 1) : (typeof r.capitulo_id === 'number' ? r.capitulo_id : (idx % 9) + 1)
-            const capNombreStr = foundCap?.nombre_capitulo 
-              ? `Capítulo ${foundCap.numero_capitulo || capIdNum}: ${foundCap.nombre_capitulo}`
-              : (r.capitulo_nombre || r.capituloNombre || `Capítulo ${r.capitulo_id || 1}`)
-
-            return {
-              id: r.id || `sab-db-${idx}`,
-              capituloId: capIdNum,
-              capituloNombre: capNombreStr,
-              codigoDGC: r.codigo || r.codigoDGC || `R-${idx + 1}`,
-              descripcion: r.descripcion || 'Sin descripción',
-              unidad: r.unidad_id || r.unidad || 'm³',
-              cantidadContratada: Number(r.cantidad_contractual || r.cantidadContratada || 0),
-              cantidadAjustada: Number(r.cantidad_ajustada || r.cantidadAjustada || 0),
-              costoUnitarioDirecto: Number(r.precio_unitario_directo || r.costoUnitarioDirecto || 0),
-              cantidadEstePeriodo: Number(r.cantidad_este_periodo || r.cantidadEstePeriodo || 0),
-              cantidadAcumuladaAnterior: Number(r.cantidad_ejecutada || r.cantidadAcumuladaAnterior || 0),
-              tipoRenglon: r.tipo_renglon || r.tipoRenglon || 'Original',
-              estadoEjecucion: r.estado_ejecucion || r.estadoEjecucion || 'En proceso',
-            }
-          })
+          const rengsMapeados = dataRengs.map((r: any, idx: number) => ({
+            id: r.id || `sab-db-${idx}`,
+            capituloId: typeof r.capitulo_id === 'number' ? r.capitulo_id : (idx % 9) + 1,
+            capituloNombre: r.capitulo_nombre || r.capituloNombre || `Cap├¡tulo ${r.capitulo_id || 1}`,
+            codigoDGC: r.codigo || r.codigoDGC || `R-${idx + 1}`,
+            descripcion: r.descripcion || 'Sin descripci├│n',
+            unidad: r.unidad_id || r.unidad || 'm┬│',
+            cantidadContratada: Number(r.cantidad_contractual || r.cantidadContratada || 0),
+            cantidadAjustada: Number(r.cantidad_ajustada || r.cantidadAjustada || 0),
+            costoUnitarioDirecto: Number(r.precio_unitario_directo || r.costoUnitarioDirecto || 0),
+            cantidadEstePeriodo: Number(r.cantidad_este_periodo || r.cantidadEstePeriodo || 0),
+            cantidadAcumuladaAnterior: Number(r.cantidad_acumulada_anterior || r.cantidadAcumuladaAnterior || 0),
+            tipoRenglon: r.tipo_renglon || r.tipoRenglon || 'Original',
+            estadoEjecucion: r.estado_ejecucion || r.estadoEjecucion || 'En proceso',
+          }))
           setRenglones(rengsMapeados)
         }
       } catch (err) {
-        console.warn('Conexión Supabase activa para catálogos:', err)
+        console.warn('Conexi├│n Supabase activa para cat├ílogos:', err)
       }
     }
 
@@ -768,34 +525,12 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
     return () => { activo = false }
   }, [])
 
-  useEffect(() => {
-    if (!proyecto?.id || esPlantillaVacia) return
-    
-    // Prevent fetching UUID endpoints with mock IDs that cause backend crashes (invalid input syntax for type uuid)
-    const isMockId = proyecto.id === '1' || proyecto.id === 'p-1' || proyecto.id.startsWith('PROY')
-    if (isMockId) return
-
-    let activo = true
-    apiGetDeduplicado(`/proyectos/${proyecto.id}/pendientes`)
-      .then((res) => {
-        if (!activo) return
-        const lista = res?.data?.data || res?.data
-        if (Array.isArray(lista)) {
-          setTrabajosPendientes(lista)
-        }
-      })
-      .catch((err) => {
-        console.warn('No se pudieron cargar los pendientes reales:', err)
-      })
-    return () => { activo = false }
-  }, [proyecto?.id, esPlantillaVacia])
-
   const formatearUnidadMedidaSymbol = (raw: string | undefined): string => {
-    if (!raw) return 'm³'
+    if (!raw) return 'm┬│'
     if (raw.length > 15 || raw.includes('-')) {
       const encontrada = unidadesLista.find((u) => u.id === raw)
       if (encontrada && encontrada.simbolo) return encontrada.simbolo
-      return 'm³'
+      return 'm┬│'
     }
     return raw
   }
@@ -811,10 +546,10 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
   const [modalEliminarOpen, setModalEliminarOpen] = useState(false)
   const [renglonAEliminar, setRenglonAEliminar] = useState<RenglonDetalladoSabana | null>(null)
 
-  // CAMPOS FORMULARIO CREAR DENSIDAD COMPACTA (PATRÓN USUARIOS)
+  // CAMPOS FORMULARIO CREAR DENSIDAD COMPACTA (PATR├ôN USUARIOS)
   const [formCodigo, setFormCodigo] = useState('')
   const [formDescripcion, setFormDescripcion] = useState('')
-  const [formUnidad, setFormUnidad] = useState('m³')
+  const [formUnidad, setFormUnidad] = useState('m┬│')
   const [formUnidadManual, setFormUnidadManual] = useState('')
   const [formCantContratada, setFormCantContratada] = useState('')
   const [formCantAjustada, setFormCantAjustada] = useState('')
@@ -823,77 +558,30 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
   const [formTipoRenglon, setFormTipoRenglon] = useState<'Original' | 'Aumento' | 'Nuevo'>('Original')
   const [formEstadoEjecucion, setFormEstadoEjecucion] = useState<'En proceso' | 'Completado' | 'No iniciado' | 'Con excedente'>('En proceso')
 
-  // ESTADO DE ERRORES DE VALIDACIÓN PARA DIBUJAR BORDES ROJOS (PATRÓN USUARIOS)
+  // ESTADO DE ERRORES DE VALIDACI├ôN PARA DIBUJAR BORDES ROJOS (PATR├ôN USUARIOS)
   const [errorsForm, setErrorsForm] = useState<Record<string, boolean>>({})
 
-  const fechaInicioRealProyecto = useMemo(() => {
-    return (
-      proyecto?.fecha_inicio_contractual ||
-      proyecto?.fechaInicioContractual ||
-      proyecto?.fecha_inicio ||
-      proyecto?.fechaInicio ||
-      proyecto?.detalle?.fecha_inicio_contractual ||
-      ''
-    )
-  }, [proyecto])
-
-  const fechaFinRealProyecto = useMemo(() => {
-    return (
-      fechaFinalizacionActualizada ||
-      proyecto?.fecha_fin_contractual ||
-      proyecto?.fechaFinContractual ||
-      proyecto?.fechaFinContractualPlan ||
-      proyecto?.fecha_fin_contractual_plan ||
-      proyecto?.fecha_fin ||
-      proyecto?.fechaFin ||
-      proyecto?.detalle?.fecha_fin_contractual ||
-      ''
-    )
-  }, [proyecto, fechaFinalizacionActualizada])
-
-  const plazoRealProyecto = useMemo(() => {
-    return (
-      proyecto?.plazo ||
-      proyecto?.plazoContractual ||
-      proyecto?.plazo_ejecucion_dias ||
-      proyecto?.plazo_ejecucion_original ||
-      proyecto?.detalle?.plazo_ejecucion_original ||
-      ''
-    )
-  }, [proyecto])
-
-  const esBorrador = useMemo(() => {
-    if (esPlantillaVacia) return true
-    if (!proyecto?.estado) return false
-    const est = typeof proyecto.estado === 'string' ? proyecto.estado.toLowerCase() : (proyecto.estado as any)?.codigo?.toLowerCase() || ''
-    return est === 'borrador'
-  }, [proyecto, esPlantillaVacia])
-
   const listaMesesDinamicos = useMemo(() => {
-    if (esPlantillaVacia || (!fechaInicioRealProyecto && !plazoRealProyecto)) {
+    if (esPlantillaVacia || proyecto?.estado === 'borrador' || (!proyecto.fechaInicio && !proyecto.plazo)) {
       return []
     }
 
     let duracionMeses = 0
 
     const parseFecha = (fechaStr: string) => {
-      if (!fechaStr || typeof fechaStr !== 'string') return null
+      if (!fechaStr) return null
       if (fechaStr.includes('/')) {
         const [dd, mm, yyyy] = fechaStr.split('/')
         if (dd && mm && yyyy) return new Date(`${yyyy}-${mm}-${dd}T00:00:00`)
       }
       if (fechaStr.includes('-')) {
-        const clean = fechaStr.split('T')[0]
-        const parts = clean.split('-')
-        if (parts.length === 3) {
-          return new Date(`${parts[0]}-${parts[1]}-${parts[2]}T00:00:00`)
-        }
+        return new Date(`${fechaStr}T00:00:00`)
       }
       return null
     }
 
-    const fechaInicio = parseFecha(fechaInicioRealProyecto)
-    const fechaFin = parseFecha(fechaFinRealProyecto)
+    const fechaInicio = parseFecha(proyecto.fechaInicio)
+    const fechaFin = parseFecha(fechaFinalizacionActualizada || proyecto.fechaFin)
 
     if (fechaInicio && fechaFin && !isNaN(fechaInicio.getTime()) && !isNaN(fechaFin.getTime())) {
       let months = (fechaFin.getFullYear() - fechaInicio.getFullYear()) * 12
@@ -903,42 +591,28 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
         months += 1
       }
       duracionMeses = Math.max(1, months)
-    } else if (plazoRealProyecto) {
-      if (typeof plazoRealProyecto === 'number') {
-        duracionMeses = plazoRealProyecto > 60 ? Math.ceil(plazoRealProyecto / 30) : Math.max(1, Math.ceil(plazoRealProyecto / 30))
-      } else {
-        const match = String(plazoRealProyecto).match(/\d+/)
-        if (match) {
-          const val = parseInt(match[0], 10)
-          duracionMeses = val > 60 ? Math.ceil(val / 30) : Math.max(1, Math.ceil(val / 30))
-        }
+    } else if (proyecto.plazo) {
+      const match = proyecto.plazo.match(/\d+/)
+      if (match) {
+        const val = parseInt(match[0], 10)
+        duracionMeses = val > 60 ? Math.round(val / 30) : val
       }
     }
 
     if (duracionMeses === 0) return []
 
     const meses = []
-    const MESES_NOMBRES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
-    const tieneFechaInicio = fechaInicio && !isNaN(fechaInicio.getTime())
-
-    for (let i = 0; i < Math.min(duracionMeses, 36); i++) {
-      if (tieneFechaInicio) {
-        const d = new Date(fechaInicio.getFullYear(), fechaInicio.getMonth() + i, 1)
-        const mesNom = MESES_NOMBRES[d.getMonth()]
-        const anio = d.getFullYear()
-        meses.push(`${mesNom} ${anio}`)
-      } else {
-        meses.push(`Mes ${i + 1}`)
-      }
+    for (let i = 1; i <= Math.min(duracionMeses, 36); i++) {
+      meses.push(`Mes ${i}`)
     }
     return meses
-  }, [proyecto, fechaInicioRealProyecto, fechaFinRealProyecto, plazoRealProyecto, esPlantillaVacia, esBorrador])
+  }, [proyecto, fechaFinalizacionActualizada, esPlantillaVacia])
 
   const handlePromoverTrabajoPendiente = (item: TrabajoPendienteBolsa) => {
     const descuentoAplicado = item.longitudBase * item.factorDescuento
     const cantidadNetaCalculada = Math.max(0, item.cantidadBruta - descuentoAplicado)
 
-    // Buscar el renglón correspondiente en la Sábana
+    // Buscar el rengl├│n correspondiente en la S├íbana
     const renglonDestino = renglones.find((r) => r.codigoDGC === item.codigoDGC)
 
     if (renglonDestino) {
@@ -948,7 +622,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
 
       if (nuevoTotalPostPromocion > renglonDestino.cantidadAjustada) {
         showErrorToast(
-          `Promoción bloqueada: La Cantidad Neta (${formatQuantity(cantidadNetaCalculada, item.unidad)} ${item.unidad}) supera el cupo contractual disponible (${formatQuantity(Math.max(0, cupoDisponible), item.unidad)} ${item.unidad}) para el renglón ${item.codigoDGC}. Requiere una orden de cambio o ampliación aprobada.`
+          `Promoci├│n bloqueada: La Cantidad Neta (${formatQuantity(cantidadNetaCalculada, item.unidad)} ${item.unidad}) supera el cupo contractual disponible (${formatQuantity(Math.max(0, cupoDisponible), item.unidad)} ${item.unidad}) para el rengl├│n ${item.codigoDGC}. Requiere una orden de cambio o ampliaci├│n aprobada.`
         )
         return
       }
@@ -985,7 +659,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
       })
     )
 
-    showSuccessToast(`Partida ${item.codigoDGC} promovida con éxito e integrada a 'Este Periodo' en la Sábana y Memoria Analítica`)
+    showSuccessToast(`Partida ${item.codigoDGC} promovida con ├®xito e integrada a 'Este Periodo' en la S├íbana y Memoria Anal├¡tica`)
   }
 
   const handleOrdenarPorColumna = (col: ColumnaOrdenable) => {
@@ -1006,7 +680,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
     setRenglonSeleccionado(null)
     setFormCodigo('')
     setFormDescripcion('')
-    setFormUnidad('m³')
+    setFormUnidad('m┬│')
     setFormUnidadManual('')
     setFormCantContratada('')
     setFormCantAjustada('')
@@ -1059,7 +733,6 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
             cantidadEstePeriodo: datosEditando.cantidadEstePeriodo ?? r.cantidadEstePeriodo,
             cantidadAcumuladaAnterior: datosEditando.cantidadAcumuladaAnterior ?? r.cantidadAcumuladaAnterior,
             costoUnitarioDirecto: datosEditando.costoUnitarioDirecto ?? r.costoUnitarioDirecto,
-            avancesMensuales: datosEditando.avancesMensuales ?? r.avancesMensuales,
           } as RenglonDetalladoSabana
         }
         return r
@@ -1080,7 +753,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
     setModalEliminarOpen(true)
   }
 
-  // REQUERIMIENTO: VALIDACIÓN CON BORDES ROJOS Y INSTANCIA TOAST REAL DE TOAST.TSX (PATRÓN USUARIOS)
+  // REQUERIMIENTO: VALIDACI├ôN CON BORDES ROJOS Y INSTANCIA TOAST REAL DE TOAST.TSX (PATR├ôN USUARIOS)
   const handleGuardarRenglonCrear = () => {
     const errs: Record<string, boolean> = {}
 
@@ -1101,7 +774,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
     const nuevo: RenglonDetalladoSabana = {
       id: `sab-custom-${Date.now()}`,
       capituloId: formCapituloId,
-      capituloNombre: capObj?.nombre || 'Capítulo I',
+      capituloNombre: capObj?.nombre || 'Cap├¡tulo I',
       codigoDGC: formCodigo.trim(),
       descripcion: formDescripcion.trim(),
       unidad: unidadFinal,
@@ -1115,14 +788,14 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
     }
 
     setRenglones((prev) => [nuevo, ...prev])
-    showSuccessToast(`Se agregó el renglón ${formCodigo.trim()} exitosamente`)
+    showSuccessToast(`Se agreg├│ el rengl├│n ${formCodigo.trim()} exitosamente`)
     setDrawerModo(null)
   }
 
   const handleConfirmarEliminar = () => {
     if (renglonAEliminar) {
       setRenglones((prev) => prev.filter((r) => r.id !== renglonAEliminar.id))
-      showSuccessToast(`Se eliminó el renglón ${renglonAEliminar.codigoDGC}`)
+      showSuccessToast(`Se elimin├│ el rengl├│n ${renglonAEliminar.codigoDGC}`)
     }
     setModalEliminarOpen(false)
     setRenglonAEliminar(null)
@@ -1131,7 +804,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
   // Handlers para Unidades de Medida CRUD
   const handleGuardarUnidad = () => {
     if (!unidadForm.simbolo.trim() || !unidadForm.nombre.trim()) {
-      showErrorToast('Ingrese el símbolo y el nombre de la unidad')
+      showErrorToast('Ingrese el s├¡mbolo y el nombre de la unidad')
       return
     }
     if (unidadForm.id) {
@@ -1164,22 +837,22 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
     setUnidadAEliminar(null)
   }
 
-  // Handlers para Capítulos Sábana CRUD
+  // Handlers para Cap├¡tulos S├íbana CRUD
   const handleGuardarCapitulo = () => {
     if (!capituloForm.nombre.trim()) {
-      showErrorToast('Ingrese el nombre del capítulo')
+      showErrorToast('Ingrese el nombre del cap├¡tulo')
       return
     }
     if (capituloForm.id) {
       setCapitulosLista((prev) =>
         prev.map((c) => (c.id === capituloForm.id ? { ...c, nombre: capituloForm.nombre.trim() } : c))
       )
-      showSuccessToast(`Capítulo actualizado`)
+      showSuccessToast(`Cap├¡tulo actualizado`)
     } else {
       const nuevoId = Math.max(0, ...capitulosLista.map((c) => c.id)) + 1
       const nuevoCap = { id: nuevoId, nombre: capituloForm.nombre.trim() }
       setCapitulosLista((prev) => [...prev, nuevoCap])
-      showSuccessToast(`Capítulo ${nuevoId} creado exitosamente`)
+      showSuccessToast(`Cap├¡tulo ${nuevoId} creado exitosamente`)
     }
     setModalCapituloFormOpen(false)
   }
@@ -1187,7 +860,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
   const handleConfirmarEliminarCapitulo = () => {
     if (capituloAEliminar) {
       setCapitulosLista((prev) => prev.filter((c) => c.id !== capituloAEliminar.id))
-      showSuccessToast(`Capítulo eliminado`)
+      showSuccessToast(`Cap├¡tulo eliminado`)
     }
     setCapituloAEliminar(null)
   }
@@ -1265,7 +938,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
     return resultado
   }, [renglones, capituloFiltro, estadoEjecucionFiltro, tipoRenglonFiltro, mesFiltro, busqueda, columnaOrden, direccionOrden])
 
-  // Paginación
+  // Paginaci├│n
   const totalItems = renglonesFiltradosYOrdenados.length
   const totalPaginas = Math.ceil(totalItems / itemsPorPagina) || 1
   const inicioIndice = (paginaActual - 1) * itemsPorPagina
@@ -1282,7 +955,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
 
       const isUuidName = typeof nombreCap === 'string' && (
         /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(nombreCap) ||
-        /CAPÍTULO\s+[0-9a-f-]{25,}/i.test(nombreCap)
+        /CAP├ìTULO\s+[0-9a-f-]{25,}/i.test(nombreCap)
       )
 
       if (!nombreCap || isUuidName) {
@@ -1290,14 +963,14 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
         const capNum = !isNaN(numCode) && numCode >= 100 ? Math.floor(numCode / 100) : (typeof rawCapId === 'number' ? rawCapId : (idx % 9) + 1)
         const foundCap = CAPITULOS_LIBRO_AZUL.find((c: any) => c.id === capNum) ||
           capitulosLista.find((c: any) => c.id === rawCapId || (c as any).uuid === rawCapId)
-        nombreCap = foundCap?.nombre || `Capítulo ${capNum}: Renglones de Obra`
+        nombreCap = foundCap?.nombre || `Cap├¡tulo ${capNum}: Renglones de Obra`
       }
       map.set(rawCapId || `cap-${idx}`, nombreCap)
     })
     return Array.from(map.entries()).map(([id, nombre]) => ({ id, nombre }))
   }, [renglonesPaginados, capitulosLista])
 
-  // Subtotales globales por capítulo
+  // Subtotales globales por cap├¡tulo
   const subtotalesPorCapitulo = useMemo(() => {
     const mapa: Record<
       number,
@@ -1353,86 +1026,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
     return mapa
   }, [renglones])
 
-  const handleGuardarNuevaEstimacion = () => {
-    if (!formEstNumero.trim() || !formEstFechaInicio || !formEstFechaCorte) {
-      showErrorToast('Por favor complete los campos obligatorios del periodo (*)')
-      return
-    }
-
-    const nuevaEst = {
-      id: `est-${Date.now()}`,
-      numero: formEstNumero.trim(),
-      mes: formEstMes.trim() || 'Periodo Nuevo',
-      fechaInicio: formEstFechaInicio,
-      fechaCorte: formEstFechaCorte,
-      estado: 'actual' as const,
-    }
-
-    setListaEstimaciones((prev) => [...prev.map((e) => ({ ...e, estado: 'cerrada' as const })), nuevaEst])
-    setNumEstimacionFiltro(nuevaEst.numero)
-    setModalAperturaEstimacionOpen(false)
-    showSuccessToast(`Se aperturó con éxito el periodo ${nuevaEst.numero} (${nuevaEst.fechaInicio} al ${nuevaEst.fechaCorte})`)
-  }
-
-  const handleGuardarNuevaMedicionAnalitica = async () => {
-    const l = parseFloat(formMedLongitud) || 0
-    const a = parseFloat(formMedAncho) || 0
-    const h = parseFloat(formMedAltura) || 0
-    const vol = Math.round(l * a * h * 100) / 100
-
-    if (!formMedCodigoDGC || l <= 0) {
-      showErrorToast('Ingrese un código de renglón válido y dimensiones positivas (*)')
-      return
-    }
-
-    const nuevaMed: MedicionAnaliticaCampo = {
-      id: `med-${Date.now()}`,
-      codigoDGC: formMedCodigoDGC,
-      estacionInicio: formMedEstacionInicio,
-      estacionFin: formMedEstacionFin,
-      longitudL: l,
-      anchoA: a,
-      alturaH: h,
-      cantidadCalculada: vol,
-      periodoEstimacion: numEstimacionFiltro === 'todos' ? 'Est. 08 (Actual)' : numEstimacionFiltro,
-    }
-
-    setMedicionesAnaliticas((prev) => [nuevaMed, ...prev])
-
-    // Actualizar renglón en Sábana acumulando el volumen
-    setRenglones((prev) =>
-      prev.map((r) => {
-        if (r.codigoDGC === formMedCodigoDGC) {
-          return {
-            ...r,
-            cantidadEstePeriodo: (r.cantidadEstePeriodo || 0) + vol,
-          }
-        }
-        return r
-      })
-    )
-
-    try {
-      await api.post('/mantenimiento/bitacora_avance', {
-        codigo_renglon: formMedCodigoDGC,
-        estacion_inicio: formMedEstacionInicio,
-        estacion_fin: formMedEstacionFin,
-        longitud_l: l,
-        ancho_a: a,
-        altura_h: h,
-        cantidad_calculada: vol,
-        periodo_estimacion: numEstimacionFiltro,
-        proyecto_id: proyecto?.id,
-      })
-    } catch {
-      // guardado local en fallback
-    }
-
-    setModalAgregarMedicionOpen(false)
-    showSuccessToast(`Medición de ${vol.toLocaleString('es-GT')} m³ registrada y transmitida a Columna I (Este Periodo)`)
-  }
-
-  // CÁLCULOS FINANCIEROS GLOBALES
+  // C├üLCULOS FINANCIEROS GLOBALES
   const subtotalCostoDirectoContratadoGlobal = useMemo(() => {
     return renglones.reduce((sum, r) => sum + r.cantidadContratada * r.costoUnitarioDirecto, 0)
   }, [renglones])
@@ -1441,83 +1035,61 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
     return renglones.reduce((sum, r) => sum + r.cantidadAjustada * r.costoUnitarioDirecto, 0)
   }, [renglones])
 
-  // Extraer parámetros dinámicos del proyecto (parametro_proyecto) con fallbacks por defecto (45% indirectos, 12% IVA, 20% anticipo)
-  const paramsProj = proyecto?.parametro_proyecto || proyecto?.parametroProyecto || proyecto?.parametro || {}
-  const pctIndirectos = typeof paramsProj.porcentaje_indirectos === 'number'
-    ? paramsProj.porcentaje_indirectos
-    : (Number(paramsProj.porcentaje_indirectos) || 0.45)
-  const pctIva = typeof paramsProj.porcentaje_iva === 'number'
-    ? paramsProj.porcentaje_iva
-    : (Number(paramsProj.porcentaje_iva) || 0.12)
-  const pctAnticipo = typeof paramsProj.porcentaje_amortizacion_anticipo === 'number'
-    ? paramsProj.porcentaje_amortizacion_anticipo
-    : (Number(paramsProj.porcentaje_amortizacion_anticipo) || 0.20)
-
-  // Monto Contractual Original = Costo Directo Total + Indirectos % + IVA %
-  const indirectos45ContratadoGlobal = subtotalCostoDirectoContratadoGlobal * pctIndirectos
+  // Monto Contractual Original = Costo Directo Total + 45% Indirectos + 12% IVA
+  const indirectos45ContratadoGlobal = subtotalCostoDirectoContratadoGlobal * 0.45
   const subtotalAntesIvaContratadoGlobal = subtotalCostoDirectoContratadoGlobal + indirectos45ContratadoGlobal
-  const iva12ContratadoGlobal = subtotalAntesIvaContratadoGlobal * pctIva
+  const iva12ContratadoGlobal = subtotalAntesIvaContratadoGlobal * 0.12
   const montoContractualOriginalTotal = subtotalAntesIvaContratadoGlobal + iva12ContratadoGlobal
 
   const subtotalCostoDirectoGlobalPeriodo = useMemo(() => {
     return renglones.reduce((sum, r) => sum + r.cantidadEstePeriodo * r.costoUnitarioDirecto, 0)
   }, [renglones])
 
-  const subtotalCostoDirectoAcumuladoAnteriorGlobal = useMemo(() => {
-    return renglones.reduce((sum, r) => sum + (r.cantidadAcumuladaAnterior || 0) * r.costoUnitarioDirecto, 0)
-  }, [renglones])
-
-  const indirectos45Global = subtotalCostoDirectoGlobalPeriodo * pctIndirectos
+  const indirectos45Global = subtotalCostoDirectoGlobalPeriodo * 0.45
   const subtotalAntesIvaGlobal = subtotalCostoDirectoGlobalPeriodo + indirectos45Global
-  const iva12Global = subtotalAntesIvaGlobal * pctIva
+  const iva12Global = subtotalAntesIvaGlobal * 0.12
   const valorTotalEstimacionBrutoGlobal = subtotalAntesIvaGlobal + iva12Global
-
-  const valorTotalAcumuladoAnteriorBrutoGlobal = (subtotalCostoDirectoAcumuladoAnteriorGlobal * (1 + pctIndirectos)) * (1 + pctIva)
-
-  const anticipoRecibido20 = (esPlantillaVacia || proyecto?.estado === 'borrador')
-    ? 0
-    : (Number(paramsProj.monto_anticipo_total || paramsProj.anticipo_total_recibido) || (montoContractualOriginalTotal * pctAnticipo))
-  const amortizacionAnteriorAcumulada = (esPlantillaVacia || proyecto?.estado === 'borrador')
-    ? 0
-    : (proyecto?.amortizacionAnteriorAcumulada !== undefined && proyecto?.amortizacionAnteriorAcumulada !== null)
-      ? Number(proyecto.amortizacionAnteriorAcumulada)
-      : (proyecto?.amortizadoAnterior !== undefined && proyecto?.amortizadoAnterior !== null)
-        ? Number(proyecto.amortizadoAnterior)
-        : valorTotalAcumuladoAnteriorBrutoGlobal * pctAnticipo
-  const amortizacionAnticipoEstePeriodo = valorTotalEstimacionBrutoGlobal * pctAnticipo
+  const anticipoRecibido20 = (esPlantillaVacia || proyecto?.estado === 'borrador') ? 0 : subtotalCostoDirectoContratadoGlobal * 0.20
+  const amortizacionAnteriorAcumulada = (esPlantillaVacia || proyecto?.estado === 'borrador') ? 0 : subtotalCostoDirectoGlobalPeriodo > 0 ? (montoContractualOriginalTotal * 0.05) : 0
+  const amortizacionAnticipoEstePeriodo = valorTotalEstimacionBrutoGlobal * 0.20
   const amortizacionTotalAcumulada = amortizacionAnteriorAcumulada + amortizacionAnticipoEstePeriodo
   const saldoAnticipoPorAmortizar = Math.max(0, anticipoRecibido20 - amortizacionTotalAcumulada)
   const liquidoAPagarNetoContratista = Math.max(0, valorTotalEstimacionBrutoGlobal - amortizacionAnticipoEstePeriodo)
 
-  // Métricas dinámicas reales calculadas en base a los renglones y estado del proyecto
-  const metricasHeaderContextuales = useMemo(() => {
-    let plazoStr = '0 Meses (0 días)'
-    const d1 = parseFechaRobust(fechaInicioRealProyecto)
-    const d2 = parseFechaRobust(fechaFinRealProyecto)
-    if (d1 && d2 && d2.getTime() >= d1.getTime()) {
-      const dias = Math.max(1, Math.round((d2.getTime() - d1.getTime()) / 86400000))
-      const meses = Math.max(1, Math.round(dias / 30))
-      plazoStr = `${meses} ${meses === 1 ? 'Mes' : 'Meses'} (${dias} días)`
-    } else if (plazoRealProyecto) {
-      plazoStr = typeof plazoRealProyecto === 'number' ? `${plazoRealProyecto} días` : String(plazoRealProyecto)
-    }
+  const esBorrador =
+    !proyecto?.estado ||
+    proyecto.estado === 'borrador' ||
+    proyecto.estado === 'BORRADOR' ||
+    (typeof proyecto.estado === 'string' && proyecto.estado.toLowerCase() === 'borrador') ||
+    (proyecto.estado as any)?.codigo === 'borrador' ||
+    (proyecto.avance ?? 0) === 0 ||
+    !proyecto?.fechaInicio
 
-    const montoOriginalBase = Number(proyecto?.montoContractualOriginal || proyecto?.presupuesto || proyecto?.monto_original || 0)
-    const montoContractualCalc = montoContractualOriginalTotal > 0 ? montoContractualOriginalTotal : montoOriginalBase
-    const costoDirectoCalc = subtotalCostoDirectoContratadoGlobal > 0
-      ? subtotalCostoDirectoContratadoGlobal
-      : (montoOriginalBase > 0 ? montoOriginalBase / ((1 + pctIndirectos) * (1 + pctIva)) : 0)
+  // M├®tricas din├ímicas reales calculadas en base a los renglones y estado del proyecto
+  const metricasHeaderContextuales = useMemo(() => {
+    let plazoStr = '0 Meses (0 d├¡as)'
+    if (!esBorrador && proyecto?.fechaInicio && proyecto?.fechaFin) {
+      const d1 = new Date(proyecto.fechaInicio).getTime()
+      const d2 = new Date(proyecto.fechaFin).getTime()
+      if (!isNaN(d1) && !isNaN(d2) && d2 > d1) {
+        const dias = Math.round((d2 - d1) / 86400000)
+        const meses = Math.round(dias / 30)
+        plazoStr = `${meses} Meses (${dias} d├¡as)`
+      }
+    } else if (!esBorrador && proyecto?.plazo) {
+      plazoStr = proyecto.plazo
+    }
 
     return {
-      nombre: `${proyecto?.nombre || proyecto?.nombre_proyecto || proyecto?.nombreOficial || 'Proyecto'} (${proyecto?.codigo || proyecto?.codigo_proyecto || 'PROY-001'})`,
-      plazo: esPlantillaVacia && !plazoStr ? '0 Meses (0 días)' : plazoStr,
-      costoDirecto: costoDirectoCalc,
-      montoContractualOriginal: montoContractualCalc,
-      liquidoNetoPeriodo: liquidoAPagarNetoContratista,
+      nombre: `${proyecto.nombre || 'Proyecto'} (${proyecto.codigo || 'PROY-001'})`,
+      plazo: esBorrador || esPlantillaVacia ? '0 Meses (0 d├¡as)' : plazoStr,
+      costoDirecto: esBorrador ? 0 : subtotalCostoDirectoContratadoGlobal,
+      montoContractualOriginal: esBorrador ? 0 : montoContractualOriginalTotal,
+      liquidoNetoPeriodo: esBorrador ? 0 : liquidoAPagarNetoContratista,
     }
-  }, [proyecto, subtotalCostoDirectoContratadoGlobal, montoContractualOriginalTotal, liquidoAPagarNetoContratista, esPlantillaVacia, pctIndirectos, pctIva, fechaInicioRealProyecto, fechaFinRealProyecto, plazoRealProyecto])
+  }, [proyecto, subtotalCostoDirectoContratadoGlobal, montoContractualOriginalTotal, liquidoAPagarNetoContratista, esPlantillaVacia, esBorrador])
 
-  const diasEmpleadosCalculados = esBorrador ? 0 : Math.max(0, Math.floor((Date.now() - (fechaInicioRealProyecto ? new Date(fechaInicioRealProyecto).getTime() : Date.now())) / 86400000))
+  const diasEmpleadosCalculados = esBorrador ? 0 : Math.max(0, Math.floor((Date.now() - (proyecto?.fechaInicio ? new Date(proyecto.fechaInicio).getTime() : Date.now())) / 86400000))
   const diasSuspendidosSumados = 0
   const fechaInicioContrato = proyecto?.fechaInicio || 'No registrada'
 
@@ -1526,7 +1098,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
   }
 
   const handleExportarExcel = () => {
-    showSuccessToast('Descargando archivo Excel oficial "DÍAS" (.xlsx)...')
+    showSuccessToast('Descargando archivo Excel oficial "D├ìAS" (.xlsx)...')
   }
 
   const handleGuardarModificarPlazo = async () => {
@@ -1564,7 +1136,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
 
     setModalModificarPlazoOpen(false)
     setErrorsPlazoForm({})
-    showSuccessToast(`Plazo modificado exitosamente. Nueva fecha de finalización: ${fechaFormateada} (+${formDiasAdicionales} días)`)
+    showSuccessToast(`Plazo modificado exitosamente. Nueva fecha de finalizaci├│n: ${fechaFormateada} (+${formDiasAdicionales} d├¡as)`)
   }
 
   const resetFiltros = () => {
@@ -1640,18 +1212,18 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                   {proyecto.codigo}
                 </span>
                 <span>/</span>
-                <span className="text-[#9B0F06] font-medium">Hoja Sábana Digital</span>
+                <span className="text-[#9B0F06] font-medium">Hoja S├íbana Digital</span>
               </div>
 
               <h1 className="text-xs font-medium text-gray-900 mt-0.5 flex items-center gap-1.5">
                 <FileSpreadsheet size={13} className="text-[#9B0F06]" />
-                <span>Hoja Sábana Digital</span>
+                <span>Hoja S├íbana Digital</span>
               </h1>
             </div>
           </div>
 
           <div className="flex items-center gap-1.5">
-            {/* Toggle Planificación / Actual */}
+            {/* Toggle Planificaci├│n / Actual */}
             <div className="inline-flex items-center rounded-md border border-gray-200 bg-gray-100 p-0.5 text-[9.5px]">
               <button
                 type="button"
@@ -1663,7 +1235,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                 }`}
               >
                 <Calendar size={11} />
-                <span>Planificación</span>
+                <span>Planificaci├│n</span>
               </button>
               {!esBorrador && (
                 <button
@@ -1681,19 +1253,196 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
               )}
             </div>
 
-            {(proyecto?.estado === 'activo' || proyecto?.estado_codigo === 'activo') && (
+            {/* Bot├│n Renglones - Navega a la p├ígina de Cat├ílogo de Renglones, Unidades y Cap├¡tulos */}
+            <button
+              type="button"
+              onClick={() => router.push('/dashboard/renglones')}
+              className="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-2.5 py-1 text-[10px] font-semibold text-gray-700 hover:text-[#9B0F06] hover:border-[#9B0F06] hover:bg-gray-50 transition-colors shadow-2xs cursor-pointer"
+              title="Ir a Gesti├│n Completa de Renglones, Unidades de Medida y Cap├¡tulos"
+            >
+              <Layers size={12} className="text-[#9B0F06]" />
+              <span>Gestionar Renglones</span>
+            </button>
+
+            {/* Bot├│n Modificar Plazo - Visible ├ÜNICAMENTE para rol Administrador */}
+            {user?.rol === 'Administrador' && (
               <button
                 type="button"
-                onClick={() => setModalAperturaEstimacionOpen(true)}
-                className="inline-flex h-[26px] items-center gap-1.5 rounded-md border border-[#9B0F06] bg-red-50 px-2 text-[9px] font-bold text-[#9B0F06] transition-colors hover:bg-red-100 cursor-pointer shadow-xs"
-                title="Aperturar nuevo periodo de estimación para este proyecto"
+                onClick={() => {
+                  setErrorsPlazoForm({})
+                  setModalModificarPlazoOpen(true)
+                }}
+                className="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-2.5 py-1 text-[10px] font-medium text-gray-700 hover:bg-gray-50 transition-colors shadow-2xs cursor-pointer"
+                title="Modificar cronograma y fecha de finalizaci├│n"
               >
-                <Plus size={11} />
-                <span>Aperturar Estimación</span>
+                <CalendarClock size={13} className="text-[#9B0F06]" />
+                <span>Modificar Plazo</span>
               </button>
             )}
 
-            {/* Estado: Disponible únicamente en Sábana y Pendientes */}
+            <button
+              type="button"
+              onClick={handleExportarExcel}
+              className="btn-success-compact cursor-pointer"
+              title="Exportar archivo Excel D├ìAS"
+            >
+              <FileSpreadsheet size={13} />
+              <span>Exportar Excel</span>
+              <Download size={12} />
+            </button>
+          </div>
+        </div>
+
+        {/* Fila horizontal de m├®tricas */}
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5 bg-gray-50/80 p-1.5 rounded-lg border border-gray-200/80 text-[10px]">
+          <div className="min-w-0">
+            <span className="text-[7.5px] font-medium uppercase tracking-wider text-gray-400 block truncate mb-0.5">
+              Proyecto / Contrato
+            </span>
+            <select
+              value={proyectoIdSeleccionado}
+              onChange={(e) => {
+                const newId = e.target.value
+                setProyectoIdSeleccionado(newId)
+                router.push(`/dashboard/proyectos/${newId}/hoja-sabana`)
+              }}
+              className="h-6 w-full rounded border border-gray-300 bg-white px-1 text-[10px] font-medium text-gray-900 focus:border-[#9B0F06] focus:outline-none cursor-pointer truncate"
+            >
+              {(proyectosLista.length > 0 ? proyectosLista : [proyecto]).map((p: any) => (
+                <option key={p.id} value={p.id}>
+                  {p.codigo || 'PROY'} ┬À {p.nombreOficial || p.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <span className="text-[7.5px] font-medium uppercase tracking-wider text-gray-400 block truncate">
+              Plazo de Ejecuci├│n Real
+            </span>
+            <span className="font-medium text-gray-800 flex items-center gap-1">
+              <Clock size={9.5} className="text-[#9B0F06] shrink-0" />
+              <span>{metricasHeaderContextuales.plazo}</span>
+            </span>
+          </div>
+
+          <div>
+            <span className="text-[7.5px] font-medium uppercase tracking-wider text-gray-400 block truncate">
+              Costo Directo Contratado Total (D ├ù F)
+            </span>
+            <span className="font-medium font-mono text-gray-900">
+              Q {metricasHeaderContextuales.costoDirecto.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+            </span>
+          </div>
+
+          <div>
+            <span className="text-[7.5px] font-medium uppercase tracking-wider text-[#9B0F06] block truncate font-bold">
+              Monto Contractual Original (con Indirectos e IVA)
+            </span>
+            <span className="font-bold font-mono text-[#9B0F06]">
+              Q {metricasHeaderContextuales.montoContractualOriginal.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+            </span>
+          </div>
+
+          <div>
+            <span className="text-[7.5px] font-medium uppercase tracking-wider text-gray-400 block truncate">
+              L├¡quido Neto Este Periodo
+            </span>
+            <span className="font-medium font-mono text-gray-900">
+              Q {metricasHeaderContextuales.liquidoNetoPeriodo.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* TABS SUPERIORES SIN NEGRILLA */}
+      <div className="border-b border-gray-200 bg-white px-1 rounded-t-md font-[Poppins]">
+        <div className="flex flex-wrap items-center gap-1">
+          {[
+            { id: 'sabana', label: 'S├íbana', icon: Layers },
+            { id: 'analitico', label: 'Anal├¡tico', icon: Calculator },
+            ...(proyecto.id === 'nuevo' || id === 'nuevo' ? [] : [{ id: 'pendientes', label: 'Pendientes', icon: AlertCircle }]),
+            ...(!esBorrador && modoVistaSabana === 'actual' ? [{ id: 'planificadoReal', label: 'Planificado vs Real', icon: TrendingUp }] : []),
+            { id: 'resumen', label: 'Resumen Financiero', icon: Banknote },
+          ].map((item) => {
+            const Icon = item.icon
+            const active = tabSeccion === item.id
+
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setTabSeccion(item.id as any)}
+                className={`flex items-center gap-1 border-b-2 px-2 py-1 text-[9.5px] font-normal transition-all ${
+                  active
+                    ? 'border-[#9B0F06] text-[#9B0F06] bg-red-50/40'
+                    : 'border-transparent text-gray-500 hover:text-gray-800 hover:bg-gray-50'
+                }`}
+              >
+                <Icon size={11} />
+                <span>{item.label}</span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* BARRA DE FILTROS Y ACCIONES COMPACTA (OCULTA EN RESUMEN FINANCIERO) */}
+      {tabSeccion !== 'resumen' && (
+        <div className="w-full rounded-lg border border-gray-200 bg-white p-1.5 shadow-2xs flex items-center justify-between gap-1.5 overflow-x-auto font-[Poppins]">
+          <div className="flex items-center gap-1 shrink-0 flex-nowrap">
+            {/* Cap├¡tulo: Disponible en S├íbana, Anal├¡tico, Pendientes y Planificado vs Real */}
+            <select
+              value={capituloFiltro}
+              onChange={(e) => {
+                setCapituloFiltro(e.target.value === 'todos' ? 'todos' : Number(e.target.value))
+                setPaginaActual(1)
+              }}
+              className="h-7 rounded border border-gray-200 bg-white px-1.5 text-[10px] font-normal text-gray-800 focus:border-[#9B0F06] focus:outline-none max-w-[130px] truncate"
+            >
+              <option value="todos">Cap├¡tulo: Todos</option>
+              {CAPITULOS_LIBRO_AZUL.map((c) => (
+                <option key={c.id} value={c.id}>
+                  Cap {c.id}: {c.nombre.split(':')[1]?.trim() || c.nombre}
+                </option>
+              ))}
+            </select>
+
+            {/* Mes: Disponible en S├íbana, Anal├¡tico y Planificado vs Real (NO en Pendientes) */}
+            {(tabSeccion === 'sabana' || tabSeccion === 'analitico' || tabSeccion === 'planificadoReal') && (
+              <select
+                value={mesFiltro}
+                onChange={(e) => {
+                  setMesFiltro(e.target.value)
+                  setPaginaActual(1)
+                }}
+                className="h-7 rounded border border-gray-200 bg-white px-1.5 text-[10px] font-normal text-gray-800 focus:border-[#9B0F06] focus:outline-none max-w-[100px] truncate"
+              >
+                <option value="todos">Mes: Todos</option>
+                {listaMesesDinamicos.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            {/* Estimaci├│n: Disponible ├║nicamente en S├íbana y Anal├¡tico */}
+            {(tabSeccion === 'sabana' || tabSeccion === 'analitico') && (
+              <select
+                value={numEstimacionFiltro}
+                onChange={(e) => setNumEstimacionFiltro(e.target.value)}
+                className="h-7 rounded border border-gray-200 bg-white px-1.5 text-[10px] font-normal text-gray-800 focus:border-[#9B0F06] focus:outline-none max-w-[110px] truncate"
+              >
+                <option value="todos">Estimaci├│n: Todas</option>
+                <option value="Est. 01">Estimaci├│n 01</option>
+                <option value="Est. 02">Estimaci├│n 02</option>
+                <option value="Est. 06">Estimaci├│n 06</option>
+                <option value="Est. 08">Estimaci├│n 08 (Actual)</option>
+              </select>
+            )}
+
+            {/* Estado: Disponible ├║nicamente en S├íbana y Pendientes */}
             {(tabSeccion === 'sabana' || tabSeccion === 'pendientes') && (
               <select
                 value={estadoEjecucionFiltro}
@@ -1711,7 +1460,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
               </select>
             )}
 
-            {/* Tipo: Disponible únicamente en Sábana y Pendientes */}
+            {/* Tipo: Disponible ├║nicamente en S├íbana y Pendientes */}
             {(tabSeccion === 'sabana' || tabSeccion === 'pendientes') && (
               <select
                 value={tipoRenglonFiltro}
@@ -1757,7 +1506,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
         </div>
       )}
 
-      {/* TAB 1: [SÁBANA] — TABLA CON FUENTE POPPINS, REGULAR SALVO CÓDIGO */}
+      {/* TAB 1: [S├üBANA] ÔÇö TABLA CON FUENTE POPPINS, REGULAR SALVO C├ôDIGO */}
       {tabSeccion === 'sabana' && (
         <div className="bg-white overflow-hidden rounded-md border-b border-gray-200/80 font-[Poppins]">
           {totalItems === 0 ? (
@@ -1779,140 +1528,106 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                   <tr className="border-b border-gray-300 bg-gray-50 text-gray-600 font-medium uppercase tracking-wider text-left text-[8.5px] whitespace-nowrap select-none">
                     <th
                       onClick={() => handleOrdenarPorColumna('codigoDGC')}
-                      className="px-2 py-2 w-16 cursor-pointer hover:bg-gray-100/80 transition-colors font-medium text-gray-900"
+                      className="px-2 py-2 w-16 cursor-pointer hover:bg-gray-100/80 transition-colors font-medium"
                     >
-                      <HeaderTooltip colKey="A">
-                        <span>A. Código {renderIconoOrden('codigoDGC')}</span>
-                      </HeaderTooltip>
+                      A. C├│digo {renderIconoOrden('codigoDGC')}
                     </th>
 
                     <th
                       onClick={() => handleOrdenarPorColumna('descripcion')}
                       className="px-2.5 py-2 min-w-[180px] cursor-pointer hover:bg-gray-100/80 transition-colors font-medium"
                     >
-                      <HeaderTooltip colKey="B">
-                        <span>B. Descripción {renderIconoOrden('descripcion')}</span>
-                      </HeaderTooltip>
+                      B. Descripci├│n {renderIconoOrden('descripcion')}
                     </th>
 
                     <th
                       onClick={() => handleOrdenarPorColumna('unidad')}
                       className="px-1.5 py-2 text-center w-10 cursor-pointer hover:bg-gray-100/80 transition-colors font-medium"
                     >
-                      <HeaderTooltip colKey="C">
-                        <span>C. Unid {renderIconoOrden('unidad')}</span>
-                      </HeaderTooltip>
+                      C. Unid {renderIconoOrden('unidad')}
                     </th>
 
                     <th
                       onClick={() => handleOrdenarPorColumna('cantidadContratada')}
                       className="px-2 py-2 text-right w-24 cursor-pointer hover:bg-gray-100/80 transition-colors font-medium"
                     >
-                      <HeaderTooltip colKey="D">
-                        <span>D. Cant. Contratada {renderIconoOrden('cantidadContratada')}</span>
-                      </HeaderTooltip>
+                      D. Cant. Contratada {renderIconoOrden('cantidadContratada')}
                     </th>
 
                     <th
                       onClick={() => handleOrdenarPorColumna('cantidadAjustada')}
                       className="px-2 py-2 text-right w-24 cursor-pointer hover:bg-gray-100/80 transition-colors font-medium text-gray-900"
                     >
-                      <HeaderTooltip colKey="E">
-                        <span>E. Cant. Ajustada {renderIconoOrden('cantidadAjustada')}</span>
-                      </HeaderTooltip>
+                      E. Cant. Ajustada {renderIconoOrden('cantidadAjustada')}
                     </th>
 
                     <th
                       onClick={() => handleOrdenarPorColumna('costoUnitarioDirecto')}
                       className="px-2 py-2 text-right w-22 cursor-pointer hover:bg-gray-100/80 transition-colors font-medium text-gray-900"
                     >
-                      <HeaderTooltip colKey="F">
-                        <span>F. Costo Unit. Directo {renderIconoOrden('costoUnitarioDirecto')}</span>
-                      </HeaderTooltip>
+                      F. Costo Unit. Directo {renderIconoOrden('costoUnitarioDirecto')}
                     </th>
 
                     <th className="px-2.5 py-2 text-right w-28 font-medium text-gray-900">
-                      <HeaderTooltip colKey="G">
-                        <span>G. Costo Total Directo (D×F)</span>
-                      </HeaderTooltip>
+                      G. Costo Total Directo (D├ùF)
                     </th>
 
                     <th className="px-2.5 py-2 text-right w-28 font-medium text-gray-900">
-                      <HeaderTooltip colKey="H">
-                        <span>H. Costo Total Ajustado (E×F)</span>
-                      </HeaderTooltip>
+                      H. Costo Total Ajustado (E├ùF)
                     </th>
 
                     <th
                       onClick={() => handleOrdenarPorColumna('cantidadEstePeriodo')}
                       className="px-2 py-2 text-right w-22 cursor-pointer hover:bg-gray-100/80 transition-colors font-medium text-[#9B0F06] text-[8.5px]"
                     >
-                      <HeaderTooltip colKey="I">
-                        <span>I. Este Periodo (Cant.) {renderIconoOrden('cantidadEstePeriodo')}</span>
-                      </HeaderTooltip>
+                      I. Este Periodo (Cant.) {renderIconoOrden('cantidadEstePeriodo')}
                     </th>
 
                     <th
                       onClick={() => handleOrdenarPorColumna('cantidadAcumuladaAnterior')}
                       className="px-2 py-2 text-right w-20 cursor-pointer hover:bg-gray-100/80 transition-colors font-medium"
                     >
-                      <HeaderTooltip colKey="J">
-                        <span>J. Acum. Anterior (Cant.) {renderIconoOrden('cantidadAcumuladaAnterior')}</span>
-                      </HeaderTooltip>
+                      J. Acum. Anterior (Cant.) {renderIconoOrden('cantidadAcumuladaAnterior')}
                     </th>
 
                     <th
                       onClick={() => handleOrdenarPorColumna('totalAFecha')}
                       className="px-2 py-2 text-right w-22 cursor-pointer hover:bg-gray-100/80 transition-colors font-medium text-gray-900"
                     >
-                      <HeaderTooltip colKey="K">
-                        <span>K. Total a Fecha (Cant.) {renderIconoOrden('totalAFecha')}</span>
-                      </HeaderTooltip>
+                      K. Total a Fecha (Cant.) {renderIconoOrden('totalAFecha')}
                     </th>
 
                     <th
                       onClick={() => handleOrdenarPorColumna('avancePct')}
                       className="px-2 py-2 text-right w-16 cursor-pointer hover:bg-gray-100/80 transition-colors font-medium text-[#9B0F06]"
                     >
-                      <HeaderTooltip colKey="L">
-                        <span>L. % Avance (Cant.) {renderIconoOrden('avancePct')}</span>
-                      </HeaderTooltip>
+                      L. % Avance (Cant.) {renderIconoOrden('avancePct')}
                     </th>
 
                     <th className="px-2.5 py-2 text-right w-24 font-medium text-gray-900">
-                      <HeaderTooltip colKey="M">
-                        <span>M. Este Periodo (Costo)</span>
-                      </HeaderTooltip>
+                      M. Este Periodo (Costo)
                     </th>
 
                     <th className="px-2.5 py-2 text-right w-24 font-medium text-gray-900">
-                      <HeaderTooltip colKey="N">
-                        <span>N. Acum. Anterior (Costo)</span>
-                      </HeaderTooltip>
+                      N. Acum. Anterior (Costo)
                     </th>
 
                     <th className="px-2.5 py-2 text-right w-24 font-medium text-gray-900">
-                      <HeaderTooltip colKey="O">
-                        <span>O. Total a Fecha (Costo)</span>
-                      </HeaderTooltip>
+                      O. Total a Fecha (Costo)
                     </th>
 
                     <th className="px-2 py-2 text-right w-16 font-medium text-[#9B0F06]">
-                      <HeaderTooltip colKey="P">
-                        <span>P. % Avance (Costo)</span>
-                      </HeaderTooltip>
+                      P. % Avance (Costo)
                     </th>
 
                     <th
                       onClick={() => handleOrdenarPorColumna('saldoPorEjecutar')}
                       className="px-2.5 py-2 text-right w-28 cursor-pointer hover:bg-gray-100/80 transition-colors font-medium text-[#9B0F06]"
                     >
-                      <HeaderTooltip colKey="Saldo">
-                        <span>Saldo por Ejecutar (H−O) {renderIconoOrden('saldoPorEjecutar')}</span>
-                      </HeaderTooltip>
+                      Saldo por Ejecutar (HÔêÆO) {renderIconoOrden('saldoPorEjecutar')}
                     </th>
 
-                    {/* Columnas mensuales (Mes 1...Mes N) según toggle Planificación / Actual */}
+                    {/* Columnas mensuales (Mes 1...Mes N) seg├║n toggle Planificaci├│n / Actual */}
                     {listaMesesDinamicos.map((mes) => (
                       <th
                         key={mes}
@@ -1959,23 +1674,23 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
 
                               <div className="flex items-center gap-2 text-[8px] font-mono font-normal text-gray-600">
                                 <span>Contratado: Q {subtotalCap.costoDirectoContratado.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</span>
-                                <span>•</span>
+                                <span>ÔÇó</span>
                                 <span>Ajustado: Q {subtotalCap.costoDirectoAjustado.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</span>
-                                <span>•</span>
+                                <span>ÔÇó</span>
                                 <span>Periodo: Q {subtotalCap.costoDirectoEstePeriodo.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</span>
-                                <span>•</span>
+                                <span>ÔÇó</span>
                                 <span>Total Fecha: Q {subtotalCap.costoDirectoTotalFecha.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</span>
-                                <span>•</span>
+                                <span>ÔÇó</span>
                                 <span className="text-[#9B0F06] font-medium">Saldo: Q {subtotalCap.saldoPorEjecutar.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</span>
                               </div>
                             </div>
                           </td>
                         </tr>
 
-                        {/* REQUERIMIENTO EDICIÓN INLINE:
+                        {/* REQUERIMIENTO EDICI├ôN INLINE:
                             - SIN fondo amarillo en la fila completa
                             - Highlight solo en campos editables con contorno gris oscuro
-                            - Código (A) es editable (dropdown), Descripción y Unid se autocompletan de solo lectura */}
+                            - C├│digo (A) es editable (dropdown), Descripci├│n y Unid se autocompletan de solo lectura */}
                         {!estaColapsado &&
                           renglonesCap.map((r) => {
                             const esEditando = filaEditandoId === r.id
@@ -1983,24 +1698,24 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                             const cantAjustadaE = esEditando ? Number(datosEditando.cantidadAjustada ?? r.cantidadAjustada) : r.cantidadAjustada
                             const costoUnitF = esEditando ? Number(datosEditando.costoUnitarioDirecto ?? r.costoUnitarioDirecto) : r.costoUnitarioDirecto
 
-                            const costoTotalDirectoG = Math.round(cantContratadaD * costoUnitF * 100) / 100
-                            const costoTotalAjustadoH = Math.round(cantAjustadaE * costoUnitF * 100) / 100
+                            const costoTotalDirectoG = cantContratadaD * costoUnitF
+                            const costoTotalAjustadoH = cantAjustadaE * costoUnitF
 
                             const cantEstePeriodoI = r.cantidadEstePeriodo
                             const cantAcumAnteriorJ = esEditando ? Number(datosEditando.cantidadAcumuladaAnterior ?? r.cantidadAcumuladaAnterior) : r.cantidadAcumuladaAnterior
                             const cantTotalFechaK = cantEstePeriodoI + cantAcumAnteriorJ
-                            const pctAvanceCantL = (!cantAjustadaE || cantAjustadaE <= 0 || isNaN(cantAjustadaE)) ? 0 : (cantTotalFechaK / cantAjustadaE) * 100
+                            const pctAvanceCantL = cantAjustadaE > 0 ? (cantTotalFechaK / cantAjustadaE) * 100 : 0
 
-                            const costoEstePeriodoM = Math.round(cantEstePeriodoI * costoUnitF * 100) / 100
-                            const costoAcumAnteriorN = Math.round(cantAcumAnteriorJ * costoUnitF * 100) / 100
-                            const costoTotalFechaO = Math.round((costoEstePeriodoM + costoAcumAnteriorN) * 100) / 100
-                            const pctAvanceCostoP = (!costoTotalAjustadoH || costoTotalAjustadoH <= 0 || isNaN(costoTotalAjustadoH)) ? 0 : (costoTotalFechaO / costoTotalAjustadoH) * 100
+                            const costoEstePeriodoM = cantEstePeriodoI * costoUnitF
+                            const costoAcumAnteriorN = cantAcumAnteriorJ * costoUnitF
+                            const costoTotalFechaO = costoEstePeriodoM + costoAcumAnteriorN
+                            const pctAvanceCostoP = costoTotalAjustadoH > 0 ? (costoTotalFechaO / costoTotalAjustadoH) * 100 : 0
 
                             const saldoPorEjecutar = Math.max(0, costoTotalAjustadoH - costoTotalFechaO)
 
                             return (
                               <tr key={r.id} className="transition-colors border-b border-gray-100 hover:bg-gray-50/60 font-[Poppins]">
-                                {/* A. Código */}
+                                {/* A. C├│digo */}
                                 <td className="px-2 py-1.5 font-mono font-bold text-gray-900">
                                   {esEditando ? (
                                     <select
@@ -2019,7 +1734,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                                   )}
                                 </td>
 
-                                {/* B. Descripción */}
+                                {/* B. Descripci├│n */}
                                 <td className="px-2.5 py-1.5 font-sans font-normal text-gray-700">
                                   {esEditando ? (
                                     <div className="w-full rounded border border-gray-300 bg-gray-100 px-1.5 py-0.5 font-sans text-[9px] text-gray-700 cursor-not-allowed">
@@ -2049,9 +1764,9 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                                     <input
                                       type="text"
                                       value={datosEditando.cantidadContratada ?? r.cantidadContratada}
-                                      onKeyDown={handleKeyDownNumericOnly}
                                       onChange={(e) => {
-                                        setDatosEditando((d) => ({ ...d, cantidadContratada: sanitizePositivo(e.target.value) }))
+                                        const val = e.target.value.replace(/[^\d.]/g, '')
+                                        setDatosEditando((d) => ({ ...d, cantidadContratada: Number(val) }))
                                       }}
                                       className="w-18 rounded border-2 border-gray-700 bg-white px-1 py-0.5 text-right font-mono text-[9px] font-normal text-gray-900 focus:outline-none"
                                     />
@@ -2066,9 +1781,9 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                                     <input
                                       type="text"
                                       value={datosEditando.cantidadAjustada ?? r.cantidadAjustada}
-                                      onKeyDown={handleKeyDownNumericOnly}
                                       onChange={(e) => {
-                                        setDatosEditando((d) => ({ ...d, cantidadAjustada: sanitizePositivo(e.target.value) }))
+                                        const val = e.target.value.replace(/[^\d.]/g, '')
+                                        setDatosEditando((d) => ({ ...d, cantidadAjustada: Number(val) }))
                                       }}
                                       className="w-18 rounded border-2 border-gray-700 bg-white px-1 py-0.5 text-right font-mono text-[9px] font-normal text-gray-900 focus:outline-none"
                                     />
@@ -2083,9 +1798,9 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                                     <input
                                       type="text"
                                       value={datosEditando.costoUnitarioDirecto ?? r.costoUnitarioDirecto}
-                                      onKeyDown={handleKeyDownNumericOnly}
                                       onChange={(e) => {
-                                        setDatosEditando((d) => ({ ...d, costoUnitarioDirecto: sanitizePositivo(e.target.value) }))
+                                        const val = e.target.value.replace(/[^\d.]/g, '')
+                                        setDatosEditando((d) => ({ ...d, costoUnitarioDirecto: Number(val) }))
                                       }}
                                       className="w-18 rounded border-2 border-gray-700 bg-white px-1 py-0.5 text-right font-mono text-[9px] font-normal text-gray-900 focus:outline-none"
                                     />
@@ -2094,24 +1809,24 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                                   )}
                                 </td>
 
-                                {/* G. Costo Total Directo = D × F */}
+                                {/* G. Costo Total Directo = D ├ù F */}
                                 <td className="px-2.5 py-1.5 text-right font-normal text-gray-800 font-mono">
                                   Q {costoTotalDirectoG.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
                                 </td>
 
-                                {/* H. Costo Total Ajustado = E × F */}
+                                {/* H. Costo Total Ajustado = E ├ù F */}
                                 <td className="px-2.5 py-1.5 text-right font-normal text-gray-900 font-mono">
                                   Q {costoTotalAjustadoH.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
                                 </td>
 
-                                {/* I. Este Periodo (Cant.): Enlace de SOLO LECTURA al tab Analítico */}
+                                {/* I. Este Periodo (Cant.): Enlace de SOLO LECTURA al tab Anal├¡tico */}
                                 <td className="px-2 py-1.5 text-right font-normal font-mono text-[9.5px]">
                                   {cantEstePeriodoI > 0 ? (
                                     <button
                                       type="button"
                                       onClick={() => setTabSeccion('analitico')}
                                       className="text-blue-700 hover:underline hover:text-[#9B0F06] transition-colors cursor-pointer font-mono text-[9.5px]"
-                                      title="Ver origen en Memoria de Cálculo Analítica"
+                                      title="Ver origen en Memoria de C├ílculo Anal├¡tica"
                                     >
                                       {formatQuantity(cantEstePeriodoI, r.unidad)}
                                     </button>
@@ -2120,7 +1835,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                                       type="button"
                                       onClick={() => setTabSeccion('analitico')}
                                       className="inline-flex items-center justify-end gap-1 text-gray-400 hover:text-[#9B0F06] transition-colors cursor-pointer font-mono text-[9px]"
-                                      title="Valor calculated en tiempo real desde el Tab Analítico (sin registros)"
+                                      title="Valor calculado en tiempo real desde el Tab Anal├¡tico (sin registros)"
                                     >
                                       <span className="text-gray-500 font-mono">{formatQuantity(0, r.unidad)}</span>
                                       <Calculator size={10} className="opacity-60" />
@@ -2134,9 +1849,9 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                                     <input
                                       type="text"
                                       value={datosEditando.cantidadAcumuladaAnterior ?? r.cantidadAcumuladaAnterior}
-                                      onKeyDown={handleKeyDownNumericOnly}
                                       onChange={(e) => {
-                                        setDatosEditando((d) => ({ ...d, cantidadAcumuladaAnterior: sanitizePositivo(e.target.value) }))
+                                        const val = e.target.value.replace(/[^\d.]/g, '')
+                                        setDatosEditando((d) => ({ ...d, cantidadAcumuladaAnterior: Number(val) }))
                                       }}
                                       className="w-16 rounded border-2 border-gray-700 bg-white px-1 py-0.5 text-right font-mono text-[9px] font-normal text-gray-900 focus:outline-none"
                                     />
@@ -2155,12 +1870,12 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                                   {pctAvanceCantL.toFixed(1)}%
                                 </td>
 
-                                {/* M. Este Periodo (Costo) = I × F */}
+                                {/* M. Este Periodo (Costo) = I ├ù F */}
                                 <td className="px-2.5 py-1.5 text-right font-normal text-gray-800 font-mono">
                                   Q {costoEstePeriodoM.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
                                 </td>
 
-                                {/* N. Acum. Anterior (Costo) = J × F */}
+                                {/* N. Acum. Anterior (Costo) = J ├ù F */}
                                 <td className="px-2.5 py-1.5 text-right font-normal text-gray-700 font-mono">
                                   Q {costoAcumAnteriorN.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
                                 </td>
@@ -2180,38 +1895,18 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                                   Q {saldoPorEjecutar.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
                                 </td>
 
-                                {/* Columnas mensuales (Mes 1...Mes N) según toggle Planificación / Actual */}
-                                {listaMesesDinamicos.map((mes, idx) => {
+                                {/* Columnas mensuales (Mes 1...Mes N) seg├║n toggle Planificaci├│n / Actual */}
+                                {listaMesesDinamicos.map((mes) => {
                                   let valMes = 0
                                   if (modoVistaSabana === 'planificacion') {
                                     valMes = r.cantidadAjustada > 0 ? r.cantidadAjustada / Math.max(1, listaMesesDinamicos.length) : 0
                                   } else {
-                                    valMes = r.avancesMensuales?.[mes] || r.avancesMensuales?.[`Mes ${idx + 1}`] || 0
+                                    valMes = r.avancesMensuales?.[mes] || 0
                                   }
 
                                   return (
                                     <td key={mes} className="px-2 py-1.5 text-right font-mono text-[8.5px] font-normal text-gray-600">
-                                      {esEditando ? (
-                                        <input
-                                          type="text"
-                                          value={datosEditando.avancesMensuales?.[mes] ?? (valMes > 0 ? valMes : '')}
-                                          onKeyDown={handleKeyDownNumericOnly}
-                                          onChange={(e) => {
-                                            const numVal = sanitizePositivo(e.target.value)
-                                            setDatosEditando((d) => ({
-                                              ...d,
-                                              avancesMensuales: {
-                                                ...(d.avancesMensuales || r.avancesMensuales || {}),
-                                                [mes]: numVal,
-                                              },
-                                            }))
-                                          }}
-                                          placeholder="0.00"
-                                          className="w-16 rounded border-2 border-gray-700 bg-white px-1 py-0.5 text-right font-mono text-[9px] font-normal text-gray-900 focus:outline-none"
-                                        />
-                                      ) : (
-                                        <span>{valMes > 0 ? formatQuantity(valMes, r.unidad) : 'Q.00'}</span>
-                                      )}
+                                      {valMes > 0 ? formatQuantity(valMes, r.unidad) : 'ÔÇö'}
                                     </td>
                                   )
                                 })}
@@ -2232,7 +1927,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                                         type="button"
                                         onClick={handleCancelarEdicionInline}
                                         className="rounded bg-gray-200 p-1 text-gray-700 hover:bg-gray-300 transition-colors cursor-pointer"
-                                        title="Cancelar edición"
+                                        title="Cancelar edici├│n"
                                       >
                                         <X size={12} />
                                       </button>
@@ -2259,7 +1954,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                                         type="button"
                                         onClick={() => handleAbrirEliminar(r)}
                                         className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-700 transition-colors cursor-pointer"
-                                        title="Eliminar renglón"
+                                        title="Eliminar rengl├│n"
                                       >
                                         <Trash2 size={12} />
                                       </button>
@@ -2277,7 +1972,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
             </div>
           )}
 
-          {/* Paginación */}
+          {/* Paginaci├│n */}
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-200/80 bg-white px-3 py-1.5 text-[9.5px] font-[Poppins]">
             <div className="flex items-center gap-1.5 text-gray-500 font-normal">
               <span>
@@ -2294,10 +1989,10 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                 }}
                 className="rounded border border-gray-200 bg-gray-50 px-1 py-0.5 text-[9px] font-normal text-gray-700 focus:outline-none"
               >
-                <option value={10}>10 / pág</option>
-                <option value={12}>12 / pág</option>
-                <option value={15}>15 / pág</option>
-                <option value={25}>25 / pág</option>
+                <option value={10}>10 / p├íg</option>
+                <option value={12}>12 / p├íg</option>
+                <option value={15}>15 / p├íg</option>
+                <option value={25}>25 / p├íg</option>
               </select>
             </div>
 
@@ -2332,33 +2027,25 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
         </div>
       )}
 
-      {/* TAB 2: [ANALÍTICO] */}
+      {/* TAB 2: [ANAL├ìTICO] */}
       {tabSeccion === 'analitico' && (
         <div className="rounded-xl border border-gray-200 bg-white p-3.5 shadow-2xs space-y-3 font-[Poppins]">
           <div className="flex items-center justify-between border-b border-gray-100 pb-2">
             <div className="flex items-center gap-2">
               <Calculator size={16} className="text-[#9B0F06]" />
               <div>
-                <h3 className="text-xs font-bold text-gray-900">
-                  Memoria de Cálculo (Bitácora de Mediciones Reales)
+                <h3 className="text-xs font-medium text-gray-900">
+                  Memoria de C├ílculo
                 </h3>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() => setModalAgregarMedicionOpen(true)}
-              className="rounded-lg bg-[#9B0F06] px-3 py-1.5 text-[10px] font-bold text-white hover:bg-[#5E0006] transition-colors flex items-center gap-1 shadow-2xs cursor-pointer"
-            >
-              <Plus size={11} />
-              <span>Registrar Nueva Medición</span>
-            </button>
           </div>
 
           {Array.from(new Set(medicionesAnaliticas.map((m) => m.codigoDGC))).map((codDGC) => {
             const renglonMaestro = CATALOGO_COMPLETO_88.find((cat) => cat.codigoDGC === codDGC) || {
               codigoDGC: codDGC,
-              descripcion: 'Renglón de obra vial',
-              unidad: 'm³',
+              descripcion: 'Rengl├│n de obra vial',
+              unidad: 'm┬│',
             }
 
             const medicionesRenglon = medicionesAnaliticas.filter((m) => {
@@ -2388,7 +2075,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
 
                   <div className="flex items-center gap-2">
                     <span className="rounded bg-white px-2 py-0.5 text-[8.5px] font-normal text-gray-600 border border-gray-200">
-                      Unidad Catálogo: <strong className="text-gray-900 font-normal">{renglonMaestro.unidad}</strong> (Solo lectura)
+                      Unidad Cat├ílogo: <strong className="text-gray-900 font-normal">{renglonMaestro.unidad}</strong> (Solo lectura)
                     </span>
                     <span className="rounded bg-gray-50 px-2 py-0.5 text-[8.5px] font-normal text-gray-700 border border-gray-200">
                       Alimenta Columna 'Este Periodo'
@@ -2399,13 +2086,13 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                 <table className="w-full text-left font-mono">
                   <thead className="bg-gray-50 text-gray-600 border-b border-gray-200 text-[8.5px] font-normal">
                     <tr>
-                      <th className="p-2">Estación Inicio</th>
-                      <th className="p-2">Estación Fin</th>
+                      <th className="p-2">Estaci├│n Inicio</th>
+                      <th className="p-2">Estaci├│n Fin</th>
                       <th className="p-2 text-right">Longitud L (m)</th>
                       <th className="p-2 text-right">Ancho A (m)</th>
                       <th className="p-2 text-right">Altura/Espesor H (m)</th>
-                      <th className="p-2 text-right font-medium text-gray-900">Cantidad Calculada (L×A×H)</th>
-                      <th className="p-2 text-center">Periodo / Estimación</th>
+                      <th className="p-2 text-right font-medium text-gray-900">Cantidad Calculada (L├ùA├ùH)</th>
+                      <th className="p-2 text-center">Periodo / Estimaci├│n</th>
                     </tr>
                   </thead>
 
@@ -2424,7 +2111,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                             {formatQuantity(cantidadCalculada, renglonMaestro.unidad)} {renglonMaestro.unidad}
                           </td>
                           <td className="p-2 text-center text-gray-500 text-[8.5px]">
-                            {m.mesPeriodo} — {m.numEstimacion}
+                            {m.mesPeriodo} ÔÇö {m.numEstimacion}
                           </td>
                         </tr>
                       )
@@ -2434,7 +2121,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                   <tfoot>
                     <tr className="bg-gray-100/90 font-normal text-gray-900 border-t border-gray-300">
                       <td colSpan={5} className="p-2 text-right uppercase tracking-wider text-[8.5px]">
-                        TOTAL MES DEL RENGLÓN {codDGC} (TRANSMITE A SÁBANA 'ESTE PERIODO'):
+                        TOTAL MES DEL RENGL├ôN {codDGC} (TRANSMITE A S├üBANA 'ESTE PERIODO'):
                       </td>
                       <td className="p-2 text-right font-normal text-[#9B0F06] font-mono text-[10px]">
                         {formatQuantity(totalCantidadCalculadaRenglon, renglonMaestro.unidad)} {renglonMaestro.unidad}
@@ -2460,7 +2147,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                   Bolsa de Trabajos Pendientes y No Conciliados
                 </h3>
                 <p className="text-[9.5px] text-gray-500 font-normal">
-                  Control de volúmenes en conciliación con cálculo de descuentos y promoción al Tab Analítico.
+                  Control de vol├║menes en conciliaci├│n con c├ílculo de descuentos y promoci├│n al Tab Anal├¡tico.
                 </p>
               </div>
             </div>
@@ -2474,125 +2161,115 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
             <table className="w-full text-left font-mono text-[9.5px]">
               <thead>
                 <tr className="bg-gray-50 text-gray-600 font-normal uppercase tracking-wider text-[8.5px] border-b border-gray-200">
-                  <th className="p-2 w-16">Código</th>
-                  <th className="p-2 min-w-[140px]">Descripción / Partida</th>
-                  <th className="p-2 text-center w-20">Estado</th>
-                  <th className="p-2 text-left">Est. Inicio</th>
-                  <th className="p-2 text-left">Est. Fin</th>
-                  <th className="p-2 text-right">Long. L (m)</th>
-                  <th className="p-2 text-right">Ancho A (m)</th>
-                  <th className="p-2 text-right">Espesor H (m)</th>
-                  <th className="p-2 text-right">Volumen Bruto</th>
-                  <th className="p-2 text-right">Descuento Técnico</th>
+                  <th className="p-2 w-16">C├│digo</th>
+                  <th className="p-2 min-w-[160px]">Descripci├│n / Partida</th>
+                  <th className="p-2 text-center w-24">Estado</th>
+                  <th className="p-2 text-right">Cant. Bruta</th>
+                  <th className="p-2 text-right">Descuento Aplicado</th>
                   <th className="p-2 text-right font-normal text-gray-900">Cant. Neta a Cobrar</th>
-                  <th className="p-2 text-center w-20">Acción</th>
+                  <th className="p-2">Origen / Trazabilidad</th>
+                  <th className="p-2 text-center w-20">Acci├│n</th>
                 </tr>
               </thead>
 
               <tbody className="divide-y divide-gray-100">
                 {trabajosPendientes
                   .filter((item) => {
-                    const matchCap = capituloFiltro === 'todos'
+                    const renglonMaestro = CATALOGO_COMPLETO_88.find((cat) => cat.codigoDGC === item.codigoDGC)
+                    const matchCap = capituloFiltro === 'todos' || renglonMaestro?.capituloId === capituloFiltro
                     const matchEst = estadoEjecucionFiltro === 'todos' || item.estado === estadoEjecucionFiltro
+                    const matchTipo = tipoRenglonFiltro === 'todos' || (renglonMaestro?.tipoRenglon === tipoRenglonFiltro)
                     const matchBusq = busqueda === '' ||
-                      (item.codigoDGC && item.codigoDGC.toLowerCase().includes(busqueda.toLowerCase())) ||
-                      (item.descripcion && item.descripcion.toLowerCase().includes(busqueda.toLowerCase())) ||
-                      (item.origenTrazabilidad && item.origenTrazabilidad.toLowerCase().includes(busqueda.toLowerCase())) ||
-                      (item.ubicacionEspecifica && item.ubicacionEspecifica.toLowerCase().includes(busqueda.toLowerCase()))
+                      item.codigoDGC.toLowerCase().includes(busqueda.toLowerCase()) ||
+                      item.descripcion.toLowerCase().includes(busqueda.toLowerCase()) ||
+                      item.origenTrazabilidad.toLowerCase().includes(busqueda.toLowerCase())
 
-                    return matchCap && matchEst && matchBusq
+                    return matchCap && matchEst && matchTipo && matchBusq
                   })
                   .map((item) => {
-                    const l = item.longitudL ?? item.longitudBase ?? 0
-                    const a = item.anchoA ?? 0
-                    const h = item.alturaH ?? 0
-                    const volBruto = item.volumenAreaBruto ?? item.cantidadBruta ?? (l * a * h)
-                    const descMonto = item.descuentoMonto ?? (item.factorDescuento ? l * item.factorDescuento : 0)
-                    const cantNeta = item.cantidadNetaCobrar ?? Math.max(0, volBruto - descMonto)
-                    const esCriticoTresMeses = (item.mesesAntiguedad || 0) >= 3 && item.estado === 'Pendiente'
+                  const descuentoMonto = item.longitudBase * item.factorDescuento
+                  const cantidadNetaCobrar = Math.max(0, item.cantidadBruta - descuentoMonto)
+                  const esCriticoTresMeses = item.mesesAntiguedad >= 3 && item.estado === 'Pendiente'
 
-                    return (
-                      <tr
-                        key={item.id}
-                        className="hover:bg-gray-50/80 bg-white transition-colors text-[9px]"
-                      >
-                        <td className="p-2 font-mono font-bold text-gray-900">{item.codigoDGC}</td>
+                  return (
+                    <tr
+                      key={item.id}
+                      className="hover:bg-gray-50/80 bg-white transition-colors"
+                    >
+                      <td className="p-2 font-mono font-bold text-gray-900">{item.codigoDGC}</td>
 
-                        <td className="p-2 font-sans font-normal text-gray-800">
-                          <div>
-                            <span>{item.descripcion}</span>
-                            {item.ubicacionEspecifica && (
-                              <div className="text-[8px] text-gray-500">{item.ubicacionEspecifica}</div>
-                            )}
-                            {esCriticoTresMeses && (
-                              <div className="mt-0.5 inline-flex items-center gap-1 text-[8.5px] font-normal text-amber-700">
-                                <AlertTriangle size={11} className="text-amber-600 shrink-0" />
-                                <span>{item.mesesAntiguedad} meses sin procesar</span>
-                              </div>
-                            )}
-                          </div>
-                        </td>
-
-                        <td className="p-2 text-center">
-                          {item.estado === 'Pendiente' && (
-                            <span className="rounded bg-amber-50 text-amber-700 px-2 py-0.5 text-[8.5px] font-medium border border-amber-200">
-                              Pendiente
-                            </span>
+                      <td className="p-2 font-sans font-normal text-gray-800">
+                        <div>
+                          <span>{item.descripcion}</span>
+                          {esCriticoTresMeses && (
+                            <div className="mt-0.5 inline-flex items-center gap-1 text-[8.5px] font-normal text-gray-700">
+                              <AlertTriangle size={11} className="text-gray-500 shrink-0" />
+                              <span>{item.mesesAntiguedad} meses sin procesar</span>
+                            </div>
                           )}
-                          {item.estado === 'Aprobado' && (
-                            <span className="rounded bg-blue-50 text-blue-700 px-2 py-0.5 text-[8.5px] font-medium border border-blue-200">
-                              Aprobado
-                            </span>
-                          )}
-                          {item.estado === 'Trasladado' && (
-                            <span className="rounded bg-emerald-50 text-emerald-700 px-2 py-0.5 text-[8.5px] font-medium border border-emerald-200 inline-flex items-center justify-center gap-0.5">
-                              <Check size={10} /> Trasladado
-                            </span>
-                          )}
-                        </td>
+                        </div>
+                      </td>
 
-                        <td className="p-2 text-left font-mono text-gray-700">{item.estacionInicio || '-'}</td>
-                        <td className="p-2 text-left font-mono text-gray-700">{item.estacionFin || '-'}</td>
-                        <td className="p-2 text-right font-mono text-gray-700">{l.toFixed(2)}</td>
-                        <td className="p-2 text-right font-mono text-gray-700">{a.toFixed(2)}</td>
-                        <td className="p-2 text-right font-mono text-gray-700">{h.toFixed(2)}</td>
+                      <td className="p-2 text-center">
+                        {item.estado === 'Pendiente' && (
+                          <span className="rounded bg-gray-100 text-gray-800 px-2 py-0.5 text-[8.5px] font-normal border border-gray-200">
+                            Pendiente
+                          </span>
+                        )}
+                        {item.estado === 'Aprobado' && (
+                          <span className="rounded bg-gray-100 text-gray-800 px-2 py-0.5 text-[8.5px] font-normal border border-gray-200">
+                            Aprobado
+                          </span>
+                        )}
+                        {item.estado === 'Trasladado' && (
+                          <span className="rounded bg-gray-100 text-gray-800 px-2 py-0.5 text-[8.5px] font-normal border border-gray-200 flex items-center justify-center gap-0.5">
+                            <Check size={10} /> Trasladado
+                          </span>
+                        )}
+                      </td>
 
-                        <td className="p-2 text-right font-mono text-gray-700 font-medium">
-                          {formatQuantity(volBruto, item.unidad)} {item.unidad}
-                        </td>
+                      <td className="p-2 text-right text-gray-700">
+                        {formatQuantity(item.cantidadBruta, item.unidad)} {item.unidad}
+                      </td>
 
-                        <td className="p-2 text-right font-mono text-gray-700">
-                          {descMonto > 0 ? (
-                            <span className="text-red-700 font-medium">
-                              −{descMonto.toFixed(2)} {item.descuentoNombre ? `(${item.descuentoNombre})` : ''}
-                            </span>
-                          ) : (
-                            <span className="text-gray-400">0.00</span>
-                          )}
-                        </td>
+                      <td className="p-2 text-right text-gray-700">
+                        {descuentoMonto > 0 ? (
+                          <span>
+                            ÔêÆ{descuentoMonto.toFixed(2)} ({item.factorDescuento}├ùL)
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">0.00</span>
+                        )}
+                      </td>
 
-                        <td className="p-2 text-right font-bold text-gray-900 font-mono bg-gray-50/50">
-                          {formatQuantity(cantNeta, item.unidad)} {item.unidad}
-                        </td>
+                      <td className="p-2 text-right font-normal text-gray-900 font-mono">
+                        {formatQuantity(cantidadNetaCobrar, item.unidad)} {item.unidad}
+                      </td>
 
-                        <td className="p-2 text-center">
-                          {item.estado !== 'Trasladado' ? (
-                            <button
-                              type="button"
-                              onClick={() => handlePromoverTrabajoPendiente(item)}
-                              className="inline-flex items-center gap-1 rounded bg-[#9B0F06] px-2 py-1 text-[8.5px] font-normal text-white hover:bg-[#5E0006] transition-colors shadow-2xs cursor-pointer"
-                              title="Promover a Trasladado e integrar con Tab Analítico"
-                            >
-                              <span>Promover</span>
-                              <ArrowRight size={10} />
-                            </button>
-                          ) : (
-                            <span className="text-[8px] text-gray-400 font-sans">Sincronizado</span>
-                          )}
-                        </td>
-                      </tr>
-                    )
-                  })}
+                      <td className="p-2 font-sans text-gray-600 text-[9px]">
+                        <span className="rounded bg-gray-100 px-1.5 py-0.5 border border-gray-200 font-mono">
+                          {item.origenTrazabilidad}
+                        </span>
+                      </td>
+
+                      <td className="p-2 text-center">
+                        {item.estado !== 'Trasladado' ? (
+                          <button
+                            type="button"
+                            onClick={() => handlePromoverTrabajoPendiente(item)}
+                            className="inline-flex items-center gap-1 rounded bg-[#9B0F06] px-2 py-1 text-[8.5px] font-normal text-white hover:bg-[#5E0006] transition-colors shadow-2xs cursor-pointer"
+                            title="Promover a Trasladado e integrar con Tab Anal├¡tico"
+                          >
+                            <span>Promover</span>
+                            <ArrowRight size={10} />
+                          </button>
+                        ) : (
+                          <span className="text-[8px] text-gray-400 font-sans">Sincronizado</span>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
@@ -2618,7 +2295,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                     Comparativa de Avance: Planificado vs Real
                   </h3>
                   <p className="text-[9.5px] text-gray-500 font-normal">
-                    Análisis de variaciones físicas y financieras según cronograma del programa de trabajo.
+                    An├ílisis de variaciones f├¡sicas y financieras seg├║n cronograma del programa de trabajo.
                   </p>
                 </div>
               </div>
@@ -2632,20 +2309,20 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
               <table className="w-full text-left font-mono text-[9.5px]">
                 <thead>
                   <tr className="bg-gray-50 text-gray-600 font-medium uppercase tracking-wider text-[8.5px] border-b border-gray-200">
-                    <th className="p-2 w-16">Código</th>
-                    <th className="p-2 min-w-[180px]">Descripción</th>
+                    <th className="p-2 w-16">C├│digo</th>
+                    <th className="p-2 min-w-[180px]">Descripci├│n</th>
                     <th className="p-2 text-right">Cant. Ajustada (Plan)</th>
                     <th className="p-2 text-right">Cant. Ejecutada (Real)</th>
                     <th className="p-2 text-right">% Planificado (Mes 6)</th>
                     <th className="p-2 text-right">% Real</th>
-                    <th className="p-2 text-center w-28">Variación</th>
+                    <th className="p-2 text-center w-28">Variaci├│n</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {pvrRenglonesPagina.map((r) => {
                     const ejecReal = r.cantidadEstePeriodo + r.cantidadAcumuladaAnterior
                     
-                    // Cálculo dinámico de % Planificado a la fecha (hasta Mes 6)
+                    // C├ílculo din├ímico de % Planificado a la fecha (hasta Mes 6)
                     const sumaPlanMes6 = r.avancesMensuales
                       ? Object.entries(r.avancesMensuales).reduce((acc, [mesKey, val]) => {
                           const numMes = parseInt(mesKey.replace('Mes ', ''), 10)
@@ -2670,10 +2347,10 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                         <td className="p-2 font-mono font-bold text-gray-900">{r.codigoDGC}</td>
                         <td className="p-2 font-sans text-gray-800">{r.descripcion}</td>
                         <td className="p-2 text-right font-mono text-gray-700">
-                          {formatQuantity(r.cantidadAjustada, r.unidad)} {formatearUnidadMedidaSymbol(r.unidad)}
+                          {formatQuantity(r.cantidadAjustada, r.unidad)} {r.unidad}
                         </td>
                         <td className="p-2 text-right font-mono text-gray-900 font-medium">
-                          {formatQuantity(ejecReal, r.unidad)} {formatearUnidadMedidaSymbol(r.unidad)}
+                          {formatQuantity(ejecReal, r.unidad)} {r.unidad}
                         </td>
                         <td className="p-2 text-right font-mono text-gray-600">{pctPlan.toFixed(1)}%</td>
                         <td className="p-2 text-right font-mono text-gray-900">{pctReal.toFixed(1)}%</td>
@@ -2689,7 +2366,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
               </table>
             </div>
 
-            {/* Paginación estandarizada DomunNet */}
+            {/* Paginaci├│n estandarizada DomunNet */}
             <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-gray-100 text-[9.5px]">
               <div className="flex items-center gap-1.5 text-gray-500 font-normal">
                 <span>Mostrando</span>
@@ -2708,10 +2385,10 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                   }}
                   className="ml-2 rounded border border-gray-200 bg-gray-50 px-1 py-0.5 text-[9px] font-normal text-gray-700 focus:outline-none"
                 >
-                  <option value={10}>10 / pág</option>
-                  <option value={15}>15 / pág</option>
-                  <option value={25}>25 / pág</option>
-                  <option value={50}>50 / pág</option>
+                  <option value={10}>10 / p├íg</option>
+                  <option value={15}>15 / p├íg</option>
+                  <option value={25}>25 / p├íg</option>
+                  <option value={50}>50 / p├íg</option>
                 </select>
               </div>
 
@@ -2747,230 +2424,139 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
         )
       })()}
 
-      {/* TAB 5: [RESUMEN FINANCIERO - OFICIAL EXCEL/DGC] */}
-      {tabSeccion === 'resumen' && (() => {
-        const montoDisenoGlobal = Number(paramsProj.monto_estudio_ingenieria || paramsProj.montoEstudioIngenieria) || 0
-        const montoTrabajosAdminGlobal = Number(paramsProj.monto_trabajos_administracion || paramsProj.montoTrabajosAdmin) || 0
-        const precioTotalOfertaGlobal = montoContractualOriginalTotal + montoDisenoGlobal + montoTrabajosAdminGlobal
-
-        const subtotalCostoDirectoTotalGlobal = subtotalCostoDirectoGlobalPeriodo + subtotalCostoDirectoAcumuladoAnteriorGlobal
-        const indirectos45AcumuladoAnteriorGlobal = subtotalCostoDirectoAcumuladoAnteriorGlobal * pctIndirectos
-        const indirectos45TotalGlobal = indirectos45Global + indirectos45AcumuladoAnteriorGlobal
-
-        const subtotalAntesIvaAcumuladoAnteriorGlobal = subtotalCostoDirectoAcumuladoAnteriorGlobal + indirectos45AcumuladoAnteriorGlobal
-        const subtotalAntesIvaTotalGlobal = subtotalAntesIvaGlobal + subtotalAntesIvaAcumuladoAnteriorGlobal
-
-        const iva12AcumuladoAnteriorGlobal = subtotalAntesIvaAcumuladoAnteriorGlobal * pctIva
-        const iva12TotalGlobal = iva12Global + iva12AcumuladoAnteriorGlobal
-
-        const valorTotalAcumuladoTotalBrutoGlobal = valorTotalEstimacionBrutoGlobal + valorTotalAcumuladoAnteriorBrutoGlobal
-
-        const disenoEstePeriodo = Number(paramsProj.diseno_este_periodo) || 0
-        const disenoAcumuladoAnterior = Number(paramsProj.diseno_acumulado_anterior) || (montoDisenoGlobal > 0 ? montoDisenoGlobal : 0)
-        const disenoTotal = disenoEstePeriodo + disenoAcumuladoAnterior
-
-        const adminEstePeriodo = Number(paramsProj.admin_este_periodo) || 0
-        const adminAcumuladoAnterior = Number(paramsProj.admin_acumulado_anterior) || 0
-        const adminTotal = adminEstePeriodo + adminAcumuladoAnterior
-
-        const valorTotalEstimacionSumaEstePeriodo = valorTotalEstimacionBrutoGlobal + disenoEstePeriodo + adminEstePeriodo
-        const valorTotalEstimacionSumaAcumuladoAnterior = valorTotalAcumuladoAnteriorBrutoGlobal + disenoAcumuladoAnterior + adminAcumuladoAnterior
-        const valorTotalEstimacionSumaAcumuladoTotal = valorTotalEstimacionSumaEstePeriodo + valorTotalEstimacionSumaAcumuladoAnterior
-
-        const pctAvanceGeneralAcumulado = precioTotalOfertaGlobal > 0 ? ((valorTotalEstimacionSumaAcumuladoTotal / precioTotalOfertaGlobal) * 100) : 0
-
-        const liquidoNetoAcumuladoAnterior = Math.max(0, valorTotalEstimacionSumaAcumuladoAnterior - amortizacionAnteriorAcumulada)
-        const liquidoNetoTotal = liquidoAPagarNetoContratista + liquidoNetoAcumuladoAnterior
-
-        return (
-          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-2xs space-y-4 text-[10px] font-[Poppins]">
-            <div className="flex items-center justify-between border-b border-gray-200 pb-2.5">
-              <div className="flex items-center gap-2">
-                <Banknote size={18} className="text-[#9B0F06]" />
-                <div>
-                  <h3 className="text-xs font-bold text-gray-900 uppercase">
-                    Resumen Financiero del Periodo y Estado de Cuenta Oficial
-                  </h3>
-                  <p className="text-[9.5px] text-gray-500 font-normal">
-                    Consolidado de Oferta Inicial, Ejecución del Periodo y Control de Amortización de Anticipo (DGC).
-                  </p>
-                </div>
+      {/* TAB 5: [RESUMEN FINANCIERO] */}
+      {tabSeccion === 'resumen' && (
+        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-2xs space-y-3 text-[10px] font-[Poppins]">
+          <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+            <div className="flex items-center gap-2">
+              <Banknote size={16} className="text-[#9B0F06]" />
+              <div>
+                <h3 className="text-xs font-medium text-gray-900">
+                  Resumen Financiero del Periodo y Estado de Cuenta
+                </h3>
+                <p className="text-[9.5px] text-gray-500 font-normal">
+                  Consolidado financiero proveniente de vista_estado_cuenta y vista_control_anticipo.
+                </p>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="rounded-full bg-red-50 border border-red-200 px-2.5 py-1 text-[9px] font-bold text-[#9B0F06]">
-                  Avance Financiero Total: {pctAvanceGeneralAcumulado.toFixed(2)}%
-                </span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="rounded-lg border border-gray-200 bg-gray-50/70 p-3 space-y-2">
+              <div className="flex items-center gap-1.5 border-b border-gray-200 pb-1.5">
+                <Banknote size={14} className="text-[#9B0F06]" />
+                <h4 className="text-[10px] font-medium uppercase text-gray-900">Control de Anticipo (20%)</h4>
+              </div>
+
+              <div className="space-y-1 font-mono text-[9.5px]">
+                <div className="flex justify-between py-0.5">
+                  <span className="font-sans text-gray-600 font-normal">Monto Total Recibido (20%):</span>
+                  <span className="font-normal text-gray-900">Q {anticipoRecibido20.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</span>
+                </div>
+
+                <div className="flex justify-between py-0.5">
+                  <span className="font-sans text-gray-600 font-normal">Amortizaci├│n Acumulada (Anterior):</span>
+                  <span className="font-normal text-emerald-800">Q {amortizacionAnteriorAcumulada.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</span>
+                </div>
+
+                <div className="flex justify-between py-0.5">
+                  <span className="font-sans text-gray-600 font-normal">Amortizaci├│n del Periodo (20%):</span>
+                  <span className="font-normal text-emerald-800">Q {amortizacionAnticipoEstePeriodo.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</span>
+                </div>
+
+                <div className="flex justify-between py-1 border-t border-gray-200 font-normal text-[#9B0F06] bg-red-50/50 px-1 rounded">
+                  <span className="font-sans">Saldo por Amortizar:</span>
+                  <span>Q {saldoAnticipoPorAmortizar.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</span>
+                </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-              {/* TABLA IZQUIERDA: PRESUPUESTO BASE / PRECIO TOTAL DE LA OFERTA */}
-              <div className="lg:col-span-5 rounded-lg border border-gray-300 bg-white shadow-xs overflow-hidden flex flex-col justify-between">
-                <div>
-                  <div className="bg-gray-100 px-3 py-2 border-b border-gray-300 font-bold text-gray-800 text-[10px] uppercase text-center tracking-wider">
-                    Presupuesto y Oferta Inicial del Contrato
-                  </div>
-                  <table className="w-full text-left text-[9.5px] border-collapse">
-                    <tbody>
-                      <tr className="border-b border-gray-200 hover:bg-gray-50">
-                        <td className="p-2 font-normal text-gray-700">COSTO DIRECTO TOTAL</td>
-                        <td className="p-2 text-right font-mono font-medium text-gray-900 border-l border-gray-200 w-32">
-                          Q {subtotalCostoDirectoContratadoGlobal.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
-                        </td>
-                      </tr>
-                      <tr className="border-b border-gray-200 hover:bg-gray-50">
-                        <td className="p-2 font-normal text-gray-700">45 % INDIRECTOS (GASTOS ADMIN + UTILIDAD)</td>
-                        <td className="p-2 text-right font-mono text-gray-800 border-l border-gray-200">
-                          Q {indirectos45ContratadoGlobal.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
-                        </td>
-                      </tr>
-                      <tr className="border-b border-gray-200 bg-gray-50/70 font-medium">
-                        <td className="p-2 text-gray-900">SUB-TOTAL (COSTO DIRECTO + INDIRECTOS)</td>
-                        <td className="p-2 text-right font-mono text-gray-900 border-l border-gray-200">
-                          Q {subtotalAntesIvaContratadoGlobal.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
-                        </td>
-                      </tr>
-                      <tr className="border-b border-gray-200 hover:bg-gray-50">
-                        <td className="p-2 font-normal text-gray-700">12 % IVA</td>
-                        <td className="p-2 text-right font-mono text-gray-800 border-l border-gray-200">
-                          Q {iva12ContratadoGlobal.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
-                        </td>
-                      </tr>
-                      <tr className="border-b border-gray-200 bg-gray-50/70 font-medium">
-                        <td className="p-2 text-gray-900">SUB-TOTAL (COSTO DIRECTO + INDIRECTOS + IVA)</td>
-                        <td className="p-2 text-right font-mono text-gray-900 border-l border-gray-200">
-                          Q {montoContractualOriginalTotal.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
-                        </td>
-                      </tr>
-                      <tr className="border-b border-gray-200 hover:bg-gray-50">
-                        <td className="p-2 font-normal text-gray-700">Estudio de Ingeniería de Detalle (diseño)</td>
-                        <td className="p-2 text-right font-mono text-gray-800 border-l border-gray-200">
-                          Q {montoDisenoGlobal.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
-                        </td>
-                      </tr>
-                      <tr className="border-b border-gray-300 hover:bg-gray-50">
-                        <td className="p-2 font-normal text-gray-700">RENGLÓN 110.11 Trabajos por Administración</td>
-                        <td className="p-2 text-right font-mono text-gray-800 border-l border-gray-200">
-                          Q {montoTrabajosAdminGlobal.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
-                        </td>
-                      </tr>
-                      <tr className="bg-red-50/90 font-bold border-t-2 border-[#9B0F06]">
-                        <td className="p-2 text-[#9B0F06] uppercase">PRECIO TOTAL DE LA OFERTA</td>
-                        <td className="p-2 text-right font-mono text-[#9B0F06] text-[10.5px] border-l border-red-200">
-                          Q {precioTotalOfertaGlobal.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-
-                <div className="bg-gray-50 p-2.5 border-t border-gray-200 text-[9px] text-gray-500 font-normal leading-tight">
-                  * Valores base contractuales originales del proyecto antes de órdenes de cambio o acuerdos suplementarios.
-                </div>
+            <div className="rounded-lg border border-gray-200 bg-gray-50/70 p-3 space-y-2">
+              <div className="flex items-center gap-1.5 border-b border-gray-200 pb-1.5">
+                <Calculator size={14} className="text-[#9B0F06]" />
+                <h4 className="text-[10px] font-medium uppercase text-gray-900">Totales Contractuales</h4>
               </div>
 
-              {/* TABLA DERECHA: DESGLOSE DE ESTIMACIÓN Y AMORTIZACIÓN (3 COLUMNAS) */}
-              <div className="lg:col-span-7 rounded-lg border border-gray-300 bg-white shadow-xs overflow-hidden flex flex-col justify-between">
-                <div>
-                  <div className="bg-gray-100 px-3 py-2 border-b border-gray-300 font-bold text-gray-800 text-[10px] uppercase text-center tracking-wider">
-                    Estado de Estimación y Amortización de Anticipo
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-[9.5px] border-collapse">
-                      <thead>
-                        <tr className="bg-gray-50 border-b border-gray-300 font-bold text-gray-700 text-[8.5px] uppercase">
-                          <th className="p-2 border-r border-gray-200">CONCEPTO FINANCIERO</th>
-                          <th className="p-2 text-right border-r border-gray-200 w-28">ESTA ESTIMACIÓN</th>
-                          <th className="p-2 text-right border-r border-gray-200 w-28">ACUMULADO ANTERIOR</th>
-                          <th className="p-2 text-right w-28">ACUMULADO TOTAL</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr className="border-b border-gray-200 hover:bg-gray-50">
-                          <td className="p-2 font-normal text-gray-800 border-r border-gray-200">VALOR DE ESTA ESTIMACIÓN</td>
-                          <td className="p-2 text-right font-mono text-gray-900 border-r border-gray-200">Q {subtotalCostoDirectoGlobalPeriodo.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</td>
-                          <td className="p-2 text-right font-mono text-gray-800 border-r border-gray-200">Q {subtotalCostoDirectoAcumuladoAnteriorGlobal.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</td>
-                          <td className="p-2 text-right font-mono font-medium text-gray-900">Q {subtotalCostoDirectoTotalGlobal.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</td>
-                        </tr>
-                        <tr className="border-b border-gray-200 hover:bg-gray-50">
-                          <td className="p-2 font-normal text-gray-800 border-r border-gray-200">45% INDIRECTOS (GASTOS ADMIN + UTILIDAD)</td>
-                          <td className="p-2 text-right font-mono text-gray-800 border-r border-gray-200">Q {indirectos45Global.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</td>
-                          <td className="p-2 text-right font-mono text-gray-800 border-r border-gray-200">Q {indirectos45AcumuladoAnteriorGlobal.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</td>
-                          <td className="p-2 text-right font-mono text-gray-900">Q {indirectos45TotalGlobal.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</td>
-                        </tr>
-                        <tr className="border-b border-gray-200 bg-gray-50/70 font-medium">
-                          <td className="p-2 text-gray-900 border-r border-gray-200">SUBTOTAL (COSTO DIRECTO + 45% INDIRECTOS)</td>
-                          <td className="p-2 text-right font-mono text-gray-900 border-r border-gray-200">Q {subtotalAntesIvaGlobal.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</td>
-                          <td className="p-2 text-right font-mono text-gray-900 border-r border-gray-200">Q {subtotalAntesIvaAcumuladoAnteriorGlobal.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</td>
-                          <td className="p-2 text-right font-mono text-gray-900">Q {subtotalAntesIvaTotalGlobal.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</td>
-                        </tr>
-                        <tr className="border-b border-gray-200 hover:bg-gray-50">
-                          <td className="p-2 font-normal text-gray-800 border-r border-gray-200">IVA (12%)</td>
-                          <td className="p-2 text-right font-mono text-gray-800 border-r border-gray-200">Q {iva12Global.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</td>
-                          <td className="p-2 text-right font-mono text-gray-800 border-r border-gray-200">Q {iva12AcumuladoAnteriorGlobal.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</td>
-                          <td className="p-2 text-right font-mono text-gray-900">Q {iva12TotalGlobal.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</td>
-                        </tr>
-                        <tr className="border-b border-gray-200 bg-gray-50/70 font-medium">
-                          <td className="p-2 text-gray-900 border-r border-gray-200">VALOR ESTA ESTIMACIÓN + 45% INDIRECTOS + IVA</td>
-                          <td className="p-2 text-right font-mono text-gray-900 border-r border-gray-200">Q {valorTotalEstimacionBrutoGlobal.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</td>
-                          <td className="p-2 text-right font-mono text-gray-900 border-r border-gray-200">Q {valorTotalAcumuladoAnteriorBrutoGlobal.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</td>
-                          <td className="p-2 text-right font-mono text-gray-900">Q {valorTotalAcumuladoTotalBrutoGlobal.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</td>
-                        </tr>
-                        <tr className="border-b border-gray-200 hover:bg-gray-50">
-                          <td className="p-2 font-normal text-gray-800 border-r border-gray-200">RENGLÓN 110.11 Trabajos por Administración</td>
-                          <td className="p-2 text-right font-mono text-gray-800 border-r border-gray-200">Q {adminEstePeriodo.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</td>
-                          <td className="p-2 text-right font-mono text-gray-800 border-r border-gray-200">Q {adminAcumuladoAnterior.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</td>
-                          <td className="p-2 text-right font-mono text-gray-900">Q {adminTotal.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</td>
-                        </tr>
-                        <tr className="border-b border-gray-300 hover:bg-gray-50">
-                          <td className="p-2 font-normal text-gray-800 border-r border-gray-200">Estudio de Ingeniería de Detalle (diseño)</td>
-                          <td className="p-2 text-right font-mono text-gray-800 border-r border-gray-200">Q {disenoEstePeriodo.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</td>
-                          <td className="p-2 text-right font-mono text-gray-800 border-r border-gray-200">Q {disenoAcumuladoAnterior.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</td>
-                          <td className="p-2 text-right font-mono text-gray-900">Q {disenoTotal.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</td>
-                        </tr>
-                        <tr className="bg-amber-50/80 font-bold border-t border-b border-amber-200">
-                          <td className="p-2 text-amber-950 border-r border-amber-200 flex items-center justify-between">
-                            <span>VALOR TOTAL DE LA ESTIMACIÓN</span>
-                          </td>
-                          <td className="p-2 text-right font-mono text-amber-950 border-r border-amber-200">Q {valorTotalEstimacionSumaEstePeriodo.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</td>
-                          <td className="p-2 text-right font-mono text-amber-950 border-r border-amber-200">Q {valorTotalEstimacionSumaAcumuladoAnterior.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</td>
-                          <td className="p-2 text-right font-mono text-amber-950 font-bold flex items-center justify-end gap-1.5">
-                            <span>Q {valorTotalEstimacionSumaAcumuladoTotal.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</span>
-                            <span className="text-[8.5px] bg-amber-200 text-amber-900 px-1 py-0.5 rounded">{pctAvanceGeneralAcumulado.toFixed(2)}%</span>
-                          </td>
-                        </tr>
-                        <tr className="border-b border-gray-200 hover:bg-gray-50 font-normal">
-                          <td className="p-2 text-gray-700 border-r border-gray-200 font-sans">(-) ANTICIPO AMORTIZADO 20%</td>
-                          <td className="p-2 text-right font-mono text-emerald-800 border-r border-gray-200">Q {amortizacionAnticipoEstePeriodo.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</td>
-                          <td className="p-2 text-right font-mono text-emerald-800 border-r border-gray-200">Q {amortizacionAnteriorAcumulada.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</td>
-                          <td className="p-2 text-right font-mono text-emerald-900 font-medium">Q {amortizacionTotalAcumulada.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</td>
-                        </tr>
-                        <tr className="bg-red-50/90 font-bold border-t-2 border-[#9B0F06]">
-                          <td className="p-2 text-[#9B0F06] uppercase border-r border-red-200">TOTAL A FAVOR DEL CONTRATISTA</td>
-                          <td className="p-2 text-right font-mono text-[#9B0F06] text-[10px] border-r border-red-200">Q {liquidoAPagarNetoContratista.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</td>
-                          <td className="p-2 text-right font-mono text-red-900 text-[10px] border-r border-red-200">Q {liquidoNetoAcumuladoAnterior.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</td>
-                          <td className="p-2 text-right font-mono text-[#9B0F06] text-[10.5px]">Q {liquidoNetoTotal.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
+              <div className="space-y-1 font-mono text-[9.5px]">
+                <div className="flex justify-between py-0.5">
+                  <span className="font-sans text-gray-600 font-normal">Costo Directo Contratado Total (D├ùF):</span>
+                  <span className="font-normal text-gray-900">Q {subtotalCostoDirectoContratadoGlobal.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</span>
                 </div>
 
-                <div className="bg-gray-50 p-2.5 border-t border-gray-200 flex items-center justify-between text-[9px] text-gray-500 font-normal">
-                  <span>* Amortización contractual del 20% deducida directamente en cada Estimación Mensual.</span>
-                  <span className="font-mono text-gray-700 font-medium">Saldo por Amortizar: Q {saldoAnticipoPorAmortizar.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</span>
+                <div className="flex justify-between py-0.5">
+                  <span className="font-sans text-gray-600 font-normal">(+) Indirectos 45% Contractuales:</span>
+                  <span className="font-normal text-gray-800">Q {indirectos45ContratadoGlobal.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</span>
+                </div>
+
+                <div className="flex justify-between py-0.5 border-b border-gray-200 pb-1">
+                  <span className="font-sans text-gray-600 font-normal">(+) IVA 12% Contractual:</span>
+                  <span className="font-normal text-gray-800">Q {iva12ContratadoGlobal.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</span>
+                </div>
+
+                <div className="flex justify-between py-1 font-bold text-[#9B0F06] bg-red-50/70 px-1 rounded">
+                  <span className="font-sans text-[8.5px] uppercase">Monto Contractual Original Total:</span>
+                  <span>Q {montoContractualOriginalTotal.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</span>
+                </div>
+
+                <div className="flex justify-between py-0.5 pt-1">
+                  <span className="font-sans text-gray-600 font-normal">Costo Directo Periodo (M):</span>
+                  <span className="font-normal text-gray-900">Q {subtotalCostoDirectoGlobalPeriodo.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</span>
+                </div>
+
+                <div className="flex justify-between py-1 border-t border-gray-200 font-normal text-[#9B0F06] bg-red-100/60 p-1.5 rounded items-center">
+                  <div className="flex items-center gap-1">
+                    <span className="font-sans text-[9px]">L├¡quido Neto a Favor Contratista Periodo:</span>
+                    <div className="relative group cursor-pointer inline-flex items-center">
+                      <Info size={13} className="text-[#9B0F06] hover:text-[#5E0006] transition-colors" />
+                      <div className="absolute left-1/2 bottom-full mb-1.5 -translate-x-1/2 hidden group-hover:block w-64 p-2 bg-gray-900 text-white text-[8.5px] font-sans font-normal rounded-md shadow-xl z-50 pointer-events-none leading-tight">
+                        <strong>F├│rmula DGC Oficial:</strong><br/>
+                        (Costo Directo Periodo ├ù 1.45 ├ù 1.12) ÔêÆ Amortizaci├│n del Periodo
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
+                      </div>
+                    </div>
+                  </div>
+                  <span>Q {liquidoAPagarNetoContratista.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-gray-200 bg-gray-50/70 p-3 space-y-2">
+              <div className="flex items-center gap-1.5 border-b border-gray-200 pb-1.5">
+                <Clock size={14} className="text-[#9B0F06]" />
+                <h4 className="text-[10px] font-medium uppercase text-gray-900">Indicadores de Tiempo</h4>
+              </div>
+
+              <div className="space-y-1.5 text-[9.5px]">
+                <div className="flex justify-between py-0.5">
+                  <span className="text-gray-600 font-normal">Fecha Inicio Contrato:</span>
+                  <span className="font-mono font-normal text-gray-900">{fechaInicioContrato}</span>
+                </div>
+
+                <div className="flex justify-between py-0.5">
+                  <span className="text-gray-600 font-normal">D├¡as Empleados:</span>
+                  <span className="font-mono font-normal text-gray-900">{diasEmpleadosCalculados} D├¡as</span>
+                </div>
+
+                <div className="flex justify-between py-0.5">
+                  <span className="text-gray-600 font-normal">D├¡as Suspendidos (Actas Formales):</span>
+                  <span className="font-mono font-normal text-orange-800">{diasSuspendidosSumados} D├¡as</span>
+                </div>
+
+                <div className="flex justify-between py-1 border-t border-gray-200 bg-blue-50/60 p-1.5 rounded text-blue-950 font-normal">
+                  <span>Finalizaci├│n Actualizada:</span>
+                  <span className="font-mono font-medium text-[#9B0F06]">{fechaFinalizacionActualizada}</span>
                 </div>
               </div>
             </div>
           </div>
-        )
-      })()}
+        </div>
+      )}
 
-      {/* REQUERIMIENTO: PANEL "DETALLE DEL RENGLÓN" (BOTÓN VER / OJO)
-          - ALINEADO AL PATRÓN DE USUARIOS (TARJETAS BG-GRAY-50/BORDER-GRAY-200)
+      {/* REQUERIMIENTO: PANEL "DETALLE DEL RENGL├ôN" (BOT├ôN VER / OJO)
+          - ALINEADO AL PATR├ôN DE USUARIOS (TARJETAS BG-GRAY-50/BORDER-GRAY-200)
           - DENSIDAD COMPACTA Y FUENTE POPPINS SIN NEAGRILLA EN VALORES
           - MOSTRAR TODAS LAS COLUMNAS DEL MOTOR FINANCIERO A-P CON VALORES EXACTOS EN GRID 2 COLUMNAS POR BLOQUES:
-            Identificación -> Cantidades y Avance -> Financiero -> Desglose Mensual
+            Identificaci├│n -> Cantidades y Avance -> Financiero -> Desglose Mensual
       */}
       {drawerModo === 'ver' && renglonSeleccionado && (
         <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs font-[Poppins]">
@@ -2981,7 +2567,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                 <Eye size={15} className="text-[#9B0F06]" />
                 <div>
                   <h3 className="text-[10.5px] font-medium text-gray-900 uppercase">
-                    DETALLE DEL RENGLÓN [{renglonSeleccionado.codigoDGC}]
+                    DETALLE DEL RENGL├ôN [{renglonSeleccionado.codigoDGC}]
                   </h3>
                   <p className="text-[8.5px] text-gray-500 font-normal">Solo lectura</p>
                 </div>
@@ -2998,20 +2584,20 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
 
             {/* Cuerpo del Panel agrupado en bloques en Grid 2 columnas (A-P) */}
             <div className="flex-1 overflow-y-auto p-3 space-y-2.5 text-[9.5px]">
-              {/* BLOQUE 1: Identificación */}
+              {/* BLOQUE 1: Identificaci├│n */}
               <div>
                 <p className="text-[8px] text-gray-400 uppercase tracking-widest font-medium mb-1.5 border-b border-gray-100 pb-1">
-                  Identificación del Renglón
+                  Identificaci├│n del Rengl├│n
                 </p>
 
                 <div className="space-y-1.5">
                   <div className="rounded-lg bg-gray-50 p-2 border border-gray-200">
-                    <span className="text-[7.5px] font-medium text-gray-600 block">Código DGC (A)</span>
+                    <span className="text-[7.5px] font-medium text-gray-600 block">C├│digo DGC (A)</span>
                     <p className="font-mono text-[10px] font-bold text-gray-900 mt-0.5">{renglonSeleccionado.codigoDGC}</p>
                   </div>
 
                   <div className="rounded-lg bg-gray-50 p-2 border border-gray-200">
-                    <span className="text-[7.5px] font-medium text-gray-600 block">Descripción Completa (B)</span>
+                    <span className="text-[7.5px] font-medium text-gray-600 block">Descripci├│n Completa (B)</span>
                     <p className="font-normal text-gray-800 leading-tight mt-0.5">{renglonSeleccionado.descripcion}</p>
                   </div>
 
@@ -3021,13 +2607,13 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                       <p className="font-normal text-gray-800">{renglonSeleccionado.unidad}</p>
                     </div>
                     <div className="rounded-lg bg-gray-50 p-2 border border-gray-200">
-                      <span className="text-[7.5px] font-medium text-gray-600 block">Tipo Renglón</span>
+                      <span className="text-[7.5px] font-medium text-gray-600 block">Tipo Rengl├│n</span>
                       <p className="font-normal text-gray-800">{renglonSeleccionado.tipoRenglon || 'Original'}</p>
                     </div>
                   </div>
 
                   <div className="rounded-lg bg-gray-50 p-2 border border-gray-200">
-                    <span className="text-[7.5px] font-medium text-gray-600 block">Capítulo Pertenece</span>
+                    <span className="text-[7.5px] font-medium text-gray-600 block">Cap├¡tulo Pertenece</span>
                     <p className="font-normal text-[#9B0F06] leading-tight">{renglonSeleccionado.capituloNombre}</p>
                   </div>
                 </div>
@@ -3036,7 +2622,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
               {/* BLOQUE 2: Cantidades y Avance (D-L) */}
               <div>
                 <p className="text-[8px] text-gray-400 uppercase tracking-widest font-medium mb-1.5 border-b border-gray-100 pb-1">
-                  Cantidades y Avance Físico (D-L)
+                  Cantidades y Avance F├¡sico (D-L)
                 </p>
 
                 <div className="grid grid-cols-2 gap-1.5">
@@ -3094,12 +2680,12 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                 <div className="space-y-1.5">
                   <div className="grid grid-cols-2 gap-1.5">
                     <div className="rounded-lg bg-gray-50 p-2 border border-gray-200">
-                      <span className="text-[7.5px] font-medium text-gray-600 block">Costo Directo Renglón (G=D×F)</span>
+                      <span className="text-[7.5px] font-medium text-gray-600 block">Costo Directo Rengl├│n (G=D├ùF)</span>
                       <p className="font-mono font-normal text-gray-900">Q {(renglonSeleccionado.cantidadContratada * renglonSeleccionado.costoUnitarioDirecto).toLocaleString('es-GT', { minimumFractionDigits: 2 })}</p>
                     </div>
 
                     <div className="rounded-lg bg-gray-50 p-2 border border-gray-200">
-                      <span className="text-[7.5px] font-medium text-gray-600 block">Costo Directo Ajustado (H=E×F)</span>
+                      <span className="text-[7.5px] font-medium text-gray-600 block">Costo Directo Ajustado (H=E├ùF)</span>
                       <p className="font-mono font-normal text-gray-900">
                         Q {(renglonSeleccionado.cantidadAjustada * renglonSeleccionado.costoUnitarioDirecto).toLocaleString('es-GT', { minimumFractionDigits: 2 })}
                       </p>
@@ -3108,7 +2694,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
 
                   <div className="grid grid-cols-2 gap-1.5">
                     <div className="rounded-lg bg-gray-50 p-2 border border-gray-200">
-                      <span className="text-[7.5px] font-medium text-gray-600 block">Este Periodo Costo (M=I×F)</span>
+                      <span className="text-[7.5px] font-medium text-gray-600 block">Este Periodo Costo (M=I├ùF)</span>
                       <p className="font-mono font-normal text-gray-900">
                         Q {(renglonSeleccionado.cantidadEstePeriodo * renglonSeleccionado.costoUnitarioDirecto).toLocaleString('es-GT', { minimumFractionDigits: 2 })}
                       </p>
@@ -3143,7 +2729,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                   </div>
 
                   <div className="rounded-lg bg-red-50/50 p-2 border border-red-200">
-                    <span className="text-[7.5px] font-medium text-[#9B0F06] block">Saldo por Ejecutar (H−O)</span>
+                    <span className="text-[7.5px] font-medium text-[#9B0F06] block">Saldo por Ejecutar (HÔêÆO)</span>
                     <p className="font-mono font-normal text-[#9B0F06] text-[10px]">
                       Q {(Math.max(0, (renglonSeleccionado.cantidadAjustada - (renglonSeleccionado.cantidadEstePeriodo + renglonSeleccionado.cantidadAcumuladaAnterior)) * renglonSeleccionado.costoUnitarioDirecto)).toLocaleString('es-GT', { minimumFractionDigits: 2 })}
                     </p>
@@ -3151,7 +2737,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                 </div>
               </div>
 
-              {/* BLOQUE 4: Desglose Mensual Dinámico */}
+              {/* BLOQUE 4: Desglose Mensual Din├ímico */}
               <div>
                 <p className="text-[8px] text-gray-400 uppercase tracking-widest font-medium mb-1.5 border-b border-gray-100 pb-1">
                   Desglose Mensual Exacto
@@ -3175,10 +2761,10 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                           <tr key={mes}>
                             <td className="p-1.5 font-sans font-normal">{mes}</td>
                             <td className="p-1.5 text-right font-normal">
-                              {cantMes > 0 ? `${cantMes.toLocaleString('es-GT', { minimumFractionDigits: 1 })} ${renglonSeleccionado.unidad}` : '—'}
+                              {cantMes > 0 ? `${cantMes.toLocaleString('es-GT', { minimumFractionDigits: 1 })} ${renglonSeleccionado.unidad}` : 'ÔÇö'}
                             </td>
                             <td className="p-1.5 text-right font-normal">
-                              {montoMes > 0 ? `Q ${montoMes.toLocaleString('es-GT', { minimumFractionDigits: 2 })}` : '—'}
+                              {montoMes > 0 ? `Q ${montoMes.toLocaleString('es-GT', { minimumFractionDigits: 2 })}` : 'ÔÇö'}
                             </td>
                           </tr>
                         )
@@ -3203,12 +2789,12 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
         </div>
       )}
 
-      {/* REQUERIMIENTO FORMULARIO "AGREGAR NUEVO RENGLÓN":
-          - ALINEADO EXACTAMENTE AL PATRÓN DE USUARIOS (CREAR/EDITAR USUARIO)
+      {/* REQUERIMIENTO FORMULARIO "AGREGAR NUEVO RENGL├ôN":
+          - ALINEADO EXACTAMENTE AL PATR├ôN DE USUARIOS (CREAR/EDITAR USUARIO)
           - FUENTE POPPINS, DENSIDAD COMPACTA
           - LABELS EN BOLD CON ASTERISCO ROJO (*), VALORES SIN BOLD
-          - CAMPOS NUMÉRICOS SOLO DÍGITOS
-          - BORDES ROJOS Y INSTANCIA REAL TOAST SI FALLA VALIDACIÓN
+          - CAMPOS NUM├ëRICOS SOLO D├ìGITOS
+          - BORDES ROJOS Y INSTANCIA REAL TOAST SI FALLA VALIDACI├ôN
           - BOTONES ABAJO A LA DERECHA
       */}
       {drawerModo === 'crear' && (
@@ -3218,7 +2804,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
               <div className="flex items-center gap-1.5">
                 <Plus size={15} className="text-[#9B0F06]" />
                 <div>
-                  <h3 className="text-[11px] font-bold uppercase text-gray-900">Agregar Nuevo Renglón</h3>
+                  <h3 className="text-[11px] font-bold uppercase text-gray-900">Agregar Nuevo Rengl├│n</h3>
                   <p className="text-[8.5px] text-gray-500 font-normal">Complete los datos obligatorios (*)</p>
                 </div>
               </div>
@@ -3233,16 +2819,16 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
             </div>
 
             <div className="flex-1 overflow-y-auto p-3 space-y-3 text-[10px]">
-              {/* Bloque Identificación */}
+              {/* Bloque Identificaci├│n */}
               <div>
                 <p className="text-[8.5px] text-gray-400 uppercase tracking-widest font-semibold mb-2 border-b border-gray-100 pb-1">
-                  1. Identificación y Descripción
+                  1. Identificaci├│n y Descripci├│n
                 </p>
 
                 <div className="space-y-2">
                   <div>
                     <label className="text-[10px] font-semibold text-gray-700 mb-0.5 block">
-                      Código DGC <span className="text-[#FF4D4F]">*</span>
+                      C├│digo DGC <span className="text-[#FF4D4F]">*</span>
                     </label>
                     <input
                       type="text"
@@ -3260,7 +2846,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
 
                   <div>
                     <label className="text-[10px] font-semibold text-gray-700 mb-0.5 block">
-                      Descripción del Renglón <span className="text-[#FF4D4F]">*</span>
+                      Descripci├│n del Rengl├│n <span className="text-[#FF4D4F]">*</span>
                     </label>
                     <textarea
                       rows={2}
@@ -3269,7 +2855,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                         setFormDescripcion(e.target.value)
                         if (errorsForm.descripcion) setErrorsForm({ ...errorsForm, descripcion: false })
                       }}
-                      placeholder="Ej: Pavimento de concreto hidráulico MR=45 e=20cm"
+                      placeholder="Ej: Pavimento de concreto hidr├íulico MR=45 e=20cm"
                       className={`w-full border rounded-lg px-2.5 py-1.5 text-[10px] font-normal text-gray-700 focus:outline-none transition-colors ${
                         errorsForm.descripcion ? 'border-[#FF4D4F] bg-red-50/20' : 'border-gray-200 focus:border-[#9B0F06]'
                       }`}
@@ -3278,16 +2864,16 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                 </div>
               </div>
 
-              {/* Bloque Clasificación */}
+              {/* Bloque Clasificaci├│n */}
               <div>
                 <p className="text-[8.5px] text-gray-400 uppercase tracking-widest font-semibold mb-2 border-b border-gray-100 pb-1">
-                  2. Clasificación y Capítulo
+                  2. Clasificaci├│n y Cap├¡tulo
                 </p>
 
                 <div className="space-y-2">
                   <div>
                     <label className="text-[10px] font-semibold text-gray-700 mb-0.5 block">
-                      Capítulo del Libro Azul <span className="text-[#FF4D4F]">*</span>
+                      Cap├¡tulo del Libro Azul <span className="text-[#FF4D4F]">*</span>
                     </label>
                     <select
                       value={formCapituloId}
@@ -3312,8 +2898,8 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                         onChange={(e) => setFormUnidad(e.target.value)}
                         className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-[10px] font-normal text-gray-700 bg-white focus:outline-none focus:border-[#9B0F06]"
                       >
-                        <option value="m²">m²</option>
-                        <option value="m³">m³</option>
+                        <option value="m┬▓">m┬▓</option>
+                        <option value="m┬│">m┬│</option>
                         <option value="ml">ml</option>
                         <option value="U">U</option>
                         <option value="Glb">Glb</option>
@@ -3341,10 +2927,10 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                 </div>
               </div>
 
-              {/* Bloque Valores Numéricos */}
+              {/* Bloque Valores Num├®ricos */}
               <div>
                 <p className="text-[8.5px] text-gray-400 uppercase tracking-widest font-semibold mb-2 border-b border-gray-100 pb-1">
-                  3. Valores Numéricos y Costos
+                  3. Valores Num├®ricos y Costos
                 </p>
 
                 <div className="space-y-2">
@@ -3405,7 +2991,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
               </div>
             </div>
 
-            {/* Footer Botones Abajo a la Derecha (Patrón Usuarios) */}
+            {/* Footer Botones Abajo a la Derecha (Patr├│n Usuarios) */}
             <div className="border-t border-gray-200 p-2.5 bg-gray-50 flex items-center justify-end gap-2">
               <button
                 type="button"
@@ -3421,7 +3007,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                 className="inline-flex items-center gap-1 rounded-lg bg-[#9B0F06] px-3.5 py-1.5 text-[10px] font-medium text-white hover:bg-[#5E0006] transition-colors shadow-2xs cursor-pointer"
               >
                 <Save size={12} />
-                <span>Guardar Renglón</span>
+                <span>Guardar Rengl├│n</span>
               </button>
             </div>
           </div>
@@ -3436,7 +3022,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
               <div className="flex items-center gap-1.5">
                 <CalendarClock size={16} className="text-[#9B0F06]" />
                 <div>
-                  <h3 className="text-xs font-bold uppercase text-gray-900">Modificar Plazo de Ejecución</h3>
+                  <h3 className="text-xs font-bold uppercase text-gray-900">Modificar Plazo de Ejecuci├│n</h3>
                   <p className="text-[9px] text-gray-500 font-normal">Registro oficial de cambios de cronograma</p>
                 </div>
               </div>
@@ -3453,7 +3039,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
             <div className="p-3.5 space-y-3 text-[10px]">
               <div>
                 <label className="text-[10px] font-semibold text-gray-700 mb-0.5 block">
-                  Nueva Fecha de Finalización <span className="text-[#FF4D4F]">*</span>
+                  Nueva Fecha de Finalizaci├│n <span className="text-[#FF4D4F]">*</span>
                 </label>
                 <input
                   type="date"
@@ -3470,14 +3056,14 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
 
               <div>
                 <label className="text-[10px] font-semibold text-gray-700 mb-0.5 block">
-                  Motivo de Modificación <span className="text-[#FF4D4F]">*</span>
+                  Motivo de Modificaci├│n <span className="text-[#FF4D4F]">*</span>
                 </label>
                 <select
                   value={formMotivoPlazo}
                   onChange={(e) => setFormMotivoPlazo(e.target.value as any)}
                   className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-[10px] font-normal text-gray-800 bg-white focus:outline-none focus:border-[#9B0F06]"
                 >
-                  <option value="ampliacion">Ampliación de plazo contractual</option>
+                  <option value="ampliacion">Ampliaci├│n de plazo contractual</option>
                   <option value="retraso">Retraso por caso fortuito / clima</option>
                   <option value="orden_cambio">Orden de cambio / Obra extra</option>
                 </select>
@@ -3485,7 +3071,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
 
               <div>
                 <label className="text-[10px] font-semibold text-gray-700 mb-0.5 block">
-                  Días de Suspensión / Ampliación <span className="text-[#FF4D4F]">*</span>
+                  D├¡as de Suspensi├│n / Ampliaci├│n <span className="text-[#FF4D4F]">*</span>
                 </label>
                 <input
                   type="text"
@@ -3538,7 +3124,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
         </div>
       )}
 
-      {/* MODAL DE CONFIRMACIÓN PARA ELIMINAR */}
+      {/* MODAL DE CONFIRMACI├ôN PARA ELIMINAR */}
       {modalEliminarOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs font-[Poppins]">
           <div className="w-full max-w-sm rounded-xl bg-white p-4 shadow-2xl space-y-3 border border-gray-200">
@@ -3547,8 +3133,8 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                 <Trash2 size={16} />
               </div>
               <div>
-                <h3 className="text-xs font-semibold text-gray-900">¿Eliminar Renglón?</h3>
-                <p className="text-[10px] text-gray-500 font-normal">Esta acción no se puede deshacer.</p>
+                <h3 className="text-xs font-semibold text-gray-900">┬┐Eliminar Rengl├│n?</h3>
+                <p className="text-[10px] text-gray-500 font-normal">Esta acci├│n no se puede deshacer.</p>
               </div>
             </div>
 
@@ -3578,7 +3164,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
           </div>
         </div>
       )}
-      {/* MODAL PRINCIPAL: GESTIÓN DE RENGLONES, UNIDADES DE MEDIDA Y CAPÍTULOS SÁBANA */}
+      {/* MODAL PRINCIPAL: GESTI├ôN DE RENGLONES, UNIDADES DE MEDIDA Y CAP├ìTULOS S├üBANA */}
       {modalGestionRenglonesOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs font-[Poppins]">
           <div className="w-full max-w-5xl rounded-2xl bg-white shadow-2xl border border-gray-200 overflow-hidden flex flex-col max-h-[90vh]">
@@ -3589,8 +3175,8 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                   <Layers size={18} />
                 </div>
                 <div>
-                  <h2 className="text-xs font-bold tracking-wide">Gestión del Catálogo de Renglones y Estructura Sábana</h2>
-                  <p className="text-[10px] text-gray-300 font-normal">Administración centralizada de renglones, unidades de medida y capítulos del Libro Azul</p>
+                  <h2 className="text-xs font-bold tracking-wide">Gesti├│n del Cat├ílogo de Renglones y Estructura S├íbana</h2>
+                  <p className="text-[10px] text-gray-300 font-normal">Administraci├│n centralizada de renglones, unidades de medida y cap├¡tulos del Libro Azul</p>
                 </div>
               </div>
               <button
@@ -3602,7 +3188,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
               </button>
             </div>
 
-            {/* Navegación por Pestañas del Modal */}
+            {/* Navegaci├│n por Pesta├▒as del Modal */}
             <div className="border-b border-gray-200 bg-gray-50 px-5 pt-2 flex items-center justify-between gap-4">
               <div className="flex items-center gap-2">
                 <button
@@ -3639,11 +3225,11 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                   }`}
                 >
                   <Layers size={13} />
-                  <span>Capítulos Sábana ({capitulosLista.length})</span>
+                  <span>Cap├¡tulos S├íbana ({capitulosLista.length})</span>
                 </button>
               </div>
 
-              {/* Botones de Acción Crear según Tab */}
+              {/* Botones de Acci├│n Crear seg├║n Tab */}
               <div className="pb-1.5">
                 {subTabGestion === 'renglones' && (
                   <button
@@ -3655,7 +3241,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                     className="inline-flex items-center gap-1 rounded-lg bg-[#9B0F06] px-3 py-1.5 text-[10px] font-medium text-white hover:bg-[#5E0006] transition-colors cursor-pointer shadow-2xs"
                   >
                     <Plus size={12} />
-                    <span>Nuevo Renglón</span>
+                    <span>Nuevo Rengl├│n</span>
                   </button>
                 )}
                 {subTabGestion === 'unidades' && (
@@ -3681,15 +3267,15 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                     className="inline-flex items-center gap-1 rounded-lg bg-[#9B0F06] px-3 py-1.5 text-[10px] font-medium text-white hover:bg-[#5E0006] transition-colors cursor-pointer shadow-2xs"
                   >
                     <Plus size={12} />
-                    <span>Nuevo Capítulo</span>
+                    <span>Nuevo Cap├¡tulo</span>
                   </button>
                 )}
               </div>
             </div>
 
-            {/* Contenido Dinámico por Pestaña */}
+            {/* Contenido Din├ímico por Pesta├▒a */}
             <div className="p-4 overflow-y-auto flex-1 bg-gray-50/50">
-              {/* PESTAÑA 1: RENGLONES */}
+              {/* PESTA├æA 1: RENGLONES */}
               {subTabGestion === 'renglones' && (
                 <div className="space-y-3 font-[Poppins]">
                   <div className="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-2xs">
@@ -3697,31 +3283,43 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                       <table className="w-full text-left text-[11px] border-collapse">
                         <thead className="sticky top-0 z-10 bg-gray-100 text-gray-700 font-semibold uppercase text-[9px] tracking-wider border-b border-gray-200">
                           <tr>
-                            <th className="px-3 py-2">Código DGC</th>
-                            <th className="px-3 py-2">Descripción del Renglón</th>
-                            <th className="px-3 py-2">Capítulo</th>
+                            <th className="px-3 py-2">C├│digo DGC</th>
+                            <th className="px-3 py-2">Descripci├│n del Rengl├│n</th>
+                            <th className="px-3 py-2">Cap├¡tulo</th>
                             <th className="px-3 py-2 text-center">Unidad</th>
                             <th className="px-3 py-2 text-right">Costo Unit. (Q)</th>
                             <th className="px-3 py-2 text-center">Estado</th>
                             <th className="px-3 py-2 text-center">Acciones</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-200 text-gray-700">
+                        <tbody className="divide-y divide-gray-200">
                           {renglones.map((r) => (
                             <tr key={r.id} className="hover:bg-gray-50/80 transition-colors">
-                              <td className="px-3 py-2 font-mono text-gray-800">{r.codigoDGC}</td>
-                              <td className="px-3 py-2 text-gray-800 max-w-xs truncate" title={r.descripcion}>
+                              <td className="px-3 py-2 font-mono font-bold text-[#9B0F06]">{r.codigoDGC}</td>
+                              <td className="px-3 py-2 text-gray-800 font-medium max-w-xs truncate" title={r.descripcion}>
                                 {r.descripcion}
                               </td>
                               <td className="px-3 py-2 text-gray-600 truncate max-w-[180px]">{r.capituloNombre}</td>
-                              <td className="px-3 py-2 text-center text-gray-700 font-mono">
-                                {r.unidad}
+                              <td className="px-3 py-2 text-center">
+                                <span className="inline-block rounded bg-gray-100 px-1.5 py-0.5 font-mono text-[9.5px] text-gray-700 font-semibold border border-gray-200">
+                                  {r.unidad}
+                                </span>
                               </td>
-                              <td className="px-3 py-2 text-right font-mono text-gray-800">
+                              <td className="px-3 py-2 text-right font-mono font-semibold text-gray-900">
                                 Q {r.costoUnitarioDirecto.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
                               </td>
-                              <td className="px-3 py-2 text-center text-gray-700 text-[10px]">
-                                {r.estadoEjecucion}
+                              <td className="px-3 py-2 text-center">
+                                <span
+                                  className={`inline-block rounded-full px-2 py-0.5 text-[9px] font-semibold ${
+                                    r.estadoEjecucion === 'Completado'
+                                      ? 'bg-green-100 text-green-800'
+                                      : r.estadoEjecucion === 'En proceso'
+                                      ? 'bg-blue-100 text-blue-800'
+                                      : 'bg-gray-100 text-gray-700'
+                                  }`}
+                                >
+                                  {r.estadoEjecucion}
+                                </span>
                               </td>
                               <td className="px-3 py-2 text-center">
                                 <div className="flex items-center justify-center gap-1">
@@ -3731,7 +3329,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                                       setModalGestionRenglonesOpen(false)
                                       handleAbrirVer(r)
                                     }}
-                                    className="p-1 text-gray-500 hover:text-blue-600 hover:bg-gray-100 rounded transition-colors"
+                                    className="p-1 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
                                     title="Ver detalle"
                                   >
                                     <Eye size={13} />
@@ -3739,8 +3337,8 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                                   <button
                                     type="button"
                                     onClick={() => handleAbrirEliminar(r)}
-                                    className="p-1 text-gray-500 hover:text-red-600 hover:bg-gray-100 rounded transition-colors"
-                                    title="Eliminar renglón"
+                                    className="p-1 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                    title="Eliminar rengl├│n"
                                   >
                                     <Trash2 size={13} />
                                   </button>
@@ -3755,7 +3353,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                 </div>
               )}
 
-              {/* PESTAÑA 2: UNIDADES DE MEDIDA */}
+              {/* PESTA├æA 2: UNIDADES DE MEDIDA */}
               {subTabGestion === 'unidades' && (
                 <div className="space-y-3 font-[Poppins]">
                   <div className="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-2xs">
@@ -3763,25 +3361,29 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                       <table className="w-full text-left text-[11px] border-collapse">
                         <thead className="sticky top-0 z-10 bg-gray-100 text-gray-700 font-semibold uppercase text-[9px] tracking-wider border-b border-gray-200">
                           <tr>
-                            <th className="px-3 py-2 text-center">Símbolo</th>
+                            <th className="px-3 py-2 text-center">S├¡mbolo</th>
                             <th className="px-3 py-2">Nombre Completo</th>
-                            <th className="px-3 py-2">Descripción de Aplicación</th>
+                            <th className="px-3 py-2">Descripci├│n de Aplicaci├│n</th>
                             <th className="px-3 py-2 text-center">Renglones Asociados</th>
                             <th className="px-3 py-2 text-center">Acciones</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-200 text-gray-700">
+                        <tbody className="divide-y divide-gray-200">
                           {unidadesLista.map((u) => {
                             const cantidadRenglonesUso = renglones.filter((r) => r.unidad.toLowerCase() === u.simbolo.toLowerCase()).length
                             return (
                               <tr key={u.id} className="hover:bg-gray-50/80 transition-colors">
-                                <td className="px-3 py-2 text-center font-mono text-gray-800">
-                                  {u.simbolo}
+                                <td className="px-3 py-2 text-center">
+                                  <span className="inline-block rounded-md bg-[#9B0F06]/10 px-2 py-0.5 font-mono text-[11px] font-bold text-[#9B0F06] border border-[#9B0F06]/20">
+                                    {u.simbolo}
+                                  </span>
                                 </td>
-                                <td className="px-3 py-2 text-gray-800">{u.nombre}</td>
-                                <td className="px-3 py-2 text-gray-600 text-[10.5px]">{u.descripcion || 'Sin descripción'}</td>
-                                <td className="px-3 py-2 text-center text-gray-600">
-                                  {cantidadRenglonesUso} renglones
+                                <td className="px-3 py-2 font-semibold text-gray-900">{u.nombre}</td>
+                                <td className="px-3 py-2 text-gray-600 text-[10.5px]">{u.descripcion || 'Sin descripci├│n'}</td>
+                                <td className="px-3 py-2 text-center">
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-0.5 text-[9.5px] font-medium text-blue-700 border border-blue-200">
+                                    {cantidadRenglonesUso} renglones
+                                  </span>
                                 </td>
                                 <td className="px-3 py-2 text-center">
                                   <div className="flex items-center justify-center gap-1">
@@ -3791,7 +3393,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                                         setUnidadForm({ id: u.id, simbolo: u.simbolo, nombre: u.nombre, descripcion: u.descripcion })
                                         setModalUnidadFormOpen(true)
                                       }}
-                                      className="p-1 text-gray-500 hover:text-blue-600 hover:bg-gray-100 rounded transition-colors"
+                                      className="p-1 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
                                       title="Editar unidad"
                                     >
                                       <Edit2 size={13} />
@@ -3799,7 +3401,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                                     <button
                                       type="button"
                                       onClick={() => setUnidadAEliminar({ id: u.id, simbolo: u.simbolo })}
-                                      className="p-1 text-gray-500 hover:text-red-600 hover:bg-gray-100 rounded transition-colors"
+                                      className="p-1 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
                                       title="Eliminar unidad"
                                     >
                                       <Trash2 size={13} />
@@ -3816,7 +3418,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                 </div>
               )}
 
-              {/* PESTAÑA 3: CAPÍTULOS SÁBANA (CON MAPPING DE RENGLONES ACTUALMENTE EN ÉL) */}
+              {/* PESTA├æA 3: CAP├ìTULOS S├üBANA (CON MAPPING DE RENGLONES ACTUALMENTE EN ├ëL) */}
               {subTabGestion === 'capitulos' && (
                 <div className="space-y-3 font-[Poppins]">
                   <div className="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-2xs">
@@ -3824,31 +3426,31 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                       <table className="w-full text-left text-[11px] border-collapse">
                         <thead className="sticky top-0 z-10 bg-gray-100 text-gray-700 font-semibold uppercase text-[9px] tracking-wider border-b border-gray-200">
                           <tr>
-                            <th className="px-3 py-2 text-center w-16">N°</th>
-                            <th className="px-3 py-2">Nombre del Capítulo</th>
-                            <th className="px-3 py-2">Renglones Actualmente en este Capítulo</th>
+                            <th className="px-3 py-2 text-center w-16">N┬░</th>
+                            <th className="px-3 py-2">Nombre del Cap├¡tulo</th>
+                            <th className="px-3 py-2">Renglones Actualmente en este Cap├¡tulo</th>
                             <th className="px-3 py-2 text-center w-24">Acciones</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-200 text-gray-700">
+                        <tbody className="divide-y divide-gray-200">
                           {capitulosLista.map((c) => {
                             const renglonesEnCapitulo = renglones.filter((r) => (r as any).capituloId === c.id)
                             return (
                               <tr key={c.id} className="hover:bg-gray-50/80 transition-colors">
-                                <td className="px-3 py-2 text-center font-mono text-gray-800">Cap. {c.id}</td>
-                                <td className="px-3 py-2 text-gray-800 max-w-xs">{c.nombre}</td>
-                                <td className="px-3 py-2 text-gray-700">
+                                <td className="px-3 py-2 text-center font-mono font-bold text-[#9B0F06]">Cap. {c.id}</td>
+                                <td className="px-3 py-2 font-semibold text-gray-900 max-w-xs">{c.nombre}</td>
+                                <td className="px-3 py-2">
                                   {renglonesEnCapitulo.length === 0 ? (
                                     <span className="text-[10px] text-gray-400 italic">No hay renglones asignados</span>
                                   ) : (
                                     <div className="flex flex-wrap items-center gap-1 max-h-20 overflow-y-auto pr-1">
-                                      <span className="text-[9px] text-gray-600">
-                                        Total: {renglonesEnCapitulo.length} |
+                                      <span className="text-[9px] font-bold text-gray-600 bg-gray-100 rounded px-1.5 py-0.5 border border-gray-200">
+                                        Total: {renglonesEnCapitulo.length}
                                       </span>
                                       {renglonesEnCapitulo.map((r) => (
                                         <span
                                           key={r.id}
-                                          className="inline-block font-mono text-[9px] text-gray-700"
+                                          className="inline-block rounded bg-red-50 px-1.5 py-0.5 font-mono text-[9px] font-semibold text-[#9B0F06] border border-red-200"
                                           title={r.descripcion}
                                         >
                                           {r.codigoDGC}
@@ -3866,7 +3468,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                                         setModalCapituloFormOpen(true)
                                       }}
                                       className="p-1 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                                      title="Editar capítulo"
+                                      title="Editar cap├¡tulo"
                                     >
                                       <Edit2 size={13} />
                                     </button>
@@ -3874,7 +3476,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                                       type="button"
                                       onClick={() => setCapituloAEliminar({ id: c.id, nombre: c.nombre })}
                                       className="p-1 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                                      title="Eliminar capítulo"
+                                      title="Eliminar cap├¡tulo"
                                     >
                                       <Trash2 size={13} />
                                     </button>
@@ -3893,7 +3495,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
 
             {/* Footer Modal Principal */}
             <div className="border-t border-gray-200 bg-gray-50 px-5 py-2.5 flex items-center justify-between text-xs text-gray-500">
-              <span>Gestión de Catálogos de Construcción Vial</span>
+              <span>Gesti├│n de Cat├ílogos de Construcci├│n Vial</span>
               <button
                 type="button"
                 onClick={() => setModalGestionRenglonesOpen(false)}
@@ -3922,12 +3524,12 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
 
             <div className="space-y-2">
               <div>
-                <label className="text-[10px] font-semibold text-gray-700 mb-0.5 block">Símbolo / Abreviatura *</label>
+                <label className="text-[10px] font-semibold text-gray-700 mb-0.5 block">S├¡mbolo / Abreviatura *</label>
                 <input
                   type="text"
                   value={unidadForm.simbolo}
                   onChange={(e) => setUnidadForm({ ...unidadForm, simbolo: e.target.value })}
-                  placeholder="Ej: m³, Glb, ton"
+                  placeholder="Ej: m┬│, Glb, ton"
                   className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-gray-800 focus:outline-none focus:border-[#9B0F06]"
                 />
               </div>
@@ -3938,18 +3540,18 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                   type="text"
                   value={unidadForm.nombre}
                   onChange={(e) => setUnidadForm({ ...unidadForm, nombre: e.target.value })}
-                  placeholder="Ej: Metro Cúbico"
+                  placeholder="Ej: Metro C├║bico"
                   className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-800 focus:outline-none focus:border-[#9B0F06]"
                 />
               </div>
 
               <div>
-                <label className="text-[10px] font-semibold text-gray-700 mb-0.5 block">Descripción de Aplicación</label>
+                <label className="text-[10px] font-semibold text-gray-700 mb-0.5 block">Descripci├│n de Aplicaci├│n</label>
                 <textarea
                   rows={2}
                   value={unidadForm.descripcion}
                   onChange={(e) => setUnidadForm({ ...unidadForm, descripcion: e.target.value })}
-                  placeholder="Ej: Utilizada para cálculo de volumen en excavaciones"
+                  placeholder="Ej: Utilizada para c├ílculo de volumen en excavaciones"
                   className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-800 focus:outline-none focus:border-[#9B0F06]"
                 />
               </div>
@@ -3975,16 +3577,16 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
         </div>
       )}
 
-      {/* CONFIRMACIÓN ELIMINAR UNIDAD */}
+      {/* CONFIRMACI├ôN ELIMINAR UNIDAD */}
       {unidadAEliminar && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs font-[Poppins]">
           <div className="w-full max-w-sm rounded-xl bg-white p-4 shadow-2xl space-y-3 border border-gray-200">
             <div className="flex items-center gap-2 text-red-700">
               <Trash2 size={16} />
-              <h3 className="text-xs font-semibold text-gray-900">¿Eliminar Unidad de Medida?</h3>
+              <h3 className="text-xs font-semibold text-gray-900">┬┐Eliminar Unidad de Medida?</h3>
             </div>
             <p className="text-[11px] text-gray-600 font-normal">
-              Está a punto de eliminar la unidad <span className="font-bold font-mono text-gray-900">{unidadAEliminar.simbolo}</span>.
+              Est├í a punto de eliminar la unidad <span className="font-bold font-mono text-gray-900">{unidadAEliminar.simbolo}</span>.
             </p>
             <div className="flex justify-end gap-1.5 pt-2 border-t border-gray-100">
               <button
@@ -4006,14 +3608,14 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
         </div>
       )}
 
-      {/* FORMULARIO CREAR / EDITAR CAPÍTULO */}
+      {/* FORMULARIO CREAR / EDITAR CAP├ìTULO */}
       {modalCapituloFormOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs font-[Poppins]">
           <div className="w-full max-w-md rounded-xl bg-white p-4 shadow-2xl space-y-3 border border-gray-200">
             <div className="flex items-center justify-between border-b border-gray-100 pb-2">
               <h3 className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
                 <Layers size={14} className="text-[#9B0F06]" />
-                <span>{capituloForm.id ? `Editar Capítulo ${capituloForm.id}` : 'Nuevo Capítulo Sábana'}</span>
+                <span>{capituloForm.id ? `Editar Cap├¡tulo ${capituloForm.id}` : 'Nuevo Cap├¡tulo S├íbana'}</span>
               </h3>
               <button type="button" onClick={() => setModalCapituloFormOpen(false)} className="text-gray-400 hover:text-gray-600">
                 <X size={14} />
@@ -4022,12 +3624,12 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
 
             <div className="space-y-2">
               <div>
-                <label className="text-[10px] font-semibold text-gray-700 mb-0.5 block">Nombre del Capítulo *</label>
+                <label className="text-[10px] font-semibold text-gray-700 mb-0.5 block">Nombre del Cap├¡tulo *</label>
                 <input
                   type="text"
                   value={capituloForm.nombre}
                   onChange={(e) => setCapituloForm({ ...capituloForm, nombre: e.target.value })}
-                  placeholder="Ej: Capítulo X: Estructuras y Puentes Principales"
+                  placeholder="Ej: Cap├¡tulo X: Estructuras y Puentes Principales"
                   className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-800 focus:outline-none focus:border-[#9B0F06]"
                 />
               </div>
@@ -4053,16 +3655,16 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
         </div>
       )}
 
-      {/* CONFIRMACIÓN ELIMINAR CAPÍTULO */}
+      {/* CONFIRMACI├ôN ELIMINAR CAP├ìTULO */}
       {capituloAEliminar && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs font-[Poppins]">
           <div className="w-full max-w-sm rounded-xl bg-white p-4 shadow-2xl space-y-3 border border-gray-200">
             <div className="flex items-center gap-2 text-red-700">
               <Trash2 size={16} />
-              <h3 className="text-xs font-semibold text-gray-900">¿Eliminar Capítulo?</h3>
+              <h3 className="text-xs font-semibold text-gray-900">┬┐Eliminar Cap├¡tulo?</h3>
             </div>
             <p className="text-[11px] text-gray-600 font-normal">
-              Está a punto de eliminar el capítulo <span className="font-bold text-gray-900">{capituloAEliminar.nombre}</span>.
+              Est├í a punto de eliminar el cap├¡tulo <span className="font-bold text-gray-900">{capituloAEliminar.nombre}</span>.
             </p>
             <div className="flex justify-end gap-1.5 pt-2 border-t border-gray-100">
               <button
@@ -4078,215 +3680,6 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                 className="rounded-lg bg-[#9B0F06] px-3 py-1 text-xs font-medium text-white hover:bg-[#5E0006] cursor-pointer"
               >
                 Eliminar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL APERTURA DE ESTIMACIÓN PERIODO MENSUAL */}
-      {modalAperturaEstimacionOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs font-[Poppins]">
-          <div className="w-full max-w-md rounded-xl bg-white p-4 shadow-2xl space-y-3 border border-gray-200">
-            <div className="flex items-center justify-between border-b border-gray-100 pb-2">
-              <h3 className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
-                <CalendarClock size={15} className="text-[#9B0F06]" />
-                <span>Apertura de Periodo de Estimación</span>
-              </h3>
-              <button type="button" onClick={() => setModalAperturaEstimacionOpen(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer">
-                <X size={14} />
-              </button>
-            </div>
-
-            <p className="text-[10.5px] text-gray-500 font-normal">
-              Establezca las fechas de inicio y cierre para el nuevo periodo de estimación antes de iniciar operaciones en este mes.
-            </p>
-
-            <div className="space-y-2.5">
-              <div>
-                <label className="text-[10px] font-bold text-gray-700 mb-0.5 block">Identificador de Estimación *</label>
-                <input
-                  type="text"
-                  value={formEstNumero}
-                  onChange={(e) => setFormEstNumero(e.target.value)}
-                  placeholder="Ej: Estimación 05, Estimación 08 (Actual)"
-                  className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-800 focus:outline-none focus:border-[#9B0F06]"
-                />
-              </div>
-
-              <div>
-                <label className="text-[10px] font-bold text-gray-700 mb-0.5 block">Mes de Correspondencia *</label>
-                <input
-                  type="text"
-                  value={formEstMes}
-                  onChange={(e) => setFormEstMes(e.target.value)}
-                  placeholder="Ej: Octubre 2026, Noviembre 2026"
-                  className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-800 focus:outline-none focus:border-[#9B0F06]"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-[10px] font-bold text-gray-700 mb-0.5 block">Fecha Inicio Periodo *</label>
-                  <input
-                    type="date"
-                    value={formEstFechaInicio}
-                    onChange={(e) => setFormEstFechaInicio(e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-gray-800 focus:outline-none focus:border-[#9B0F06]"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold text-gray-700 mb-0.5 block">Fecha Corte / Cierre *</label>
-                  <input
-                    type="date"
-                    value={formEstFechaCorte}
-                    onChange={(e) => setFormEstFechaCorte(e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-gray-800 focus:outline-none focus:border-[#9B0F06]"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-[10px] font-bold text-gray-700 mb-0.5 block">Observaciones / Alcance</label>
-                <textarea
-                  rows={2}
-                  value={formEstNotas}
-                  onChange={(e) => setFormEstNotas(e.target.value)}
-                  placeholder="Notas adicionales sobre la estimación de este periodo..."
-                  className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-800 focus:outline-none focus:border-[#9B0F06]"
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-1.5 pt-2 border-t border-gray-100">
-              <button
-                type="button"
-                onClick={() => setModalAperturaEstimacionOpen(false)}
-                className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-normal text-gray-700 hover:bg-gray-50 cursor-pointer"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={handleGuardarNuevaEstimacion}
-                className="rounded-lg bg-[#9B0F06] px-4 py-1.5 text-xs font-bold text-white hover:bg-[#5E0006] cursor-pointer shadow-2xs"
-              >
-                Aperturar y Fijar Periodo
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL REGISTRAR MEDISIÓN EN TAB ANALÍTICO */}
-      {modalAgregarMedicionOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs font-[Poppins]">
-          <div className="w-full max-w-md rounded-xl bg-white p-4 shadow-2xl space-y-3 border border-gray-200">
-            <div className="flex items-center justify-between border-b border-gray-100 pb-2">
-              <h3 className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
-                <Calculator size={15} className="text-[#9B0F06]" />
-                <span>Registrar Medición de Campo (Tab Analítico)</span>
-              </h3>
-              <button type="button" onClick={() => setModalAgregarMedicionOpen(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer">
-                <X size={14} />
-              </button>
-            </div>
-
-            <div className="space-y-2.5">
-              <div>
-                <label className="text-[10px] font-bold text-gray-700 mb-0.5 block">Renglón de Trabajo *</label>
-                <select
-                  value={formMedCodigoDGC}
-                  onChange={(e) => setFormMedCodigoDGC(e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-gray-800 focus:outline-none focus:border-[#9B0F06]"
-                >
-                  {renglones.map((r) => (
-                    <option key={r.id} value={r.codigoDGC}>
-                      {r.codigoDGC} - {r.descripcion.slice(0, 45)}...
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-[10px] font-bold text-gray-700 mb-0.5 block">Estación Inicio *</label>
-                  <input
-                    type="text"
-                    value={formMedEstacionInicio}
-                    onChange={(e) => setFormMedEstacionInicio(e.target.value)}
-                    placeholder="Ej: 14+200"
-                    className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-mono text-gray-800 focus:outline-none focus:border-[#9B0F06]"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold text-gray-700 mb-0.5 block">Estación Fin *</label>
-                  <input
-                    type="text"
-                    value={formMedEstacionFin}
-                    onChange={(e) => setFormMedEstacionFin(e.target.value)}
-                    placeholder="Ej: 14+700"
-                    className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-mono text-gray-800 focus:outline-none focus:border-[#9B0F06]"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-2">
-                <div>
-                  <label className="text-[10px] font-bold text-gray-700 mb-0.5 block">Longitud L (m) *</label>
-                  <input
-                    type="number"
-                    value={formMedLongitud}
-                    onChange={(e) => setFormMedLongitud(e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-mono text-gray-800 focus:outline-none focus:border-[#9B0F06]"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold text-gray-700 mb-0.5 block">Ancho A (m) *</label>
-                  <input
-                    type="number"
-                    value={formMedAncho}
-                    onChange={(e) => setFormMedAncho(e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-mono text-gray-800 focus:outline-none focus:border-[#9B0F06]"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold text-gray-700 mb-0.5 block">Altura H (m) *</label>
-                  <input
-                    type="number"
-                    value={formMedAltura}
-                    onChange={(e) => setFormMedAltura(e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-mono text-gray-800 focus:outline-none focus:border-[#9B0F06]"
-                  />
-                </div>
-              </div>
-
-              <div className="rounded-lg bg-red-50/80 p-2 border border-red-100 flex items-center justify-between text-xs font-bold text-[#9B0F06]">
-                <span>Volumen Calculado (L × A × H):</span>
-                <span className="font-mono text-sm">
-                  {((parseFloat(formMedLongitud) || 0) * (parseFloat(formMedAncho) || 0) * (parseFloat(formMedAltura) || 0)).toLocaleString('es-GT', { minimumFractionDigits: 2 })} m³
-                </span>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-1.5 pt-2 border-t border-gray-100">
-              <button
-                type="button"
-                onClick={() => setModalAgregarMedicionOpen(false)}
-                className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-normal text-gray-700 hover:bg-gray-50 cursor-pointer"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={handleGuardarNuevaMedicionAnalitica}
-                className="rounded-lg bg-[#9B0F06] px-4 py-1.5 text-xs font-bold text-white hover:bg-[#5E0006] cursor-pointer shadow-2xs"
-              >
-                Transmitir a Sábana
               </button>
             </div>
           </div>
