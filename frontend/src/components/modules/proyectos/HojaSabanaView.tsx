@@ -598,8 +598,37 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
         fechaFin: '',
       }
     }
-    return PROYECTOS_MOCK.find((p) => p.id === proyectoIdSeleccionado) || PROYECTOS_MOCK[0]
+    const isMock = PROYECTOS_MOCK.find((p) => p.id === proyectoIdSeleccionado)
+    if (isMock) return isMock
+    return {
+      id: proyectoIdSeleccionado,
+      codigo: 'PROY',
+      nombre: 'Cargando Proyecto...',
+      presupuesto: 0,
+      montoContractualOriginal: 0,
+      plazo: '0 Meses (0 días)',
+      ubicacion: '',
+      responsable: 'Sin Asignar',
+      estado: 'borrador' as const,
+      avance: 0,
+      equipo: [],
+      fases: [],
+      documentos: [],
+      fechaInicio: '',
+      fechaFin: '',
+    }
   }, [proyectoReal, esPlantillaVacia, proyectosLista, proyectoIdSeleccionado])
+
+  
+  useEffect(() => {
+    if (typeof window !== 'undefined' && montoContractualOriginalTotal > 0) {
+      if (proyecto?.id && proyecto.id !== 'nuevo') {
+        localStorage.setItem('proyecto_sabana_monto_' + proyecto.id, String(montoContractualOriginalTotal))
+      } else {
+        localStorage.setItem('proyecto_sabana_monto_nuevo', String(montoContractualOriginalTotal))
+      }
+    }
+  }, [proyecto?.id, montoContractualOriginalTotal])
 
   const [tabSeccion, setTabSeccion] = useState<'sabana' | 'analitico' | 'pendientes' | 'planificadoReal' | 'resumen'>('sabana')
   const [modoVistaSabana, setModoVistaSabana] = useState<'planificacion' | 'actual'>('actual')
@@ -770,11 +799,6 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
 
   useEffect(() => {
     if (!proyecto?.id || esPlantillaVacia) return
-    
-    // Prevent fetching UUID endpoints with mock IDs that cause backend crashes (invalid input syntax for type uuid)
-    const isMockId = proyecto.id === '1' || proyecto.id === 'p-1' || proyecto.id.startsWith('PROY')
-    if (isMockId) return
-
     let activo = true
     apiGetDeduplicado(`/proyectos/${proyecto.id}/pendientes`)
       .then((res) => {
@@ -1517,6 +1541,13 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
     }
   }, [proyecto, subtotalCostoDirectoContratadoGlobal, montoContractualOriginalTotal, liquidoAPagarNetoContratista, esPlantillaVacia, pctIndirectos, pctIva, fechaInicioRealProyecto, fechaFinRealProyecto, plazoRealProyecto])
 
+  
+  useEffect(() => {
+    if (proyecto?.id && montoContractualOriginalTotal > 0 && typeof window !== 'undefined') {
+      localStorage.setItem('proyecto_sabana_monto_' + proyecto.id, String(montoContractualOriginalTotal))
+    }
+  }, [proyecto?.id, montoContractualOriginalTotal])
+
   const diasEmpleadosCalculados = esBorrador ? 0 : Math.max(0, Math.floor((Date.now() - (fechaInicioRealProyecto ? new Date(fechaInicioRealProyecto).getTime() : Date.now())) / 86400000))
   const diasSuspendidosSumados = 0
   const fechaInicioContrato = proyecto?.fechaInicio || 'No registrada'
@@ -1620,9 +1651,24 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => router.push(`/dashboard/proyectos/${proyecto.id}`)}
-              className="p-1 text-gray-600 hover:text-[#9B0F06] transition-colors"
-              title="Regresar al detalle del proyecto"
+              onClick={() => {
+                if (typeof window !== 'undefined') {
+                  const urlParams = new URLSearchParams(window.location.search)
+                  const fromParam = urlParams.get('from')
+                  const montoQS = montoContractualOriginalTotal > 0 ? `?monto=${montoContractualOriginalTotal}` : ''
+                  if (fromParam === 'editar' || window.location.href.includes('from=editar')) {
+                    router.push(`/dashboard/proyectos/${proyecto.id}/editar${montoQS}`)
+                    return
+                  }
+                  if (fromParam === 'nuevo' || fromParam === 'crear' || window.location.href.includes('from=nuevo')) {
+                    router.push(`/dashboard/proyectos/nuevo${montoQS}`)
+                    return
+                  }
+                }
+                router.push(`/dashboard/proyectos/${proyecto.id}`)
+              }}
+              className="p-1 text-gray-600 hover:text-[#9B0F06] transition-colors cursor-pointer"
+              title="Regresar al formulario"
             >
               <ArrowLeft size={16} />
             </button>
@@ -1635,7 +1681,22 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                 <span>/</span>
                 <span
                   className="hover:underline cursor-pointer text-gray-700"
-                  onClick={() => router.push(`/dashboard/proyectos/${proyecto.id}`)}
+                  onClick={() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search)
+      const fromParam = urlParams.get('from')
+      const montoQS = montoContractualOriginalTotal > 0 ? `?monto=${montoContractualOriginalTotal}` : ''
+      if (fromParam === 'editar' || window.location.href.includes('from=editar')) {
+        router.push(`/dashboard/proyectos/${proyecto.id}/editar${montoQS}`)
+        return
+      }
+      if (fromParam === 'nuevo' || fromParam === 'crear' || window.location.href.includes('from=nuevo')) {
+        router.push(`/dashboard/proyectos/nuevo${montoQS}`)
+        return
+      }
+    }
+    router.push(`/dashboard/proyectos/${proyecto.id}`)
+  }}
                 >
                   {proyecto.codigo}
                 </span>
@@ -1646,6 +1707,15 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
               <h1 className="text-xs font-medium text-gray-900 mt-0.5 flex items-center gap-1.5">
                 <FileSpreadsheet size={13} className="text-[#9B0F06]" />
                 <span>Hoja Sábana Digital</span>
+                {modoVistaSabana === 'planificacion' && (
+                  <span
+                    className="inline-flex items-center gap-1 rounded bg-amber-50 px-2 py-0.5 text-[9px] font-medium text-amber-700 border border-amber-200 ml-2"
+                    title="Distribución automática estimada — no basada en cronograma capturado"
+                  >
+                    <Info size={10} className="text-amber-600" />
+                    <span>Distribución estimada (Promedio lineal)</span>
+                  </span>
+                )}
               </h1>
             </div>
           </div>
@@ -1655,8 +1725,11 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
             <div className="inline-flex items-center rounded-md border border-gray-200 bg-gray-100 p-0.5 text-[9.5px]">
               <button
                 type="button"
-                onClick={() => setModoVistaSabana('planificacion')}
-                className={`inline-flex items-center gap-1 border-b-2 px-2 py-1 text-[9.5px] font-normal transition-all cursor-pointer ${
+                disabled={esBorrador}
+                onClick={() => !esBorrador && setModoVistaSabana('planificacion')}
+                className={`inline-flex items-center gap-1 border-b-2 px-2 py-1 text-[9.5px] font-normal transition-all ${
+                  esBorrador ? 'opacity-50 cursor-not-allowed text-gray-400' : 'cursor-pointer'
+                } ${
                   modoVistaSabana === 'planificacion'
                     ? 'border-[#9B0F06] text-[#9B0F06] bg-white font-medium shadow-xs'
                     : 'border-transparent text-gray-500 hover:text-gray-800 hover:bg-gray-50'
@@ -1681,16 +1754,208 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
               )}
             </div>
 
-            {(proyecto?.estado === 'activo' || proyecto?.estado_codigo === 'activo') && (
+            {/* Botón Apertura Estimación: a la par de Planificación, sólo cuando el proyecto está activo */}
+            {!esBorrador && (
               <button
                 type="button"
                 onClick={() => setModalAperturaEstimacionOpen(true)}
-                className="inline-flex h-[26px] items-center gap-1.5 rounded-md border border-[#9B0F06] bg-red-50 px-2 text-[9px] font-bold text-[#9B0F06] transition-colors hover:bg-red-100 cursor-pointer shadow-xs"
+                className="inline-flex items-center gap-1 rounded bg-red-50 border border-red-200 px-2 py-1 text-[9.5px] font-bold text-[#9B0F06] hover:bg-red-100 transition-colors shadow-2xs cursor-pointer"
                 title="Aperturar nuevo periodo de estimación para este proyecto"
               >
                 <Plus size={11} />
                 <span>Aperturar Estimación</span>
               </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => router.push('/dashboard/renglones')}
+              className="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-2.5 py-1 text-[10px] font-semibold text-gray-700 hover:text-[#9B0F06] hover:border-[#9B0F06] hover:bg-gray-50 transition-colors shadow-2xs cursor-pointer"
+              title="Ir a Gestión Completa de Renglones, Unidades de Medida y Capítulos"
+            >
+              <Layers size={12} className="text-[#9B0F06]" />
+              <span>Gestionar Renglones</span>
+            </button>
+
+            {/* Botón Modificar Plazo - Visible para Administrador cuando el proyecto NO está en borrador (ej. Activo) */}
+            {user?.rol === 'Administrador' && proyecto?.estado !== 'borrador' && (
+              <button
+                type="button"
+                onClick={() => {
+                  setErrorsPlazoForm({})
+                  setModalModificarPlazoOpen(true)
+                }}
+                className="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-2.5 py-1 text-[10px] font-medium text-gray-700 hover:bg-gray-50 transition-colors shadow-2xs cursor-pointer"
+                title="Modificar cronograma y fecha de finalización (Exclusivo proyectos activos)"
+              >
+                <CalendarClock size={13} className="text-[#9B0F06]" />
+                <span>Modificar Plazo</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={handleExportarExcel}
+              className="btn-success-compact cursor-pointer"
+              title="Exportar archivo Excel DÍAS"
+            >
+              <FileSpreadsheet size={13} />
+              <span>Exportar Excel</span>
+              <Download size={12} />
+            </button>
+          </div>
+        </div>
+
+        {/* Fila horizontal de métricas */}
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5 bg-gray-50/80 p-1.5 rounded-lg border border-gray-200/80 text-[10px]">
+          <div className="min-w-0">
+            <span className="text-[7.5px] font-medium uppercase tracking-wider text-gray-400 block truncate mb-0.5">
+              Proyecto / Contrato
+            </span>
+            <select
+              value={proyectoIdSeleccionado}
+              onChange={(e) => {
+                const newId = e.target.value
+                setProyectoIdSeleccionado(newId)
+                router.push(`/dashboard/proyectos/${newId}/hoja-sabana`)
+              }}
+              className="h-6 w-full rounded border border-gray-300 bg-white px-1 text-[10px] font-medium text-gray-900 focus:border-[#9B0F06] focus:outline-none cursor-pointer truncate"
+            >
+              {(proyectosLista.length > 0 ? proyectosLista : [proyecto]).map((p: any) => (
+                <option key={p.id} value={p.id}>
+                  {p.codigo || 'PROY'} · {p.nombreOficial || p.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <span className="text-[7.5px] font-medium uppercase tracking-wider text-gray-400 block truncate">
+              {esBorrador ? 'Plazo Planificado' : 'Plazo de Ejecución Real'}
+            </span>
+            <span className="font-medium text-gray-800 flex items-center gap-1">
+              <Clock size={9.5} className="text-[#9B0F06] shrink-0" />
+              <span>{metricasHeaderContextuales.plazo}</span>
+            </span>
+          </div>
+
+          <div>
+            <span className="text-[7.5px] font-medium uppercase tracking-wider text-gray-400 block truncate">
+              Costo Directo Contratado Total (D × F)
+            </span>
+            <span className="font-medium font-mono text-gray-900">
+              Q {metricasHeaderContextuales.costoDirecto.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+            </span>
+          </div>
+
+          <div>
+            <span className="text-[7.5px] font-medium uppercase tracking-wider text-[#9B0F06] block truncate font-bold">
+              Monto Contractual Original (con Indirectos e IVA)
+            </span>
+            <span className="font-bold font-mono text-[#9B0F06]">
+              Q {metricasHeaderContextuales.montoContractualOriginal.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+            </span>
+          </div>
+
+          <div>
+            <span className="text-[7.5px] font-medium uppercase tracking-wider text-gray-400 block truncate">
+              Líquido Neto Este Periodo
+            </span>
+            <span className="font-medium font-mono text-gray-900">
+              Q {metricasHeaderContextuales.liquidoNetoPeriodo.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* TABS SUPERIORES SIN NEGRILLA */}
+      <div className="border-b border-gray-200 bg-white px-1 rounded-t-md font-[Poppins]">
+        <div className="flex flex-wrap items-center gap-1">
+          {[
+            { id: 'sabana', label: 'Sábana', icon: Layers },
+            { id: 'resumen', label: 'Resumen Financiero', icon: Banknote },
+            ...(proyecto.id === 'nuevo' || id === 'nuevo' || esBorrador ? [] : [{ id: 'pendientes', label: 'Pendientes', icon: AlertCircle }]),
+            ...(!esBorrador && modoVistaSabana === 'actual' ? [{ id: 'planificadoReal', label: 'Planificado vs Real', icon: TrendingUp }] : []),
+          ].map((item) => {
+            const Icon = item.icon
+            const active = tabSeccion === item.id
+
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setTabSeccion(item.id as any)}
+                className={`flex items-center gap-1 border-b-2 px-2 py-1 text-[9.5px] font-normal transition-all ${
+                  active
+                    ? 'border-[#9B0F06] text-[#9B0F06] bg-red-50/40'
+                    : 'border-transparent text-gray-500 hover:text-gray-800 hover:bg-gray-50'
+                }`}
+              >
+                <Icon size={11} />
+                <span>{item.label}</span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* BARRA DE FILTROS Y ACCIONES COMPACTA (OCULTA EN RESUMEN FINANCIERO) */}
+      {tabSeccion !== 'resumen' && (
+        <div className="w-full rounded-lg border border-gray-200 bg-white p-1.5 shadow-2xs flex items-center justify-between gap-1.5 overflow-x-auto font-[Poppins]">
+          <div className="flex items-center gap-1 shrink-0 flex-nowrap">
+            {/* Capítulo: Disponible en Sábana, Analítico, Pendientes y Planificado vs Real */}
+            <select
+              value={capituloFiltro}
+              onChange={(e) => {
+                setCapituloFiltro(e.target.value === 'todos' ? 'todos' : Number(e.target.value))
+                setPaginaActual(1)
+              }}
+              className="h-7 rounded border border-gray-200 bg-white px-1.5 text-[10px] font-normal text-gray-800 focus:border-[#9B0F06] focus:outline-none max-w-[130px] truncate"
+            >
+              <option value="todos">Capítulo: Todos</option>
+              {CAPITULOS_LIBRO_AZUL.map((c) => (
+                <option key={c.id} value={c.id}>
+                  Cap {c.id}: {c.nombre.split(':')[1]?.trim() || c.nombre}
+                </option>
+              ))}
+            </select>
+
+            {/* Mes: Disponible en Sábana, Analítico y Planificado vs Real (NO en Pendientes) */}
+            {(tabSeccion === 'sabana' || tabSeccion === 'analitico' || tabSeccion === 'planificadoReal') && (
+              <select
+                value={mesFiltro}
+                onChange={(e) => {
+                  setMesFiltro(e.target.value)
+                  setPaginaActual(1)
+                }}
+                className="h-7 rounded border border-gray-200 bg-white px-1.5 text-[10px] font-normal text-gray-800 focus:border-[#9B0F06] focus:outline-none max-w-[100px] truncate"
+              >
+                <option value="todos">Mes: Todos</option>
+                {listaMesesDinamicos.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            {/* Estimación: Disponible únicamente en Sábana y Analítico */}
+            {(tabSeccion === 'sabana' || tabSeccion === 'analitico') && (
+              <div className="flex items-center gap-1">
+                <select
+                  value={numEstimacionFiltro}
+                  onChange={(e) => setNumEstimacionFiltro(e.target.value)}
+                  className="h-7 rounded border border-gray-200 bg-white px-1.5 text-[10px] font-normal text-gray-800 focus:border-[#9B0F06] focus:outline-none max-w-[125px] truncate cursor-pointer"
+                >
+                  <option value="todos">Estimación: Todas</option>
+                  {listaEstimaciones.map((est) => (
+                    <option key={est.id} value={est.numero}>
+                      {est.numero} ({est.mes})
+                    </option>
+                  ))}
+                </select>
+                
+              </div>
             )}
 
             {/* Estado: Disponible únicamente en Sábana y Pendientes */}
@@ -2028,7 +2293,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                                       </span>
                                     </div>
                                   ) : (
-                                    <span className="truncate block max-w-[200px]">{r.descripcion}</span>
+                                    <span className="truncate block min-w-[220px] max-w-[340px]" title={r.descripcion}>{r.descripcion}</span>
                                   )}
                                 </td>
 

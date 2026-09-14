@@ -18,6 +18,7 @@ import type {
   ProyectoRolAsignado,
 } from '@/types/proyecto'
 import {
+  AlertCircle,
   ArrowLeft,
   ArrowRight,
   Building2,
@@ -70,6 +71,13 @@ const inputClass =
   'w-full rounded border border-gray-200 bg-white px-2 py-1 text-[10px] text-gray-800 placeholder-gray-400 focus:border-[#9B0F06] focus:outline-none focus:ring-1 focus:ring-[#9B0F06] transition-colors font-medium'
 
 const labelClass = 'mb-0.5 block text-[8px] font-extrabold uppercase tracking-wider text-gray-600'
+
+const labelClassPaso3 = 'mb-0.5 block text-[9px] font-extrabold uppercase tracking-wider text-gray-600'
+const inputClassPaso3 = 'w-full rounded border border-gray-200 bg-white px-2 py-1 text-[11px] text-gray-800 placeholder-gray-400 focus:border-[#9B0F06] focus:outline-none focus:ring-1 focus:ring-[#9B0F06] transition-colors font-medium'
+function errorInputClassPaso3(errors: Record<string, boolean>, field: string) {
+  return `w-full rounded border ${errors[field] ? 'border-red-500 ring-1 ring-red-400' : 'border-gray-200'} bg-white px-2 py-1 text-[11px] text-gray-800 placeholder-gray-400 focus:border-[#9B0F06] focus:outline-none focus:ring-1 focus:ring-[#9B0F06] transition-colors font-medium`
+}
+
 
 // Helper: returns inputClass with red border if field has error
 function errorInputClass(errors: Record<string, boolean>, field: string) {
@@ -286,6 +294,7 @@ function SelectorMapaInteractivo({
   const instanciaMapaRef = useRef<any>(null)
   const marcadorRef = useRef<any>(null)
   const rutaPolylineRef = useRef<any>(null)
+  const [mapaListo, setMapaListo] = useState(false)
 
   const DEPARTAMENTOS_GT_COORDS: Record<string, { lat: number; lng: number }> = {
     'guatemala': { lat: 14.6349, lng: -90.5069 },
@@ -581,12 +590,16 @@ function SelectorMapaInteractivo({
 
       instanciaMapaRef.current = mapa
       marcadorRef.current = marcador
-      setTimeout(() => mapa.invalidateSize(), 0)
+      setMapaListo(true)
+      setTimeout(() => {
+        try { mapa.invalidateSize() } catch (e) {}
+      }, 100)
     }
 
     void inicializarMapa()
     return () => {
       activo = false
+      setMapaListo(false)
       instanciaMapaRef.current?.remove()
       instanciaMapaRef.current = null
       marcadorRef.current = null
@@ -595,7 +608,7 @@ function SelectorMapaInteractivo({
 
   // Actualizar marcador y trazar ruta estilo Google Maps si hay kilometraje
   useEffect(() => {
-    if (!instanciaMapaRef.current || !marcadorRef.current) return
+    if (!instanciaMapaRef.current || !marcadorRef.current || !mapaListo) return
     const posicion: [number, number] = [coordenadas.lat, coordenadas.lng]
     marcadorRef.current.setLatLng(posicion)
 
@@ -693,7 +706,7 @@ function SelectorMapaInteractivo({
     }
 
     void actualizarRutaPolyline()
-  }, [coordenadas.lat, coordenadas.lng, distanciaTramoKm, kilometroFin, coordenadasFinManual])
+  }, [mapaListo, coordenadas.lat, coordenadas.lng, distanciaTramoKm, kilometroFin, coordenadasFinManual, direccionFin])
 
   return (
     <div className="space-y-2 rounded-lg border border-gray-200 bg-gray-50/50 p-2.5">
@@ -1027,8 +1040,8 @@ export function ProyectoFormulario({
   const [departamentoId, setDepartamentoId] = useState((proyectoInicial as any)?.departamentoId || '')
   const [municipioId, setMunicipioId] = useState((proyectoInicial as any)?.municipioId || '')
   const [esMultimunicipio, setEsMultimunicipio] = useState(false)
-  const [departamentoFinId, setDepartamentoFinId] = useState('')
-  const [municipioFinId, setMunicipioFinId] = useState('')
+  const [departamentoFinId, setDepartamentoFinId] = useState((proyectoInicial as any)?.departamentoFinId || (proyectoInicial as any)?.departamento_fin_id || (proyectoInicial as any)?.departamento_final_id || '')
+  const [municipioFinId, setMunicipioFinId] = useState((proyectoInicial as any)?.municipioFinId || (proyectoInicial as any)?.municipio_fin_id || (proyectoInicial as any)?.municipio_final_id || '')
   const [delegadoResidenteId, setDelegadoResidenteId] = useState('')
   const [empresaContratanteId, setEmpresaContratanteId] = useState('')
   const [empresaContratistaId, setEmpresaContratistaId] = useState('')
@@ -1220,6 +1233,101 @@ export function ProyectoFormulario({
     }).catch(() => {});
   }, []);
 
+
+  // Auto-resolver departamentos y municipios al cargar o editar
+  useEffect(() => {
+    if (!proyectoInicial && !esEditar) return
+    const raw: any = proyectoInicial || {}
+    
+    // Si viene monto actualizado desde Hoja Sábana guardado en localStorage o query
+    if (raw.id) {
+      const savedMonto = typeof window !== 'undefined' ? localStorage.getItem('proyecto_sabana_monto_' + raw.id) : null
+      if (savedMonto && Number(savedMonto) > 0) {
+        setMontoContractualOriginal(savedMonto)
+      }
+    }
+
+    // 1. Resolver Departamento y Municipio Inicial
+    const rawDepId = raw.departamentoId || raw.departamento_id
+    const rawMunId = raw.municipioId || raw.municipio_id
+    const textoUbicacion = (raw.direccion || raw.ubicacionFisica || raw.ubicacion || raw.tramo || '').toLowerCase()
+
+    let finalDepId = departamentoId || rawDepId || ''
+    let finalMunId = municipioId || rawMunId || ''
+
+    if (municipios.length > 0) {
+      if (finalMunId && !finalDepId) {
+        const m = municipios.find((x: any) => x.id === finalMunId || (x.nombre && x.nombre.toLowerCase() === String(finalMunId).toLowerCase()))
+        if (m) {
+          finalMunId = m.id
+          finalDepId = m.departamento_id
+        }
+      }
+      if (!finalMunId && textoUbicacion) {
+        const m = municipios.find((x: any) => x.nombre && textoUbicacion.includes(x.nombre.toLowerCase()))
+        if (m) {
+          finalMunId = m.id
+          finalDepId = m.departamento_id
+        }
+      }
+    }
+
+    if (departamentos.length > 0 && !finalDepId) {
+      const dByName = departamentos.find((d: any) => d.id === rawDepId || (d.nombre && d.nombre.toLowerCase() === String(rawDepId).toLowerCase()))
+      if (dByName) {
+        finalDepId = dByName.id
+      } else if (textoUbicacion) {
+        const d = departamentos.find((x: any) => x.nombre && textoUbicacion.includes(x.nombre.toLowerCase()))
+        if (d) finalDepId = d.id
+      }
+    }
+
+    if (finalDepId && finalDepId !== departamentoId) setDepartamentoId(finalDepId)
+    if (finalMunId && finalMunId !== municipioId) setMunicipioId(finalMunId)
+
+    // 2. Resolver Departamento y Municipio Final
+    const rawDepFinId = raw.departamentoFinId || raw.departamento_fin_id
+    const rawMunFinId = raw.municipioFinId || raw.municipio_fin_id
+    const textoUbicacionFin = (raw.direccionFin || raw.direccion_fin || '').toLowerCase()
+
+    let finalDepFinId = departamentoFinId || rawDepFinId || ''
+    let finalMunFinId = municipioFinId || rawMunFinId || ''
+
+    if (municipios.length > 0) {
+      if (finalMunFinId && !finalDepFinId) {
+        const m = municipios.find((x: any) => x.id === finalMunFinId || (x.nombre && x.nombre.toLowerCase() === String(finalMunFinId).toLowerCase()))
+        if (m) {
+          finalMunFinId = m.id
+          finalDepFinId = m.departamento_id
+        }
+      }
+      if (!finalMunFinId && textoUbicacionFin) {
+        const m = municipios.find((x: any) => x.nombre && textoUbicacionFin.includes(x.nombre.toLowerCase()))
+        if (m) {
+          finalMunFinId = m.id
+          finalDepFinId = m.departamento_id
+        }
+      }
+    }
+
+    if (departamentos.length > 0 && !finalDepFinId) {
+      const dByName = departamentos.find((d: any) => d.id === rawDepFinId || (d.nombre && d.nombre.toLowerCase() === String(rawDepFinId).toLowerCase()))
+      if (dByName) {
+        finalDepFinId = dByName.id
+      } else if (textoUbicacionFin) {
+        const d = departamentos.find((x: any) => x.nombre && textoUbicacionFin.includes(x.nombre.toLowerCase()))
+        if (d) finalDepFinId = d.id
+      }
+    }
+
+    // Default al origen si no hay destino final seleccionado y es mismo tramo
+    if (!finalDepFinId && finalDepId) finalDepFinId = finalDepId
+    if (!finalMunFinId && finalMunId && finalDepFinId === finalDepId) finalMunFinId = finalMunId
+
+    if (finalDepFinId && finalDepFinId !== departamentoFinId) setDepartamentoFinId(finalDepFinId)
+    if (finalMunFinId && finalMunFinId !== municipioFinId) setMunicipioFinId(finalMunFinId)
+  }, [proyectoInicial, departamentos, municipios, esEditar]);
+
 // Sync departamentoId/municipioId/delegadoResidenteId y todos los campos al recibir proyectoInicial
 useEffect(() => {
   if (proyectoInicial) {
@@ -1229,7 +1337,8 @@ useEffect(() => {
     }
     if (proyectoInicial.descripcion) setDescripcion(proyectoInicial.descripcion)
     if (proyectoInicial.ubicacionFisica || proyectoInicial.ubicacion) setUbicacionFisica(proyectoInicial.ubicacionFisica || proyectoInicial.ubicacion || '')
-    if (proyectoInicial.direccion) setDireccion(proyectoInicial.direccion)
+    const dirInicio = proyectoInicial?.direccion || proyectoInicial?.ubicacionFisica || proyectoInicial?.ubicacion || (proyectoInicial as any)?.tramo || ''
+    if (dirInicio) setDireccion(dirInicio)
     const dirFin = (proyectoInicial as any)?.direccionFin || (proyectoInicial as any)?.direccion_fin
     if (dirFin) setDireccionFin(dirFin)
     if ((proyectoInicial as any).kilometroInicio != null) setKilometroInicio(String((proyectoInicial as any).kilometroInicio))
@@ -1284,6 +1393,20 @@ useEffect(() => {
     }
   }
 }, [proyectoInicial, municipios, departamentos]);
+
+
+  useEffect(() => {
+    if (municipios.length > 0) {
+      if (municipioId && !departamentoId) {
+        const found = municipios.find((m: any) => String(m.id) === String(municipioId))
+        if (found?.departamento_id) setDepartamentoId(String(found.departamento_id))
+      }
+      if (municipioFinId && !departamentoFinId) {
+        const found = municipios.find((m: any) => String(m.id) === String(municipioFinId))
+        if (found?.departamento_id) setDepartamentoFinId(String(found.departamento_id))
+      }
+    }
+  }, [municipios, municipioId, municipioFinId])
 
 // Sync Entidad Contratante combobox state initially
 useEffect(() => {
@@ -1392,6 +1515,40 @@ useEffect(() => {
 
   // Lista de Equipo Asignado (Módulo de Usuarios)
   const [equipo, setEquipo] = useState<MiembroEquipo[]>(proyectoInicial?.equipo || [])
+  
+  const camposFaltantesParaActivo = useMemo(() => {
+    if (estado !== 'activo') return []
+    const faltantes: string[] = []
+    if (!montoContractualOriginal || Number(montoContractualOriginal) <= 0) faltantes.push('Plan de Trabajo / Hoja Sábana aprobada')
+    if (!delegadoResidenteId) faltantes.push('Delegado Residente')
+    if (!empresaSupervisora.trim()) faltantes.push('Empresa Supervisora')
+    if (!numeroEscrituraPublica.trim()) faltantes.push('Número de Escritura Pública')
+    if (!fechaAdjudicacion) faltantes.push('Fecha de Adjudicación')
+    if (!fechaInicioContractual) faltantes.push('Fecha Inicio Contractual')
+    if (!fechaFinContractualPlan) faltantes.push('Fecha Final Contractual')
+    if (!responsable) faltantes.push('Ingeniero Responsable')
+    if (equipo.length === 0) faltantes.push('Equipo Asignado')
+    return faltantes
+  }, [estado, montoContractualOriginal, delegadoResidenteId, empresaSupervisora, numeroEscrituraPublica, fechaAdjudicacion, fechaInicioContractual, fechaFinContractualPlan, responsable, equipo])
+
+  
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      const montoParam = params.get('monto')
+      if (montoParam && Number(montoParam) > 0) {
+        setMontoContractualOriginal(montoParam)
+        return
+      }
+      const pId = proyectoInicial?.id
+      const key = pId && pId !== 'nuevo' ? 'proyecto_sabana_monto_' + pId : 'proyecto_sabana_monto_nuevo'
+      const saved = localStorage.getItem(key)
+      if (saved && Number(saved) > 0) {
+        setMontoContractualOriginal(saved)
+      }
+    }
+  }, [proyectoInicial?.id])
+
   const [fases] = useState<FaseTimeline[]>(proyectoInicial?.fases || [])
   const [categorias] = useState<string[]>(proyectoInicial?.categorias || [])
   const [rolesProyecto] = useState<ProyectoRolAsignado[]>(proyectoInicial?.rolesProyecto || [])
@@ -1403,7 +1560,7 @@ useEffect(() => {
     
     if (esEditar) {
       const targetId = proyectoInicial?.id || '1'
-      router.push(`/dashboard/proyectos/${targetId}/hoja-sabana`)
+      router.push(`/dashboard/proyectos/${targetId}/hoja-sabana?from=editar`)
     } else {
       router.push('/dashboard/proyectos/nuevo/hoja-sabana')
     }
@@ -1628,7 +1785,7 @@ function tieneAlMenosDosLetras(texto: string): boolean {
       if (!fechaAdjudicacion) { faltantes.push('Fecha de Adjudicación'); newErrors.fechaAdjudicacion = true }
       if (!fechaInicioContractual) { faltantes.push('Fecha Inicio Contractual'); newErrors.fechaInicioContractual = true }
       if (!fechaFinContractualPlan) { faltantes.push('Fecha Final Contractual'); newErrors.fechaFinContractualPlan = true }
-      if (!montoContractualOriginal || Number(montoContractualOriginal) <= 0) { faltantes.push('Monto Contractual Original'); newErrors.montoContractualOriginal = true }
+      if (!montoContractualOriginal || Number(montoContractualOriginal) <= 0) { faltantes.push('Plan de Trabajo / Hoja Sábana aprobada (Monto Contractual Original)'); newErrors.montoContractualOriginal = true }
       if (!responsable) { faltantes.push('Ingeniero Responsable / Director'); newErrors.responsable = true }
     }
 
@@ -1907,7 +2064,7 @@ function tieneAlMenosDosLetras(texto: string): boolean {
                 </div>
 
                 <div>
-                  <label className={labelClass}>Empresa Supervisora de Obra (Solo Lectura - Configuración General)</label>
+                  <label className={labelClass}>Empresa Supervisora de Obra (Solo Lectura) <span className="text-[#9B0F06]">*</span></label>
                   <input
                     type="text"
                     value={empresaSupervisora}
@@ -2122,10 +2279,7 @@ function tieneAlMenosDosLetras(texto: string): boolean {
 
                 {/* 4. DIRECCIÓN FINAL / DESTINO CON DEPARTAMENTO FINAL Y MUNICIPIO FINAL */}
                 <div className="rounded-xl p-3 space-y-2.5 bg-white">
-                  <div className="flex items-center gap-2 text-[9.5px] font-bold text-gray-800 uppercase tracking-wider">
-                    <MapPin size={14} className="text-blue-600" />
-                    <span>Ubicación Final / Destino del Tramo (Punto Azul)</span>
-                  </div>
+                  
 
                   <div>
                     <label className={labelClass}>
@@ -2208,7 +2362,7 @@ function tieneAlMenosDosLetras(texto: string): boolean {
               <div className="space-y-2">
                 <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                   <div>
-                    <label className={labelClass}>Fecha de Adjudicación / Contrato</label>
+                    <label className={labelClassPaso3}>Fecha de Adjudicación / Contrato <span className="text-[#9B0F06]">*</span></label>
                     <input
                       type="date"
                       value={fechaAdjudicacion}
@@ -2216,17 +2370,17 @@ function tieneAlMenosDosLetras(texto: string): boolean {
                         setFechaAdjudicacion(e.target.value)
                         setErrors((prev) => ({ ...prev, fechaAdjudicacion: false }))
                       }}
-                      className={errorInputClass(errors, 'fechaAdjudicacion')}
+                      className={errorInputClassPaso3(errors, 'fechaAdjudicacion')}
                     />
                   </div>
 
                   <div>
-                    <label className={labelClass}>Número de Escritura Pública (Campo Anexo)</label>
+                    <label className={labelClassPaso3}>Número de Escritura Pública <span className="text-[#9B0F06]">*</span></label>
                     <input
                       type="text"
                       value={numeroEscrituraPublica}
                       onChange={(e) => setNumeroEscrituraPublica(e.target.value)}
-                      className={inputClass}
+                      className={inputClassPaso3}
                       placeholder="Ej: Escritura No. 142-2024 Notaría de Gobierno"
                     />
                   </div>
@@ -2234,7 +2388,7 @@ function tieneAlMenosDosLetras(texto: string): boolean {
 
                 <div className="grid grid-cols-1 gap-2 md:grid-cols-4">
                   <div>
-                    <label className={labelClass}>Fecha de Inicio Contractual</label>
+                    <label className={labelClassPaso3}>Fecha de Inicio Contractual <span className="text-[#9B0F06]">*</span></label>
                     <input
                       type="date"
                       value={fechaInicioContractual}
@@ -2243,12 +2397,12 @@ function tieneAlMenosDosLetras(texto: string): boolean {
                         setErrors((prev) => ({ ...prev, fechaInicioContractual: false }))
                         if (errorFechaFin) setErrorFechaFin(false)
                       }}
-                      className={errorInputClass(errors, 'fechaInicioContractual')}
+                      className={errorInputClassPaso3(errors, 'fechaInicioContractual')}
                     />
                   </div>
 
                   <div>
-                    <label className={labelClass}>Fecha Final Contractual</label>
+                    <label className={labelClassPaso3}>Fecha Final Contractual <span className="text-[#9B0F06]">*</span></label>
                     <input
                       type="date"
                       value={fechaFinContractualPlan}
@@ -2269,30 +2423,30 @@ function tieneAlMenosDosLetras(texto: string): boolean {
                         setErrors((prev) => ({ ...prev, fechaFinContractualPlan: false }))
                         setErrorFechaFin(false)
                       }}
-                      className={`${errorInputClass(errors, 'fechaFinContractualPlan')} ${errorFechaFin ? 'border-red-500 ring-1 ring-red-400 bg-red-50/20' : ''}`}
+                      className={`${errorInputClassPaso3(errors, 'fechaFinContractualPlan')} ${errorFechaFin ? 'border-red-500 ring-1 ring-red-400 bg-red-50/20' : ''}`}
                     />
                   </div>
 
                   <div>
-                    <label className={labelClass}>
+                    <label className={labelClassPaso3}>
                       Plazo de Ejecución Contractual Original
                     </label>
-                    <div className="flex items-center rounded border border-gray-200 bg-gray-100 px-2 py-1 text-[10px] font-bold text-gray-700">
+                    <div className="flex items-center rounded border border-gray-200 bg-gray-100 px-2 py-1 text-[11px] font-bold text-gray-700">
                       <span>{plazoCalculadoOriginal}</span>
                     </div>
                   </div>
 
                   {/* REQUERIMIENTO ESPECIAL: Campo "Monto Contractual Original *" de Solo Lectura con Botón "Ver" */}
                   <div>
-                    <label className={labelClass}>
-                      Monto Contractual Original <span className="text-[#9B0F06]">*</span> <span className="text-[8px] font-normal text-gray-400">(SOLO LECTURA)</span>
+                    <label className={labelClassPaso3}>
+                      Monto Contractual Original <span className="text-[#9B0F06]">*</span> <span className="text-[9px] font-normal text-gray-400">(SOLO LECTURA)</span>
                     </label>
                     <div className="flex gap-1">
                       <div className={`flex flex-1 rounded ${errors.montoContractualOriginal ? 'border border-red-500 ring-1 ring-red-400' : ''}`}>
-                        <div className="flex items-center rounded-l border border-r-0 border-gray-200 bg-gray-100 px-2 py-1 text-[10px] font-bold text-gray-600">
+                        <div className="flex items-center rounded-l border border-r-0 border-gray-200 bg-gray-100 px-2 py-1 text-[11px] font-bold text-gray-600">
                           Q
                         </div>
-                        <div className="flex-1 rounded-r border border-gray-200 bg-gray-100 px-2 py-1 text-[10px] text-gray-800 font-bold flex items-center justify-between">
+                        <div className="flex-1 rounded-r border border-gray-200 bg-gray-100 px-2 py-1 text-[11px] text-gray-800 font-bold flex items-center justify-between">
                           <span>
                             {montoContractualOriginal && Number(montoContractualOriginal) > 0
                               ? Number(montoContractualOriginal).toLocaleString('es-GT', { minimumFractionDigits: 2 })
@@ -2308,7 +2462,7 @@ function tieneAlMenosDosLetras(texto: string): boolean {
                       <button
                         type="button"
                         onClick={handleIrAPrograma}
-                        className="inline-flex items-center gap-1 rounded bg-[#9B0F06] px-2.5 py-1 text-[10px] font-bold text-white transition-colors hover:bg-[#5E0006] shrink-0 cursor-pointer"
+                        className="inline-flex items-center gap-1 rounded bg-[#9B0F06] px-2.5 py-1 text-[11px] font-bold text-white transition-colors hover:bg-[#5E0006] shrink-0 cursor-pointer"
                         title={
                           esEditar
                             ? 'Ver Programa de Trabajo del Proyecto'
@@ -2330,26 +2484,20 @@ function tieneAlMenosDosLetras(texto: string): boolean {
                       setResponsable(val)
                       setErrors((prev) => ({ ...prev, responsable: false }))
                     }}
-                    labelClass={labelClass}
+                    labelClass={labelClassPaso3}
                     onAbrirCrearIngeniero={() => setOpenCrearIngenieroDrawer(true)}
                     reloadTrigger={reloadIngenierosTrigger}
                   />
 
                   <div>
-                    <label className={labelClass}>Estado Inicial del Proyecto <span className="text-[8px] font-normal text-gray-400">(AUTOMÁTICO)</span></label>
+                    <label className={labelClassPaso3}>Estado Inicial del Proyecto <span className="text-[9px] font-normal text-gray-400">(AUTOMÁTICO)</span></label>
                     <select
                       value={estado}
                       onChange={(e) => setEstado(e.target.value as EstadoProyecto)}
-                      className={inputClass}
+                      className={inputClassPaso3}
                     >
                       <option value="borrador">Borrador</option>
-                      <option 
-                        value="activo" 
-                        disabled={!montoContractualOriginal || Number(montoContractualOriginal) <= 0}
-                        title={(!montoContractualOriginal || Number(montoContractualOriginal) <= 0) ? 'Debe cargar la Hoja Sábana (Plan de Trabajo) para activar el proyecto' : ''}
-                      >
-                        Activo {(!montoContractualOriginal || Number(montoContractualOriginal) <= 0) && '(Requiere Hoja Sábana)'}
-                      </option>
+                      <option value="activo">Activo</option>
                     </select>
                   </div>
                 </div>
@@ -2367,43 +2515,43 @@ function tieneAlMenosDosLetras(texto: string): boolean {
                 />
                 <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
                   <div>
-                    <label className={labelClass}>Fecha de Finalización Real</label>
+                    <label className={labelClassPaso3}>Fecha de Finalización Real <span className="text-[9px] font-normal text-gray-400">(OPCIONAL)</span></label>
                     <input
                       type="date"
                       value={fechaFinalizacionReal}
                       onChange={(e) => setFechaFinalizacionReal(e.target.value)}
-                      className={inputClass}
+                      className={inputClassPaso3}
                     />
-                    <p className="mt-0.5 text-[8px] text-gray-400">Fecha de acta de recepción definitiva de obra.</p>
+                    <p className="mt-0.5 text-[9px] text-gray-400">Fecha de acta de recepción definitiva de obra.</p>
                   </div>
 
                   <div>
-                    <label className={labelClass}>Plazo de Ejecución Real Ampliado</label>
+                    <label className={labelClassPaso3}>Plazo de Ejecución Real Ampliado <span className="text-[9px] font-normal text-gray-400">(OPCIONAL)</span></label>
                     <input
                       type="text"
                       value={plazoEjecucionRealAmpliado}
                       onChange={(e) => setPlazoEjecucionRealAmpliado(e.target.value)}
-                      className={inputClass}
+                      className={inputClassPaso3}
                       placeholder="Ej: 24 Meses (+6 meses por orden de cambio #2)"
                     />
-                    <p className="mt-0.5 text-[8px] text-gray-400">Plazo acumulado autorizados por prórroga.</p>
+                    <p className="mt-0.5 text-[9px] text-gray-400">Plazo acumulado autorizados por prórroga.</p>
                   </div>
 
                   <div>
-                    <label className={labelClass}>Monto Financiero Final Ejecutado</label>
+                    <label className={labelClassPaso3}>Monto Financiero Final Ejecutado <span className="text-[9px] font-normal text-gray-400">(OPCIONAL)</span></label>
                     <div className="flex">
-                      <div className="flex items-center rounded-l border border-r-0 border-gray-200 bg-gray-100 px-2 py-1 text-[10px] font-bold text-gray-600">
+                      <div className="flex items-center rounded-l border border-r-0 border-gray-200 bg-gray-100 px-2 py-1 text-[11px] font-bold text-gray-600">
                         <Lock size={9} className="mr-1 text-gray-400" /> Q
                       </div>
                       <input
                         type="number"
                         value={montoFinancieroFinalEjecutado}
                         onChange={(e) => setMontoFinancieroFinalEjecutado(e.target.value)}
-                        className="flex-1 rounded-r border border-gray-200 bg-gray-50 px-2 py-1 text-[10px] font-bold text-gray-800 focus:border-[#9B0F06] focus:outline-none"
+                        className="flex-1 rounded-r border border-gray-200 bg-gray-50 px-2 py-1 text-[11px] font-bold text-gray-800 focus:border-[#9B0F06] focus:outline-none"
                         placeholder="21,240,000.00"
                       />
                     </div>
-                    <p className="mt-0.5 text-[8px] text-gray-400">
+                    <p className="mt-0.5 text-[9px] text-gray-400">
                       Monto total liquidado con estimaciones de obra y sobrecostos aprobados.
                     </p>
                   </div>
@@ -2423,6 +2571,22 @@ function tieneAlMenosDosLetras(texto: string): boolean {
             )}
           </div>
         )}
+
+        
+            {/* Mensaje de campos faltantes para activar proyecto */}
+            {pasoActual === 3 && estado === 'activo' && camposFaltantesParaActivo.length > 0 && (
+              <div className="py-2 px-1 text-[11px] text-gray-700 space-y-1.5">
+                <div className="flex items-center gap-1.5 font-bold text-[#9B0F06]">
+                  <AlertCircle size={14} className="text-[#9B0F06] shrink-0" />
+                  <span>Para guardar el proyecto en estado ACTIVO, debe completar los siguientes requerimientos:</span>
+                </div>
+                <ul className="list-disc list-inside font-medium pl-1 text-[10px] space-y-0.5 text-gray-600">
+                  {camposFaltantesParaActivo.map((c, i) => (
+                    <li key={i} className="marker:text-[#9B0F06]">{c}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
         {/* Botones de Navegación de Paso */}
         <div className="flex items-center justify-between border-t border-gray-100 pt-2.5">
@@ -2460,7 +2624,7 @@ function tieneAlMenosDosLetras(texto: string): boolean {
             ) : (
               <button
                 type="button"
-                disabled={errorFechaFin}
+                disabled={errorFechaFin || (estado === 'activo' && camposFaltantesParaActivo.length > 0)}
                 onClick={handleFinalizarFormulario}
                 className="inline-flex items-center gap-1.5 rounded-md bg-[#9B0F06] px-4 py-1.5 text-xs font-bold text-white hover:bg-[#5E0006] transition-colors shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
               >

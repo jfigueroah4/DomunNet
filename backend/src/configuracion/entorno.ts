@@ -24,6 +24,9 @@ export const entorno = {
     apiKey: process.env.CLOUDINARY_API_KEY || '',
     apiSecret: process.env.CLOUDINARY_API_SECRET || '',
   },
+  gcsProjectId: process.env.GCS_PROJECT_ID || '',
+  gcsKeyFile: process.env.GCS_KEY_FILE || '',
+  gcsBucketName: process.env.GCS_BUCKET_NAME || '',
 }
 
 export function validarEntorno() {

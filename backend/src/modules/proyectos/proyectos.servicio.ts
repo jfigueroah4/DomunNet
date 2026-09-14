@@ -153,7 +153,7 @@ export async function obtenerProyectoPorId(proyectoId: string) {
 
   const { data: detalle, error: detalleError } = await clienteSupabase
     .from('proyecto_detalle')
-    .select('nombre_oficial, descripcion_proyecto, tramo, direccion, latitud, longitud, municipio_id, departamento_id, kilometro_inicio, kilometro_fin, empresa_contratante_id, empresa_contratista_id, empresa_supervisora, delegado_residente_id, fecha_adjudicacion, fecha_inicio_contractual, numero_escritura_publica, monto_original, plazo_ejecucion_original, plazo_ejecucion_ampliado, fecha_finalizacion_real, monto_final')
+    .select('nombre_oficial, descripcion_proyecto, tramo, direccion, latitud, longitud, municipio_id, departamento_id, municipio_fin_id, departamento_fin_id, direccion_fin, kilometro_inicio, kilometro_fin, empresa_contratante_id, empresa_contratista_id, empresa_supervisora, delegado_residente_id, fecha_adjudicacion, fecha_inicio_contractual, numero_escritura_publica, monto_original, plazo_ejecucion_original, plazo_ejecucion_ampliado, fecha_finalizacion_real, monto_final')
     .eq('proyecto_id', proyectoId)
     .single()
 
@@ -274,6 +274,9 @@ export async function obtenerProyectoPorId(proyectoId: string) {
         : undefined,
       municipioId: detalle.municipio_id,
       departamentoId: detalle.departamento_id,
+      municipioFinId: detalle.municipio_fin_id,
+      departamentoFinId: detalle.departamento_fin_id,
+      direccionFin: detalle.direccion_fin ?? '',
       kilometroInicio: detalle.kilometro_inicio,
       kilometroFin: detalle.kilometro_fin,
       empresaContratanteId: detalle.empresa_contratante_id ?? null,
@@ -492,8 +495,10 @@ export async function crearProyecto(datosFormulario: any) {
     throw new Error('No se pudo crear el registro base del proyecto')
   }
 
-  const muniId = datosFormulario.municipioId ? Number(datosFormulario.municipioId) : null
-  const depaId = datosFormulario.departamentoId ? Number(datosFormulario.departamentoId) : null
+  const muniId = esUuidValido(datosFormulario.municipioId)
+  const depaId = esUuidValido(datosFormulario.departamentoId)
+  const muniFinId = esUuidValido(datosFormulario.municipioFinId)
+  const depaFinId = esUuidValido(datosFormulario.departamentoFinId)
   const empContratanteId = await resolverEmpresaContratanteId(datosFormulario.empresaContratanteId || datosFormulario.entidadContratante)
   const empContratistaId = await resolverEmpresaContratistaId(datosFormulario.empresaContratistaId || datosFormulario.empresaContratista)
   const delegadoResId = esUuidValido(datosFormulario.delegadoResidenteId)
@@ -509,6 +514,9 @@ export async function crearProyecto(datosFormulario: any) {
       
       municipio_id: muniId,
       departamento_id: depaId,
+      municipio_fin_id: muniFinId,
+      departamento_fin_id: depaFinId,
+      direccion_fin: datosFormulario.direccionFin || null,
       kilometro_inicio: datosFormulario.kilometroInicio ?? null,
       kilometro_fin: datosFormulario.kilometroFin ?? null,
       latitud: datosFormulario.latitud || null,
@@ -594,8 +602,11 @@ export async function actualizarProyecto(proyectoId: string, datosFormulario: Re
     proyectoUpdates.ubicacion = datosFormulario.ubicacionFisica
     detalleUpdates.tramo = datosFormulario.ubicacionFisica
   }
-  if ('municipioId' in datosFormulario) detalleUpdates.municipio_id = datosFormulario.municipioId ? Number(datosFormulario.municipioId) : null
-  if ('departamentoId' in datosFormulario) detalleUpdates.departamento_id = datosFormulario.departamentoId ? Number(datosFormulario.departamentoId) : null
+  if ('municipioId' in datosFormulario) detalleUpdates.municipio_id = esUuidValido(datosFormulario.municipioId)
+  if ('departamentoId' in datosFormulario) detalleUpdates.departamento_id = esUuidValido(datosFormulario.departamentoId)
+  if ('municipioFinId' in datosFormulario) detalleUpdates.municipio_fin_id = esUuidValido(datosFormulario.municipioFinId)
+  if ('departamentoFinId' in datosFormulario) detalleUpdates.departamento_fin_id = esUuidValido(datosFormulario.departamentoFinId)
+  if ('direccionFin' in datosFormulario) detalleUpdates.direccion_fin = datosFormulario.direccionFin || null
   if ('latitud' in datosFormulario) detalleUpdates.latitud = datosFormulario.latitud
   if ('longitud' in datosFormulario) detalleUpdates.longitud = datosFormulario.longitud
   if ('direccion' in datosFormulario) detalleUpdates.direccion = datosFormulario.direccion

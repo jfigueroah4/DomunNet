@@ -1,8 +1,8 @@
 'use client'
 import { useState, useMemo } from 'react'
-import { Plus, FileText, X, MapPin, Camera, MessageSquare, Maximize2 } from 'lucide-react'
+import { Plus, FileText, X } from 'lucide-react'
 import { RegistroBitacora, TipoBitacora, EstadoBitacora } from '@/types/bitacora'
-import { BITACORA_MOCK } from '@/data/bitacora.mock'
+// import { BITACORA_MOCK } from '@/data/bitacora.mock'
 import { BitacoraFiltros } from '@/components/modules/bitacora/BitacoraFiltros'
 import { BitacoraCard } from '@/components/modules/bitacora/BitacoraCard'
 import { BitacoraInformeModal } from '@/components/modules/bitacora/BitacoraInformeModal'
@@ -14,7 +14,7 @@ export default function BitacoraPage() {
   const [vista, setVista] = useState<'lista' | 'crear'>('lista')
 
   // REQUERIMIENTO: 3 Tabs ("Todos", "Registros de Campo", "Ensayos de Laboratorio")
-  const [vistaOperativa, setVistaOperativa] = useState<'todas' | 'registros_campo' | 'ensayos_laboratorio'>('todas')
+  const [vistaOperativa, setVistaOperativa] = useState<'todas' | 'registros_campo' | 'ensayos_laboratorio' | 'administrador' | 'ingeniero_residente'>('todas')
 
   // REQUERIMIENTO: Drawer lateral deslizable de detalle de registro
   const [drawerRegistro, setDrawerRegistro] = useState<RegistroBitacora | null>(null)
@@ -26,7 +26,7 @@ export default function BitacoraPage() {
   const [estado, setEstado] = useState<EstadoBitacora | 'todos'>('todos')
   const [fechaDesde, setFechaDesde] = useState('')
   const [fechaHasta, setFechaHasta] = useState('')
-  const [rolFiltro, setRolFiltro] = useState('todos')
+  // const [rolFiltro] = useState('todos')
   const [usuarioFiltro, setUsuarioFiltro] = useState('')
 
   // Filtrado
@@ -65,7 +65,7 @@ export default function BitacoraPage() {
         matchFechaHasta
       )
     })
-  }, [busqueda, tipo, proyectoId, estado, fechaDesde, fechaHasta, vistaOperativa, rolFiltro, usuarioFiltro])
+  }, [busqueda, tipo, proyectoId, estado, fechaDesde, fechaHasta, vistaOperativa, usuarioFiltro])
 
   // Agrupar por fecha
   const registrosAgrupados = useMemo(() => {
@@ -197,19 +197,30 @@ export default function BitacoraPage() {
 
       {/* Main Layout - Ancho completo */}
       <div className="w-full space-y-4 font-[Poppins]">
-        <BitacoraFiltros
-          busqueda={busqueda}
-          onBusquedaChange={setBusqueda}
-          tipo={tipo}
-          onTipoChange={setTipo}
-          proyectoId={proyectoId}
-          onProyectoChange={setProyectoId}
-          estado={estado}
-          onEstadoChange={setEstado}
-          fechaDesde={fechaDesde}
-          onFechaDesdeChange={setFechaDesde}
-          fechaHasta={fechaHasta}
-          onFechaHastaChange={setFechaHasta}
+        <BitacoraFiltros
+          busqueda={busqueda}
+          onBusquedaChange={setBusqueda}
+          tipo={tipo as string}
+          onTipoChange={setTipo as any}
+          proyectoId={proyectoId}
+          onProyectoChange={setProyectoId}
+          estado={estado}
+          onEstadoChange={setEstado}
+          fechaDesde={fechaDesde}
+          onFechaDesdeChange={setFechaDesde}
+          fechaHasta={fechaHasta}
+          onFechaHastaChange={setFechaHasta}
+          usuarioFiltro={usuarioFiltro}
+          onUsuarioChange={setUsuarioFiltro}
+          onLimpiar={() => {
+            setBusqueda('')
+            setTipo('todos')
+            setProyectoId('')
+            setEstado('todos')
+            setFechaDesde('')
+            setFechaHasta('')
+            setUsuarioFiltro('')
+          }}
         />
 
         {registrosAgrupados.length === 0 ? (
