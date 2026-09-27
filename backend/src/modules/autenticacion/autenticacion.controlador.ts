@@ -43,6 +43,9 @@ export async function iniciarSesionControlador(req: Request, res: Response) {
 
     return sendResponse(res, 200, { usuario: acceso.usuario }, 'Inicio de sesión correcto')
   } catch (error: unknown) {
+    if (error instanceof Error && error.message === 'DESACTIVADO') {
+      return sendError(res, 403, 'Su cuenta se encuentra desactivada. Contacte al administrador.')
+    }
     console.error('[autenticacion.controlador] Error no controlado en iniciarSesion', {
       identificador: resultado.success ? resultado.data.correo : req.body?.correo,
       error,

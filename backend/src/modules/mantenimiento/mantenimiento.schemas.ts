@@ -306,7 +306,8 @@ const catalogoDescuentoTecnicoSchema = z.object({
 
 const bitacoraPendienteSchema = z.object({
   renglon_id: z.string().uuid(),
-  proyecto_id: z.string().uuid(),
+  proyecto_id: z.string().uuid(),
+  bitacora_entrada_id: z.string().uuid().optional().nullable().or(z.literal('')),
   registrado_por: z.string().uuid().optional().nullable().or(z.literal('')),
   fecha_medicion: z.string(),
   estimacion_origen: z.coerce.number().optional().nullable().or(z.literal('')),
@@ -314,9 +315,9 @@ const bitacoraPendienteSchema = z.object({
   ubicacion_especifica: z.string().max(255).optional().nullable().or(z.literal('')),
   estacion_inicial: z.coerce.number().optional().nullable().or(z.literal('')),
   estacion_final: z.coerce.number().optional().nullable().or(z.literal('')),
-  longitud_medida: z.coerce.number().optional().default(0),
-  ancho: z.coerce.number().optional().default(0),
-  altura_espesor: z.coerce.number().optional().default(0),
+  longitud_medida: z.coerce.number().optional().nullable().or(z.literal('')),
+  ancho: z.coerce.number().optional().nullable().or(z.literal('')),
+  altura_espesor: z.coerce.number().optional().nullable().or(z.literal('')),
   descuento_aplicado_id: z.string().uuid().optional().nullable().or(z.literal('')),
   es_derrumbre: z.boolean().optional().default(false),
   estado_conciliacion: z.enum(['Pendiente', 'Aprobado', 'Trasladado']).optional().default('Pendiente'),

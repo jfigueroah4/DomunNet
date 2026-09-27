@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link';
 import { useRolesStore } from '@/stores/useRolesStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { Portal } from '@/components/ui/Portal'
@@ -107,7 +108,7 @@ const defaultForm = (usuario?: Usuario) => {
     diaNacimiento: parsedFecha.dia,
     mesNacimiento: parsedFecha.mes,
     anoNacimiento: parsedFecha.ano,
-    motivoBloqueo: '',
+    motivoBloqueo: (usuario as any)?.motivoBloqueo || (usuario as any)?.motivo_bloqueo || '',
   }
 }
 
@@ -744,13 +745,9 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
 
 
     if (name === 'telefono') {
-
-
-
-      if (/[^0-9-]/.test(value)) return;
-
-
-
+      const cleanVal = value.replace(/\D/g, '').slice(0, 8);
+      setFormData((prev: any) => ({ ...prev, telefono: cleanVal }));
+      return;
     }
 
 
@@ -1364,21 +1361,10 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
 
 
                 <input
-
-
-
                   name="telefono"
-
-
-
                   type="tel"
-
-
-
+                  maxLength={8}
                   value={formData.telefono}
-
-
-
                   onChange={handleChange}
 
 
@@ -1999,9 +1985,9 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
                 name="rol"
                 value={formData.rol}
                 onChange={handleChange}
-                disabled={isViewMode || String(formData.rol).toLowerCase() === 'contratante' || String(usuario?.rol).toLowerCase() === 'contratante' || (!esAdmin && String(usuario?.rol) === 'Administrador')}
+                disabled={isViewMode || Boolean(usuario && profile && (usuario.id === profile.id || usuario.correo?.toLowerCase() === profile.correo?.toLowerCase())) || String(formData.rol).toLowerCase() === 'contratante' || String(usuario?.rol).toLowerCase() === 'contratante' || (!esAdmin && String(usuario?.rol) === 'Administrador')}
                 className={`w-full h-8 px-3 text-xs rounded-lg border border-gray-200 focus:border-[#9B0F06] focus:outline-none transition-colors ${
-                  isViewMode || String(formData.rol).toLowerCase() === 'contratante' || String(usuario?.rol).toLowerCase() === 'contratante' || (!esAdmin && String(usuario?.rol) === 'Administrador')
+                  isViewMode || Boolean(usuario && profile && (usuario.id === profile.id || usuario.correo?.toLowerCase() === profile.correo?.toLowerCase())) || String(formData.rol).toLowerCase() === 'contratante' || String(usuario?.rol).toLowerCase() === 'contratante' || (!esAdmin && String(usuario?.rol) === 'Administrador')
                     ? 'bg-gray-100 font-semibold text-gray-700 cursor-not-allowed'
                     : 'bg-white'
                 }`}
@@ -2079,17 +2065,7 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
 
 
                   <option value="Activo">Activo</option>
-
-
-
-                  <option value="Inactivo">Inactivo</option>
-
-
-
                   <option value="Suspendido">Suspendido</option>
-
-
-
                 </select>
 
 
@@ -2123,37 +2099,13 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
 
 
               <textarea
-
-
-
                 name="motivoBloqueo"
-
-
-
                 value={formData.motivoBloqueo}
-
-
-
                 onChange={handleChange}
-
-
-
                 rows={2}
-
-
-
                 disabled={isViewMode}
-
-
-
-                className="w-full rounded-lg border border-amber-300 bg-white px-3 py-2.5 text-xs text-gray-700 focus:border-amber-600 focus:outline-none disabled:bg-gray-50 transition-colors resize-none"
-
-
-
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs text-gray-700 focus:border-gray-400 focus:outline-none disabled:bg-gray-50 transition-colors resize-none h-16 overflow-y-auto max-w-full"
                 placeholder="Razón de la suspensión..."
-
-
-
               />
 
 
@@ -2399,33 +2351,25 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
 
 
               {usuario?.proyectosAsignados && usuario.proyectosAsignados.length > 0 ? (
-
-
-
-                usuario.proyectosAsignados.map((proyecto, idx) => (
-
-
-
-                  <div key={idx} className="p-2.5 bg-gray-50 rounded-lg border border-gray-100 flex items-center gap-2">
-
-
-
-                    <FolderOpen size={12} className="text-[#9B0F06]" />
-
-
-
-                    <span className="text-[10px] font-semibold text-gray-700">{proyecto}</span>
-
-
-
-                  </div>
-
-
-
-                ))
-
-
-
+                usuario.proyectosAsignados.map((proyecto, idx) => {
+                  const proyNombre = typeof proyecto === 'string' ? proyecto : (proyecto as any).nombre || (proyecto as any).id || ''
+                  return (
+                    <div key={idx} className="p-2.5 bg-gray-50 rounded-lg border border-gray-100 flex items-center justify-between gap-2 shadow-2xs">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <FolderOpen size={12} className="text-[#9B0F06] shrink-0" />
+                        <span className="text-[10px] font-semibold text-gray-700 truncate">{proyNombre}</span>
+                      </div>
+                      <Link
+                        href={`/dashboard/proyectos?buscar=${encodeURIComponent(proyNombre)}`}
+                        onClick={() => setDrawerProyectosAbierto(false)}
+                        className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2 py-1 text-[9px] font-semibold text-gray-700 shadow-2xs transition-colors hover:border-[#9B0F06] hover:text-[#9B0F06] shrink-0 cursor-pointer"
+                      >
+                        <Eye size={10} />
+                        Ver
+                      </Link>
+                    </div>
+                  )
+                })
               ) : (
 
 

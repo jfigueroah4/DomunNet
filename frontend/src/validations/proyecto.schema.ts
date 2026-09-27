@@ -23,7 +23,7 @@ export const FaseTimelineSchema = z.object({
   fechaInicio: z.string(),
   fechaFin: z.string(),
   avance: z.number(),
-  estado: z.enum(['borrador', 'activo', 'en_revision', 'completado', 'cancelado']),
+  estado: z.enum(['borrador', 'activo', 'en_revision', 'completado', 'pausado']),
 })
 
 export const ProyectoSchema = z.object({
@@ -32,7 +32,7 @@ export const ProyectoSchema = z.object({
   nombre: z.string(),
   nombreOficial: z.string().optional(),
   descripcion: z.string().optional(),
-  estado: z.enum(['borrador', 'activo', 'en_revision', 'completado', 'cancelado']),
+  estado: z.enum(['borrador', 'activo', 'en_revision', 'completado', 'pausado']),
   ubicacion: z.string(),
   ubicacionFisica: z.string().optional(),
   direccion: z.string().optional(),

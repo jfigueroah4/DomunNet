@@ -3,11 +3,12 @@ import { TablaConfig } from '../mantenimiento.types';
 export const bitacoraPendienteConfig: TablaConfig = {
   "nombreTablaDb": "bitacora_pendiente",
   "permisoRequerido": "catalogos.write",
-  "columnasVisibles": "id, renglon_id, proyecto_id, registrado_por, fecha_medicion, estimacion_origen, lado_via, ubicacion_especifica, estacion_inicial, estacion_final, longitud_medida, ancho, altura_espesor, volumen_area_bruto, descuento_aplicado_id, cantidad_neta_cobrar, es_derrumbre, observaciones, created_at, updated_at",
+  "columnasVisibles": "id, renglon_id, proyecto_id, bitacora_entrada_id, registrado_por, fecha_medicion, estimacion_origen, lado_via, ubicacion_especifica, estacion_inicial, estacion_final, longitud_medida, ancho, altura_espesor, volumen_area_bruto, descuento_aplicado_id, cantidad_neta_cobrar, es_derrumbre, estado_conciliacion, observaciones, created_at, updated_at",
   "columnasFiltroOrden": [
     "id",
     "renglon_id",
     "proyecto_id",
+    "bitacora_entrada_id",
     "registrado_por",
     "fecha_medicion",
     "estimacion_origen",
@@ -22,6 +23,7 @@ export const bitacoraPendienteConfig: TablaConfig = {
     "descuento_aplicado_id",
     "cantidad_neta_cobrar",
     "es_derrumbre",
+    "estado_conciliacion",
     "observaciones",
     "created_at",
     "updated_at"

@@ -1,202 +1,187 @@
-'use client'
-import { useState, useMemo } from 'react'
-import { Plus, FileText, X } from 'lucide-react'
-import { RegistroBitacora, TipoBitacora, EstadoBitacora } from '@/types/bitacora'
-// import { BITACORA_MOCK } from '@/data/bitacora.mock'
-import { BitacoraFiltros } from '@/components/modules/bitacora/BitacoraFiltros'
-import { BitacoraCard } from '@/components/modules/bitacora/BitacoraCard'
-import { BitacoraInformeModal } from '@/components/modules/bitacora/BitacoraInformeModal'
-import { BitacoraEstadoBadge } from '@/components/modules/bitacora/BitacoraEstadoBadge'
-import { BitacoraForm } from '@/components/modules/bitacora/BitacoraForm'
-
-export default function BitacoraPage() {
-  const [mostrarInforme, setMostrarInforme] = useState(false)
-  const [vista, setVista] = useState<'lista' | 'crear'>('lista')
-
-  // REQUERIMIENTO: 3 Tabs ("Todos", "Registros de Campo", "Ensayos de Laboratorio")
-  const [vistaOperativa, setVistaOperativa] = useState<'todas' | 'registros_campo' | 'ensayos_laboratorio' | 'administrador' | 'ingeniero_residente'>('todas')
-
-  // REQUERIMIENTO: Drawer lateral deslizable de detalle de registro
-  const [drawerRegistro, setDrawerRegistro] = useState<RegistroBitacora | null>(null)
-  const [fotoExpandida, setFotoExpandida] = useState<string | null>(null)
-
-  const [busqueda, setBusqueda] = useState('')
-  const [tipo, setTipo] = useState<TipoBitacora | 'todos'>('todos')
-  const [proyectoId, setProyectoId] = useState('')
-  const [estado, setEstado] = useState<EstadoBitacora | 'todos'>('todos')
-  const [fechaDesde, setFechaDesde] = useState('')
+'use client'
+import { useState, useMemo, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { Plus, X } from 'lucide-react'
+import { RegistroBitacora, TipoBitacora, EstadoBitacora } from '@/types/bitacora'
+import { BitacoraFiltros } from '@/components/modules/bitacora/BitacoraFiltros'
+import { BitacoraCard } from '@/components/modules/bitacora/BitacoraCard'
+import { BitacoraEstadoBadge } from '@/components/modules/bitacora/BitacoraEstadoBadge'
+import { BitacoraForm } from '@/components/modules/bitacora/BitacoraForm'
+
+import { useAuthStore } from '@/stores/useAuthStore'
+import { apiGetDeduplicado } from '@/lib/api/cliente'
+
+export default function BitacoraPage() {
+  const searchParams = useSearchParams()
+  const usuario = useAuthStore((s) => s.profile)
+  const rolUsuario = (usuario?.rol || '').toLowerCase()
+  const esAdmin = rolUsuario.includes('admin') || rolUsuario.includes('director')
+  const esResidente = rolUsuario.includes('residente')
+  const esRolCampoRestringido = !esAdmin && !esResidente
+
+  const [vista, setVista] = useState<'lista' | 'crear'>('lista')
+  const [registrosApi, setRegistrosApi] = useState<any[]>([])
+
+  useEffect(() => {
+    if (searchParams?.get('nuevo') === 'true' || searchParams?.get('formulario') === 'true') {
+      setVista('crear')
+    }
+  }, [searchParams])
+
+  useEffect(() => {
+    apiGetDeduplicado('/mantenimiento/bitacora_entrada')
+      .then((res) => {
+        if (res.data?.success && Array.isArray(res.data.data)) {
+          setRegistrosApi(res.data.data)
+        }
+      })
+      .catch(() => {})
+  }, [])
+
+  // Drawer lateral deslizable de detalle de registro
+  const [drawerRegistro, setDrawerRegistro] = useState<RegistroBitacora | null>(null)
+  const [fotoExpandida, setFotoExpandida] = useState<string | null>(null)
+
+  const [busqueda, setBusqueda] = useState('')
+  const [tipo, setTipo] = useState<TipoBitacora | 'todos'>('todos')
+  const [proyectoId, setProyectoId] = useState('')
+  const [estado, setEstado] = useState<EstadoBitacora | 'todos'>('todos')
+  const [fechaDesde, setFechaDesde] = useState('')
   const [fechaHasta, setFechaHasta] = useState('')
-  // const [rolFiltro] = useState('todos')
-  const [usuarioFiltro, setUsuarioFiltro] = useState('')
-
-  // Filtrado
-  const registrosFiltrados = useMemo(() => {
-    const registrosBase: any[] = [];
-    return registrosBase.filter((registro: any) => {
-      const matchBusqueda =
-        busqueda === '' ||
-        registro.titulo.toLowerCase().includes(busqueda.toLowerCase()) ||
-        registro.descripcion.toLowerCase().includes(busqueda.toLowerCase())
-
-      const matchTipo = tipo === 'todos' || registro.tipo === tipo
-
-      // REQUERIMIENTO: Filtrado por "Registros de Campo" vs "Ensayos de Laboratorio"
-      const matchVista =
-        vistaOperativa === 'todas' ||
-        (vistaOperativa === 'registros_campo' && (registro.tipoIngreso === 'campo' || registro.tipo === 'actividad' || registro.tipo === 'incidente' || registro.tipo === 'visita' || registro.tipo === 'inspeccion')) ||
-        (vistaOperativa === 'ensayos_laboratorio' && (registro.tipoIngreso === 'laboratorio' || registro.tipo === 'material' || registro.tipo === 'observacion'))
-
-      const matchProyecto = proyectoId === '' || registro.proyectoId === proyectoId
-      const matchEstado = estado === 'todos' || registro.estado === estado
-
-      const registroFecha = new Date(registro.fecha)
-      const matchFechaDesde =
-        fechaDesde === '' || registroFecha >= new Date(fechaDesde)
-      const matchFechaHasta =
-        fechaHasta === '' || registroFecha <= new Date(fechaHasta)
-
-      return (
-        matchBusqueda &&
-        matchTipo &&
-        matchVista &&
-        matchProyecto &&
-        matchEstado &&
-        matchFechaDesde &&
-        matchFechaHasta
-      )
-    })
-  }, [busqueda, tipo, proyectoId, estado, fechaDesde, fechaHasta, vistaOperativa, usuarioFiltro])
-
-  // Agrupar por fecha
-  const registrosAgrupados = useMemo(() => {
-    const agrupado: { [fecha: string]: RegistroBitacora[] } = {}
-
-    registrosFiltrados.forEach((registro) => {
-      if (!agrupado[registro.fecha]) {
-        agrupado[registro.fecha] = []
-      }
-      agrupado[registro.fecha].push(registro)
-    })
-
-    return Object.entries(agrupado)
-      .sort(([fechaA], [fechaB]) => new Date(fechaB).getTime() - new Date(fechaA).getTime())
-      .map(([fecha, registros]) => ({
-        fecha,
-        registros: registros.sort(
-          (a, b) =>
-            new Date(`${b.fecha}T${b.hora}`).getTime() -
-            new Date(`${a.fecha}T${a.hora}`).getTime()
-        ),
-      }))
-  }, [registrosFiltrados])
-
-  // REQUERIMIENTO: "Resumen de Hoy" con Renglones (campo) y Ensayos (laboratorio)
-    
-  
-
-  
-
-  const formatearFecha = (fecha: string) => {
-    const date = new Date(fecha + 'T00:00:00')
-    const dias = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
-    const meses = [
-      'Enero',
-      'Febrero',
-      'Marzo',
-      'Abril',
-      'Mayo',
-      'Junio',
-      'Julio',
-      'Agosto',
-      'Septiembre',
-      'Octubre',
-      'Noviembre',
-      'Diciembre',
-    ]
-    return `${dias[date.getDay()]}, ${date.getDate()} de ${meses[date.getMonth()]} ${date.getFullYear()}`
-  }
-
-  if (vista === 'crear') {
-    return (
-      <div className="p-4 sm:p-6">
-        <BitacoraForm
-          onBack={() => setVista('lista')}
-          onSubmit={() => {
-            setVista('lista')
-          }}
-        />
-      </div>
-    )
-  }
-
-  return (
-    <div className="p-4 sm:p-6 space-y-5">
-      {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-base font-extrabold text-gray-900">Bitácora de Obra</h1>
-          <p className="text-[10px] text-gray-500">Registro diario de actividades de campo y ensayos de laboratorio</p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          {/* REQUERIMIENTO: Tabs de filtrado "Todos", "Registros de Campo", "Ensayos de Laboratorio" */}
-          <div className="flex rounded-lg border border-gray-200 bg-white p-0.5 shadow-2xs">
-            <button
-              type="button"
-              onClick={() => setVistaOperativa('todas')}
-              className={`px-3 py-1 text-[10px] font-bold rounded-md transition-colors ${
-                vistaOperativa === 'todas'
-                  ? 'bg-[#9B0F06] text-white shadow-2xs'
-                  : 'text-gray-600 hover:text-[#9B0F06]'
-              }`}
-            >
-              Todos
-            </button>
-            <button
-              type="button"
-              onClick={() => setVistaOperativa('registros_campo')}
-              className={`px-3 py-1 text-[10px] font-bold rounded-md transition-colors ${
-                vistaOperativa === 'registros_campo'
-                  ? 'bg-[#9B0F06] text-white shadow-2xs'
-                  : 'text-gray-600 hover:text-[#9B0F06]'
-              }`}
-            >
-              Registros de Campo
-            </button>
-            <button
-              type="button"
-              onClick={() => setVistaOperativa('ensayos_laboratorio')}
-              className={`px-3 py-1 text-[10px] font-bold rounded-md transition-colors ${
-                vistaOperativa === 'ensayos_laboratorio'
-                  ? 'bg-[#9B0F06] text-white shadow-2xs'
-                  : 'text-gray-600 hover:text-[#9B0F06]'
-              }`}
-            >
-              Ensayos de Laboratorio
-            </button>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setMostrarInforme(true)}
-            className="flex items-center gap-1.5 border border-[#9B0F06] text-[#9B0F06] text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
-          >
-            <FileText size={13} />
-            Generar Informe
-          </button>
-          <button
-            type="button"
-            onClick={() => setVista('crear')}
-            className="flex items-center gap-1.5 bg-[#9B0F06] text-white text-xs font-bold px-3.5 py-1.5 rounded-lg hover:bg-[#5E0006] transition-colors shadow-2xs"
-          >
-            <Plus size={13} />
-            Nuevo Registro
-          </button>
-        </div>
-      </div>
-
-      {/* Main Layout - Ancho completo */}
-      <div className="w-full space-y-4 font-[Poppins]">
+  const [rolFiltro, setRolFiltro] = useState('todos')
+  const [usuarioFiltro, setUsuarioFiltro] = useState('')
+
+  // Filtrado
+  const registrosFiltrados = useMemo(() => {
+    const registrosBase: any[] = registrosApi
+    if (registrosBase.length === 0) return []
+    return registrosBase.filter((registro: any) => {
+      // Restricción por rol de campo (solo sus propios registros)
+      if (esRolCampoRestringido && usuario) {
+        const esAutor =
+          registro.autor_id === usuario.id ||
+          registro.autorId === usuario.id ||
+          (registro.autor && String(registro.autor).toLowerCase().includes((usuario.nombre || '').toLowerCase()))
+        if (!esAutor) return false
+      }
+
+      const matchBusqueda =
+        busqueda === '' ||
+        registro.titulo?.toLowerCase().includes(busqueda.toLowerCase()) ||
+        registro.descripcion?.toLowerCase().includes(busqueda.toLowerCase())
+
+      const matchTipo = tipo === 'todos' || registro.tipo === tipo
+
+      const matchProyecto = proyectoId === '' || registro.proyectoId === proyectoId || registro.proyecto_id === proyectoId
+      const matchEstado = estado === 'todos' || registro.estado === estado
+
+      const registroFecha = new Date(registro.fecha)
+      const matchFechaDesde =
+        fechaDesde === '' || registroFecha >= new Date(fechaDesde)
+      const matchFechaHasta =
+        fechaHasta === '' || registroFecha <= new Date(fechaHasta)
+
+      const matchUsuario =
+        !usuarioFiltro ||
+        registro.autor_id === usuarioFiltro ||
+        registro.autorId === usuarioFiltro ||
+        (registro.autor && String(registro.autor).toLowerCase().includes(usuarioFiltro.toLowerCase()))
+
+      const matchRol =
+        rolFiltro === 'todos' ||
+        (registro.rol && String(registro.rol).toLowerCase().includes(rolFiltro.toLowerCase())) ||
+        (registro.creadorRol && String(registro.creadorRol).toLowerCase().includes(rolFiltro.toLowerCase()))
+
+      return (
+        matchBusqueda &&
+        matchTipo &&
+        matchProyecto &&
+        matchEstado &&
+        matchFechaDesde &&
+        matchFechaHasta &&
+        matchUsuario &&
+        matchRol
+      )
+    })
+  }, [registrosApi, busqueda, tipo, proyectoId, estado, fechaDesde, fechaHasta, usuarioFiltro, rolFiltro, esRolCampoRestringido, usuario])
+
+  // Agrupar por fecha
+  const registrosAgrupados = useMemo(() => {
+    const agrupado: { [fecha: string]: RegistroBitacora[] } = {}
+
+    registrosFiltrados.forEach((registro) => {
+      if (!agrupado[registro.fecha]) {
+        agrupado[registro.fecha] = []
+      }
+      agrupado[registro.fecha].push(registro)
+    })
+
+    return Object.entries(agrupado)
+      .sort(([fechaA], [fechaB]) => new Date(fechaB).getTime() - new Date(fechaA).getTime())
+      .map(([fecha, registros]) => ({
+        fecha,
+        registros: registros.sort(
+          (a, b) =>
+            new Date(`${b.fecha}T${b.hora}`).getTime() -
+            new Date(`${a.fecha}T${a.hora}`).getTime()
+        ),
+      }))
+  }, [registrosFiltrados])
+
+  const formatearFecha = (fecha: string) => {
+    const date = new Date(fecha + 'T00:00:00')
+    const dias = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
+    const meses = [
+      'Enero',
+      'Febrero',
+      'Marzo',
+      'Abril',
+      'Mayo',
+      'Junio',
+      'Julio',
+      'Agosto',
+      'Septiembre',
+      'Octubre',
+      'Noviembre',
+      'Diciembre',
+    ]
+    return `${dias[date.getDay()]}, ${date.getDate()} de ${meses[date.getMonth()]} ${date.getFullYear()}`
+  }
+
+  if (vista === 'crear') {
+    return (
+      <div className="p-4 sm:p-6">
+        <BitacoraForm
+          onBack={() => setVista('lista')}
+          onSubmit={() => {
+            setVista('lista')
+          }}
+        />
+      </div>
+    )
+  }
+
+  return (
+    <div className="p-4 sm:p-6 space-y-5">
+      {/* Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-base font-extrabold text-gray-900">Bitácora de Obra</h1>
+          <p className="text-[10px] text-gray-500">Registro diario de actividades de campo y ensayos de laboratorio</p>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setVista('crear')}
+          className="flex items-center gap-1.5 bg-[#9B0F06] text-white text-xs font-bold px-3.5 py-1.5 rounded-lg hover:bg-[#5E0006] transition-colors shadow-2xs cursor-pointer"
+        >
+          <Plus size={13} />
+          Nuevo Registro
+        </button>
+      </div>
+
+      {/* Main Layout - Ancho completo */}
+      <div className="w-full space-y-4 font-[Poppins]">
         <BitacoraFiltros
           busqueda={busqueda}
           onBusquedaChange={setBusqueda}
@@ -212,6 +197,10 @@ export default function BitacoraPage() {
           onFechaHastaChange={setFechaHasta}
           usuarioFiltro={usuarioFiltro}
           onUsuarioChange={setUsuarioFiltro}
+          rolFiltro={rolFiltro}
+          onRolChange={setRolFiltro}
+          esRolCampoRestringido={esRolCampoRestringido}
+          registrosBitacora={registrosApi}
           onLimpiar={() => {
             setBusqueda('')
             setTipo('todos')
@@ -219,46 +208,42 @@ export default function BitacoraPage() {
             setEstado('todos')
             setFechaDesde('')
             setFechaHasta('')
+            setRolFiltro('todos')
             setUsuarioFiltro('')
           }}
-        />
-
-        {registrosAgrupados.length === 0 ? (
-          <div className="text-center py-12 bg-white rounded-xl border border-gray-200 shadow-2xs">
-            <p className="text-xs font-bold text-gray-700">No se encontraron registros</p>
-            <p className="text-[10px] text-gray-400 mt-0.5">Intenta con otros criterios de búsqueda o filtros</p>
-          </div>
-        ) : (
-          <div>
-            {registrosAgrupados.map((grupo) => (
-              <div key={grupo.fecha}>
-                <div className="flex items-center gap-3 my-3">
-                  <div className="h-px bg-gray-200 flex-1" />
-                  <span className="text-[9px] text-gray-500 font-bold uppercase tracking-wider bg-gray-100 px-2.5 py-0.5 rounded-full font-mono">
-                    {formatearFecha(grupo.fecha)}
-                  </span>
-                  <div className="h-px bg-gray-200 flex-1" />
-                </div>
-
-                <div className="space-y-2.5">
-                  {grupo.registros.map((registro) => (
-                    <BitacoraCard
-                      key={registro.id}
-                      registro={registro}
-                      onClick={() => setDrawerRegistro(registro)}
-                    />
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        />
+
+        {registrosAgrupados.length === 0 ? (
+          <div className="text-center py-12 bg-white rounded-xl border border-gray-200 shadow-2xs">
+            <p className="text-xs font-bold text-gray-700">No hay registros de bitácora</p>
+            <p className="text-[10px] text-gray-400 mt-0.5">No hay registros</p>
+          </div>
+        ) : (
+          <div>
+            {registrosAgrupados.map((grupo) => (
+              <div key={grupo.fecha}>
+                <div className="flex items-center gap-3 my-3">
+                  <div className="h-px bg-gray-200 flex-1" />
+                  <span className="text-[9px] text-gray-500 font-bold uppercase tracking-wider bg-gray-100 px-2.5 py-0.5 rounded-full font-mono">
+                    {formatearFecha(grupo.fecha)}
+                  </span>
+                  <div className="h-px bg-gray-200 flex-1" />
+                </div>
+
+                <div className="space-y-2.5">
+                  {grupo.registros.map((registro) => (
+                    <BitacoraCard
+                      key={registro.id}
+                      registro={registro}
+                      onClick={() => setDrawerRegistro(registro)}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
-
-      <BitacoraInformeModal
-        isOpen={mostrarInforme}
-        onClose={() => setMostrarInforme(false)}
-      />
 
       {/* REQUERIMIENTO NUEVO: DRAWER LATERAL DESLIZANTE DE DETALLE DE REGISTRO */}
       {drawerRegistro && (

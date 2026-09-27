@@ -7,6 +7,7 @@ import { DelegadoResidenteSelect } from './DelegadoResidenteSelect'
 import { IngenieroResponsableSelect } from './IngenieroResponsableSelect'
 import { EmpresaRelacionadaDrawer } from '@/components/modules/empresas/EmpresaRelacionadaDrawer'
 import { useRouter } from 'next/navigation'
+import { Portal } from '@/components/ui/Portal'
 import { api, apiGetDeduplicado, limpiarCacheMemoria } from '@/lib/api/cliente'
 import { useEffect } from 'react'
 import type {
@@ -1009,6 +1010,14 @@ export function ProyectoFormulario({
   // Estado de Pasos para Formulario Paginado (Wizard de 3 Pasos)
   const [pasoActual, setPasoActual] = useState<1 | 2 | 3>(1)
 
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const p = new URLSearchParams(window.location.search).get('paso')
+      if (p === '3') setPasoActual(3)
+      else if (p === '2') setPasoActual(2)
+    }
+  }, [])
+
   // REQUERIMIENTO ESPECIAL: Modo Captura Vacía de Hoja Sábana para Nuevo Proyecto
   const [modoCapturaSabanaInicial, setModoCapturaSabanaInicial] = useState(false)
   const [renglonesPlan, setRenglonesPlan] = useState<any[]>([])
@@ -1381,7 +1390,8 @@ useEffect(() => {
       setFechaFinContractualPlan((proyectoInicial as any)?.fechaFinContractualPlan || (proyectoInicial as any)?.fechaFinContractual || proyectoInicial.fechaFin || '')
     }
     if (proyectoInicial.montoContractualOriginal || proyectoInicial.presupuesto) setMontoContractualOriginal((proyectoInicial.montoContractualOriginal || proyectoInicial.presupuesto || '').toString())
-    if (proyectoInicial.responsable) setResponsable(proyectoInicial.responsable)
+    const targetResp = (proyectoInicial as any)?.responsable_id || (proyectoInicial as any)?.responsableId || proyectoInicial?.responsable
+    if (targetResp) setResponsable(targetResp)
     if (proyectoInicial.estado) setEstado(proyectoInicial.estado)
 
     if (proyectoInicial.fechaFinalizacionReal) setFechaFinalizacionReal(proyectoInicial.fechaFinalizacionReal)
@@ -1501,8 +1511,44 @@ useEffect(() => {
   )
 
   // Responsable General
-  const [responsable, setResponsable] = useState(proyectoInicial?.responsable || '')
+  const initialRespId = (proyectoInicial as any)?.responsable_id || (proyectoInicial as any)?.responsableId || proyectoInicial?.responsable || ''
+  const [responsable, setResponsable] = useState(initialRespId)
+
+  useEffect(() => {
+    if (!responsable && proyectoInicial?.responsable && usuariosDisponibles.length > 0) {
+      const respText = String(proyectoInicial.responsable).toLowerCase().trim()
+      const foundUser = usuariosDisponibles.find((u: any) => {
+        const name = (u.nombre || `${u.primer_nombre || ''} ${u.primer_apellido || ''}`).toLowerCase().trim()
+        return name && (name.includes(respText) || respText.includes(name))
+      })
+      if (foundUser?.id) {
+        setResponsable(foundUser.id)
+      }
+    }
+  }, [proyectoInicial?.responsable, usuariosDisponibles, responsable])
+
   const [estado, setEstado] = useState<EstadoProyecto>(proyectoInicial?.estado || 'activo')
+  const [estadoAnterior, setEstadoAnterior] = useState<EstadoProyecto>(proyectoInicial?.estado || 'borrador')
+  const [showModalConfirmacionActivo, setShowModalConfirmacionActivo] = useState(false)
+
+  const handleEstadoChange = (nuevoEstado: EstadoProyecto) => {
+    if (nuevoEstado === 'activo' && estado !== 'activo') {
+      setEstadoAnterior(estado)
+      setEstado('activo')
+      setShowModalConfirmacionActivo(true)
+    } else {
+      setEstado(nuevoEstado)
+    }
+  }
+
+  const bloquearFechas = useMemo(() => {
+    return Boolean(
+      (proyectoInicial as any)?.en_replanificacion ||
+      estado === 'pausado' ||
+      estado === 'en_revision' ||
+      estado === 'completado'
+    )
+  }, [(proyectoInicial as any)?.en_replanificacion, estado])
 
   // CAMPOS EXCLUSIVOS DE EDICIÓN
   const [fechaFinalizacionReal, setFechaFinalizacionReal] = useState(proyectoInicial?.fechaFinalizacionReal || '')
@@ -1804,7 +1850,7 @@ function tieneAlMenosDosLetras(texto: string): boolean {
       } else if (newErrors.entidadContratante || newErrors.empresaContratista || newErrors.delegadoResidenteId) {
         setPasoActual(3)
       } else {
-        setPasoActual(4)
+        setPasoActual(3)
       }
       return
     }
@@ -2097,41 +2143,6 @@ function tieneAlMenosDosLetras(texto: string): boolean {
                 />
               </div>
 
-              <UsuarioFormularioDrawer
-                isOpen={openCrearUsuarioDrawer}
-                onClose={() => setOpenCrearUsuarioDrawer(false)}
-                onSave={handleUsuarioCreadoEnWizard}
-              />
-
-              <UsuarioFormularioDrawer
-                isOpen={openCrearDelegadoDrawer}
-                onClose={() => setOpenCrearDelegadoDrawer(false)}
-                onSave={handleDelegadoCreadoEnWizard}
-                rolesPermitidos={['Administrador', 'IngenieroResidente', 'Ingeniero Residente']}
-              />
-
-              <UsuarioFormularioDrawer
-                isOpen={openCrearIngenieroDrawer}
-                onClose={() => setOpenCrearIngenieroDrawer(false)}
-                onSave={handleIngenieroCreadoEnWizard}
-                rolesPermitidos={['Administrador', 'IngenieroResidente', 'Ingeniero Residente', 'Director']}
-              />
-
-              <EmpresaRelacionadaDrawer
-                isOpen={openCrearEntidadDrawer}
-                onClose={() => setOpenCrearEntidadDrawer(false)}
-                onSave={handleEntidadCreadaEnWizard}
-                tipo="entidad"
-                mode="create"
-              />
-
-              <EmpresaRelacionadaDrawer
-                isOpen={openCrearContratistaDrawer}
-                onClose={() => setOpenCrearContratistaDrawer(false)}
-                onSave={handleContratistaCreadoEnWizard}
-                tipo="contratista"
-                mode="create"
-              />
             </div>
           </div>
         )}
@@ -2365,6 +2376,7 @@ function tieneAlMenosDosLetras(texto: string): boolean {
                     <label className={labelClassPaso3}>Fecha de Adjudicación / Contrato <span className="text-[#9B0F06]">*</span></label>
                     <input
                       type="date"
+                      disabled={bloquearFechas}
                       value={fechaAdjudicacion}
                       onChange={(e) => {
                         setFechaAdjudicacion(e.target.value)
@@ -2391,6 +2403,7 @@ function tieneAlMenosDosLetras(texto: string): boolean {
                     <label className={labelClassPaso3}>Fecha de Inicio Contractual <span className="text-[#9B0F06]">*</span></label>
                     <input
                       type="date"
+                      disabled={bloquearFechas}
                       value={fechaInicioContractual}
                       onChange={(e) => {
                         setFechaInicioContractual(e.target.value)
@@ -2405,6 +2418,7 @@ function tieneAlMenosDosLetras(texto: string): boolean {
                     <label className={labelClassPaso3}>Fecha Final Contractual <span className="text-[#9B0F06]">*</span></label>
                     <input
                       type="date"
+                      disabled={bloquearFechas}
                       value={fechaFinContractualPlan}
                       min={fechaInicioContractual || undefined}
                       onChange={(e) => {
@@ -2443,10 +2457,10 @@ function tieneAlMenosDosLetras(texto: string): boolean {
                     </label>
                     <div className="flex gap-1">
                       <div className={`flex flex-1 rounded ${errors.montoContractualOriginal ? 'border border-red-500 ring-1 ring-red-400' : ''}`}>
-                        <div className="flex items-center rounded-l border border-r-0 border-gray-200 bg-gray-100 px-2 py-1 text-[11px] font-bold text-gray-600">
+                        <div className="flex items-center rounded-l border border-r-0 border-gray-200 bg-white px-2 py-1 text-[11px] font-normal text-gray-500">
                           Q
                         </div>
-                        <div className="flex-1 rounded-r border border-gray-200 bg-gray-100 px-2 py-1 text-[11px] text-gray-800 font-bold flex items-center justify-between">
+                        <div className="flex-1 rounded-r border border-gray-200 bg-white px-2 py-1 text-[11px] text-gray-800 font-normal flex items-center justify-between">
                           <span>
                             {montoContractualOriginal && Number(montoContractualOriginal) > 0
                               ? Number(montoContractualOriginal).toLocaleString('es-GT', { minimumFractionDigits: 2 })
@@ -2493,11 +2507,14 @@ function tieneAlMenosDosLetras(texto: string): boolean {
                     <label className={labelClassPaso3}>Estado Inicial del Proyecto <span className="text-[9px] font-normal text-gray-400">(AUTOMÁTICO)</span></label>
                     <select
                       value={estado}
-                      onChange={(e) => setEstado(e.target.value as EstadoProyecto)}
+                      onChange={(e) => handleEstadoChange(e.target.value as EstadoProyecto)}
                       className={inputClassPaso3}
                     >
                       <option value="borrador">Borrador</option>
                       <option value="activo">Activo</option>
+                      <option value="en_revision">En Revisión</option>
+                      <option value="completado">Completado</option>
+                      <option value="pausado">Pausado</option>
                     </select>
                   </div>
                 </div>
@@ -2588,6 +2605,42 @@ function tieneAlMenosDosLetras(texto: string): boolean {
               </div>
             )}
 
+              <UsuarioFormularioDrawer
+                isOpen={openCrearUsuarioDrawer}
+                onClose={() => setOpenCrearUsuarioDrawer(false)}
+                onSave={handleUsuarioCreadoEnWizard}
+              />
+
+              <UsuarioFormularioDrawer
+                isOpen={openCrearDelegadoDrawer}
+                onClose={() => setOpenCrearDelegadoDrawer(false)}
+                onSave={handleDelegadoCreadoEnWizard}
+                rolesPermitidos={['Administrador', 'IngenieroResidente', 'Ingeniero Residente']}
+              />
+
+              <UsuarioFormularioDrawer
+                isOpen={openCrearIngenieroDrawer}
+                onClose={() => setOpenCrearIngenieroDrawer(false)}
+                onSave={handleIngenieroCreadoEnWizard}
+                rolesPermitidos={['Administrador', 'IngenieroResidente', 'Ingeniero Residente', 'Director']}
+              />
+
+              <EmpresaRelacionadaDrawer
+                isOpen={openCrearEntidadDrawer}
+                onClose={() => setOpenCrearEntidadDrawer(false)}
+                onSave={handleEntidadCreadaEnWizard}
+                tipo="entidad"
+                mode="create"
+              />
+
+              <EmpresaRelacionadaDrawer
+                isOpen={openCrearContratistaDrawer}
+                onClose={() => setOpenCrearContratistaDrawer(false)}
+                onSave={handleContratistaCreadoEnWizard}
+                tipo="contratista"
+                mode="create"
+              />
+
         {/* Botones de Navegación de Paso */}
         <div className="flex items-center justify-between border-t border-gray-100 pt-2.5">
           <div>
@@ -2635,6 +2688,45 @@ function tieneAlMenosDosLetras(texto: string): boolean {
           </div>
         </div>
       </div>
+
+      {showModalConfirmacionActivo && (
+        <Portal>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs font-[Poppins]">
+            <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-2xl border border-gray-100 animate-in fade-in zoom-in-95 duration-150">
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-600">
+                  <AlertCircle size={22} />
+                </div>
+                <div className="space-y-1.5">
+                  <h3 className="text-sm font-bold text-gray-900">Confirmar cambio de estado a Activo</h3>
+                  <p className="text-xs text-gray-600 leading-relaxed">
+                    ¿Estás seguro de que se han implementado todos los campos? Puedes modificarlos más adelante, a excepción del plan de trabajo el cual se mantendrá con los registros implementados de esa manera, y para cambiarlo el estado debe pasar a estado de Borrador.
+                  </p>
+                </div>
+              </div>
+              <div className="mt-5 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEstado(estadoAnterior)
+                    setShowModalConfirmacionActivo(false)
+                  }}
+                  className="rounded-lg border border-gray-300 px-3.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowModalConfirmacionActivo(false)}
+                  className="rounded-lg bg-[#9B0F06] px-4 py-1.5 text-xs font-bold text-white hover:bg-[#5E0006] transition-colors shadow-xs cursor-pointer"
+                >
+                  Confirmar y Activar
+                </button>
+              </div>
+            </div>
+          </div>
+        </Portal>
+      )}
     </div>
   )
 }

@@ -58,10 +58,36 @@ export function UsuarioFormularioDrawer({
   const [fechaInvalida, setFechaInvalida] = useState(false)
   const { showErrorToast } = useCustomToast()
 
+  const rolSeleccionado = useMemo(() => {
+    if (!formData.rol || !roles) return null
+    const targetNorm = String(formData.rol).toLowerCase().trim().replace(/\s+/g, '')
+    return roles.find(
+      (r: any) =>
+        r.nombre?.toLowerCase().trim().replace(/\s+/g, '') === targetNorm ||
+        r.id === formData.rol
+    )
+  }, [formData.rol, roles])
+
+  const esRolInactivo = useMemo(() => {
+    if (!rolSeleccionado) return false
+    const rAny = rolSeleccionado as any
+    return (
+      rAny.estado === 'Inactivo' ||
+      rAny.activo === false ||
+      rAny.esActivo === false
+    )
+  }, [rolSeleccionado])
+
+  useEffect(() => {
+    if (esRolInactivo) {
+      setFormData((prev) => ({ ...prev, estado: 'Suspendido' }))
+    }
+  }, [esRolInactivo])
+
   // Carga de catálogos y usuarios existentes para verificación en vivo
   useEffect(() => {
     if (isOpen) {
-      fetchRoles()
+      fetchRoles({ bypassCache: true })
       apiGetDeduplicado('/empresas-contratistas')
         .then((r) => setEmpresasContratistas(r.data?.data || []))
         .catch(() => {})
@@ -171,6 +197,37 @@ export function UsuarioFormularioDrawer({
     return null
   }, [formData.primer_apellido])
 
+  // Fecha y Edad
+  const statusFecha = useMemo(() => {
+    const { diaNacimiento, mesNacimiento, anoNacimiento } = formData
+    if (!diaNacimiento && !mesNacimiento && !anoNacimiento) return null
+
+    if (diaNacimiento || mesNacimiento || anoNacimiento) {
+      if (!diaNacimiento || !mesNacimiento || anoNacimiento.length !== 4) {
+        return { state: 'info', message: 'Formato: DD / MM / YYYY' }
+      }
+      const d = parseInt(diaNacimiento, 10)
+      const m = parseInt(mesNacimiento, 10)
+      const a = parseInt(anoNacimiento, 10)
+
+      if (isNaN(d) || d < 1 || d > 31) return { state: 'error', message: 'Día debe ser entre 1 y 31' }
+      if (isNaN(m) || m < 1 || m > 12) return { state: 'error', message: 'Mes debe ser entre 1 y 12' }
+      if (isNaN(a) || a < 1900 || a > new Date().getFullYear()) return { state: 'error', message: 'Año de nacimiento no válido' }
+
+      const dateObj = new Date(a, m - 1, d)
+      if (dateObj.getFullYear() !== a || dateObj.getMonth() !== m - 1 || dateObj.getDate() !== d) {
+        return { state: 'error', message: 'Fecha no existe en el calendario' }
+      }
+
+      const edad = calcularEdad(diaNacimiento, mesNacimiento, anoNacimiento)
+      if (edad < 18) {
+        return { state: 'error', message: 'El usuario debe ser mayor de 18 años' }
+      }
+      return { state: 'valid', message: `Fecha válida (${edad} años, mayor de edad)` }
+    }
+    return null
+  }, [formData.diaNacimiento, formData.mesNacimiento, formData.anoNacimiento])
+
   // Helper para generar clase de input con borde verde / rojo en vivo (fuente 11px)
   const getLiveInputClass = (
     isError: boolean,
@@ -261,8 +318,8 @@ export function UsuarioFormularioDrawer({
     if (!formData.telefono || statusTelefono?.state === 'error') newErrors.telefono = true
     if (formData.username && statusUsername?.state === 'error') newErrors.username = true
 
-    if (!usuario && formData.password && formData.password.length < 6) newErrors.password = true
-    if (usuario && formData.password && formData.password.length < 6) newErrors.password = true
+    if (!usuario && (!formData.password || formData.password.trim().length < 6)) newErrors.password = true
+    if (usuario && formData.password && formData.password.trim().length > 0 && formData.password.trim().length < 6) newErrors.password = true
 
     let errorFecha = false
     if (formData.diaNacimiento || formData.mesNacimiento || formData.anoNacimiento) {
@@ -378,7 +435,7 @@ export function UsuarioFormularioDrawer({
 
               <div>
                 <label className="text-[9.5px] font-bold text-gray-700 block mb-1 uppercase tracking-wide">
-                  Segundo Nombre
+                  Resto del Nombre
                 </label>
                 <input
                   type="text"
@@ -429,7 +486,7 @@ export function UsuarioFormularioDrawer({
 
               <div>
                 <label className="text-[9.5px] font-bold text-gray-700 block mb-1 uppercase tracking-wide">
-                  Segundo Apellido
+                  Resto del Apellido
                 </label>
                 <input
                   type="text"
@@ -551,10 +608,10 @@ export function UsuarioFormularioDrawer({
 
               <div>
                 <div className="flex items-center gap-1.5 mb-1">
-                  <Calendar size={11} className={fechaInvalida ? 'text-red-500' : 'text-gray-500'} />
+                  <Calendar size={11} className={statusFecha?.state === 'error' || fechaInvalida ? 'text-red-500' : statusFecha?.state === 'valid' ? 'text-emerald-500' : 'text-gray-500'} />
                   <label
                     className={`text-[9.5px] font-bold uppercase tracking-wide ${
-                      fechaInvalida ? 'text-red-700' : 'text-gray-700'
+                      statusFecha?.state === 'error' || fechaInvalida ? 'text-red-700' : statusFecha?.state === 'valid' ? 'text-emerald-700' : 'text-gray-700'
                     }`}
                   >
                     Fecha Nacimiento
@@ -571,7 +628,11 @@ export function UsuarioFormularioDrawer({
                     }}
                     onBlur={handleFechaBlur}
                     className={`w-10 h-8 px-0 text-center text-[11px] border rounded-md focus:outline-none ${
-                      fechaInvalida ? 'border-red-500 bg-red-50' : 'border-gray-200 focus:border-[#9B0F06]'
+                      statusFecha?.state === 'error' || fechaInvalida
+                        ? 'border-red-500 bg-red-50/40 text-red-900'
+                        : statusFecha?.state === 'valid'
+                          ? 'border-emerald-500 bg-emerald-50/20 text-emerald-900'
+                          : 'border-gray-200 focus:border-[#9B0F06]'
                     }`}
                   />
                   <span className="text-gray-300 font-light flex items-center">/</span>
@@ -585,7 +646,11 @@ export function UsuarioFormularioDrawer({
                     }}
                     onBlur={handleFechaBlur}
                     className={`w-10 h-8 px-0 text-center text-[11px] border rounded-md focus:outline-none ${
-                      fechaInvalida ? 'border-red-500 bg-red-50' : 'border-gray-200 focus:border-[#9B0F06]'
+                      statusFecha?.state === 'error' || fechaInvalida
+                        ? 'border-red-500 bg-red-50/40 text-red-900'
+                        : statusFecha?.state === 'valid'
+                          ? 'border-emerald-500 bg-emerald-50/20 text-emerald-900'
+                          : 'border-gray-200 focus:border-[#9B0F06]'
                     }`}
                   />
                   <span className="text-gray-300 font-light flex items-center">/</span>
@@ -599,12 +664,28 @@ export function UsuarioFormularioDrawer({
                     }}
                     onBlur={handleFechaBlur}
                     className={`flex-1 min-w-[40px] h-8 px-0 text-center text-[11px] border rounded-md focus:outline-none ${
-                      fechaInvalida ? 'border-red-500 bg-red-50' : 'border-gray-200 focus:border-[#9B0F06]'
+                      statusFecha?.state === 'error' || fechaInvalida
+                        ? 'border-red-500 bg-red-50/40 text-red-900'
+                        : statusFecha?.state === 'valid'
+                          ? 'border-emerald-500 bg-emerald-50/20 text-emerald-900'
+                          : 'border-gray-200 focus:border-[#9B0F06]'
                     }`}
                   />
                 </div>
-                {fechaInvalida && (
-                  <p className="text-[9px] text-red-600 font-medium mt-1">
+                {statusFecha ? (
+                  <p
+                    className={`mt-0.5 text-[9px] font-medium ${
+                      statusFecha.state === 'valid'
+                        ? 'text-emerald-600'
+                        : statusFecha.state === 'error'
+                          ? 'text-red-500'
+                          : 'text-gray-400'
+                    }`}
+                  >
+                    {statusFecha.message}
+                  </p>
+                ) : fechaInvalida && (
+                  <p className="text-[9px] text-red-600 font-medium mt-0.5">
                     El usuario debe ser mayor de 18 años
                   </p>
                 )}
@@ -645,9 +726,9 @@ export function UsuarioFormularioDrawer({
                     name="rol"
                     value={formData.rol}
                     onChange={handleChange}
-                    disabled={!esAdmin && usuario?.rol === 'Administrador'}
+                    disabled={Boolean(isPerfilEdit || (usuario && profile && (usuario.id === profile.id || usuario.correo?.toLowerCase() === profile.correo?.toLowerCase()))) || (!esAdmin && usuario?.rol === 'Administrador')}
                     className={`w-full h-8 px-2.5 text-[11px] rounded-lg border bg-white focus:border-[#9B0F06] focus:outline-none transition-colors ${
-                      !esAdmin && usuario?.rol === 'Administrador' ? 'bg-gray-100 cursor-not-allowed' : ''
+                      Boolean(isPerfilEdit || (usuario && profile && (usuario.id === profile.id || usuario.correo?.toLowerCase() === profile.correo?.toLowerCase()))) || (!esAdmin && usuario?.rol === 'Administrador') ? 'bg-gray-100 font-semibold text-gray-700 cursor-not-allowed' : ''
                     }`}
                   >
                     <option value="">Sin rol asignado</option>
@@ -657,29 +738,27 @@ export function UsuarioFormularioDrawer({
                         { id: 'r2', nombre: 'Gerencia', estado: 'Activo' },
                         { id: 'r3', nombre: 'Supervisor', estado: 'Activo' },
                         { id: 'r4', nombre: 'Inspector', estado: 'Activo' },
-                        { id: 'r5', nombre: 'Campo', estado: 'Activo' },
-                        { id: 'r6', nombre: 'Proveedor', estado: 'Activo' },
-                        { id: 'r7', nombre: 'Delegado Residente', estado: 'Activo' },
-                        { id: 'r8', nombre: 'Laboratorista', estado: 'Activo' },
+                        { id: 'r5', nombre: 'AuxiliarDeCampo', estado: 'Activo' },
+                        { id: 'r6', nombre: 'IngenieroResidente', estado: 'Activo' },
+                        { id: 'r7', nombre: 'Laboratorista', estado: 'Activo' },
                       ]
                       const listaBase = roles && roles.length > 0 ? roles : fallbackRoles
                       return listaBase
                         .filter((r: any) => {
-                          if (r.nombre.toLowerCase() === 'contratante') return false
                           if (!esAdmin && r.nombre === 'Administrador') return false
+                          if (r.nombre?.toLowerCase() === 'contratante') return false
                           if (rolesPermitidos && rolesPermitidos.length > 0) {
                             const norm = r.nombre.toLowerCase().replace(/\s+/g, '')
-                            const coincide = rolesPermitidos.some((p) => {
+                            return rolesPermitidos.some((p) => {
                               const pNorm = p.toLowerCase().replace(/\s+/g, '')
                               return norm === pNorm || norm.includes(pNorm) || pNorm.includes(norm)
                             })
-                            return coincide && (r.estado === 'Activo' || r.nombre === formData.rol)
                           }
-                          return r.estado === 'Activo' || r.nombre === formData.rol
+                          return true
                         })
                         .map((rol: any) => (
                           <option key={rol.id || rol.nombre} value={rol.nombre}>
-                            {rol.nombre}
+                            {rol.nombre} {rol.estado === 'Inactivo' || rol.activo === false ? '(Inactivo)' : ''}
                           </option>
                         ))
                     })()}
@@ -691,10 +770,10 @@ export function UsuarioFormularioDrawer({
                 <label className="text-[9.5px] font-bold text-gray-700 block mb-1 uppercase tracking-wide">
                   Estado *
                 </label>
-                {esRestringidoPerfil ? (
+                {esRestringidoPerfil || esRolInactivo ? (
                   <input
                     type="text"
-                    value={formData.estado || 'Activo'}
+                    value={esRolInactivo ? 'Suspendido' : (formData.estado || 'Activo')}
                     readOnly
                     disabled
                     className="w-full h-8 px-2.5 text-[11px] rounded-lg border border-gray-200 bg-gray-100 font-semibold text-gray-700 cursor-not-allowed"
@@ -708,6 +787,7 @@ export function UsuarioFormularioDrawer({
                   >
                     <option value="Activo">Activo</option>
                     <option value="Inactivo">Inactivo</option>
+                    <option value="Suspendido">Suspendido</option>
                   </select>
                 )}
               </div>
@@ -745,25 +825,27 @@ export function UsuarioFormularioDrawer({
             {!esRestringidoPerfil && (
               <div>
                 <label className="text-[9.5px] font-bold text-gray-700 block mb-1 uppercase tracking-wide">
-                  Contraseña Temporal
+                  {usuario ? 'Contraseña Nueva (Opcional)' : 'Contraseña *'}
                 </label>
-                <div className="relative">
+                <div className="relative flex items-center">
                   <input
                     type={showPassword ? 'text' : 'password'}
                     name="password"
                     value={formData.password}
                     onChange={handleChange}
                     placeholder="********"
-                    className={`w-full h-8 border rounded-lg pl-2.5 pr-8 text-[11px] text-gray-700 bg-white focus:outline-none transition-colors ${
+                    className={`w-full h-8 border rounded-lg pl-2.5 pr-9 text-[11px] text-gray-700 bg-white focus:outline-none transition-colors ${
                       errors.password ? 'border-red-500 ring-1 ring-red-400 bg-red-50/20' : 'border-gray-200 focus:border-[#9B0F06]'
                     }`}
                   />
                   <button
                     type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 right-0 flex items-center pr-2.5 text-gray-400 hover:text-gray-600"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 flex h-6 w-6 items-center justify-center rounded-md text-gray-600 hover:text-[#9B0F06] hover:bg-gray-100 transition-colors z-20 cursor-pointer focus:outline-none"
+                    title={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                    tabIndex={-1}
                   >
-                    {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                    {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
                   </button>
                 </div>
                 <p className="mt-0.5 text-[9px] text-gray-400">

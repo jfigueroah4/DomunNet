@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { api } from '@/lib/api/cliente'
+import { api, apiGetDeduplicado } from '@/lib/api/cliente'
 import {
   ProyectoType,
   RenglonDetalladoSabanaType,
@@ -18,13 +18,14 @@ export const USE_MOCK = false
 
 export const proyectoService = {
   getProyectoReal: async (slug: string) => {
-    const { data } = await api.get(`/proyectos/${slug}`)
-    return data?.data
+    const res = await apiGetDeduplicado(`/proyectos/${slug}`)
+    return res?.data?.data
   },
 
   getProyectoBySlug: async (slug: string): Promise<ProyectoType | undefined> => {
     try {
-      const { data } = await api.get(`/proyectos/${slug}`)
+      const res = await apiGetDeduplicado(`/proyectos/${slug}`)
+      const data = res?.data
       if (data && data.success && data.data) {
         const raw = data.data
         return {

@@ -32,9 +32,9 @@ export const TABLES_SCHEMA: Record<string, FieldSchema[]> = {
   dato_usuario: [
     { name: 'usuario_id', label: 'Usuario', type: 'select', required: true, endpoint: '/mantenimiento/usuario', labelKey: 'correo', valueKey: 'id' },
     { name: 'primer_nombre', label: 'Primer Nombre', type: 'text', required: true },
-    { name: 'segundo_nombre', label: 'Segundo Nombre', type: 'text' },
+    { name: 'segundo_nombre', label: 'Resto del Nombre', type: 'text' },
     { name: 'primer_apellido', label: 'Primer Apellido', type: 'text', required: true },
-    { name: 'segundo_apellido', label: 'Segundo Apellido', type: 'text' },
+    { name: 'segundo_apellido', label: 'Resto del Apellido', type: 'text' },
     { name: 'email', label: 'Email', type: 'email' },
     { name: 'telefono', label: 'Teléfono', type: 'text' },
     { name: 'fecha_nacimiento', label: 'Fecha Nacimiento', type: 'date' },

@@ -1,77 +1,76 @@
-import { test } from 'node:test'
-import assert from 'node:assert'
+import { test, expect } from 'vitest'
 import { isValidEmail, isValidUsername, validateLoginInput } from './validations'
 
 test('isValidEmail - email válido', () => {
-  assert.strictEqual(isValidEmail('test@example.com'), true)
+  expect(isValidEmail('test@example.com')).toBe(true)
 })
 
 test('isValidEmail - email inválido sin @', () => {
-  assert.strictEqual(isValidEmail('testexample.com'), false)
+  expect(isValidEmail('testexample.com')).toBe(false)
 })
 
 test('isValidEmail - email inválido sin dominio', () => {
-  assert.strictEqual(isValidEmail('test@'), false)
+  expect(isValidEmail('test@')).toBe(false)
 })
 
 test('isValidEmail - email vacío', () => {
-  assert.strictEqual(isValidEmail(''), false)
+  expect(isValidEmail('')).toBe(false)
 })
 
 test('isValidEmail - email con espacios', () => {
-  assert.strictEqual(isValidEmail('test @example.com'), false)
+  expect(isValidEmail('test @example.com')).toBe(false)
 })
 
 test('isValidUsername - username válido', () => {
-  assert.strictEqual(isValidUsername('juan.perez'), true)
+  expect(isValidUsername('juan.perez')).toBe(true)
 })
 
 test('isValidUsername - username con guiones', () => {
-  assert.strictEqual(isValidUsername('juan_perez-123'), true)
+  expect(isValidUsername('juan_perez-123')).toBe(true)
 })
 
 test('isValidUsername - username muy corto (debe fallar)', () => {
-  assert.strictEqual(isValidUsername('ab'), false)
+  expect(isValidUsername('ab')).toBe(false)
 })
 
 test('isValidUsername - username muy largo (debe fallar)', () => {
-  assert.strictEqual(isValidUsername('a'.repeat(31)), false)
+  expect(isValidUsername('a'.repeat(31))).toBe(false)
 })
 
 test('isValidUsername - username con espacios (debe fallar)', () => {
-  assert.strictEqual(isValidUsername('juan perez'), false)
+  expect(isValidUsername('juan perez')).toBe(false)
 })
 
 test('isValidUsername - username con @ (debe fallar)', () => {
-  assert.strictEqual(isValidUsername('juan@perez'), false)
+  expect(isValidUsername('juan@perez')).toBe(false)
 })
 
 test('validateLoginInput - identificador vacío', () => {
   const resultado = validateLoginInput('', 'password123')
-  assert.strictEqual(resultado.valid, false)
-  assert.strictEqual(resultado.error, 'Ingrese su usuario')
+  expect(resultado.valid).toBe(false)
+  expect(resultado.error).toBe('Ingrese su usuario')
 })
 
 test('validateLoginInput - password vacío', () => {
   const resultado = validateLoginInput('juan', '')
-  assert.strictEqual(resultado.valid, false)
-  assert.strictEqual(resultado.error, 'Ingrese su contraseña')
+  expect(resultado.valid).toBe(false)
+  expect(resultado.error).toBe('Ingrese su contraseña')
 })
 
 test('validateLoginInput - ambos vacíos', () => {
   const resultado = validateLoginInput('', '')
-  assert.strictEqual(resultado.valid, false)
-  assert.strictEqual(resultado.error, 'Ingrese su usuario')
+  expect(resultado.valid).toBe(false)
+  expect(resultado.error).toBe('Ingrese su usuario')
 })
 
 test('validateLoginInput - ambos válidos', () => {
   const resultado = validateLoginInput('juan@example.com', 'password123')
-  assert.strictEqual(resultado.valid, true)
-  assert.strictEqual(resultado.error, undefined)
+  expect(resultado.valid).toBe(true)
+  expect(resultado.error).toBe(undefined)
 })
 
 test('validateLoginInput - identificador con espacios', () => {
   const resultado = validateLoginInput('  ', 'password123')
-  assert.strictEqual(resultado.valid, false)
-  assert.strictEqual(resultado.error, 'Ingrese su usuario')
+  expect(resultado.valid).toBe(false)
+  expect(resultado.error).toBe('Ingrese su usuario')
 })

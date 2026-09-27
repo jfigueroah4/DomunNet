@@ -1,11 +1,27 @@
 'use client'
 
+import { useEffect } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import ProyectoFormulario from '@/components/modules/proyectos/ProyectoFormulario'
+import { useAuthStore } from '@/stores/useAuthStore'
+import { useCustomToast } from '@/hooks/useCustomToast'
 
 export default function NuevoProyectoPage() {
   const router = useRouter()
+  const usuario = useAuthStore((s) => s.profile)
+  const { showErrorToast } = useCustomToast()
+
+  const esResidente = (usuario?.rol || '').toLowerCase().includes('residente') || (usuario?.cargo || '').toLowerCase().includes('residente')
+
+  useEffect(() => {
+    if (esResidente) {
+      showErrorToast('El rol Ingeniero Residente no tiene permisos para crear proyectos.')
+      router.push('/dashboard/proyectos')
+    }
+  }, [esResidente, router, showErrorToast])
+
+  if (esResidente) return null
 
   return (
     <div className="space-y-4 text-[#07152B]">

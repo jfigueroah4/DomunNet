@@ -6,6 +6,7 @@ export interface DatosRol {
   descripcion: string
   nivel?: number
   permisos?: string[]
+  estado?: 'Activo' | 'Inactivo'
   activo?: boolean
   usuariosAsignados?: string[]
 }
@@ -66,6 +67,21 @@ async function obtenerMapaUsuariosPorRol() {
   return mapa
 }
 
+function extraerPermisosPlanos(filaPermisos: Record<string, string[]> | null): string[] {
+  if (!filaPermisos || Object.keys(filaPermisos).length === 0) return []
+  const result: string[] = []
+  for (const [mod, acciones] of Object.entries(filaPermisos)) {
+    for (const a of acciones || []) {
+      if (a === '*' || a === '') {
+        result.push(mod)
+      } else {
+        result.push(`${mod}.${a}`)
+      }
+    }
+  }
+  return result
+}
+
 async function obtenerRolCompletoPorId(rolId: string) {
   const { data: rol, error } = await clienteSupabase.from('rol').select('*').eq('id', rolId).maybeSingle()
   if (error) {
@@ -77,10 +93,7 @@ async function obtenerRolCompletoPorId(rolId: string) {
 
   const usuariosAsignados = await obtenerUsuariosIdsDeRol(rolId)
   const fila = rol as FilaRol
-  // Si la columna JSONB `permisos` existe, convertirla a lista plana 'modulo.accion'
-  const permisos = (fila.permisos && Object.keys(fila.permisos || {}).length > 0)
-    ? Object.entries(fila.permisos).flatMap(([mod, acciones]) => (acciones || []).map((a) => `${mod}.${a}`))
-    : []
+  const permisos = extraerPermisosPlanos(fila.permisos)
 
   return mapearRolBase(fila, permisos, usuariosAsignados)
 }
@@ -97,9 +110,7 @@ export async function listarRoles() {
 
   return (rolesRespuesta.data || []).map((rol: FilaRol) => {
     const usuariosAsignados = mapaUsuarios.get(rol.id) || []
-    const permisos = (rol.permisos && Object.keys(rol.permisos || {}).length > 0)
-      ? Object.entries(rol.permisos).flatMap(([mod, acciones]) => (acciones || []).map((a) => `${mod}.${a}`))
-      : []
+    const permisos = extraerPermisosPlanos(rol.permisos)
     return mapearRolBase(rol, permisos, usuariosAsignados)
   })
 }
@@ -126,32 +137,39 @@ export async function obtenerRolPorNombre(nombre: string) {
   return mapearRolBase(fila, permisos, usuariosAsignados)
 }
 
-export async function crearRol(datos: DatosRol) {
-  const { data: existentes, error: errorExistentes } = await clienteSupabase
-    .from('rol')
-    .select('id, nombre_rol')
-    .ilike('nombre_rol', datos.nombre)
-
-  if (errorExistentes) {
-    throw new Error(errorExistentes.message)
+function agruparPermisos(permisosLista?: string[]): Record<string, string[]> {
+  const permisosAgrupados: Record<string, string[]> = {}
+  if (permisosLista) {
+    for (const p of permisosLista) {
+      if (p.includes('.')) {
+        const parts = p.split('.')
+        const mod = parts[0]
+        const acc = parts[1] || '*'
+        if (!permisosAgrupados[mod]) permisosAgrupados[mod] = []
+        if (!permisosAgrupados[mod].includes(acc)) permisosAgrupados[mod].push(acc)
+      } else {
+        if (!permisosAgrupados[p]) permisosAgrupados[p] = []
+        if (!permisosAgrupados[p].includes('*')) permisosAgrupados[p].push('*')
+      }
+    }
   }
-  if ((existentes || []).length > 0) {
+  return permisosAgrupados
+}
+
+export async function crearRol(datos: DatosRol) {
+  const { data: existente } = await clienteSupabase
+    .from('rol')
+    .select('id')
+    .ilike('nombre_rol', datos.nombre)
+    .maybeSingle()
+
+  if (existente) {
     throw new Error('Ya existe un rol con ese nombre')
   }
 
-  // Agrupar permisos de modulo.accion a Record<string, string[]>
-  const permisosAgrupados: Record<string, string[]> = {}
-  if (datos.permisos) {
-    for (const p of datos.permisos) {
-      const parts = p.split('.')
-      const mod = parts[0]
-      const acc = parts[1] || '*'
-      if (!permisosAgrupados[mod]) {
-        permisosAgrupados[mod] = []
-      }
-      permisosAgrupados[mod].push(acc)
-    }
-  }
+  const permisosAgrupados = agruparPermisos(datos.permisos)
+
+  const esActivo = datos.estado ? datos.estado === 'Activo' : datos.activo !== false
 
   const { data: nuevoRol, error: errorInsercion } = await clienteSupabase
     .from('rol')
@@ -160,7 +178,7 @@ export async function crearRol(datos: DatosRol) {
       descripcion: datos.descripcion,
       nivel_permisos: datos.nivel || 0,
       permisos: permisosAgrupados,
-      activo: datos.activo !== false,
+      activo: esActivo,
     })
     .select('*')
     .single()
@@ -196,20 +214,9 @@ export async function actualizarRol(id: string, datos: DatosRol) {
     throw new Error('Ya existe un rol con ese nombre')
   }
 
-  // Agrupar permisos de modulo.accion a Record<string, string[]>
-  const permisosAgrupados: Record<string, string[]> = {}
-  if (datos.permisos) {
-    for (const p of datos.permisos) {
-      const parts = p.split('.')
-      const mod = parts[0]
-      const acc = parts[1] || '*'
-      if (!permisosAgrupados[mod]) {
-        permisosAgrupados[mod] = []
-      }
-      permisosAgrupados[mod].push(acc)
-    }
-  }
+  const permisosAgrupados = agruparPermisos(datos.permisos)
 
+  const esActivo = datos.estado ? datos.estado === 'Activo' : datos.activo !== false
   const { error } = await clienteSupabase
     .from('rol')
     .update({
@@ -217,13 +224,19 @@ export async function actualizarRol(id: string, datos: DatosRol) {
       descripcion: datos.descripcion,
       nivel_permisos: datos.nivel || 0,
       permisos: permisosAgrupados,
-      activo: datos.activo !== false,
+      activo: esActivo,
     })
     .eq('id', id)
 
   if (error) {
     throw new Error(error.message)
   }
+
+  // Actualizar estado de los usuarios asignados al rol según el nuevo estado del rol
+  await clienteSupabase
+    .from('usuario')
+    .update({ activo: esActivo, updated_at: new Date().toISOString() })
+    .eq('rol_id', id)
 
   if (datos.usuariosAsignados) {
     await asignarUsuariosRol(id, datos.usuariosAsignados)

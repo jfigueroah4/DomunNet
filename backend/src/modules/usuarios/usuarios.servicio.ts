@@ -352,12 +352,15 @@ export async function actualizarUsuario(id: string, datos: DatosUsuario) {
   const rol = await validarRolExiste(datos.rol)
   await validarCorreoUnico(datos.correo, id)
 
-  // Obtener dato_usuario actual para ver si ya tiene username
+  // Obtener dato_usuario actual para ver si ya tiene username, fecha_nacimiento y direccion
   const { data: datoActual } = await clienteSupabase
     .from('dato_usuario')
-    .select('username')
+    .select('username, fecha_nacimiento, direccion')
     .eq('usuario_id', id)
     .maybeSingle()
+
+  const fechaNacimientoFinal = datos.fecha_nacimiento !== undefined ? (datos.fecha_nacimiento || null) : (datoActual?.fecha_nacimiento || null)
+  const direccionFinal = datos.direccion !== undefined ? (datos.direccion || null) : (datoActual?.direccion || null)
 
   let usernameFinal = datos.username?.trim().toLowerCase()
   if (usernameFinal) {
@@ -440,8 +443,8 @@ export async function actualizarUsuario(id: string, datos: DatosUsuario) {
       email: datos.correo,
       username: usernameFinal,
       password_hash: null, // explicit NULL
-      fecha_nacimiento: datos.fecha_nacimiento || null,
-      direccion: datos.direccion || null,
+      fecha_nacimiento: fechaNacimientoFinal,
+      direccion: direccionFinal,
       updated_at: new Date().toISOString()
     }, { onConflict: 'usuario_id' })
 

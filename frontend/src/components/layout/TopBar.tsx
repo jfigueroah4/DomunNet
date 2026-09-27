@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
-import { Search, Bell, Menu, User, LogOut, Ticket, Bot } from 'lucide-react'
-import { api } from '@/lib/api/cliente'
+import { Search, Bell, Menu, User, LogOut, Ticket, Bot, AlertTriangle } from 'lucide-react'
+import { api, apiGetDeduplicado } from '@/lib/api/cliente'
 import { useAuthStore } from '@/stores/useAuthStore'
 
 const AIAssistant = dynamic(() => import('./AIAssistant'), { ssr: false })
@@ -61,10 +61,14 @@ interface TopBarProps {
 
 const getShortName = (profile: any) => {
   if (!profile) return 'Usuario'
-  const pNombre = profile.nombre ? profile.nombre.split(' ')[0] : ''
-  const pApellido = profile.apellido ? profile.apellido.split(' ')[0] : ''
-  return `${pNombre} ${pApellido}`.trim() || 'Usuario'
+  const pNombre = profile.primerNombre || (profile.nombre ? profile.nombre.trim().split(' ')[0] : '')
+  const pApellido = profile.primerApellido || (profile.apellido ? profile.apellido.trim().split(' ')[0] : '')
+  const res = `${pNombre} ${pApellido}`.trim()
+  return res || profile.nombre || 'Usuario'
 }
+
+let cachedSearchItems: { name: string; path: string; category: string; keywords: string[] }[] | null = null
+let pendingSearchItemsPromise: Promise<{ name: string; path: string; category: string; keywords: string[] }[]> | null = null
 
 export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
   const router = useRouter()
@@ -73,7 +77,9 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
   const [isAIOpen, setIsAIOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [notificationsVisible, setNotificationsVisible] = useState(false)
-  const [unreadCount] = useState(0) // Default 0 to match empty state
+  const [unreadCount, setUnreadCount] = useState<number>(0)
+  const [notificacionesTickets, setNotificacionesTickets] = useState<any[]>([])
+  const [notificacionesSabana, setNotificacionesSabana] = useState<any[]>([])
   const [openTicketsCount, setOpenTicketsCount] = useState<number>(0)
   const { profile } = useAuthStore()
   
@@ -81,55 +87,149 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [suggestions, setSuggestions] = useState<{ name: string; path: string; category?: string; keywords?: string[] }[]>([])
   const [showSearchDropdown, setShowSearchDropdown] = useState(false)
-  const [realProjects, setRealProjects] = useState<{ name: string; path: string; category: string; keywords: string[] }[]>([])
+  const [dynamicSearchItems, setDynamicSearchItems] = useState<{ name: string; path: string; category: string; keywords: string[] }[]>([])
 
-  useEffect(() => {
-    const fetchProyectos = async () => {
-      try {
-        const res = await api.get('/mantenimiento/proyecto?limite=100')
-        const items = res.data?.data || res.data || []
-        if (Array.isArray(items)) {
-          const projectRoutes = items.map((p: any) => ({
-            name: p.nombre_proyecto || p.codigo_proyecto || 'Proyecto',
-            path: `/dashboard/proyectos/hoja-sabana?slug=${p.slug || p.id}`,
-            category: 'Proyecto Real',
-            keywords: [p.codigo_proyecto, p.nombre_proyecto, p.tramo_vial, p.departamento].filter(Boolean)
-          }))
-          setRealProjects(projectRoutes)
-        }
-      } catch {
-        // Fallback en caso de error
+  const ensureSearchItemsLoaded = async () => {
+    if (cachedSearchItems) {
+      setDynamicSearchItems(cachedSearchItems)
+      return
+    }
+
+    if (!pendingSearchItemsPromise) {
+      pendingSearchItemsPromise = (async () => {
+        try {
+          const [resProy, resUsers, resReng] = await Promise.allSettled([
+            apiGetDeduplicado('/proyectos'),
+            apiGetDeduplicado('/usuarios'),
+            apiGetDeduplicado('/mantenimiento/renglon_trabajo_catalogo?limite=300')
+          ])
+
+          const items: { name: string; path: string; category: string; keywords: string[] }[] = []
+
+          if (resProy.status === 'fulfilled') {
+            const proys = resProy.value.data?.data || resProy.value.data || []
+            if (Array.isArray(proys)) {
+              proys.forEach((p: any) => {
+                const nombre = p.nombre_oficial || p.nombre || p.codigo || 'Proyecto'
+                const cod = p.codigo || p.numero_contrato_original || ''
+                  items.push({
+                    name: `Proyecto: [${cod}] ${nombre}`,
+                    path: `/dashboard/proyectos/${p.id}/hoja-sabana`,
+                    category: 'Proyectos',
+                    keywords: [cod, nombre, p.ubicacion_fisica, p.delegado_residente].filter(Boolean)
+                  })
+                })
+              }
+            }
+
+            if (resUsers.status === 'fulfilled') {
+              const users = resUsers.value.data?.data || resUsers.value.data || []
+              if (Array.isArray(users)) {
+                users.forEach((u: any) => {
+                  const nombreCompleto = `${u.primer_nombre || ''} ${u.segundo_nombre || ''} ${u.primer_apellido || ''} ${u.segundo_apellido || ''}`.replace(/\s+/g, ' ').trim()
+                  const mail = u.correo || ''
+                  const rol = u.rol || 'Usuario'
+                  items.push({
+                    name: `Usuario: ${nombreCompleto} (${rol})`,
+                    path: `/dashboard/usuarios?edit=${u.id}`,
+                    category: 'Usuarios',
+                    keywords: [nombreCompleto, mail, rol, u.username].filter(Boolean)
+                  })
+                })
+              }
+            }
+
+            if (resReng.status === 'fulfilled') {
+              const rengs = resReng.value.data?.data || resReng.value.data || []
+              if (Array.isArray(rengs)) {
+                rengs.forEach((r: any) => {
+                  const cod = r.codigo || r.codigoDGC || 'Renglón'
+                  const desc = r.descripcion || ''
+                  items.push({
+                    name: `Renglón ${cod}: ${desc}`,
+                    path: `/dashboard/renglones?edit=${r.id}`,
+                    category: 'Renglones de Trabajo',
+                    keywords: [cod, desc, r.unidad, `capitulo ${r.capitulo_id}`].filter(Boolean)
+                  })
+                })
+              }
+            }
+
+            cachedSearchItems = items
+            return items
+          } catch (err) {
+            console.warn('Error al cargar datos para barra de búsqueda:', err)
+            return []
+          } finally {
+            pendingSearchItemsPromise = null
+          }
+        })()
+      }
+
+      const res = await pendingSearchItemsPromise
+      if (res) {
+        setDynamicSearchItems(res)
       }
     }
-    fetchProyectos()
-  }, [])
 
   useEffect(() => {
-    const updateTicketsCount = () => {
-      try {
-        const stored = localStorage.getItem('domun_support_tickets');
-        if (stored) {
-          const tickets = JSON.parse(stored);
-          const count = Array.isArray(tickets)
-            ? tickets.filter((t: any) => t.status !== 'cerrado').length
-            : 0;
-          setOpenTicketsCount(count);
-        } else {
-          setOpenTicketsCount(2);
-        }
-      } catch {
-        setOpenTicketsCount(0);
-      }
+    const esReciente2Dias = (fechaStr: string) => {
+      if (!fechaStr) return true;
+      const fechaMs = new Date(fechaStr.replace(' ', 'T')).getTime();
+      if (isNaN(fechaMs)) return true;
+      return Date.now() - fechaMs <= 2 * 24 * 60 * 60 * 1000;
     };
 
-    updateTicketsCount();
-    window.addEventListener('storage', updateTicketsCount);
-    const interval = setInterval(updateTicketsCount, 2000);
+    const updateNotifications = () => {
+      try {
+        let sabanaNotifs: any[] = []
+        const sabanaStored = localStorage.getItem('domun_alertas_sabana')
+        if (sabanaStored) {
+          const parsed = JSON.parse(sabanaStored)
+          if (Array.isArray(parsed)) sabanaNotifs = parsed
+        }
+        setNotificacionesSabana(sabanaNotifs)
+
+        let ticketsNotifs: any[] = []
+        let openTickets = 0
+        const stored = localStorage.getItem('domun_support_tickets')
+        if (stored) {
+          const rawTickets = JSON.parse(stored)
+          if (Array.isArray(rawTickets)) {
+            const tickets = rawTickets.filter((t: any) => esReciente2Dias(t.createdAt))
+            openTickets = tickets.filter((t: any) => t.status !== 'cerrado').length
+            ticketsNotifs = tickets.map((t: any) => ({
+              id: t.id,
+              title: t.status === 'abierto' ? `Nuevo ticket: ${t.title}` : `Ticket ${t.status.replace(/_/g, ' ')}: ${t.title}`,
+              author: t.createdBy,
+              status: t.status,
+              time: t.createdAt,
+              link: '/dashboard/tickets',
+              tipo: 'ticket',
+            }))
+          }
+        }
+        setOpenTicketsCount(openTickets)
+        setNotificacionesTickets(ticketsNotifs)
+        setUnreadCount(sabanaNotifs.length + ticketsNotifs.length)
+      } catch {
+        setOpenTicketsCount(0)
+        setNotificacionesTickets([])
+        setNotificacionesSabana([])
+        setUnreadCount(0)
+      }
+    }
+
+    updateNotifications()
+    window.addEventListener('storage', updateNotifications)
+    window.addEventListener('sabana-alertas-updated', updateNotifications)
+    const interval = setInterval(updateNotifications, 2000)
     return () => {
-      window.removeEventListener('storage', updateTicketsCount);
-      clearInterval(interval);
-    };
-  }, []);
+      window.removeEventListener('storage', updateNotifications)
+      window.removeEventListener('sabana-alertas-updated', updateNotifications)
+      clearInterval(interval)
+    }
+  }, [])
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -179,7 +279,7 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
     }
 
     const lowerQuery = query.toLowerCase()
-    const allRoutes = [...realProjects, ...systemRoutes]
+    const allRoutes = [...dynamicSearchItems, ...systemRoutes]
     const filtered = allRoutes.filter(route =>
       route.name.toLowerCase().includes(lowerQuery) ||
       route.path.toLowerCase().includes(lowerQuery) ||
@@ -228,6 +328,7 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
             type="text"
             placeholder="Buscar páginas (configuración/mantenimiento, proyectos...)"
             value={searchQuery}
+            onFocus={ensureSearchItemsLoaded}
             onChange={handleSearchChange}
             onKeyDown={handleKeyDown}
             className="bg-transparent outline-none text-[10px] w-full placeholder:text-[10px] placeholder-gray-400"
@@ -318,12 +419,42 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
                 </button>
               </div>
 
-              <div className="px-4 py-7 text-center flex flex-col items-center justify-center">
-                <Bell size={20} className="text-gray-300 mb-2 transition-transform duration-500 hover:rotate-12" />
-                <p className="text-[10px] font-semibold text-gray-500">No hay actividad que mostrar</p>
-                <p className="text-[8px] text-gray-400 mt-0.5 leading-normal max-w-[160px] mx-auto">
-                  Te notificaremos cuando ocurra algo importante.
-                </p>
+              <div className="max-h-64 overflow-y-auto divide-y divide-gray-100">
+                {[...notificacionesSabana, ...notificacionesTickets].length > 0 ? (
+                  [...notificacionesSabana, ...notificacionesTickets].slice(0, 8).map((notif: any) => (
+                    <button
+                      key={notif.id}
+                      onClick={() => {
+                        closeNotifications()
+                        router.push(notif.link || '/dashboard/tickets')
+                      }}
+                      className="w-full text-left p-3 hover:bg-gray-50 transition-colors flex items-start gap-2.5 cursor-pointer"
+                    >
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
+                        notif.tipo === 'hoja_sabana' ? 'bg-amber-100 text-amber-800' : 'bg-red-50 text-[#9B0F06]'
+                      }`}>
+                        {notif.tipo === 'hoja_sabana' ? <AlertTriangle size={12} /> : <Ticket size={12} />}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10.5px] font-semibold text-gray-800 leading-tight truncate">
+                          {notif.title}
+                        </p>
+                        <p className="text-[9px] text-gray-400 mt-0.5 flex items-center justify-between">
+                          <span className="truncate">{notif.author}</span>
+                          <span>{notif.time}</span>
+                        </p>
+                      </div>
+                    </button>
+                  ))
+                ) : (
+                  <div className="px-4 py-7 text-center flex flex-col items-center justify-center">
+                    <Bell size={20} className="text-gray-300 mb-2 transition-transform duration-500 hover:rotate-12" />
+                    <p className="text-[10px] font-semibold text-gray-500">No hay actividad que mostrar</p>
+                    <p className="text-[8px] text-gray-400 mt-0.5 leading-normal max-w-[160px] mx-auto">
+                      Te notificaremos cuando ocurra algo importante.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           )}

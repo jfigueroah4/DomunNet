@@ -92,11 +92,14 @@ export async function actualizarUsuarioControlador(req: SolicitudAutenticada, re
   try {
     const targetUser = await obtenerUsuarioPorId(req.params.id);
     if (targetUser) {
-      const targetRole = await obtenerRolPorNombre(targetUser.rol);
-      const targetNivel = targetRole ? targetRole.nivel_permisos : 0;
-      const myNivel = req.usuario?.nivel_permisos || 0;
-      if (targetNivel > myNivel) {
-        return sendError(res, 403, 'No tienes jerarquía suficiente para modificar este usuario');
+      const isMyRoleAdmin = (req.usuario?.rol || '').toLowerCase().trim() === 'administrador' || (req.usuario?.rol || '').toLowerCase().trim() === 'admin';
+      if (!isMyRoleAdmin) {
+        const targetRole = await obtenerRolPorNombre(targetUser.rol);
+        const targetNivel = targetRole ? targetRole.nivel_permisos : 0;
+        const myNivel = req.usuario?.nivel_permisos || 0;
+        if (targetNivel > myNivel) {
+          return sendError(res, 403, 'No tienes jerarquía suficiente para modificar este usuario');
+        }
       }
     }
   } catch (err) {
@@ -116,11 +119,14 @@ export async function eliminarUsuarioControlador(req: SolicitudAutenticada, res:
   try {
     const targetUser = await obtenerUsuarioPorId(req.params.id);
     if (targetUser) {
-      const targetRole = await obtenerRolPorNombre(targetUser.rol);
-      const targetNivel = targetRole ? targetRole.nivel_permisos : 0;
-      const myNivel = req.usuario?.nivel_permisos || 0;
-      if (targetNivel > myNivel) {
-        return sendError(res, 403, 'No tienes jerarquía suficiente para eliminar este usuario');
+      const isMyRoleAdmin = (req.usuario?.rol || '').toLowerCase().trim() === 'administrador' || (req.usuario?.rol || '').toLowerCase().trim() === 'admin';
+      if (!isMyRoleAdmin) {
+        const targetRole = await obtenerRolPorNombre(targetUser.rol);
+        const targetNivel = targetRole ? targetRole.nivel_permisos : 0;
+        const myNivel = req.usuario?.nivel_permisos || 0;
+        if (targetNivel > myNivel) {
+          return sendError(res, 403, 'No tienes jerarquía suficiente para eliminar este usuario');
+        }
       }
     }
   } catch (err) {

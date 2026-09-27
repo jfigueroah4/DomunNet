@@ -256,9 +256,9 @@ export default function PerfilPage() {
           </div>
           <div className="grid grid-cols-2 gap-x-3 gap-y-2">
             <EditableField label="Primer Nombre" value={profile.primerNombre} fallback="-" />
-            <EditableField label="Segundo Nombre" value={profile.segundoNombre} fallback="-" />
+            <EditableField label="Resto del Nombre" value={profile.segundoNombre} fallback="-" />
             <EditableField label="Primer Apellido" value={profile.primerApellido} fallback="-" />
-            <EditableField label="Segundo Apellido" value={profile.segundoApellido} fallback="-" />
+            <EditableField label="Resto del Apellido" value={profile.segundoApellido} fallback="-" />
             <div className="col-span-2">
               <EditableField label="Nombre de Usuario" value={profile.username} fallback="No registrado" editable={false} />
             </div>
@@ -348,7 +348,7 @@ export default function PerfilPage() {
               </div>
               <h3 className="text-lg font-bold text-gray-900 mb-1">¿Desactivar tu propia cuenta?</h3>
               <p className="text-sm text-gray-500">
-                Estás a punto de cambiar tu estado a <span className="font-semibold text-red-600">"{pendingData?.estado}"</span>.
+                Estás a punto de cambiar tu estado a <span className="font-semibold text-red-600">&quot;{pendingData?.estado}&quot;</span>.
               </p>
             </div>
             

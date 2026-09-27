@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { api } from '@/lib/api/cliente'
+import { apiGetDeduplicado } from '@/lib/api/cliente'
 
 interface UserProfile {
   id: string
@@ -27,17 +27,22 @@ interface AuthState {
   profile: UserProfile | null
   loading: boolean
   error: Error | null
-  fetchProfile: (retries?: number) => Promise<void>
+  fetchProfile: (retries?: number, force?: boolean) => Promise<void>
 }
 
 // Global promise to prevent duplicate concurrent fetches
 let profilePromise: Promise<any> | null = null;
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
   profile: null,
   loading: true,
   error: null,
-  fetchProfile: async (retries = 3) => {
+  fetchProfile: async (retries = 3, force = false) => {
+    if (!force && get().profile) {
+      set({ loading: false })
+      return
+    }
+
     if (profilePromise) {
       try {
         const data = await profilePromise
@@ -50,9 +55,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
     const fetchWithRetry = async (attemptsLeft: number): Promise<any> => {
       try {
-        // Timeout de 15s para evitar que la petición quede colgada 
-        // silenciosamente durante la compilación pesada de Next.js
-        const res = await api.get('/auth/perfil', { timeout: 15000 })
+        const res = await apiGetDeduplicado('/auth/perfil', { bypassCache: force })
         if (res.data?.success && res.data?.data) {
           return res.data.data
         }
@@ -61,8 +64,6 @@ export const useAuthStore = create<AuthState>((set) => ({
         const status = err.response?.status
         const isAuthError = status === 401 || status === 403
         
-        // Si no es un error de autenticación explícito (ej. timeout o network error)
-        // y nos quedan reintentos, probamos de nuevo.
         if (!isAuthError && attemptsLeft > 0) {
           console.warn(`[fetchProfile] Network/Timeout error, reintentando... (${attemptsLeft} intentos restantes)`)
           return fetchWithRetry(attemptsLeft - 1)
@@ -79,7 +80,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     } catch (err: any) {
       set({ profile: null, error: err, loading: false })
     } finally {
-      profilePromise = null // Reset the promise after it resolves/rejects
+      profilePromise = null
     }
   }
 }))

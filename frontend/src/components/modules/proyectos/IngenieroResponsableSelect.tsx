@@ -73,7 +73,7 @@ export function IngenieroResponsableSelect({
 
   return (
     <div className={className}>
-      <label className={labelClass}>Ingeniero Responsable / Director</label>
+      <label className={labelClass}>Ingeniero Responsable / Director <span className="text-[#9B0F06]">*</span></label>
       <Combobox
         options={options}
         value={value}

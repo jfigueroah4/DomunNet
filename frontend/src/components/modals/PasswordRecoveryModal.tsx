@@ -104,6 +104,21 @@ export default function PasswordRecoveryModal({
       // Si el correo SÍ existe: reiniciar intentos fallidos
       localStorage.removeItem('domun_pwd_rec_failed_attempts');
 
+      // Check for pending password recovery tickets for this email
+      const existingTicketsRaw = localStorage.getItem('domun_support_tickets');
+      const existingTickets = existingTicketsRaw ? JSON.parse(existingTicketsRaw) : [];
+      const pendingTicket = existingTickets.find(
+        (t: any) =>
+          (t.createdByEmail?.toLowerCase() === trimmedEmail || t.createdBy?.toLowerCase() === trimmedEmail) &&
+          t.category === 'contrasena' &&
+          (t.status === 'abierto' || t.status === 'pendiente' || t.status === 'en_proceso')
+      );
+
+      if (pendingTicket) {
+        showErrorToast('Debe esperar a que se complete su última solicitud de cambio de contraseña');
+        return;
+      }
+
       // Crear ticket automático en soporte (contrasena)
       const nowStr = new Date().toISOString().slice(0, 16).replace('T', ' ');
       const newTicket = {
@@ -127,8 +142,6 @@ export default function PasswordRecoveryModal({
         ],
       };
 
-      const existingTicketsRaw = localStorage.getItem('domun_support_tickets');
-      const existingTickets = existingTicketsRaw ? JSON.parse(existingTicketsRaw) : [];
       existingTickets.unshift(newTicket);
       localStorage.setItem('domun_support_tickets', JSON.stringify(existingTickets));
 

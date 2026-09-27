@@ -8,9 +8,12 @@ if (faltantes.length > 0) {
 
 export type BaseDeDatos = SupabaseClient
 
+const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || entorno.supabaseUrl || 'https://thpnjsfmfoxcupywisqu.supabase.co'
+const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || entorno.supabaseServiceRoleKey || ''
+
 export const clienteSupabase: BaseDeDatos = createClient(
-  entorno.supabaseUrl || 'https://placeholder.supabase.co',
-  entorno.supabaseServiceRoleKey || 'placeholder-service-role-key',
+  url,
+  key,
   {
     auth: {
       persistSession: false,

@@ -58,7 +58,7 @@ export default function DashboardLayout({
     // Check if user has permission for the most specific matched route
     const mostSpecific = matches.sort((a, b) => b.length - a.length)[0]
     const permiso = RUTAS_PERMISOS[mostSpecific]
-    return tienePermiso(profile.permisos || [], permiso)
+    return tienePermiso(profile.permisos || [], permiso, profile.rol)
   }, [pathname, profile])
 
   const section = useMemo(() => getSectionTitle(pathname), [pathname])

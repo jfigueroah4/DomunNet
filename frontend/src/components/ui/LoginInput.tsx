@@ -1,14 +1,10 @@
 import React from 'react';
 
-interface LoginInputProps {
+interface LoginInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   icon?: React.ReactNode;
   rightIcon?: React.ReactNode;
-  type?: string;
-  placeholder?: string;
-  value?: string;
-  onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  required?: boolean;
   error?: boolean;
+  inputRef?: React.Ref<HTMLInputElement>;
 }
 
 export default function LoginInput({
@@ -20,6 +16,8 @@ export default function LoginInput({
   onChange,
   required,
   error = false,
+  inputRef,
+  ...restProps
 }: LoginInputProps) {
   return (
     <div className="relative">
@@ -38,11 +36,13 @@ export default function LoginInput({
 
       {/* Input */}
       <input
+        ref={inputRef}
         type={type}
         placeholder={placeholder}
         value={value}
         onChange={onChange}
         required={required}
+        {...restProps}
         style={{
           borderBottom: error ? '1.5px solid #FF4D4F' : '1px solid rgba(255, 255, 255, 0.4)',
           transition: 'border-bottom-color 0.25s ease, border-bottom-width 0.25s ease',

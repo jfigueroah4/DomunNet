@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { Plus, Users, Shield, Search, Loader2, ChevronLeft, ChevronRight, LogOut, X } from 'lucide-react'
 import { useRolesStore } from '@/stores/useRolesStore'
 
-import { api } from '@/lib/api/cliente'
+import { api, apiGetDeduplicado, limpiarCacheMemoria } from '@/lib/api/cliente'
 
 import { Usuario, RolUsuario, EstadoUsuario } from '@/types/usuario'
 
@@ -48,8 +48,7 @@ export default function UsuariosPage() {
   
 
   const [paginaActual, setPaginaActual] = useState(1)
-
-  const [registrosPorPagina, setRegistrosPorPagina] = useState(5)
+  const [registrosPorPagina, setRegistrosPorPagina] = useState(8)
 
 
 
@@ -64,41 +63,77 @@ export default function UsuariosPage() {
   const [usuarioEliminar, setUsuarioEliminar] = useState<Usuario | undefined>()
 
 
+  const [modoModalEliminar, setModoModalEliminar] = useState<'todos' | 'activar' | 'eliminar' | 'suspender'>('todos')
 
   const cargarUsuarios = useCallback(async () => {
-
     try {
-
       setLoading(true)
+      const [resUsuarios, resProyectos] = await Promise.all([
+        apiGetDeduplicado('/usuarios'),
+        apiGetDeduplicado('/proyectos').catch(() => ({ data: { data: [] } })),
+      ])
 
-      const res = await api.get('/usuarios')
+      const listaUsuarios: Usuario[] = resUsuarios.data?.data || []
+      const listaProyectos: any[] = resProyectos.data?.data || []
 
-      if (res.data && res.data.success) {
+      const proyectosActivos = listaProyectos.filter(
+        (p: any) => String(p.estado || '').toLowerCase() === 'activo'
+      )
 
-        setUsuarios(res.data.data || [])
+      const usuariosConProyectos = listaUsuarios.map((user) => {
+        const uId = String(user.id || '').toLowerCase()
+        const uCorreo = String(user.correo || '').toLowerCase()
+        const uPrimerNombre = String(user.primer_nombre || '').toLowerCase()
+        const uPrimerApellido = String(user.primer_apellido || '').toLowerCase()
+        const uRolNorm = String(user.rol || '').toLowerCase().trim()
 
-      }
+        let matchProyectos = proyectosActivos.filter((p: any) => {
+          const delId = String(p.delegadoResidenteId || p.delegado_residente_id || '').toLowerCase()
+          const respId = String(p.responsable || p.responsable_id || '').toLowerCase()
+          const delNombre = String(p.delegadoResidente || p.delegado_residente || '').toLowerCase()
+          const respNombre = String(p.responsable || '').toLowerCase()
 
+          if (delId && (delId === uId || delId === uCorreo)) return true
+          if (respId && (respId === uId || respId === uCorreo)) return true
+          if (delNombre && (delNombre.includes(uPrimerNombre) || delNombre.includes(uPrimerApellido))) return true
+          if (respNombre && (respNombre.includes(uPrimerNombre) || respNombre.includes(uPrimerApellido))) return true
+
+          if (Array.isArray(p.equipo)) {
+            return p.equipo.some((m: any) => {
+              const mId = String(m.id || '').toLowerCase()
+              const mNom = String(m.nombre || '').toLowerCase()
+              return (mId && (mId === uId || mId === uCorreo)) ||
+                (mNom && uPrimerNombre && mNom.includes(uPrimerNombre)) ||
+                (mNom && uPrimerApellido && mNom.includes(uPrimerApellido))
+            })
+          }
+          return false
+        })
+
+        if (matchProyectos.length === 0 && (uRolNorm.includes('admin') || uRolNorm.includes('gerenc')) && proyectosActivos.length > 0) {
+          matchProyectos = proyectosActivos
+        }
+
+        const proysAsignados = matchProyectos.map((p: any) => p.nombreOficial || p.nombre || p.codigo || 'Proyecto Activo')
+
+        return {
+          ...user,
+          proyectosAsignados: proysAsignados,
+          proyectos_activos_count: proysAsignados.length,
+        }
+      })
+
+      setUsuarios(usuariosConProyectos)
     } catch (error) {
-
       console.error('Error al cargar usuarios:', error)
-
     } finally {
-
       setLoading(false)
-
     }
-
   }, [])
 
-
-
   useEffect(() => {
-
     cargarUsuarios()
-
-      fetchRoles()
-
+    fetchRoles()
   }, [cargarUsuarios, fetchRoles])
 
 
@@ -295,24 +330,55 @@ export default function UsuariosPage() {
 
 
 
-  const handleEliminar = (id: string) => {
-
+  const handleEliminar = (id: string, modoModal: 'todos' | 'activar' | 'eliminar' | 'suspender' = 'todos') => {
     setUsuarioEliminar(usuarios.find((usuario) => usuario.id === id))
-
+    setModoModalEliminar(modoModal)
     setDeleteOpen(true)
-
   }
 
 
 
+  const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null
+  const editId = searchParams?.get('edit')
+
+  useEffect(() => {
+    if (editId && usuarios.length > 0) {
+      const target = usuarios.find((u) => u.id === editId)
+      if (target) {
+        setUsuarioActivo(target)
+        setDrawerMode('edit')
+        setDrawerOpen(true)
+      }
+    }
+  }, [editId, usuarios])
+
   const handleConfirmarEliminar = async (accion: 'eliminar' | 'suspender' | 'activar') => {
     if (!usuarioEliminar) return
+
+    const esContratante = String(usuarioEliminar.rol).toLowerCase() === 'contratante'
+
+    if (accion === 'eliminar' && esContratante) {
+      showErrorToast('Los usuarios con rol Contratante no se pueden eliminar definitivamente de manera normal. Debe desactivarse el usuario para gestionar el representante de la empresa.')
+      setDeleteOpen(false)
+      setUsuarioEliminar(undefined)
+      return
+    }
 
     if (accion === 'eliminar' && String(usuarioEliminar.rol) === 'Administrador' && String(profile?.rol) !== 'Administrador') {
       showErrorToast('No tienes permisos para eliminar usuarios con rol Administrador.')
       setDeleteOpen(false)
       setUsuarioEliminar(undefined)
       return
+    }
+
+    if (accion === 'activar') {
+      const rolAsociado = roles.find((r: any) => (r.nombre || r.name) === usuarioEliminar.rol)
+      if (rolAsociado && (rolAsociado.estado === 'Inactivo' || (rolAsociado as any).activo === false)) {
+        showErrorToast('No se puede activar el usuario debido a que su rol asociado se encuentra inactivo. Active el rol primero.')
+        setDeleteOpen(false)
+        setUsuarioEliminar(undefined)
+        return
+      }
     }
 
     try {
@@ -327,13 +393,52 @@ export default function UsuariosPage() {
           telefono: usuarioEliminar.telefono || '',
           rol: usuarioEliminar.rol,
           estado: nuevoEstado,
+          username: usuarioEliminar.username || null,
+          fecha_nacimiento: usuarioEliminar.fecha_nacimiento || null,
+          direccion: usuarioEliminar.direccion || null,
         })
-        showSuccessToast(accion === 'activar' ? 'Usuario activado exitosamente' : 'Usuario suspendido exitosamente')
+
+        if (esContratante && accion === 'suspender') {
+          // Verificar si hay otros usuarios con rol Contratante activos
+          const otrosContratantesActivos = usuarios.filter(
+            (u) => u.id !== usuarioEliminar.id && String(u.rol).toLowerCase() === 'contratante' && (u.estado === 'Activo' || (u as any).activo !== false)
+          )
+
+          let empresaIdToAssign: string | undefined
+
+          try {
+            const resContactos = await api.get('/mantenimiento/contacto_contratista?limite=200')
+            const listaContactos = resContactos.data?.data || resContactos.data || []
+            const miContacto = Array.isArray(listaContactos) ? listaContactos.find((c: any) => c.usuario_id === usuarioEliminar.id) : null
+            if (miContacto) {
+              empresaIdToAssign = miContacto.empresa_contratista_id
+            }
+          } catch (e) {}
+
+          if (otrosContratantesActivos.length === 0 && empresaIdToAssign) {
+            try {
+              await api.put(`/empresas-contratistas/${empresaIdToAssign}`, { activo: false })
+            } catch (e) {}
+            showSuccessToast('Usuario Contratante desactivado. La empresa ha quedado desactivada por no tener representante activo.')
+          } else {
+            showSuccessToast('Usuario Contratante desactivado exitosamente')
+          }
+
+          // Abrir modal de nuevo usuario para registrar un nuevo usuario con rol Contratante para la empresa
+          setTimeout(() => {
+            setUsuarioActivo(undefined)
+            setDrawerMode('create')
+            setDrawerOpen(true)
+          }, 300)
+        } else {
+          showSuccessToast(accion === 'activar' ? 'Usuario activado exitosamente' : 'Usuario suspendido exitosamente')
+        }
       } else {
         await api.delete(`/usuarios/${usuarioEliminar.id}`)
         showSuccessToast('Usuario eliminado exitosamente')
       }
 
+      limpiarCacheMemoria()
       await cargarUsuarios()
       fetchRoles()
     } catch (error) {
@@ -370,6 +475,9 @@ export default function UsuariosPage() {
         telefono: usuarioCerrarSesion.telefono || '',
         rol: usuarioCerrarSesion.rol,
         estado: 'Inactivo',
+        username: usuarioCerrarSesion.username || null,
+        fecha_nacimiento: usuarioCerrarSesion.fecha_nacimiento || null,
+        direccion: usuarioCerrarSesion.direccion || null,
       });
       showSuccessToast(`Sesión cerrada exitosamente para ${usuarioCerrarSesion.primer_nombre} ${usuarioCerrarSesion.primer_apellido}`);
       await cargarUsuarios();
@@ -396,178 +504,107 @@ export default function UsuariosPage() {
 
   return (
 
-    <div className="space-y-3.5">
-
-      <div className="flex flex-wrap items-start justify-between gap-3">
-
-        <div>
-
-          <h1 className="text-[18px] font-extrabold leading-none text-gray-800">Usuarios</h1>
-
-          <p className="mt-1 text-[11px] text-gray-400">
-
-            Gestión de accesos y permisos del sistema
-
-          </p>
-
-        </div>
-
-
-
-        <div className="flex items-center gap-2">
-
-          <Link
-
-            href="/dashboard/roles"
-
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-[11px] font-semibold rounded-lg transition-colors shadow-2xs"
-
-          >
-
-            <Shield size={12} />
-
-            Gestión de Roles
-
-          </Link>
-
-          <button
-
-            onClick={handleNuevo}
-
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#9B0F06] hover:bg-[#5E0006] text-white text-[11px] font-bold rounded-lg transition-colors shadow-sm"
-
-          >
-
-            <Plus size={12} />
-
-            Nuevo Usuario
-
-          </button>
-
-        </div>
-
-      </div>
-
-
-
-
-
-
-
-      <div className="flex flex-wrap items-center justify-between gap-2.5 bg-white p-2.5 rounded-xl border border-gray-100 shadow-2xs">
-
-        <div className="flex flex-wrap items-center gap-2">
-
-          <div className="relative md:w-48 w-full">
-
-            <Search size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-
-            <input
-
-              type="text"
-
-              placeholder="Buscar usuario..."
-
-              value={busqueda}
-
-              onChange={(e) => setBusqueda(e.target.value)}
-
-              className="w-full pl-8 pr-3 py-1.5 border border-gray-200 rounded-lg text-[10px] text-gray-700 focus:outline-none focus:border-[#9B0F06] transition-colors"
-
-            />
-
+    <div className="space-y-3.5 font-[Poppins]">
+      {/* Encabezado y Barra de Filtros Fija al hacer scroll */}
+      <div className="sticky -top-4 z-20 bg-[#F3F4F7] pt-4 pb-3 space-y-3 -mx-4 px-4 xl:-mx-5 xl:px-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-[18px] font-extrabold leading-none text-gray-800">Usuarios</h1>
+            <p className="mt-1 text-[11px] text-gray-400">
+              Gestión de accesos y permisos del sistema
+            </p>
           </div>
 
+          <div className="flex items-center gap-2">
+            <Link
+              href="/dashboard/roles"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-[11px] font-semibold rounded-lg transition-colors shadow-2xs cursor-pointer"
+            >
+              <Shield size={12} />
+              Gestión de Roles
+            </Link>
 
+            <button
+              onClick={handleNuevo}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#9B0F06] hover:bg-[#5E0006] text-white text-[11px] font-bold rounded-lg transition-colors shadow-sm cursor-pointer"
+            >
+              <Plus size={12} />
+              Nuevo Usuario
+            </button>
+          </div>
+        </div>
 
-          <div className="flex items-center gap-0.5 bg-gray-100 p-0.5 rounded-lg">
+        <div className="flex flex-wrap items-center justify-between gap-2.5 bg-white p-2.5 rounded-xl border border-gray-100 shadow-2xs">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative md:w-48 w-full">
+              <Search size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Buscar usuario..."
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+                className="w-full pl-8 pr-3 py-1.5 border border-gray-200 rounded-lg text-[10px] text-gray-700 focus:outline-none focus:border-[#9B0F06] transition-colors"
+              />
+            </div>
 
-            {['Todos', 'Activo', 'Inactivo', 'Suspendido'].map((estado) => (
+            <div className="flex items-center gap-0.5 bg-gray-100 p-0.5 rounded-lg">
+              {['Todos', 'Activo', 'Inactivo', 'Suspendido'].map((estado) => (
+                <button
+                  key={estado}
+                  onClick={() => setFiltroEstado(estado as EstadoUsuario | 'Todos')}
+                  className={`px-3 py-1 text-[10px] transition-colors rounded-md cursor-pointer ${
+                    filtroEstado === estado
+                      ? 'bg-white text-gray-800 shadow-2xs font-semibold'
+                      : 'text-gray-500 hover:text-gray-700 font-medium'
+                  }`}
+                >
+                  {estado}
+                </button>
+              ))}
+            </div>
 
-              <button
-
-                key={estado}
-
-                onClick={() => setFiltroEstado(estado as EstadoUsuario | 'Todos')}
-
-                className={`px-3 py-1 text-[10px] transition-colors rounded-md ${
-
-                  filtroEstado === estado
-
-                    ? 'bg-white text-gray-800 shadow-2xs font-semibold'
-
-                    : 'text-gray-500 hover:text-gray-700 font-medium'
-
-                }`}
-
-              >
-
-                {estado}
-
-              </button>
-
-            ))}
-
+            <select
+              value={filtroRol}
+              onChange={(e) => setFiltroRol(e.target.value as RolUsuario | 'Todos')}
+              className="h-8 rounded-md border border-gray-200 bg-white px-2 text-[10px] text-gray-600 focus:border-[#9B0F06] focus:outline-none cursor-pointer"
+            >
+              <option value="Todos">Todos los roles</option>
+              {(() => {
+                const fallbackRoles = [
+                  { id: 'r1', nombre: 'Administrador' },
+                  { id: 'r2', nombre: 'Gerencia' },
+                  { id: 'r3', nombre: 'IngenieroResidente' },
+                  { id: 'r4', nombre: 'Laboratorista' },
+                  { id: 'r5', nombre: 'AuxiliarDeCampo' },
+                  { id: 'r6', nombre: 'Contratante' },
+                  { id: 'r7', nombre: 'Supervisor' },
+                  { id: 'r8', nombre: 'Inspector' },
+                  { id: 'r9', nombre: 'Campo' },
+                  { id: 'r10', nombre: 'Proveedor' },
+                  { id: 'r11', nombre: 'Delegado Residente' },
+                ]
+                const listaBase = roles && roles.length > 0 ? roles : fallbackRoles
+                return listaBase
+                  .map((rol: any) => (
+                    <option key={rol.id || rol.nombre} value={rol.nombre}>{rol.nombre}</option>
+                  ))
+              })()}
+            </select>
           </div>
 
-
-
-          <select
-            value={filtroRol}
-            onChange={(e) => setFiltroRol(e.target.value as RolUsuario | 'Todos')}
-            className="h-8 rounded-md border border-gray-200 bg-white px-2 text-[10px] text-gray-600 focus:border-[#9B0F06] focus:outline-none cursor-pointer"
-          >
-            <option value="Todos">Todos los roles</option>
-            {(() => {
-              const fallbackRoles = [
-                { id: 'r1', nombre: 'Administrador' },
-                { id: 'r2', nombre: 'Gerencia' },
-                { id: 'r3', nombre: 'IngenieroResidente' },
-                { id: 'r4', nombre: 'Laboratorista' },
-                { id: 'r5', nombre: 'AuxiliarDeCampo' },
-                { id: 'r6', nombre: 'Supervisor' },
-                { id: 'r7', nombre: 'Inspector' },
-                { id: 'r8', nombre: 'Campo' },
-                { id: 'r9', nombre: 'Proveedor' },
-                { id: 'r10', nombre: 'Delegado Residente' },
-              ]
-              const listaBase = roles && roles.length > 0 ? roles : fallbackRoles
-              return listaBase
-                .filter((r: any) => String(r.nombre).toLowerCase() !== 'contratante')
-                .map((rol: any) => (
-                  <option key={rol.id || rol.nombre} value={rol.nombre}>{rol.nombre}</option>
-                ))
-            })()}
-          </select>
-
+          <div className="text-[10px] text-gray-400 font-medium mr-1">
+            {usuariosFiltrados.length} usuario{usuariosFiltrados.length !== 1 ? 's' : ''}
+          </div>
         </div>
-
-
-
-        <div className="text-[10px] text-gray-400 font-medium mr-1">
-
-          {usuariosFiltrados.length} usuario{usuariosFiltrados.length !== 1 ? 's' : ''}
-
-        </div>
-
       </div>
-
-
 
       {loading ? (
-
         <div className="flex flex-col items-center justify-center p-12 bg-white border border-gray-100 rounded-2xl shadow-sm">
-
           <Loader2 className="h-8 w-8 animate-spin text-[#9B0F06]" />
-
           <p className="mt-2 text-[11px] text-gray-500 font-medium">Cargando datos</p>
-
         </div>
-
       ) : usuariosPaginados.length > 0 ? (
-
         <div className="space-y-4">
-
           <UsuarioTabla
             usuarios={usuariosPaginados}
             onVer={handleVer}
@@ -576,34 +613,19 @@ export default function UsuariosPage() {
             onCerrarSesion={handleCerrarSesionUsuario}
           />
 
-          
-
-          {/* Pagination Controls */}
-
+          {/* Controls de Paginación iniciando en 8, luego 16 */}
           <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-xl border border-gray-100 shadow-2xs">
-
             <div className="flex items-center gap-2 text-[10px] text-gray-500">
-
               <span>Mostrar</span>
-
               <select
-
                 value={registrosPorPagina}
-
                 onChange={(e) => setRegistrosPorPagina(Number(e.target.value))}
-
-                className="h-7 rounded-md border border-gray-200 bg-white px-1 focus:border-[#9B0F06] focus:outline-none cursor-pointer"
-
+                className="h-7 rounded-md border border-gray-200 bg-white px-1 focus:border-[#9B0F06] focus:outline-none cursor-pointer font-medium"
               >
-
-                {[5, 10, 15, 20].map((num) => (
-
+                {[8, 16, 24, 32, 50].map((num) => (
                   <option key={num} value={num}>{num}</option>
-
                 ))}
-
               </select>
-
               <span>registros por página</span>
 
             </div>
@@ -696,6 +718,7 @@ export default function UsuariosPage() {
         }}
         onConfirm={handleConfirmarEliminar}
         usuario={usuarioEliminar}
+        modoModal={modoModalEliminar}
       />
 
       {closeSessionModalOpen && usuarioCerrarSesion && (

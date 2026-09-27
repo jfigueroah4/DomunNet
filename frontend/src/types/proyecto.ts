@@ -3,7 +3,7 @@ export type EstadoProyecto =
   | 'activo'
   | 'en_revision'
   | 'completado'
-  | 'cancelado'
+  | 'pausado'
 
 export interface MiembroEquipo {
   id: string
@@ -71,6 +71,7 @@ export interface Proyecto {
   nombre: string
   descripcion: string
   estado: EstadoProyecto
+  en_replanificacion?: boolean
   ubicacion: string
   responsable: string
   equipo: MiembroEquipo[]

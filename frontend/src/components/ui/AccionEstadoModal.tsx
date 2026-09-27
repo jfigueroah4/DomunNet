@@ -1,6 +1,6 @@
 'use client'
 
-import { Trash2, X, CheckCircle, PowerOff } from 'lucide-react'
+import { Trash2, X, CheckCircle, PowerOff, UserX } from 'lucide-react'
 
 export interface AccionEstadoModalProps {
   isOpen: boolean
@@ -11,6 +11,7 @@ export interface AccionEstadoModalProps {
   subtitulo1?: string
   subtitulo2?: string
   isSuspended: boolean
+  modoModal?: 'todos' | 'activar' | 'eliminar' | 'suspender'
 }
 
 export function AccionEstadoModal({
@@ -22,32 +23,60 @@ export function AccionEstadoModal({
   subtitulo1 = '',
   subtitulo2 = '',
   isSuspended,
+  modoModal = 'todos',
 }: AccionEstadoModalProps) {
   if (!isOpen) return null
+
+  const esModoActivar = modoModal === 'activar'
+  const esModoEliminar = modoModal === 'eliminar'
+  const esModoSuspender = modoModal === 'suspender'
+
+  const tituloEfectivo = esModoActivar
+    ? 'Activar Usuario'
+    : esModoEliminar
+    ? 'Eliminar Usuario'
+    : esModoSuspender
+    ? 'Desactivar Usuario'
+    : titulo
 
   return (
     <>
       <div className="fixed inset-0 z-40 bg-black/45 backdrop-blur-[1px]" onClick={onClose} />
-      <div className="fixed left-1/2 top-1/2 z-50 w-full max-w-[420px] -translate-x-1/2 -translate-y-1/2">
+      <div className="fixed left-1/2 top-1/2 z-50 w-full max-w-[420px] -translate-x-1/2 -translate-y-1/2 font-[Poppins]">
         <div className="relative overflow-hidden rounded-2xl bg-white p-6 shadow-2xl">
-          <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-red-500 to-[#9B0F06]" />
+          <div className={`absolute left-0 top-0 h-1 w-full ${esModoActivar ? 'bg-gradient-to-r from-orange-400 to-green-600' : 'bg-gradient-to-r from-red-500 to-[#9B0F06]'}`} />
           
           <div className="mb-4 flex items-center justify-center relative">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-[#9B0F06] ring-4 ring-red-50/50">
-              <Trash2 size={22} strokeWidth={1.75} />
+            <div className={`flex h-12 w-12 items-center justify-center rounded-full ring-4 ${
+              esModoActivar
+                ? 'bg-green-50 text-green-600 ring-green-50/50'
+                : 'bg-red-50 text-[#9B0F06] ring-red-50/50'
+            }`}>
+              {esModoActivar ? (
+                <CheckCircle size={22} strokeWidth={1.75} />
+              ) : esModoEliminar ? (
+                <Trash2 size={22} strokeWidth={1.75} />
+              ) : (
+                <UserX size={22} strokeWidth={1.75} />
+              )}
             </div>
             <button
               onClick={onClose}
-              className="absolute right-0 top-0 rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+              className="absolute right-0 top-0 rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 cursor-pointer"
               title="Cerrar"
             >
               <X size={16} />
             </button>
           </div>
 
-          <h3 className="text-[18px] font-bold text-gray-800 text-center">{titulo}</h3>
+          <h3 className="text-[18px] font-bold text-gray-800 text-center">{tituloEfectivo}</h3>
           <p className="mt-2 text-[12px] leading-relaxed text-gray-500 text-center">
-            Selecciona la acción que deseas realizar para <span className="font-semibold text-gray-800">{nombreItem}</span>.
+            {esModoActivar
+              ? `Confirmas reactivar el acceso para `
+              : esModoEliminar
+              ? `Confirmas eliminar definitivamente a `
+              : `Selecciona la acción que deseas realizar para `}
+            <span className="font-semibold text-gray-800">{nombreItem}</span>.
           </p>
 
           <div className="mt-5 bg-gray-50 p-3 rounded-xl border border-gray-100">
@@ -57,7 +86,23 @@ export function AccionEstadoModal({
           </div>
 
           <div className="mt-5 flex flex-col gap-2">
-            {!isSuspended ? (
+            {esModoActivar ? (
+              <button
+                onClick={() => onConfirm('activar')}
+                className="w-full flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-[12px] font-bold text-white transition-colors bg-orange-500 hover:bg-orange-600 cursor-pointer"
+              >
+                <CheckCircle size={16} />
+                <span>Activar Usuario</span>
+              </button>
+            ) : esModoEliminar ? (
+              <button
+                onClick={() => onConfirm('eliminar')}
+                className="w-full flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-[12px] font-bold text-white transition-colors bg-[#9B0F06] hover:bg-[#5E0006] cursor-pointer"
+              >
+                <Trash2 size={16} />
+                <span>Eliminar definitivamente</span>
+              </button>
+            ) : !isSuspended ? (
               <button
                 onClick={() => onConfirm('suspender')}
                 className="w-full flex items-center justify-center gap-2 rounded-xl py-2.5 text-[12px] font-semibold text-white transition-colors bg-[#9B0F06] hover:bg-[#5E0006] cursor-pointer"
@@ -86,7 +131,7 @@ export function AccionEstadoModal({
             
             <button
               onClick={onClose}
-              className="w-full rounded-xl border border-gray-200 py-2.5 text-[12px] font-medium text-gray-600 transition-colors hover:bg-gray-50 mt-1"
+              className="w-full rounded-xl border border-gray-200 py-2.5 text-[12px] font-medium text-gray-600 transition-colors hover:bg-gray-50 mt-1 cursor-pointer"
             >
               Cancelar
             </button>

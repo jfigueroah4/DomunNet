@@ -172,6 +172,7 @@ export function EmpresaRelacionadaDrawer({
 
   // Correo Institucional Empresa
   const statusEmpresaCorreo = useMemo(() => {
+    if (mode === 'view') return null
     const val = data.correo_institucional.trim().toLowerCase()
     if (!val) return null
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -183,10 +184,11 @@ export function EmpresaRelacionadaDrawer({
       return { state: 'error', message: 'Este correo ya está registrado' }
     }
     return { state: 'valid', message: 'Correo institucional disponible' }
-  }, [data.correo_institucional, empresasExistentes, empresa])
+  }, [data.correo_institucional, empresasExistentes, empresa, mode])
 
   // Teléfono Empresa
   const statusEmpresaTelefono = useMemo(() => {
+    if (mode === 'view') return null
     const val = data.telefono.trim()
     if (!val) return null
     if (val.length !== 4 && val.length !== 8) {
@@ -197,10 +199,11 @@ export function EmpresaRelacionadaDrawer({
       return { state: 'error', message: 'Teléfono ya registrado en otra empresa' }
     }
     return { state: 'valid', message: 'Teléfono disponible' }
-  }, [data.telefono, empresasExistentes, empresa])
+  }, [data.telefono, empresasExistentes, empresa, mode])
 
   // Correo Contacto
   const statusContactoCorreo = useMemo(() => {
+    if (mode === 'view') return null
     const val = data.contacto.correo.trim().toLowerCase()
     if (!val) return null
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -212,10 +215,11 @@ export function EmpresaRelacionadaDrawer({
       return { state: 'error', message: 'Este correo ya pertenece a un usuario' }
     }
     return { state: 'valid', message: 'Correo disponible' }
-  }, [data.contacto.correo, usuariosExistentes])
+  }, [data.contacto.correo, usuariosExistentes, mode])
 
   // Teléfono Contacto
   const statusContactoTelefono = useMemo(() => {
+    if (mode === 'view') return null
     const val = data.contacto.telefono.trim()
     if (!val) return null
     if (val.length !== 4 && val.length !== 8) {
@@ -226,10 +230,11 @@ export function EmpresaRelacionadaDrawer({
       return { state: 'error', message: 'Teléfono ya registrado a otro usuario' }
     }
     return { state: 'valid', message: 'Teléfono disponible' }
-  }, [data.contacto.telefono, usuariosExistentes])
+  }, [data.contacto.telefono, usuariosExistentes, mode])
 
   // Username Contacto
   const statusContactoUsername = useMemo(() => {
+    if (mode === 'view') return null
     const val = data.contacto.username.trim().toLowerCase()
     if (!val) return null
     if (val.length < 3) {
@@ -240,10 +245,11 @@ export function EmpresaRelacionadaDrawer({
       return { state: 'error', message: 'Nombre de usuario ya está ocupado' }
     }
     return { state: 'valid', message: 'Username disponible' }
-  }, [data.contacto.username, usuariosExistentes])
+  }, [data.contacto.username, usuariosExistentes, mode])
 
   // Helper para generar clase de input con borde verde / rojo en vivo
   const getLiveInputClass = (baseClass: string, isError: boolean, status: { state: string; message: string } | null) => {
+    if (mode === 'view') return `${baseClass} border-gray-200 focus:border-[#9B0F06]`
     if (isError || status?.state === 'error') {
       return `${baseClass} border-red-500 ring-1 ring-red-400 bg-red-50/20 text-red-900 pr-7`
     }
@@ -647,7 +653,7 @@ export function EmpresaRelacionadaDrawer({
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-semibold text-gray-700 mb-0.5">Segundo Nombre</label>
+                  <label className="block text-[10px] font-semibold text-gray-700 mb-0.5">Resto del Nombre</label>
                   <input
                     type="text"
                     disabled={isViewMode}
@@ -677,7 +683,7 @@ export function EmpresaRelacionadaDrawer({
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-semibold text-gray-700 mb-0.5">Segundo Apellido</label>
+                  <label className="block text-[10px] font-semibold text-gray-700 mb-0.5">Resto del Apellido</label>
                   <input
                     type="text"
                     disabled={isViewMode}

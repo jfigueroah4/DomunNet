@@ -1,4 +1,11 @@
-import { clienteSupabase } from '@/configuracion/cliente-supabase'
+import { clienteSupabase } from '../../configuracion/cliente-supabase'
+import {
+  procesarMedicionRenglon,
+  calcularLiquidacionEstimacion,
+  calcularCantidadMedicion,
+  calcularLongitudEstaciones,
+  obtenerDimensionesRequeridas
+} from '../../lib/calculos/index'
 
 export class ValidationError extends Error {
   public field: string;
@@ -14,19 +21,47 @@ export class ValidationError extends Error {
  * de un estado basado en su código de catálogo portable (en minúsculas).
  */
 export async function obtenerEstadoIdPorCodigo(codigo: string): Promise<string> {
-  const { data, error } = await clienteSupabase
-    .from('catalogo_item')
-    .select('id, catalogo!inner(codigo)')
-    .eq('catalogo.codigo', 'estado_proyecto')
-    .eq('codigo', codigo)
-    .single()
-
-  if (error || !data) {
-    // AJUSTE: Lanza un ValidationError claro que el controlador atrapará como HTTP 400
-    throw new ValidationError(`Estado '${codigo}' no es válido o no existe en el catálogo.`, 'estado_codigo')
+  if (!codigo) {
+    throw new ValidationError('Código de estado no proporcionado.', 'estado_codigo')
   }
-  
-  return data.id
+  const codigoNorm = codigo.toLowerCase().trim()
+
+  const { data: exact } = await clienteSupabase
+    .from('catalogo_item')
+    .select('id, codigo, catalogo!inner(codigo)')
+    .eq('catalogo.codigo', 'estado_proyecto')
+    .eq('codigo', codigoNorm)
+    .maybeSingle()
+
+  if (exact?.id) return exact.id
+
+  const aliasMap: Record<string, string[]> = {
+    'borrador': ['borrador', 'draft', 'planificacion', 'modificacion', 'modificativo', 'en_modificacion', 'modificación'],
+    'activo': ['activo', 'active', 'en_ejecucion'],
+    'en_revision': ['en_revision', 'revision', 'en_revisión'],
+    'completado': ['completado', 'finalizado', 'terminado', 'concluido'],
+    'pausado': ['pausado', 'pausa', 'suspendido', 'en_suspension', 'suspension', 'en_suspensión', 'cancelado', 'anulado'],
+    'suspendido': ['suspendido', 'en_suspension', 'suspension', 'en_suspensión', 'pausado']
+  }
+
+  const posibles = aliasMap[codigoNorm] || [codigoNorm]
+
+  const { data: items } = await clienteSupabase
+    .from('catalogo_item')
+    .select('id, codigo, catalogo!inner(codigo)')
+    .eq('catalogo.codigo', 'estado_proyecto')
+
+  if (items && items.length > 0) {
+    const match = items.find((it: any) =>
+      posibles.includes(it.codigo.toLowerCase()) ||
+      it.codigo.toLowerCase().includes(codigoNorm) ||
+      codigoNorm.includes(it.codigo.toLowerCase())
+    )
+    if (match?.id) return match.id
+    return items[0].id
+  }
+
+  throw new ValidationError(`Estado '${codigo}' no existe en el catálogo.`, 'estado_codigo')
 }
 
 export function esUuidValido(val: any): string | null {
@@ -35,8 +70,147 @@ export function esUuidValido(val: any): string | null {
   return uuidRegex.test(val.trim()) ? val.trim() : null
 }
 
+export async function validarOperacionProyectoPermitida(proyectoId: string, tipoOperacion: 'bitacora' | 'analitico' | 'fechas'): Promise<void> {
+  const { data: proy } = await clienteSupabase
+    .from('proyecto')
+    .select('id, en_replanificacion, estado_id, catalogo_item:estado_id(codigo)')
+    .eq('id', proyectoId)
+    .maybeSingle()
+
+  if (!proy) {
+    return
+  }
+
+  const estadoCodigo = ((proy.catalogo_item as any)?.codigo || '').toLowerCase()
+  const enReplanificacion = Boolean(proy.en_replanificacion)
+
+  if (enReplanificacion) {
+    throw new ValidationError('El proyecto se encuentra en ciclo de modificación de plazo / replanificación. Operación no permitida.', 'en_replanificacion')
+  }
+
+  if (tipoOperacion === 'bitacora') {
+    if (estadoCodigo !== 'activo') {
+      throw new ValidationError(`No se pueden registrar avances de Bitácora cuando el proyecto está en estado '${estadoCodigo}'.`, 'estado')
+    }
+  } else if (tipoOperacion === 'analitico') {
+    if (['pausado', 'inactivo', 'completado', 'en_revision', 'borrador'].includes(estadoCodigo)) {
+      throw new ValidationError(`Operación no permitida en Analítico para el estado '${estadoCodigo}'.`, 'estado')
+    }
+  } else if (tipoOperacion === 'fechas') {
+    if (['pausado', 'inactivo', 'completado', 'en_revision'].includes(estadoCodigo) || enReplanificacion) {
+      throw new ValidationError('No se pueden editar las fechas del proyecto mientras esté pausado, inactivo, completado, en revisión o en replanificación.', 'fechas')
+    }
+  }
+}
+
+export async function iniciarReplanificacionProyecto(proyectoId: string) {
+  const { error } = await clienteSupabase
+    .from('proyecto')
+    .update({ en_replanificacion: true })
+    .eq('id', proyectoId)
+
+  if (error) {
+    throw new Error('Error al iniciar el ciclo de replanificación del proyecto')
+  }
+  return true
+}
+
+export async function activarReplanificacionProyecto(params: {
+  proyectoId: string
+  esReanudacionPausa?: boolean
+  fechaReanudacion?: string
+  nuevaFechaFin?: string
+  nuevosDiasContractuales?: number
+}) {
+  const { proyectoId, esReanudacionPausa, fechaReanudacion, nuevaFechaFin } = params
+
+  const { data: proy } = await clienteSupabase
+    .from('proyecto')
+    .select('id, estado_id, catalogo_item:estado_id(codigo)')
+    .eq('id', proyectoId)
+    .single()
+
+  const estadoCodigo = ((proy?.catalogo_item as any)?.codigo || '').toLowerCase()
+
+  if (esReanudacionPausa || estadoCodigo === 'pausado') {
+    if (!fechaReanudacion || !fechaReanudacion.trim()) {
+      throw new ValidationError('fechaReanudacion es obligatoria para reanudar desde pausado', 'fechaReanudacion')
+    }
+    const fReanudacion = fechaReanudacion.trim()
+    
+    const { data: suspAbierta } = await clienteSupabase
+      .from('suspension_plazo')
+      .select('id, fecha_inicio')
+      .eq('proyecto_id', proyectoId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (suspAbierta) {
+      if (fReanudacion < suspAbierta.fecha_inicio) {
+        throw new ValidationError(
+          `La fecha de reanudación (${fReanudacion}) no puede ser anterior a la fecha de inicio de la suspensión (${suspAbierta.fecha_inicio}).`,
+          'fechaReanudacion'
+        )
+      }
+
+      const { error: errSuspUpdate } = await clienteSupabase
+        .from('suspension_plazo')
+        .update({
+          fecha_fin: fReanudacion
+        })
+        .eq('id', suspAbierta.id)
+
+      if (errSuspUpdate) {
+        throw new Error(`Error de BD al actualizar suspension_plazo: ${errSuspUpdate.message}`)
+      }
+    }
+  }
+
+  const activoEstadoId = await obtenerEstadoIdPorCodigo('activo')
+
+  const updates: Record<string, any> = {
+    en_replanificacion: false,
+    estado_id: activoEstadoId
+  }
+
+  if (nuevaFechaFin) {
+    updates.fecha_fin_estimada = nuevaFechaFin
+  }
+
+  const { error: errUpdProy } = await clienteSupabase
+    .from('proyecto')
+    .update(updates)
+    .eq('id', proyectoId)
+
+  if (errUpdProy) {
+    throw new Error(`Error al activar replanificación: ${errUpdProy.message}`)
+  }
+
+  if (nuevaFechaFin) {
+    await clienteSupabase
+      .from('proyecto_detalle')
+      .update({ fecha_finalizacion_real: nuevaFechaFin })
+      .eq('proyecto_id', proyectoId)
+  }
+
+  return true
+}
+
 export async function actualizarEstadoProyecto(proyectoId: string, nuevoEstadoCodigo: string) {
-  // 1. Validaciones de Negocio si el nuevo estado es 'activo'
+  const { data: proyActual } = await clienteSupabase
+    .from('proyecto')
+    .select('id, estado_id, catalogo_item:estado_id(codigo)')
+    .eq('id', proyectoId)
+    .single()
+
+  const estadoActualCodigo = ((proyActual?.catalogo_item as any)?.codigo || '').toLowerCase()
+
+  if (estadoActualCodigo === 'pausado' && nuevoEstadoCodigo === 'activo') {
+    await iniciarReplanificacionProyecto(proyectoId)
+    return true
+  }
+
   if (nuevoEstadoCodigo === 'activo') {
     const { data: proyecto, error: errorProy } = await clienteSupabase
       .from('proyecto')
@@ -82,10 +256,8 @@ export async function actualizarEstadoProyecto(proyectoId: string, nuevoEstadoCo
     }
   }
 
-  // 2. Obtener UUID del nuevo estado
   const nuevoEstadoId = await obtenerEstadoIdPorCodigo(nuevoEstadoCodigo)
 
-  // 3. Actualizar estado
   const { error: errorUpdate } = await clienteSupabase
     .from('proyecto')
     .update({ estado_id: nuevoEstadoId })
@@ -93,6 +265,18 @@ export async function actualizarEstadoProyecto(proyectoId: string, nuevoEstadoCo
 
   if (errorUpdate) {
     throw new Error('Error de BD al actualizar el estado del proyecto')
+  }
+
+  if (nuevoEstadoCodigo === 'pausado') {
+    const fechaPausa = new Date().toISOString().split('T')[0]
+    await clienteSupabase
+      .from('suspension_plazo')
+      .insert({
+        proyecto_id: proyectoId,
+        fecha_inicio: fechaPausa,
+        motivo: 'Proyecto pausado',
+        numero_acta_resolucion: 'PAUSA-SISTEMA'
+      })
   }
 
   return true
@@ -170,6 +354,49 @@ export async function obtenerProyectoPorId(proyectoId: string) {
     .eq('proyecto_id', proyectoId)
     .maybeSingle()
 
+  const { data: renglonesRows } = await clienteSupabase
+    .from('renglon_trabajo')
+    .select(`
+      id,
+      descripcion,
+      cantidad_contractual,
+      cantidad_ejecutada,
+      cantidad_ajustada,
+      precio_unitario_directo,
+      especificacion:especificacion_id(codigo, descripcion, unidad),
+      unidad:unidad_id(abreviatura, nombre)
+    `)
+    .eq('proyecto_id', proyectoId)
+
+  function extraerCodigoRenglon(desc?: string, codExplicit?: string | null): string | null {
+    if (codExplicit) return codExplicit
+    if (!desc) return null
+    const match = desc.match(/\(([0-9]+(?:\.[0-9]+)?(?:\([a-z]\))?|[0-9]+\.[0-9]+[a-z]?)\)/i)
+    return match ? match[1] : null
+  }
+
+  const mappedRenglones = (renglonesRows || []).map((r: any) => {
+    const esp = r.especificacion || {}
+    const uni = r.unidad || {}
+    const codParsed = extraerCodigoRenglon(r.descripcion, esp.codigo || r.codigo)
+    const cod = codParsed || esp.codigo || r.codigo || r.id
+    const desc = r.descripcion || esp.descripcion || 'Renglón de trabajo'
+    const unidad = uni.abreviatura || esp.unidad || r.unidad_medida || ''
+    return {
+      id: cod,
+      renglonId: r.id,
+      codigo: cod,
+      codigoDGC: cod,
+      desc,
+      descripcion: desc,
+      unidad,
+      unidad_medida: unidad,
+      cantidadContratada: Number(r.cantidad_contractual) || 0,
+      cantidadAjustada: Number(r.cantidad_ajustada) || 0,
+      costoUnitarioDirecto: Number(r.precio_unitario_directo) || 0,
+    }
+  })
+
   const equipo = (equipoRows || []).map((row: any) => {
     const u = row.usuario
     const dato = u?.dato_usuario
@@ -246,6 +473,20 @@ export async function obtenerProyectoPorId(proyectoId: string) {
     }
   }
 
+  let responsableNombre = ''
+  if (proyecto.responsable_id) {
+    const { data: respU } = await clienteSupabase
+      .from('usuario')
+      .select('correo, dato_usuario(primer_nombre, primer_apellido)')
+      .eq('id', proyecto.responsable_id)
+      .maybeSingle()
+    if (respU) {
+      const dato = (respU as any).dato_usuario
+      const full = dato ? `${dato.primer_nombre || ''} ${dato.primer_apellido || ''}`.trim() : ''
+      responsableNombre = full || respU.correo || ''
+    }
+  }
+
     const fInicioCalc = detalle.fecha_inicio_contractual || proyecto.fecha_inicio || detalle.fecha_adjudicacion || ''
     const plazoNumCalc = detalle.plazo_ejecucion_original || detalle.plazo_ejecucion_ampliado || null
     let fFinCalc = detalle.fecha_finalizacion_real || proyecto.fecha_fin_estimada || ''
@@ -286,7 +527,10 @@ export async function obtenerProyectoPorId(proyectoId: string) {
       empresaSupervisora: detalle.empresa_supervisora ?? '',
       delegadoResidenteId: detalle.delegado_residente_id ?? null,
       delegadoResidente: delegadoResidenteNombre,
-      responsable: delegadoResidenteNombre || 'No asignado',
+      responsableId: proyecto.responsable_id ?? null,
+      responsable_id: proyecto.responsable_id ?? null,
+      responsable: proyecto.responsable_id ?? null,
+      responsableNombre: responsableNombre || delegadoResidenteNombre || 'No asignado',
       fechaAdjudicacion: detalle.fecha_adjudicacion ?? '',
       fechaInicioContractual: detalle.fecha_inicio_contractual ?? fInicioCalc,
       fechaInicio: fInicioCalc,
@@ -309,6 +553,8 @@ export async function obtenerProyectoPorId(proyectoId: string) {
       estado: await resolverCodigoEstado(proyecto.estado_id),
       parametro_proyecto: paramRow || null,
       parametroProyecto: paramRow || null,
+      planTrabajo: mappedRenglones,
+      renglones: mappedRenglones,
       paso2: {},
       paso3: {},
     }
@@ -587,6 +833,22 @@ export async function crearProyecto(datosFormulario: any) {
 }
 
 export async function actualizarProyecto(proyectoId: string, datosFormulario: Record<string, unknown>) {
+  const tieneCamposFecha = Boolean(
+    datosFormulario.fechaAdjudicacion ||
+    datosFormulario.fechaInicioContractual ||
+    datosFormulario.fechaInicio ||
+    datosFormulario.fechaFinContractualPlan ||
+    datosFormulario.fechaFin ||
+    datosFormulario.fechaFinalizacionReal ||
+    datosFormulario.plazoEjecucionOriginal ||
+    datosFormulario.plazoEjecucionContractualOriginal ||
+    datosFormulario.plazoEjecucionRealAmpliado
+  )
+
+  if (tieneCamposFecha) {
+    await validarOperacionProyectoPermitida(proyectoId, 'fechas')
+  }
+
   const proyectoUpdates: Record<string, unknown> = {}
   const detalleUpdates: Record<string, unknown> = {}
 
@@ -656,17 +918,28 @@ export async function actualizarProyecto(proyectoId: string, datosFormulario: Re
       detalleUpdates.plazo_ejecucion_original = p
     }
   }
-  if ('responsable' in datosFormulario) proyectoUpdates.responsable_id = datosFormulario.responsable
+  if ('responsable' in datosFormulario || 'responsable_id' in datosFormulario || 'responsableId' in datosFormulario) {
+    const rawResp = datosFormulario.responsable || datosFormulario.responsable_id || datosFormulario.responsableId
+    const respVal = esUuidValido(rawResp)
+    if (respVal) proyectoUpdates.responsable_id = respVal
+  }
   if ('estado' in datosFormulario && datosFormulario.estado) {
     const estadoId = await obtenerEstadoIdPorCodigo(datosFormulario.estado as string)
     if (estadoId) proyectoUpdates.estado_id = estadoId
   }
-  if ('fechaFinalizacionReal' in datosFormulario) {
-    detalleUpdates.fecha_finalizacion_real = datosFormulario.fechaFinalizacionReal || null
+  if ('fechaFinalizacionReal' in datosFormulario || 'fechaFinContractualPlan' in datosFormulario || 'fechaFin' in datosFormulario) {
+    const fFin = (datosFormulario.fechaFinalizacionReal || datosFormulario.fechaFinContractualPlan || datosFormulario.fechaFin) as string
+    if (fFin && typeof fFin === 'string' && fFin.trim() !== '') {
+      detalleUpdates.fecha_finalizacion_real = fFin.trim()
+      proyectoUpdates.fecha_fin_estimada = fFin.trim()
+    }
   }
-  if ('plazoEjecucionRealAmpliado' in datosFormulario) {
-    const p = parseInt(datosFormulario.plazoEjecucionRealAmpliado as string, 10)
-    detalleUpdates.plazo_ejecucion_ampliado = isNaN(p) ? null : p
+  if ('plazoEjecucionRealAmpliado' in datosFormulario || 'diasAdicionalesPlazo' in datosFormulario || 'dias_adicionales' in datosFormulario) {
+    const valRaw = datosFormulario.plazoEjecucionRealAmpliado ?? datosFormulario.diasAdicionalesPlazo ?? datosFormulario.dias_adicionales
+    const p = typeof valRaw === 'number' ? valRaw : parseInt(String(valRaw), 10)
+    if (!isNaN(p)) {
+      detalleUpdates.plazo_ejecucion_ampliado = p
+    }
   }
   if ('montoFinancieroFinalEjecutado' in datosFormulario || 'montoFinal' in datosFormulario) {
     detalleUpdates.monto_final = datosFormulario.montoFinancieroFinalEjecutado || datosFormulario.montoFinal || null
@@ -715,6 +988,7 @@ export async function obtenerPendientesPorProyecto(proyectoId: string) {
       id,
       proyecto_id,
       renglon_id,
+      bitacora_entrada_id,
       fecha_medicion,
       estacion_inicial,
       estacion_final,
@@ -728,13 +1002,30 @@ export async function obtenerPendientesPorProyecto(proyectoId: string) {
       observaciones,
       ubicacion_especifica,
       lado_via,
+      estimacion_origen,
+      anulado_en,
+      anulado_por,
+      motivo_anulacion,
       renglon:renglon_id(
         id,
+        codigo,
         descripcion,
+        cantidad_contractual,
+        cantidad_ajustada,
+        cantidad_ejecutada,
+        precio_unitario_directo,
         unidad_id,
+        especificacion:especificacion_id(codigo, descripcion, unidad),
         unidad:unidad_id(abreviatura, nombre)
       ),
-      descuento:descuento_aplicado_id(id, descripcion, factor_seccion_transversal)
+      descuento:descuento_aplicado_id(id, descripcion, factor_seccion_transversal),
+      bitacora_entrada:bitacora_entrada_id(
+        id,
+        titulo,
+        descripcion,
+        comentarios,
+        evidencia_fotografica(id, url_archivo, descripcion)
+      )
     `)
     .eq('proyecto_id', proyectoId)
     .order('created_at', { ascending: false })
@@ -746,17 +1037,25 @@ export async function obtenerPendientesPorProyecto(proyectoId: string) {
 
   return (data || []).map((row: any) => {
     const renglon = row.renglon || {}
+    const espObj = renglon.especificacion || {}
     const unidadObj = renglon.unidad || {}
     const descObj = row.descuento || {}
+    const bitacora = row.bitacora_entrada || {}
+    const evidencias = Array.isArray(bitacora.evidencia_fotografica) ? bitacora.evidencia_fotografica : []
 
-    const codigoDGC = '201.03(b)'
-    const descripcion = renglon.descripcion || 'Trabajo pendiente en campo'
-    const unidadSimbolo = unidadObj.abreviatura || unidadObj.nombre || 'm³'
+    const matchDesc = renglon.descripcion ? renglon.descripcion.match(/\(([0-9]+(?:\.[0-9]+)?(?:\([a-z]\))?|[0-9]+\.[0-9]+[a-z]?)\)/i) : null
+    const codParsed = matchDesc ? matchDesc[1] : null
+    const codigoDGC = codParsed || espObj.codigo || renglon.codigo || row.codigoDGC || '101.01'
+    const descripcion = renglon.descripcion || espObj.descripcion || 'Trabajo pendiente en campo'
+    const unidadSimbolo = unidadObj.abreviatura || espObj.unidad || unidadObj.nombre || 'm³'
     const factorDescuento = descObj.factor_seccion_transversal || 0
     const descuentoNombre = descObj.descripcion || ''
 
     return {
       id: row.id,
+      proyectoId: row.proyecto_id,
+      renglonId: row.renglon_id,
+      bitacoraEntradaId: row.bitacora_entrada_id,
       codigoDGC,
       descripcion,
       unidad: unidadSimbolo,
@@ -772,15 +1071,418 @@ export async function obtenerPendientesPorProyecto(proyectoId: string) {
       descuentoMonto: Number(row.longitud_medida * factorDescuento) || 0,
       factorDescuento,
       descuentoNombre,
+      descuentoAplicadoId: row.descuento_aplicado_id || null,
       cantidadNetaCobrar: Number(row.cantidad_neta_cobrar) || 0,
       estado: row.estado_conciliacion || 'Pendiente',
       observaciones: row.observaciones || '',
       ubicacionEspecifica: row.ubicacion_especifica || '',
       ladoVia: row.lado_via || '',
+      estimacionOrigen: row.estimacion_origen || null,
+      anuladoEn: row.anulado_en || null,
+      anuladoPor: row.anulado_por || null,
+      motivoAnulacion: row.motivo_anulacion || null,
+      esAnulado: !!row.anulado_en,
       fechaMedicion: row.fecha_medicion || '',
-      mesesAntiguedad: row.fecha_medicion ? Math.floor((new Date().getTime() - new Date(row.fecha_medicion).getTime()) / (1000 * 60 * 60 * 24 * 30)) : 0
+      mesesAntiguedad: row.fecha_medicion ? Math.floor((new Date().getTime() - new Date(row.fecha_medicion).getTime()) / (1000 * 60 * 60 * 24 * 30)) : 0,
+      // Metadatos adicionales para el modal
+      cantidadAjustada: Number(renglon.cantidad_ajustada ?? renglon.cantidad_contractual) || 0,
+      cantidadContractual: Number(renglon.cantidad_contractual) || 0,
+      cantidadEjecutada: Number(renglon.cantidad_ejecutada) || 0,
+      precioUnitario: Number(renglon.precio_unitario_directo) || 0,
+      bitacoraTitulo: bitacora.titulo || '',
+      bitacoraDescripcion: bitacora.descripcion || '',
+      bitacoraObservaciones: bitacora.comentarios || '',
+      fotoEvidenciaUrl: evidencias[0]?.url_archivo || null,
+      fotoEvidencias: evidencias
     }
   })
 }
+
+export interface ProcesarPendienteParams {
+  pendienteId: string
+  proyectoId: string
+  usuarioId: string
+  accion: 'confirmar' | 'pendiente' | 'anular'
+  motivo?: string
+  ancho?: number
+  alturaEspesor?: number
+  ladoVia?: string
+  multiplicador?: number
+  descuentoAplicadoId?: string | null
+  descuentoMonto?: number
+  observaciones?: string
+  estimacionNum?: number
+}
+
+export async function procesarPendienteProyecto(params: ProcesarPendienteParams) {
+  const {
+    pendienteId,
+    proyectoId: _proyectoId,
+    usuarioId,
+    accion,
+    motivo,
+    ancho,
+    alturaEspesor,
+    ladoVia,
+    multiplicador,
+    descuentoAplicadoId,
+    descuentoMonto,
+    observaciones,
+    estimacionNum,
+  } = params
+
+  if (!pendienteId) {
+    throw new ValidationError('ID de pendiente no proporcionado', 'pendienteId')
+  }
+
+  // 1. Obtener fila actual de bitacora_pendiente
+  const { data: pend, error: errFetch } = await clienteSupabase
+    .from('bitacora_pendiente')
+    .select(`
+      *,
+      renglon:renglon_id(
+        id,
+        codigo,
+        descripcion,
+        cantidad_ajustada,
+        unidad_id,
+        especificacion:especificacion_id(codigo, descripcion, unidad),
+        unidad:unidad_medida(abreviatura, nombre)
+      )
+    `)
+    .eq('id', pendienteId)
+    .single()
+
+  if (errFetch || !pend) {
+    throw new ValidationError('Fila de pendiente no encontrada', 'pendienteId')
+  }
+
+  // 2. Validar que la fila no esté previamente anulada
+  if (pend.anulado_en) {
+    throw new ValidationError(
+      'No se puede editar ni procesar una fila de pendiente que ya ha sido anulada.',
+      'anulado'
+    )
+  }
+
+  // 3. Acción ANULAR
+  if (accion === 'anular') {
+    if (!motivo || !motivo.trim()) {
+      throw new ValidationError('El motivo de anulación es obligatorio.', 'motivo')
+    }
+
+    const updates: Record<string, any> = {
+      anulado_en: new Date().toISOString(),
+      anulado_por: usuarioId || null,
+      motivo_anulacion: motivo.trim()
+    }
+
+    const { error: errUpdate } = await clienteSupabase
+      .from('bitacora_pendiente')
+      .update(updates)
+      .eq('id', pendienteId)
+
+    if (errUpdate) {
+      throw new Error(`Error al anular pendiente: ${errUpdate.message}`)
+    }
+
+    return {
+      ok: true,
+      accion: 'anular',
+      id: pendienteId,
+      estado: pend.estado_conciliacion,
+      anuladoEn: updates.anulado_en,
+      motivoAnulacion: updates.motivo_anulacion
+    }
+  }
+
+  // 4. Acciones CONFIRMAR o PENDIENTE (Dejar en pendiente)
+  const renglon = Array.isArray(pend.renglon) ? (pend.renglon[0] || {}) : (pend.renglon || {})
+  const esp = Array.isArray(renglon.especificacion) ? (renglon.especificacion[0] || {}) : (renglon.especificacion || {})
+  const unidadObj = Array.isArray(renglon.unidad) ? (renglon.unidad[0] || {}) : (renglon.unidad || {})
+  let unidadStr = esp.unidad || unidadObj.abreviatura || unidadObj.nombre
+
+  if (!unidadStr && renglon.unidad_id) {
+    const { data: um } = await clienteSupabase
+      .from('unidad_medida')
+      .select('abreviatura, nombre')
+      .eq('id', renglon.unidad_id)
+      .maybeSingle()
+    if (um) {
+      unidadStr = um.abreviatura || um.nombre
+    }
+  }
+
+  if (!unidadStr) {
+    unidadStr = 'm³'
+  }
+
+  const longitudCalculada = calcularLongitudEstaciones(pend.estacion_inicial, pend.estacion_final)
+  const longitudUsar = longitudCalculada > 0 ? longitudCalculada : (Number(pend.longitud_medida) || 0)
+  const anchoUsar = ancho !== undefined ? Number(ancho) : (pend.ancho != null ? Number(pend.ancho) : undefined)
+  const alturaUsar = alturaEspesor !== undefined ? Number(alturaEspesor) : (pend.altura_espesor != null ? Number(pend.altura_espesor) : undefined)
+  const multUsar = multiplicador !== undefined ? Number(multiplicador) : 1
+
+  let factorDescuento = 0
+  if (descuentoAplicadoId) {
+    const { data: catDesc } = await clienteSupabase
+      .from('catalogo_descuento_tecnico')
+      .select('factor_seccion_transversal')
+      .eq('id', descuentoAplicadoId)
+      .maybeSingle()
+    if (catDesc) {
+      factorDescuento = Number(catDesc.factor_seccion_transversal) || 0
+    }
+  }
+
+  const resCalc = calcularCantidadMedicion({
+    unidad: unidadStr,
+    longitudL: longitudUsar > 0 ? longitudUsar : undefined,
+    anchoA: anchoUsar,
+    alturaH: alturaUsar,
+    multiplicador: multUsar,
+    descuento: factorDescuento > 0 ? factorDescuento : (descuentoMonto !== undefined ? Number(descuentoMonto) : undefined),
+    tipoDescuento: factorDescuento > 0 ? 'factor' : 'monto'
+  })
+
+function normalizarLadoVia(lado?: string): string {
+  if (!lado) return 'Sección Completa'
+  const l = lado.trim()
+  if (l.toLowerCase() === 'ambos') return 'Sección Completa'
+  const permitidos = ['Derecho', 'Izquierdo', 'Centro', 'Sección Completa', 'Ambos Lados', 'N/A']
+  const match = permitidos.find(p => p.toLowerCase() === l.toLowerCase())
+  return match || 'Sección Completa'
+}
+
+  const updates: Record<string, any> = {
+    longitud_medida: longitudUsar,
+    ancho: anchoUsar !== undefined ? anchoUsar : pend.ancho,
+    altura_espesor: !obtenerDimensionesRequeridas(unidadStr).requiereAltura ? null : (alturaUsar !== undefined ? alturaUsar : pend.altura_espesor),
+    lado_via: normalizarLadoVia(ladoVia || pend.lado_via),
+    descuento_aplicado_id: descuentoAplicadoId !== undefined ? descuentoAplicadoId : pend.descuento_aplicado_id,
+    cantidad_neta_cobrar: resCalc.cantidadNeta,
+    observaciones: observaciones !== undefined ? observaciones : pend.observaciones,
+  }
+
+  if (accion === 'confirmar') {
+    updates.estado_conciliacion = 'Aprobado'
+    updates.estimacion_origen = estimacionNum || pend.estimacion_origen || 1
+  } else {
+    updates.estado_conciliacion = 'Pendiente'
+  }
+
+  const { error: errUpd } = await clienteSupabase
+    .from('bitacora_pendiente')
+    .update(updates)
+    .eq('id', pendienteId)
+
+  if (errUpd) {
+    throw new Error(`Error al actualizar bitacora_pendiente: ${errUpd.message}`)
+  }
+
+  return {
+    ok: true,
+    accion,
+    id: pendienteId,
+    estado: updates.estado_conciliacion,
+    cantidadNetaCobrar: updates.cantidad_neta_cobrar,
+    estimacionOrigen: updates.estimacion_origen
+  }
+}
+
+/**
+ * SERVICIO 1 (Backend Producción): Registrar medición con control de tope.
+ * Aplica el tope de la regla de negocio (topes.ts) y deriva excesos a bitacora_pendiente.
+ */
+export async function registrarMedicionBackend(params: {
+  proyectoId: string;
+  renglonId: string;
+  medicionPeriodo: number;
+  estimacionOrigen?: number;
+  observaciones?: string;
+}) {
+  const { data: renglon, error: errR } = await clienteSupabase
+    .from('renglon_trabajo')
+    .select('*')
+    .eq('id', params.renglonId)
+    .single();
+
+  if (errR || !renglon) throw new Error(`Renglón no encontrado: ${errR?.message || params.renglonId}`);
+
+  // Consultar el acumulado cobrado anterior desde bitacora_avance si existe
+  const { data: avances } = await clienteSupabase
+    .from('bitacora_avance')
+    .select('cantidad_neta_cobrar')
+    .eq('renglon_id', params.renglonId);
+
+  const acumuladoAnterior = (avances || []).reduce((sum, row) => sum + (Number(row.cantidad_neta_cobrar) || 0), 0);
+
+  // Invocar función pura de topes compartida
+  const resTopes = procesarMedicionRenglon({
+    cantidadAjustada: Number(renglon.cantidad_ajustada) || 0,
+    acumuladoAnterior,
+    medicionPeriodo: params.medicionPeriodo,
+    precioUnitario: Number(renglon.precio_unitario_directo) || 0,
+  });
+
+  let idFilaPendiente: string | null = null;
+
+  // Si existe sobreejecución / exceso, guardar en bitacora_pendiente
+  if (resTopes.retenidoPendiente > 0) {
+    const { data: insertedPend, error: errPend } = await clienteSupabase
+      .from('bitacora_pendiente')
+      .insert({
+        proyecto_id: params.proyectoId,
+        renglon_id: params.renglonId,
+        longitud_medida: resTopes.retenidoPendiente,
+        ancho: 1,
+        altura_espesor: 1,
+        estado_conciliacion: 'Pendiente',
+        estimacion_origen: params.estimacionOrigen || 1,
+        observaciones: params.observaciones || 'Sobreejecución derivado a retención',
+        fecha_medicion: new Date().toISOString().split('T')[0],
+      })
+      .select()
+      .single();
+
+    if (errPend) throw new Error(`Error insertando pendiente: ${errPend.message}`);
+    idFilaPendiente = insertedPend.id;
+  }
+
+  return {
+    ...resTopes,
+    idFilaPendiente,
+  };
+}
+
+/**
+ * SERVICIO 2 (Backend Producción): Aprobar Modificativo / Adenda.
+ * Incrementa cantidad_ajustada y libera las filas de bitacora_pendiente cambiando su estado a 'Aprobado'
+ * e insertando las correspondientes filas en bitacora_pendiente_ajuste.
+ */
+export async function aprobarModificativoBackend(params: {
+  renglonId: string;
+  cantidadDelta: number;
+  motivo: string;
+  documentoReferencia: string;
+}) {
+  const { data: renglon, error: errR } = await clienteSupabase
+    .from('renglon_trabajo')
+    .select('id, cantidad_ajustada')
+    .eq('id', params.renglonId)
+    .single();
+
+  if (errR || !renglon) throw new Error(`Renglón no encontrado: ${errR?.message || params.renglonId}`);
+
+  const nuevaCantidadAjustada = (Number(renglon.cantidad_ajustada) || 0) + params.cantidadDelta;
+
+  // Actualizar cantidad ajustada en renglon_trabajo
+  const { error: errUpdR } = await clienteSupabase
+    .from('renglon_trabajo')
+    .update({ cantidad_ajustada: nuevaCantidadAjustada })
+    .eq('id', params.renglonId);
+
+  if (errUpdR) throw new Error(`Error actualizando renglón: ${errUpdR.message}`);
+
+  // Registrar justificante en modificativo_renglon
+  const { data: mod, error: errMod } = await clienteSupabase
+    .from('modificativo_renglon')
+    .insert({
+      renglon_id: params.renglonId,
+      cantidad_delta: params.cantidadDelta,
+      motivo: params.motivo,
+      documento_referencia: params.documentoReferencia,
+    })
+    .select()
+    .single();
+
+  if (errMod) throw new Error(`Error creando modificativo: ${errMod.message}`);
+
+  // Buscar renglones pendientes retenidos para liberar
+  const { data: pendientes } = await clienteSupabase
+    .from('bitacora_pendiente')
+    .select('id, cantidad_neta_cobrar')
+    .eq('renglon_id', params.renglonId)
+    .eq('estado_conciliacion', 'Pendiente');
+
+  const liberados: string[] = [];
+  if (pendientes && pendientes.length > 0) {
+    for (const pend of pendientes) {
+      // Registrar liberación en bitacora_pendiente_ajuste
+      const { error: errAj } = await clienteSupabase
+        .from('bitacora_pendiente_ajuste')
+        .insert({
+          bitacora_pendiente_id: pend.id,
+          valor_descuento: Number(pend.cantidad_neta_cobrar) || 0,
+          descripcion: `Liberación automática por Modificativo / Adenda ID ${mod.id}`,
+        });
+
+      if (errAj) throw new Error(`Error al registrar ajuste de liberación: ${errAj.message}`);
+
+      // Cambiar estado a Aprobado (Estado distinto de 'Pendiente')
+      const { error: errUpdPend } = await clienteSupabase
+        .from('bitacora_pendiente')
+        .update({ estado_conciliacion: 'Aprobado' })
+        .eq('id', pend.id);
+
+      if (errUpdPend) throw new Error(`Error actualizando estado de pendiente: ${errUpdPend.message}`);
+
+      liberados.push(pend.id);
+    }
+  }
+
+  return {
+    ok: true,
+    modificativoId: mod.id,
+    nuevaCantidadAjustada,
+    filasLiberadas: liberados,
+  };
+}
+
+/**
+ * SERVICIO 3 (Backend Producción): Registrar estimación y control de anticipo.
+ * Utiliza liquidacion.ts para calcular la amortización sin permitir saldos negativos y guarda en control_anticipo.
+ */
+export async function registrarEstimacionBackend(params: {
+  proyectoId: string;
+  numeroEstimacion: number;
+  montoDirectoPeriodo: number;
+  porcentajeAmortizacionAnticipo: number;
+  anticipoRecibidoTotal: number;
+  anticipoAmortizadoAnterior: number;
+}) {
+  // Invocar liquidación financiera pura
+  const resLiq = calcularLiquidacionEstimacion({
+    montoDirectoPeriodo: params.montoDirectoPeriodo,
+    porcentajeIndirectos: 0,
+    porcentajeIva: 0,
+    montoRenglonGlobal: 0,
+    excluirIndirectosIvaGlobal: true,
+    porcentajeAmortizacionAnticipo: params.porcentajeAmortizacionAnticipo,
+    anticipoRecibidoTotal: params.anticipoRecibidoTotal,
+    anticipoAmortizadoAnterior: params.anticipoAmortizadoAnterior,
+  });
+
+  // Guardar en control_anticipo
+  const { data: rowControl, error: errC } = await clienteSupabase
+    .from('control_anticipo')
+    .insert({
+      proyecto_id: params.proyectoId,
+      numero_estimacion: params.numeroEstimacion,
+      monto_anticipo_total: params.anticipoRecibidoTotal,
+      valor_estimacion_periodo: params.montoDirectoPeriodo,
+      saldo_por_amortizar: resLiq.saldoAnticipoRemanente,
+    })
+    .select()
+    .single();
+
+  if (errC) throw new Error(`Error en control_anticipo: ${errC.message}`);
+
+  return {
+    controlAnticipoId: rowControl.id,
+    liquidacion: resLiq,
+  };
+}
+
 
 

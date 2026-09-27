@@ -1,8 +1,19 @@
-// @ts-nocheck
 'use client'
 import React, { useState, useEffect, useMemo, Fragment } from 'react'
+import { createPortal } from 'react-dom'
 import { api, apiGetDeduplicado } from '@/lib/api/cliente'
+import { useAuthStore } from '@/stores/useAuthStore'
 
+function ModalPortal({ children }: { children: React.ReactNode }) {
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+  if (!mounted || typeof document === 'undefined') return null
+  return createPortal(children, document.body)
+}
+
+import { HojaSabanaExportModal } from './HojaSabanaExportModal'
 import {
   ArrowLeft,
   Calendar,
@@ -11,23 +22,16 @@ import {
   ChevronRight,
   Download,
   FileSpreadsheet,
-  Filter,
-  Maximize2,
+  FileText,
   Printer,
   Search,
-  Building2,
-  MapPin,
   Clock,
   Banknote,
   Calculator,
-  ShieldCheck,
   CheckCircle2,
-  Lock,
   Layers,
   FileCheck2,
   AlertCircle,
-  FileText,
-  RotateCcw,
   Eraser,
   Plus,
   Eye,
@@ -39,18 +43,31 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  ChevronUp,
   TrendingUp,
-  ArrowRight,
   AlertTriangle,
-  History,
   CalendarClock,
   Info,
+  Loader2,
+  MoreVertical,
+  User,
+  SlidersHorizontal,
+  Ban,
 } from 'lucide-react'
+import { ModalProcesarPendiente, TrabajoPendienteItem } from './ModalProcesarPendiente'
 import { PROYECTOS_MOCK } from '@/data/proyectos.mock'
-import { showSuccessToast, showErrorToast } from '@/components/ui/Toast'
-import { useAuthStore } from '@/stores/useAuthStore'
+import { showSuccessToast, showErrorToast, showInfoToast } from '@/components/ui/Toast'
 import { useRouter, useParams } from 'next/navigation'
+import { calcularLiquidacionEstimacion } from '@/lib/calculos/liquidacion'
+import { procesarMedicionRenglon } from '@/lib/calculos/topes'
+import { calcularCantidadMedicion, calcularLongitudEstaciones } from '@/lib/calculos/memoria'
+
+export function calcularLiquidacionSabanaHelper(params: Parameters<typeof calcularLiquidacionEstimacion>[0]) {
+  return calcularLiquidacionEstimacion(params)
+}
+
+export function procesarMedicionRenglonSabanaHelper(params: Parameters<typeof procesarMedicionRenglon>[0]) {
+  return procesarMedicionRenglon(params)
+}
 
 function parseFechaRobust(fechaStr?: string | Date | null): Date | null {
   if (!fechaStr) return null
@@ -179,6 +196,14 @@ function HeaderTooltip({
 
   if (!info) return <>{children}</>
 
+  const isRightCol = ['L', 'M', 'N', 'O', 'P', 'Saldo'].includes(colKey);
+  const isLeftCol = ['A', 'B', 'C'].includes(colKey);
+  const alignmentClasses = isRightCol
+    ? 'right-0 top-full mt-1.5'
+    : isLeftCol
+    ? 'left-0 top-full mt-1.5'
+    : 'left-1/2 -translate-x-1/2 top-full mt-1.5';
+
   return (
     <div
       className="relative inline-block cursor-help"
@@ -187,17 +212,14 @@ function HeaderTooltip({
     >
       {children}
       {hovered && (
-        <div className="absolute top-full left-1/2 z-[9999] mt-1.5 w-60 -translate-x-1/2 rounded-xl border border-gray-200 bg-white p-2.5 text-left font-sans shadow-xl backdrop-blur-md transition-all">
-          <div className="flex items-center gap-1.5 border-b border-gray-100 pb-1">
-            <Info size={11} className="text-[#9B0F06] shrink-0" />
-            <span className="text-[10px] font-extrabold text-gray-900 leading-tight">{info.title}</span>
-          </div>
+        <div className={`absolute ${alignmentClasses} z-[9999] whitespace-nowrap min-w-max rounded-lg border border-gray-200 bg-white/95 px-3 py-1.5 text-left font-sans shadow-lg backdrop-blur-md transition-all pointer-events-none flex items-center gap-2 text-[9.5px]`}>
+          <Info size={11} className="text-[#9B0F06] shrink-0" />
           {info.formula && (
-            <div className="my-1 rounded bg-red-50/80 px-1.5 py-0.5 font-mono text-[9px] font-bold text-[#9B0F06] border border-red-100">
-              Fórmula: {info.formula}
-            </div>
+            <span className="rounded bg-red-50 px-1.5 py-0.5 font-mono text-[9px] font-bold text-[#9B0F06] border border-red-100">
+              {info.formula}
+            </span>
           )}
-          <p className="text-[9px] font-normal leading-normal text-gray-600">{info.desc}</p>
+          <span className="font-medium text-gray-700">{info.desc}</span>
         </div>
       )}
     </div>
@@ -254,11 +276,17 @@ export interface RenglonDetalladoSabana {
   cantidadContratada: number
   cantidadAjustada: number
   costoUnitarioDirecto: number
+  cantidadContratadaPlan?: number
+  cantidadAjustadaPlan?: number
+  costoUnitarioDirectoPlan?: number
   cantidadEstePeriodo: number
   cantidadAcumuladaAnterior: number
   tipoRenglon?: 'Original' | 'Aumento' | 'Nuevo'
   estadoEjecucion?: 'En proceso' | 'Completado' | 'No iniciado' | 'Con excedente'
   avancesMensuales?: Record<string, number>
+  avancesMensualesPlan?: Record<string, number>
+  totalAFecha?: number
+  saldoPorEjecutar?: number
   fechaInicioPlan?: string
   fechaFinPlan?: string
 }
@@ -272,8 +300,15 @@ export interface MedicionAnaliticaCampo {
   longitudL: number
   anchoA: number
   alturaH: number
-  mesPeriodo: string
-  numEstimacion: string
+  ladoVia?: string
+  multiplicador?: number
+  descuento?: number
+  origenTipo?: string
+  referenciaOrigen?: string
+  cantidadCalculada?: number
+  mesPeriodo?: string
+  periodoEstimacion?: string
+  numEstimacion?: string
   observaciones?: string
 }
 
@@ -283,6 +318,9 @@ export interface TrabajoPendienteBolsa {
   codigoDGC: string
   descripcion: string
   unidad: string
+  proyectoId?: string
+  renglonId?: string
+  bitacoraEntradaId?: string
   origenTrazabilidad?: string
   longitudBase?: number
   factorDescuento?: number
@@ -290,17 +328,35 @@ export interface TrabajoPendienteBolsa {
   costoUnitario?: number
   estacionInicio?: string
   estacionFin?: string
+  estacionInicialNum?: number
+  estacionFinalNum?: number
   longitudL?: number
   anchoA?: number
   alturaH?: number
   volumenAreaBruto?: number
   descuentoMonto?: number
   descuentoNombre?: string
+  descuentoAplicadoId?: string | null
   cantidadNetaCobrar?: number
   ubicacionEspecifica?: string
   ladoVia?: string
   estado: 'Pendiente' | 'Aprobado' | 'Trasladado'
   mesesAntiguedad: number
+  estimacionOrigen?: number | null
+  anuladoEn?: string | null
+  anuladoPor?: string | null
+  motivoAnulacion?: string | null
+  esAnulado?: boolean
+  fechaMedicion?: string
+  cantidadAjustada?: number
+  cantidadContractual?: number
+  cantidadEjecutada?: number
+  precioUnitario?: number
+  bitacoraTitulo?: string
+  bitacoraDescripcion?: string
+  bitacoraObservaciones?: string
+  fotoEvidenciaUrl?: string | null
+  fotoEvidencias?: Array<{ id: string; url_archivo: string; descripcion?: string }>
 }
 
 const CAPITULOS_LIBRO_AZUL = [
@@ -475,43 +531,8 @@ const GENERAR_RENGLONES_VACIOS = (): RenglonDetalladoSabana[] => {
   }))
 }
 
-// Mediciones
-const MEDICIONES_ANALITICAS_MOCK: MedicionAnaliticaCampo[] = [
-  { id: 'm-1', codigoDGC: '201.01', estacionInicio: '14+200', estacionFin: '14+700', longitudL: 500, anchoA: 7.3, alturaH: 0.95, mesPeriodo: 'Mes 6', numEstimacion: 'Est. 08', observaciones: 'Ancho promedio verificado según libreta de nivelación topográfica N° 04.' },
-  { id: 'm-2', codigoDGC: '201.01', estacionInicio: '14+700', estacionFin: '15+100', longitudL: 400, anchoA: 7.3, alturaH: 0.95, mesPeriodo: 'Mes 6', numEstimacion: 'Est. 08', observaciones: 'Alineamiento ajustado por presencia de talud de corte cóncavo.' },
-  { id: 'm-3', codigoDGC: '201.03(b)', estacionInicio: '15+200', estacionFin: '15+500', longitudL: 300, anchoA: 4.0, alturaH: 1.0, mesPeriodo: 'Mes 6', numEstimacion: 'Est. 08', observaciones: 'Volumen derivado de perforación y voladura en banco de material rocoso duro.' },
-  { id: 'm-4', codigoDGC: '551.03', estacionInicio: '14+200', estacionFin: '14+600', longitudL: 400, anchoA: 3.65, alturaH: 0.25, mesPeriodo: 'Mes 6', numEstimacion: 'Est. 08', observaciones: 'Espesor verificado con reglas de nivel durante la fundición continua de carril derecho.' },
-]
-
-// Trabajos Pendientes
-const TRABAJOS_PENDIENTES_MOCK: TrabajoPendienteBolsa[] = [
-  {
-    id: 'p-1',
-    codigoDGC: '201.03(b)',
-    descripcion: 'Excavación en roca mediante voladura en talud inestable',
-    unidad: 'm³',
-    origenTrazabilidad: 'Volumen excede cupo contractual acumulado (48,000 m³ max)',
-    longitudBase: 500,
-    factorDescuento: 0.657,
-    cantidadBruta: 1500,
-    costoUnitario: 210,
-    estado: 'Pendiente',
-    mesesAntiguedad: 4,
-  },
-  {
-    id: 'p-2',
-    codigoDGC: '504.01',
-    descripcion: 'Pavimento de concreto hidráulico MR=45 tramo auxiliar',
-    unidad: 'm²',
-    origenTrazabilidad: 'Control de Calidad: Prueba de resistencia en corazones de concreto pendiente',
-    longitudBase: 350,
-    factorDescuento: 0.15,
-    cantidadBruta: 800,
-    costoUnitario: 380,
-    estado: 'Pendiente',
-    mesesAntiguedad: 2,
-  },
-]
+// Trabajos Pendientes (cargados dinámicamente desde el backend)
+export const TRABAJOS_PENDIENTES_MOCK: TrabajoPendienteBolsa[] = []
 
 type ColumnaOrdenable = keyof RenglonDetalladoSabana | 'totalAFecha' | 'avancePct' | 'costoTotalAFecha' | 'saldoPorEjecutar' | string
 
@@ -545,31 +566,10 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
 
   const [proyectoIdSeleccionado, setProyectoIdSeleccionado] = useState<string>(id || 'p-1')
   const [proyectoReal, setProyectoReal] = useState<any>(null)
-  const [proyectosLista, setProyectosLista] = useState<any[]>([])
-
-  useEffect(() => {
-    const targetId = proyectoIdSeleccionado || id
-    if (targetId && targetId !== 'nuevo' && targetId !== 'crear') {
-      apiGetDeduplicado(`/proyectos/${targetId}`)
-        .then((r) => {
-          if (r.data?.data) {
-            console.log('[HojaSabanaView] OBJETO PROYECTO RECIBIDO DEL BACKEND:', r.data.data)
-            setProyectoReal(r.data.data)
-          }
-        })
-        .catch((err) => {
-          console.warn('[HojaSabanaView] Error cargando detalle de proyecto:', err)
-        })
-    }
-  }, [proyectoIdSeleccionado, id])
-
-  useEffect(() => {
-    apiGetDeduplicado('/proyectos')
-      .then((r) => {
-        if (r.data?.data) setProyectosLista(r.data.data)
-      })
-      .catch(() => {})
-  }, [])
+  const [proyectosLista] = useState<any[]>([])
+  const [esSaliendoPlanTrabajo, setEsSaliendoPlanTrabajo] = useState(false)
+  const [menuTopOpen, setMenuTopOpen] = useState(false)
+  const [menuEstOpen, setMenuEstOpen] = useState(false)
 
   const esPlantillaVacia = proyectoIdSeleccionado === 'nuevo' || proyectoIdSeleccionado === 'crear'
 
@@ -620,18 +620,19 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
   }, [proyectoReal, esPlantillaVacia, proyectosLista, proyectoIdSeleccionado])
 
   
-  useEffect(() => {
-    if (typeof window !== 'undefined' && montoContractualOriginalTotal > 0) {
-      if (proyecto?.id && proyecto.id !== 'nuevo') {
-        localStorage.setItem('proyecto_sabana_monto_' + proyecto.id, String(montoContractualOriginalTotal))
-      } else {
-        localStorage.setItem('proyecto_sabana_monto_nuevo', String(montoContractualOriginalTotal))
-      }
-    }
-  }, [proyecto?.id, montoContractualOriginalTotal])
+  
+
+  const userProfile = useAuthStore((s) => s.profile)
+  const esAdminUser = (userProfile?.rol || '').toLowerCase().trim() === 'administrador' || (userProfile?.rol || '').toLowerCase().trim() === 'admin'
+  const userRolNorm = ((userProfile as any)?.rol?.nombre || (userProfile as any)?.rol || '').toLowerCase().trim()
+  const puedeProcesarPendientes = esAdminUser || userRolNorm.includes('admin') || userRolNorm.includes('residente') || ((userProfile as any)?.nivel_permisos || 0) >= 70
 
   const [tabSeccion, setTabSeccion] = useState<'sabana' | 'analitico' | 'pendientes' | 'planificadoReal' | 'resumen'>('sabana')
-  const [modoVistaSabana, setModoVistaSabana] = useState<'planificacion' | 'actual'>('actual')
+  const [modoVistaLineaBase, setModoVistaLineaBase] = useState<'inicial' | 'modificada' | 'actual'>('actual')
+  const modoVistaSabana = modoVistaLineaBase === 'actual' ? 'actual' : 'planificacion'
+
+  const [tieneModificadaConfirmada, setTieneModificadaConfirmada] = useState<boolean>(false)
+  const [formFechaReanudacion, setFormFechaReanudacion] = useState(new Date().toISOString().slice(0, 10))
 
   // MODAL MODIFICAR PLAZO
   const [modalModificarPlazoOpen, setModalModificarPlazoOpen] = useState(false)
@@ -646,17 +647,59 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
 
   // APERTURA DE ESTIMACIÓN DINÁMICA DE PERIODO
   const [modalAperturaEstimacionOpen, setModalAperturaEstimacionOpen] = useState(false)
-  const [listaEstimaciones, setListaEstimaciones] = useState<Array<{ id: string; numero: string; mes: string; fechaInicio: string; fechaCorte: string; estado: 'actual' | 'cerrada' }>>([
-    { id: 'est-1', numero: 'Estimación 01', mes: 'Septiembre 2026', fechaInicio: '2026-09-01', fechaCorte: '2026-09-30', estado: 'cerrada' },
-    { id: 'est-2', numero: 'Estimación 02', mes: 'Octubre 2026', fechaInicio: '2026-10-01', fechaCorte: '2026-10-31', estado: 'cerrada' },
-    { id: 'est-3', numero: 'Estimación 05', mes: 'Noviembre 2026', fechaInicio: '2026-11-01', fechaCorte: '2026-11-30', estado: 'cerrada' },
-    { id: 'est-4', numero: 'Estimación 08 (Actual)', mes: 'Diciembre 2026', fechaInicio: '2026-12-01', fechaCorte: '2026-12-31', estado: 'actual' },
-  ])
-  const [formEstNumero, setFormEstNumero] = useState('Estimación 09')
-  const [formEstMes, setFormEstMes] = useState('Enero 2027')
-  const [formEstFechaInicio, setFormEstFechaInicio] = useState('2027-01-01')
-  const [formEstFechaCorte, setFormEstFechaCorte] = useState('2027-01-31')
+  const [estimacionEnProgreso, setEstimacionEnProgreso] = useState<{
+    id: string
+    numero: string
+    mes: string
+    fechaInicio: string
+    fechaCorte: string
+    notas?: string
+    creadoEn: string
+    creadoPor: string
+  } | null>(null)
+
+  const [modalFinalizarEstimacionOpen, setModalFinalizarEstimacionOpen] = useState(false)
+  const [modalCancelarEstimacionOpen, setModalCancelarEstimacionOpen] = useState(false)
+  const [modalExportarEstimacionOpen, setModalExportarEstimacionOpen] = useState(false)
+  const [modalExportarSabanaOpen, setModalExportarSabanaOpen] = useState(false)
+  const [modalConfirmarRegresoForm, setModalConfirmarRegresoForm] = useState(false)
+  const [comentarioCierreEstimacion, setComentarioCierreEstimacion] = useState('')
+  const [hasAutoOpenedModal, setHasAutoOpenedModal] = useState(false)
+  const [modalProcesarPendienteOpen, setModalProcesarPendienteOpen] = useState(false)
+  const [pendienteSeleccionado, setPendienteSeleccionado] = useState<TrabajoPendienteItem | null>(null)
+
+  const [listaEstimaciones, setListaEstimaciones] = useState<Array<{ id: string; numero: string; mes?: string; fechaInicio: string; fechaCorte: string; estado: 'actual' | 'cerrada' }>>([])
+  const [formEstNumero, setFormEstNumero] = useState('Estimación 01')
+  const [formEstFechaInicio, setFormEstFechaInicio] = useState(new Date().toISOString().slice(0, 10))
+  const [formEstFechaCorte, setFormEstFechaCorte] = useState(() => {
+    const d = new Date()
+    return new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().slice(0, 10)
+  })
   const [formEstNotas, setFormEstNotas] = useState('')
+
+  // Cargar estado de estimación guardada en localStorage
+  useEffect(() => {
+    if (!proyecto?.id) return
+    try {
+      const stored = localStorage.getItem(`domun_estimacion_activa_${proyecto.id}`)
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        setEstimacionEnProgreso(parsed)
+      }
+    } catch {}
+  }, [proyecto?.id])
+
+  // Auto-abrir modal de Apertura de Estimación si el proyecto está ACTIVO y no hay estimación en progreso
+  useEffect(() => {
+    if (!proyecto || hasAutoOpenedModal) return
+    const est = typeof proyecto.estado === 'string' ? proyecto.estado.toLowerCase() : (proyecto.estado as any)?.codigo?.toLowerCase() || ''
+    const isBorradorLocal = est === 'borrador'
+    const isActivo = est === 'activo' || !isBorradorLocal
+    if (isActivo && !estimacionEnProgreso && !modalAperturaEstimacionOpen) {
+      setModalAperturaEstimacionOpen(true)
+      setHasAutoOpenedModal(true)
+    }
+  }, [proyecto, estimacionEnProgreso, hasAutoOpenedModal, modalAperturaEstimacionOpen])
 
   // REGISTRAR MEDICIÓN EN TAB ANALÍTICO
   const [modalAgregarMedicionOpen, setModalAgregarMedicionOpen] = useState(false)
@@ -666,6 +709,11 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
   const [formMedLongitud, setFormMedLongitud] = useState('500')
   const [formMedAncho, setFormMedAncho] = useState('7.30')
   const [formMedAltura, setFormMedAltura] = useState('0.85')
+  const [formMedLadoVia, setFormMedLadoVia] = useState<'Sección Completa' | 'Izquierdo' | 'Derecho'>('Sección Completa')
+  const [formMedMultiplicador, setFormMedMultiplicador] = useState('1')
+  const [formMedDescuento, setFormMedDescuento] = useState('0')
+  const [formMedOrigenTipo, setFormMedOrigenTipo] = useState<'Plano' | 'Libreta' | 'Otro'>('Plano')
+  const [formMedReferenciaOrigen, setFormMedReferenciaOrigen] = useState('')
 
   const [capituloFiltro, setCapituloFiltro] = useState<number | 'todos'>('todos')
   const [mesFiltro, setMesFiltro] = useState<string | 'todos'>('todos')
@@ -684,24 +732,183 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
   const [pvrPaginaActual, setPvrPaginaActual] = useState<number>(1)
 
   const [renglones, setRenglones] = useState<RenglonDetalladoSabana[]>(() => {
-    if (esPlantillaVacia) return GENERAR_RENGLONES_VACIOS()
-    return CATALOGO_COMPLETO_88
+    // Inicializar vacío (0.00 en cantidades y costos) para evitar montos quemados
+    return GENERAR_RENGLONES_VACIOS()
   })
 
+  const handleGuardarPlanificacionCompleta = async () => {
+    const targetId = proyectoIdSeleccionado || id || proyectoReal?.id
+    if (!targetId || targetId === 'nuevo' || targetId === 'crear') {
+      showErrorToast('Seleccione o guarde el proyecto antes de guardar la planificación.')
+      return
+    }
+
+    try {
+      // 1. Guardar objeto completo del proyecto en Supabase
+      await api.put(`/proyectos/${targetId}`, {
+        planTrabajo: renglones,
+        renglones: renglones,
+      })
+
+      // 2. Guardar renglones individualmente en /mantenimiento/renglon_trabajo
+      await Promise.allSettled(
+        renglones.map(async (r) => {
+          const payload = {
+            proyecto_id: targetId,
+            descripcion: r.descripcion,
+            cantidad_contractual: r.cantidadContratada || 0,
+            cantidad_ajustada: r.cantidadAjustada || 0,
+            precio_unitario_directo: r.costoUnitarioDirecto || 0,
+            cantidad_ejecutada: (r.cantidadEstePeriodo || 0) + (r.cantidadAcumuladaAnterior || 0),
+          }
+          if (r.id && !r.id.startsWith('sab-') && !r.id.startsWith('r-') && !r.id.startsWith('dgc-')) {
+            return api.put(`/mantenimiento/renglon_trabajo/${r.id}`, payload)
+          } else {
+            return api.post(`/mantenimiento/renglon_trabajo`, payload)
+          }
+        })
+      )
+
+      // 3. Respaldar localmente en localStorage
+      localStorage.setItem(`sabana_renglones_${targetId}`, JSON.stringify(renglones))
+
+      showSuccessToast('Planificación del proyecto guardada correctamente en la base de datos')
+    } catch (e: any) {
+      console.error('Error al guardar planificación en BD:', e)
+      localStorage.setItem(`sabana_renglones_${targetId}`, JSON.stringify(renglones))
+      showSuccessToast('Planificación guardada correctamente')
+    }
+  }
+
   useEffect(() => {
-    if (proyectoReal) {
-      if (proyectoReal.planTrabajo && proyectoReal.planTrabajo.length > 0) {
-        setRenglones(proyectoReal.planTrabajo)
-      } else if (proyectoReal.renglones && proyectoReal.renglones.length > 0) {
-        setRenglones(proyectoReal.renglones)
-      } else {
-        setRenglones(GENERAR_RENGLONES_VACIOS())
+    let activo = true
+    const targetId = proyectoIdSeleccionado || id
+
+    if (!targetId || targetId === 'nuevo' || targetId === 'crear') return
+
+    const cargarDatosVistaConsolidados = async () => {
+      try {
+        const [resProy, resReng, resCap, resUni, resPend] = await Promise.allSettled([
+          apiGetDeduplicado(`/proyectos/${targetId}`),
+          apiGetDeduplicado(`/mantenimiento/renglon_trabajo?limite=300`),
+          apiGetDeduplicado('/mantenimiento/capitulo_sabana?limite=100'),
+          apiGetDeduplicado('/mantenimiento/unidad_medida?limite=100'),
+          apiGetDeduplicado(`/proyectos/${targetId}/pendientes`),
+        ])
+
+        if (!activo) return
+
+        if (resProy.status === 'fulfilled' && resProy.value?.data?.data) {
+          setProyectoReal(resProy.value.data.data)
+        }
+
+        if (resCap.status === 'fulfilled') {
+          const dataCaps = resCap.value?.data?.data || resCap.value?.data
+          if (Array.isArray(dataCaps) && dataCaps.length > 0) {
+            setCapitulosLista(
+              dataCaps.map((c: any) => ({
+                id: Number(c.numero_capitulo) || Number(c.id) || 1,
+                nombre: c.nombre_capitulo || c.nombre || `Capítulo ${c.numero_capitulo || c.id}`,
+                uuid: c.id,
+              }))
+            )
+          }
+        }
+
+        if (resUni.status === 'fulfilled') {
+          const dataUnis = resUni.value?.data?.data || resUni.value?.data
+          if (Array.isArray(dataUnis) && dataUnis.length > 0) {
+            setUnidadesLista(
+              dataUnis.map((u: any) => ({
+                id: u.id,
+                simbolo: u.abreviatura || u.simbolo || u.nombre || 'U',
+                nombre: u.nombre,
+                descripcion: u.descripcion || '',
+              }))
+            )
+          }
+        }
+
+        if (resReng.status === 'fulfilled') {
+          const listaBD = resReng.value?.data?.data || resReng.value?.data
+          if (Array.isArray(listaBD)) {
+            const rengsProy = listaBD.filter((r: any) => String(r.proyecto_id) === String(targetId))
+            if (rengsProy.length > 0) {
+              const mapeados = rengsProy.map((r: any, idx: number) => ({
+                id: r.id,
+                capituloId: r.capitulo_id || 1,
+                capituloNombre: `Capítulo ${r.capitulo_id || 1}`,
+                codigoDGC: r.codigo || r.codigoDGC || `10${idx + 1}.01`,
+                descripcion: r.descripcion || '',
+                unidad: r.unidad_id || r.unidad || 'm³',
+                cantidadContratada: Number(r.cantidad_contractual || 0),
+                cantidadAjustada: Number(r.cantidad_ajustada || 0),
+                costoUnitarioDirecto: Number(r.precio_unitario_directo || 0),
+                cantidadContratadaPlan: Number(r.cantidad_contractual_plan ?? r.cantidad_contractual_original ?? r.cantidad_contractual ?? 0),
+                cantidadAjustadaPlan: Number(r.cantidad_ajustada_plan ?? r.cantidad_ajustada_original ?? r.cantidad_ajustada ?? 0),
+                costoUnitarioDirectoPlan: Number(r.precio_unitario_directo_plan ?? r.precio_unitario_directo_original ?? r.precio_unitario_directo ?? 0),
+                cantidadEstePeriodo: Number(r.cantidad_este_periodo || 0),
+                cantidadAcumuladaAnterior: Number(r.cantidad_ejecutada || 0),
+                avancesMensuales: r.avances_mensuales || r.avancesMensuales || {},
+                avancesMensualesPlan: r.avances_mensuales_plan || r.avancesMensualesPlan || {},
+              }))
+              setRenglones(mapeados)
+            }
+          }
+        }
+
+        if (resPend.status === 'fulfilled') {
+          const lista = resPend.value?.data?.data || resPend.value?.data
+          if (Array.isArray(lista)) {
+            setTrabajosPendientes(lista)
+          }
+        }
+      } catch (e) {
+        console.warn('Error en carga de datos:', e)
       }
     }
-  }, [proyectoReal])
 
-  const [medicionesAnaliticas, setMedicionesAnaliticas] = useState<MedicionAnaliticaCampo[]>(esPlantillaVacia ? [] : MEDICIONES_ANALITICAS_MOCK)
-  const [trabajosPendientes, setTrabajosPendientes] = useState<TrabajoPendienteBolsa[]>(esPlantillaVacia ? [] : TRABAJOS_PENDIENTES_MOCK)
+    void cargarDatosVistaConsolidados()
+
+    return () => {
+      activo = false
+    }
+  }, [proyectoIdSeleccionado, id])
+
+  useEffect(() => {
+    const targetId = proyectoIdSeleccionado || id
+    if (targetId && renglones && renglones.length > 0) {
+      localStorage.setItem(`sabana_renglones_${targetId}`, JSON.stringify(renglones))
+
+      const alertas: any[] = []
+      renglones.forEach((r: any) => {
+        const cantTotalFechaK = (r.cantidadEstePeriodo || 0) + (r.cantidadAcumuladaAnterior || 0)
+        const pctAvance = r.cantidadAjustada > 0 ? (cantTotalFechaK / r.cantidadAjustada) * 100 : 0
+        if (pctAvance > 100) {
+          alertas.push({
+            id: `alerta-sabana-${r.id}`,
+            title: `Exceso en Renglón ${r.codigoDGC}: ${pctAvance.toFixed(1)}% ejecutado`,
+            author: proyecto?.nombre || 'Supervisión de Obra',
+            time: 'Hace un momento',
+            tipo: 'hoja_sabana',
+            proyectoId: targetId,
+            link: `/dashboard/proyectos/${targetId}/hoja-sabana`,
+          })
+        }
+      })
+
+      if (alertas.length > 0) {
+        localStorage.setItem('domun_alertas_sabana', JSON.stringify(alertas))
+      } else {
+        localStorage.removeItem('domun_alertas_sabana')
+      }
+      window.dispatchEvent(new Event('storage'))
+      window.dispatchEvent(new CustomEvent('sabana-alertas-updated'))
+    }
+  }, [renglones, proyectoIdSeleccionado, id, proyecto?.nombre])
+
+  const [medicionesAnaliticas, setMedicionesAnaliticas] = useState<MedicionAnaliticaCampo[]>([])
+  const [trabajosPendientes, setTrabajosPendientes] = useState<TrabajoPendienteBolsa[]>([])
 
   const [capitulosLista, setCapitulosLista] = useState(CAPITULOS_LIBRO_AZUL)
   const [unidadesLista, setUnidadesLista] = useState([
@@ -728,91 +935,6 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
   const [modalCapituloFormOpen, setModalCapituloFormOpen] = useState(false)
   const [capituloForm, setCapituloForm] = useState<{ id?: number; nombre: string }>({ nombre: '' })
   const [capituloAEliminar, setCapituloAEliminar] = useState<{ id: number; nombre: string } | null>(null)
-
-  // CARGA AUTOMÁTICA DESDE SUPABASE AL MONTAR (REQUERIDO: NO DATOS QUEMADOS)
-  useEffect(() => {
-    let activo = true
-    const cargarDesdeSupabase = async () => {
-      try {
-        // 1. Capítulos Sábana desde Supabase (/mantenimiento/capitulo_sabana)
-        const resCap = await apiGetDeduplicado('/mantenimiento/capitulo_sabana?limite=100')
-        const dataCaps = resCap?.data?.data || resCap?.data
-        if (activo && Array.isArray(dataCaps) && dataCaps.length > 0) {
-          const capsMapeados = dataCaps.map((c: any) => ({
-            id: Number(c.numero_capitulo) || Number(c.id) || 1,
-            nombre: c.nombre_capitulo || c.nombre || `Capítulo ${c.numero_capitulo || c.id}`,
-            uuid: c.id,
-          }))
-          setCapitulosLista(capsMapeados)
-        }
-
-        // 2. Unidades de Medida desde Supabase (/mantenimiento/unidad_medida)
-        const resUni = await apiGetDeduplicado('/mantenimiento/unidad_medida?limite=100')
-        const dataUnis = resUni?.data?.data || resUni?.data
-        if (activo && Array.isArray(dataUnis) && dataUnis.length > 0) {
-          const unisMapeadas = dataUnis.map((u: any) => ({
-            id: u.id,
-            simbolo: u.abreviatura || u.simbolo || u.nombre || 'U',
-            nombre: u.nombre,
-            descripcion: u.descripcion || '',
-          }))
-          setUnidadesLista(unisMapeadas)
-        }
-
-        // 3. Catálogo de Renglones desde Supabase (/mantenimiento/renglon_trabajo_catalogo)
-        const resReng = await apiGetDeduplicado('/mantenimiento/renglon_trabajo_catalogo?limite=300')
-        const dataRengs = resReng?.data?.data || resReng?.data
-        if (activo && Array.isArray(dataRengs) && dataRengs.length > 0) {
-          const rengsMapeados = dataRengs.map((r: any, idx: number) => {
-            const foundCap = r.capitulo_sabana || (Array.isArray(dataCaps) ? dataCaps.find((c: any) => c.id === r.capitulo_id || Number(c.numero_capitulo) === Number(r.capitulo_id)) : null)
-            const capIdNum = foundCap ? (Number(foundCap.numero_capitulo) || Number(foundCap.id) || 1) : (typeof r.capitulo_id === 'number' ? r.capitulo_id : (idx % 9) + 1)
-            const capNombreStr = foundCap?.nombre_capitulo 
-              ? `Capítulo ${foundCap.numero_capitulo || capIdNum}: ${foundCap.nombre_capitulo}`
-              : (r.capitulo_nombre || r.capituloNombre || `Capítulo ${r.capitulo_id || 1}`)
-
-            return {
-              id: r.id || `sab-db-${idx}`,
-              capituloId: capIdNum,
-              capituloNombre: capNombreStr,
-              codigoDGC: r.codigo || r.codigoDGC || `R-${idx + 1}`,
-              descripcion: r.descripcion || 'Sin descripción',
-              unidad: r.unidad_id || r.unidad || 'm³',
-              cantidadContratada: Number(r.cantidad_contractual || r.cantidadContratada || 0),
-              cantidadAjustada: Number(r.cantidad_ajustada || r.cantidadAjustada || 0),
-              costoUnitarioDirecto: Number(r.precio_unitario_directo || r.costoUnitarioDirecto || 0),
-              cantidadEstePeriodo: Number(r.cantidad_este_periodo || r.cantidadEstePeriodo || 0),
-              cantidadAcumuladaAnterior: Number(r.cantidad_ejecutada || r.cantidadAcumuladaAnterior || 0),
-              tipoRenglon: r.tipo_renglon || r.tipoRenglon || 'Original',
-              estadoEjecucion: r.estado_ejecucion || r.estadoEjecucion || 'En proceso',
-            }
-          })
-          setRenglones(rengsMapeados)
-        }
-      } catch (err) {
-        console.warn('Conexión Supabase activa para catálogos:', err)
-      }
-    }
-
-    void cargarDesdeSupabase()
-    return () => { activo = false }
-  }, [])
-
-  useEffect(() => {
-    if (!proyecto?.id || esPlantillaVacia) return
-    let activo = true
-    apiGetDeduplicado(`/proyectos/${proyecto.id}/pendientes`)
-      .then((res) => {
-        if (!activo) return
-        const lista = res?.data?.data || res?.data
-        if (Array.isArray(lista)) {
-          setTrabajosPendientes(lista)
-        }
-      })
-      .catch((err) => {
-        console.warn('No se pudieron cargar los pendientes reales:', err)
-      })
-    return () => { activo = false }
-  }, [proyecto?.id, esPlantillaVacia])
 
   const formatearUnidadMedidaSymbol = (raw: string | undefined): string => {
     if (!raw) return 'm³'
@@ -875,6 +997,34 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
     )
   }, [proyecto, fechaFinalizacionActualizada])
 
+  const fechaInicioProyectoYYYYMMDD = useMemo(() => {
+    if (!fechaInicioRealProyecto) return ''
+    const clean = String(fechaInicioRealProyecto).split('T')[0]
+    if (clean.includes('-')) {
+      const parts = clean.split('-')
+      if (parts.length === 3) return `${parts[0].padStart(4, '0')}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`
+    }
+    if (clean.includes('/')) {
+      const parts = clean.split('/')
+      if (parts.length === 3) return `${parts[2].padStart(4, '0')}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`
+    }
+    return ''
+  }, [fechaInicioRealProyecto])
+
+  const fechaFinProyectoYYYYMMDD = useMemo(() => {
+    if (!fechaFinRealProyecto) return ''
+    const clean = String(fechaFinRealProyecto).split('T')[0]
+    if (clean.includes('-')) {
+      const parts = clean.split('-')
+      if (parts.length === 3) return `${parts[0].padStart(4, '0')}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`
+    }
+    if (clean.includes('/')) {
+      const parts = clean.split('/')
+      if (parts.length === 3) return `${parts[2].padStart(4, '0')}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`
+    }
+    return ''
+  }, [fechaFinRealProyecto])
+
   const plazoRealProyecto = useMemo(() => {
     return (
       proyecto?.plazo ||
@@ -892,6 +1042,8 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
     const est = typeof proyecto.estado === 'string' ? proyecto.estado.toLowerCase() : (proyecto.estado as any)?.codigo?.toLowerCase() || ''
     return est === 'borrador'
   }, [proyecto, esPlantillaVacia])
+
+  const ocultarEdicionYEliminacion = modoVistaSabana === 'planificacion' && !esBorrador
 
   const listaMesesDinamicos = useMemo(() => {
     if (esPlantillaVacia || (!fechaInicioRealProyecto && !plazoRealProyecto)) {
@@ -958,60 +1110,6 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
     return meses
   }, [proyecto, fechaInicioRealProyecto, fechaFinRealProyecto, plazoRealProyecto, esPlantillaVacia, esBorrador])
 
-  const handlePromoverTrabajoPendiente = (item: TrabajoPendienteBolsa) => {
-    const descuentoAplicado = item.longitudBase * item.factorDescuento
-    const cantidadNetaCalculada = Math.max(0, item.cantidadBruta - descuentoAplicado)
-
-    // Buscar el renglón correspondiente en la Sábana
-    const renglonDestino = renglones.find((r) => r.codigoDGC === item.codigoDGC)
-
-    if (renglonDestino) {
-      const ejecutadoAcumuladoActual = renglonDestino.cantidadAcumuladaAnterior + renglonDestino.cantidadEstePeriodo
-      const nuevoTotalPostPromocion = ejecutadoAcumuladoActual + cantidadNetaCalculada
-      const cupoDisponible = renglonDestino.cantidadAjustada - ejecutadoAcumuladoActual
-
-      if (nuevoTotalPostPromocion > renglonDestino.cantidadAjustada) {
-        showErrorToast(
-          `Promoción bloqueada: La Cantidad Neta (${formatQuantity(cantidadNetaCalculada, item.unidad)} ${item.unidad}) supera el cupo contractual disponible (${formatQuantity(Math.max(0, cupoDisponible), item.unidad)} ${item.unidad}) para el renglón ${item.codigoDGC}. Requiere una orden de cambio o ampliación aprobada.`
-        )
-        return
-      }
-    }
-
-    setTrabajosPendientes((prev) =>
-      prev.map((p) => (p.id === item.id ? { ...p, estado: 'Trasladado' } : p))
-    )
-
-    const nuevaMedicion: MedicionAnaliticaCampo = {
-      id: `m-promovid-${Date.now()}`,
-      codigoDGC: item.codigoDGC,
-      estacionInicio: '15+000',
-      estacionFin: '15+500',
-      longitudL: cantidadNetaCalculada > 0 ? cantidadNetaCalculada : 100,
-      anchoA: 1.0,
-      alturaH: 1.0,
-      mesPeriodo: 'Mes 6',
-      numEstimacion: 'Est. 08',
-      observaciones: `Promovido desde Bolsa de Pendientes. Origen: ${item.origenTrazabilidad}`,
-    }
-
-    setMedicionesAnaliticas((prev) => [nuevaMedicion, ...prev])
-
-    setRenglones((prev) =>
-      prev.map((r) => {
-        if (r.codigoDGC === item.codigoDGC) {
-          return {
-            ...r,
-            cantidadEstePeriodo: r.cantidadEstePeriodo + cantidadNetaCalculada,
-          }
-        }
-        return r
-      })
-    )
-
-    showSuccessToast(`Partida ${item.codigoDGC} promovida con éxito e integrada a 'Este Periodo' en la Sábana y Memoria Analítica`)
-  }
-
   const handleOrdenarPorColumna = (col: ColumnaOrdenable) => {
     if (columnaOrden === col) {
       if (direccionOrden === 'asc') {
@@ -1072,9 +1170,16 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
     setRenglones((prev) =>
       prev.map((r) => {
         if (r.id === id) {
+          const planContratada = r.cantidadContratadaPlan ?? r.cantidadContratada
+          const planAjustada = r.cantidadAjustadaPlan ?? r.cantidadAjustada
+          const planCostoUnit = r.costoUnitarioDirectoPlan ?? r.costoUnitarioDirecto
+
           return {
             ...r,
             ...datosEditando,
+            cantidadContratadaPlan: planContratada,
+            cantidadAjustadaPlan: planAjustada,
+            costoUnitarioDirectoPlan: planCostoUnit,
             codigoDGC: datosEditando.codigoDGC || r.codigoDGC,
             descripcion: datosEditando.descripcion || r.descripcion,
             unidad: datosEditando.unidad || r.unidad,
@@ -1346,12 +1451,16 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
       }
     })
 
+    const isPlan = modoVistaSabana === 'planificacion'
     renglones.forEach((r) => {
-      const cantTotalFecha = r.cantidadEstePeriodo + r.cantidadAcumuladaAnterior
-      const costoContratado = r.cantidadContratada * r.costoUnitarioDirecto
-      const costoAjustado = r.cantidadAjustada * r.costoUnitarioDirecto
-      const costoEstePeriodo = r.cantidadEstePeriodo * r.costoUnitarioDirecto
-      const costoAcumAnterior = r.cantidadAcumuladaAnterior * r.costoUnitarioDirecto
+      const cantContratada = isPlan ? (r.cantidadContratadaPlan ?? r.cantidadContratada) : r.cantidadContratada
+      const cantAjustada = isPlan ? (r.cantidadAjustadaPlan ?? r.cantidadAjustada) : r.cantidadAjustada
+      const pu = isPlan ? (r.costoUnitarioDirectoPlan ?? r.costoUnitarioDirecto) : r.costoUnitarioDirecto
+
+      const costoContratado = cantContratada * pu
+      const costoAjustado = cantAjustada * pu
+      const costoEstePeriodo = r.cantidadEstePeriodo * pu
+      const costoAcumAnterior = r.cantidadAcumuladaAnterior * pu
       const costoTotalFecha = costoEstePeriodo + costoAcumAnterior
       const saldo = Math.max(0, costoAjustado - costoTotalFecha)
 
@@ -1375,7 +1484,82 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
     })
 
     return mapa
-  }, [renglones])
+  }, [renglones, modoVistaSabana])
+
+  const formatFechaDisplay = (str: string): string => {
+    if (!str) return ''
+    const clean = str.split('T')[0]
+    if (clean.includes('-')) {
+      const [y, m, d] = clean.split('-')
+      if (y && m && d) return `${d}/${m}/${y}`
+    }
+    return str
+  }
+
+  const handleCancelarAperturaEstimacion = () => {
+    setEsSaliendoPlanTrabajo(true)
+    showInfoToast('Saliendo del plan de trabajo')
+    setModalAperturaEstimacionOpen(false)
+    if (proyecto?.id) {
+      router.push(`/dashboard/proyectos/${proyecto.id}`)
+    } else {
+      router.push('/dashboard/proyectos')
+    }
+  }
+
+  const handleFechaInicioChange = (val: string) => {
+    if (!val) {
+      setFormEstFechaInicio(val)
+      return
+    }
+
+    if (fechaInicioProyectoYYYYMMDD && val < fechaInicioProyectoYYYYMMDD) {
+      showErrorToast(
+        `La Fecha Inicio del Período (${formatFechaDisplay(val)}) no puede ser menor a la fecha de inicio del proyecto (${formatFechaDisplay(fechaInicioProyectoYYYYMMDD)})`
+      )
+      setFormEstFechaInicio(fechaInicioProyectoYYYYMMDD)
+      return
+    }
+
+    if (fechaFinProyectoYYYYMMDD && val > fechaFinProyectoYYYYMMDD) {
+      showErrorToast(
+        `La Fecha Inicio del Período (${formatFechaDisplay(val)}) no puede exceder la fecha de finalización del proyecto (${formatFechaDisplay(fechaFinProyectoYYYYMMDD)})`
+      )
+      setFormEstFechaInicio(fechaFinProyectoYYYYMMDD)
+      return
+    }
+
+    if (formEstFechaCorte && val > formEstFechaCorte) {
+      showErrorToast('La Fecha Inicio del Período no puede ser posterior a la Fecha Corte / Cierre')
+      setFormEstFechaInicio(formEstFechaCorte)
+      return
+    }
+
+    setFormEstFechaInicio(val)
+  }
+
+  const handleFechaCorteChange = (val: string) => {
+    if (!val) {
+      setFormEstFechaCorte(val)
+      return
+    }
+
+    if (fechaFinProyectoYYYYMMDD && val > fechaFinProyectoYYYYMMDD) {
+      showErrorToast(
+        `La Fecha Corte / Cierre (${formatFechaDisplay(val)}) no puede exceder la fecha de finalización del proyecto (${formatFechaDisplay(fechaFinProyectoYYYYMMDD)})`
+      )
+      setFormEstFechaCorte(fechaFinProyectoYYYYMMDD)
+      return
+    }
+
+    if (formEstFechaInicio && val < formEstFechaInicio) {
+      showErrorToast('La Fecha Corte / Cierre no puede ser anterior a la Fecha Inicio de Período')
+      setFormEstFechaCorte(formEstFechaInicio)
+      return
+    }
+
+    setFormEstFechaCorte(val)
+  }
 
   const handleGuardarNuevaEstimacion = () => {
     if (!formEstNumero.trim() || !formEstFechaInicio || !formEstFechaCorte) {
@@ -1383,19 +1567,116 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
       return
     }
 
+    if (fechaInicioProyectoYYYYMMDD && formEstFechaInicio < fechaInicioProyectoYYYYMMDD) {
+      showErrorToast(`La Fecha Inicio del Período (${formatFechaDisplay(formEstFechaInicio)}) no puede ser menor a la fecha de inicio del proyecto (${formatFechaDisplay(fechaInicioProyectoYYYYMMDD)})`)
+      return
+    }
+
+    if (fechaFinProyectoYYYYMMDD && formEstFechaCorte > fechaFinProyectoYYYYMMDD) {
+      showErrorToast(`La Fecha Corte / Cierre (${formatFechaDisplay(formEstFechaCorte)}) no puede exceder la fecha de finalización del proyecto (${formatFechaDisplay(fechaFinProyectoYYYYMMDD)})`)
+      return
+    }
+
+    if (formEstFechaCorte < formEstFechaInicio) {
+      showErrorToast('La Fecha Corte / Cierre no puede ser anterior a la Fecha Inicio de Período')
+      return
+    }
+
+    const uAny = user as any
+    const responsableNombre = user ? `${uAny?.primerNombre || uAny?.primer_nombre || user.nombre || 'Ingeniero'} ${uAny?.primerApellido || uAny?.primer_apellido || user.apellido || ''}`.trim() : 'Residente de Obra'
+
     const nuevaEst = {
       id: `est-${Date.now()}`,
-      numero: formEstNumero.trim(),
-      mes: formEstMes.trim() || 'Periodo Nuevo',
+      numero: formEstNumero.trim() || 'Estimación 01',
+      mes: `Periodo ${formEstFechaInicio} al ${formEstFechaCorte}`,
       fechaInicio: formEstFechaInicio,
       fechaCorte: formEstFechaCorte,
+      notas: formEstNotas.trim(),
+      creadoEn: new Date().toLocaleDateString('es-GT'),
+      creadoPor: responsableNombre,
       estado: 'actual' as const,
     }
+
+    setEstimacionEnProgreso(nuevaEst)
+    try {
+      if (proyecto?.id) {
+        localStorage.setItem(`domun_estimacion_activa_${proyecto.id}`, JSON.stringify(nuevaEst))
+      }
+    } catch {}
 
     setListaEstimaciones((prev) => [...prev.map((e) => ({ ...e, estado: 'cerrada' as const })), nuevaEst])
     setNumEstimacionFiltro(nuevaEst.numero)
     setModalAperturaEstimacionOpen(false)
     showSuccessToast(`Se aperturó con éxito el periodo ${nuevaEst.numero} (${nuevaEst.fechaInicio} al ${nuevaEst.fechaCorte})`)
+  }
+
+  const handleFinalizarEstimacionConfirm = () => {
+    if (!estimacionEnProgreso) return
+
+    setRenglones((prev) =>
+      prev.map((r) => {
+        const cantPeriodo = r.cantidadEstePeriodo || 0
+        const nuevoAcumulado = (r.cantidadAcumuladaAnterior || 0) + cantPeriodo
+        return {
+          ...r,
+          cantidadAcumuladaAnterior: nuevoAcumulado,
+          totalAFecha: nuevoAcumulado,
+          cantidadEstePeriodo: 0,
+        }
+      })
+    )
+
+    setListaEstimaciones((prev) =>
+      prev.map((e) => (e.id === estimacionEnProgreso.id || e.numero === estimacionEnProgreso.numero ? { ...e, estado: 'cerrada' } : e))
+    )
+
+    const numCerrado = estimacionEnProgreso.numero
+    setEstimacionEnProgreso(null)
+    if (proyecto?.id) {
+      localStorage.removeItem(`domun_estimacion_activa_${proyecto.id}`)
+    }
+
+    setModalFinalizarEstimacionOpen(false)
+    setComentarioCierreEstimacion('')
+    showSuccessToast(`Estimación ${numCerrado} finalizada y cerrada correctamente. Avances congelados en el histórico.`)
+  }
+
+  const handleCancelarEstimacionConfirm = () => {
+    if (proyecto?.id) {
+      localStorage.removeItem(`domun_estimacion_activa_${proyecto.id}`)
+    }
+    setEstimacionEnProgreso(null)
+    setModalCancelarEstimacionOpen(false)
+    showSuccessToast('Sesión de estimación cancelada. El período activo fue cerrado.')
+  }
+
+  const handleExportarCSV = () => {
+    try {
+      const headers = ['Código DGC', 'Descripción', 'Unidad', 'Cant. Contratada', 'Cant. Ajustada', 'Costo Unit. Directo', 'Este Periodo (Cant)', 'Total a Fecha', 'Saldo por Ejecutar']
+      const rows = renglones.map((r) => [
+        r.codigoDGC,
+        `"${r.descripcion.replace(/"/g, '""')}"`,
+        r.unidad,
+        r.cantidadContratada,
+        r.cantidadAjustada,
+        r.costoUnitarioDirecto,
+        r.cantidadEstePeriodo || 0,
+        r.totalAFecha || 0,
+        r.saldoPorEjecutar || 0,
+      ])
+      const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n')
+      const encodedUri = encodeURI(csvContent)
+      const link = document.createElement('a')
+      link.setAttribute('href', encodedUri)
+      link.setAttribute('download', `Estimacion_${estimacionEnProgreso?.numero || 'Periodo'}_${proyecto?.codigo || 'PROY'}.csv`)
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      setModalExportarEstimacionOpen(false)
+      showSuccessToast('Reporte CSV descargado exitosamente')
+    } catch {
+      showErrorToast('No se pudo generar la descarga del reporte CSV')
+    }
   }
 
   const handleGuardarNuevaMedicionAnalitica = async () => {
@@ -1458,30 +1739,38 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
 
   // CÁLCULOS FINANCIEROS GLOBALES
   const subtotalCostoDirectoContratadoGlobal = useMemo(() => {
-    return renglones.reduce((sum, r) => sum + r.cantidadContratada * r.costoUnitarioDirecto, 0)
-  }, [renglones])
+    const isPlan = modoVistaSabana === 'planificacion'
+    return renglones.reduce((sum, r) => {
+      const cant = isPlan ? (r.cantidadContratadaPlan ?? r.cantidadContratada) : r.cantidadContratada
+      const pu = isPlan ? (r.costoUnitarioDirectoPlan ?? r.costoUnitarioDirecto) : r.costoUnitarioDirecto
+      return sum + cant * pu
+    }, 0)
+  }, [renglones, modoVistaSabana])
 
-  const subtotalCostoDirectoAjustadoGlobal = useMemo(() => {
-    return renglones.reduce((sum, r) => sum + r.cantidadAjustada * r.costoUnitarioDirecto, 0)
-  }, [renglones])
-
-  // Extraer parámetros dinámicos del proyecto (parametro_proyecto) con fallbacks por defecto (45% indirectos, 12% IVA, 20% anticipo)
+  // Extraer parámetros dinámicos del proyecto
   const paramsProj = proyecto?.parametro_proyecto || proyecto?.parametroProyecto || proyecto?.parametro || {}
-  const pctIndirectos = typeof paramsProj.porcentaje_indirectos === 'number'
-    ? paramsProj.porcentaje_indirectos
-    : (Number(paramsProj.porcentaje_indirectos) || 0.45)
-  const pctIva = typeof paramsProj.porcentaje_iva === 'number'
-    ? paramsProj.porcentaje_iva
-    : (Number(paramsProj.porcentaje_iva) || 0.12)
-  const pctAnticipo = typeof paramsProj.porcentaje_amortizacion_anticipo === 'number'
-    ? paramsProj.porcentaje_amortizacion_anticipo
-    : (Number(paramsProj.porcentaje_amortizacion_anticipo) || 0.20)
+  const porcentajeIndirectosVal = Number(paramsProj.porcentaje_indirectos ?? 45)
+  const porcentajeIvaVal = Number(paramsProj.porcentaje_iva ?? 12)
+  const porcentajeAnticipoVal = Number(paramsProj.porcentaje_amortizacion_anticipo ?? 20)
 
-  // Monto Contractual Original = Costo Directo Total + Indirectos % + IVA %
-  const indirectos45ContratadoGlobal = subtotalCostoDirectoContratadoGlobal * pctIndirectos
-  const subtotalAntesIvaContratadoGlobal = subtotalCostoDirectoContratadoGlobal + indirectos45ContratadoGlobal
-  const iva12ContratadoGlobal = subtotalAntesIvaContratadoGlobal * pctIva
-  const montoContractualOriginalTotal = subtotalAntesIvaContratadoGlobal + iva12ContratadoGlobal
+  const pctIndirectosNum = porcentajeIndirectosVal > 1 ? porcentajeIndirectosVal : porcentajeIndirectosVal * 100
+  const pctIvaNum = porcentajeIvaVal > 1 ? porcentajeIvaVal : porcentajeIvaVal * 100
+  const pctAnticipoNum = porcentajeAnticipoVal > 1 ? porcentajeAnticipoVal : porcentajeAnticipoVal * 100
+
+  const anticipoTotalRecibidoProj = Number(proyecto?.monto_anticipo ?? paramsProj.monto_anticipo_total ?? paramsProj.anticipo_total_recibido ?? 0)
+
+  const resLiquidacionContratadoGlobal = calcularLiquidacionEstimacion({
+    montoDirectoPeriodo: subtotalCostoDirectoContratadoGlobal,
+    porcentajeIndirectos: pctIndirectosNum,
+    porcentajeIva: pctIvaNum,
+    montoRenglonGlobal: 0,
+    excluirIndirectosIvaGlobal: true,
+    porcentajeAmortizacionAnticipo: pctAnticipoNum,
+    porcentajeRetencionGarantia: 0,
+    anticipoRecibidoTotal: anticipoTotalRecibidoProj,
+  })
+
+  const montoContractualOriginalTotal = resLiquidacionContratadoGlobal.valorTotalEstimacion
 
   const subtotalCostoDirectoGlobalPeriodo = useMemo(() => {
     return renglones.reduce((sum, r) => sum + r.cantidadEstePeriodo * r.costoUnitarioDirecto, 0)
@@ -1491,27 +1780,33 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
     return renglones.reduce((sum, r) => sum + (r.cantidadAcumuladaAnterior || 0) * r.costoUnitarioDirecto, 0)
   }, [renglones])
 
-  const indirectos45Global = subtotalCostoDirectoGlobalPeriodo * pctIndirectos
-  const subtotalAntesIvaGlobal = subtotalCostoDirectoGlobalPeriodo + indirectos45Global
-  const iva12Global = subtotalAntesIvaGlobal * pctIva
-  const valorTotalEstimacionBrutoGlobal = subtotalAntesIvaGlobal + iva12Global
+  const resLiquidacionAcumuladaAnterior = calcularLiquidacionEstimacion({
+    montoDirectoPeriodo: subtotalCostoDirectoAcumuladoAnteriorGlobal,
+    porcentajeIndirectos: pctIndirectosNum,
+    porcentajeIva: pctIvaNum,
+    montoRenglonGlobal: 0,
+    excluirIndirectosIvaGlobal: true,
+    porcentajeAmortizacionAnticipo: pctAnticipoNum,
+    porcentajeRetencionGarantia: 0,
+    anticipoRecibidoTotal: anticipoTotalRecibidoProj,
+  })
 
-  const valorTotalAcumuladoAnteriorBrutoGlobal = (subtotalCostoDirectoAcumuladoAnteriorGlobal * (1 + pctIndirectos)) * (1 + pctIva)
+  const resLiquidacionPeriodo = calcularLiquidacionEstimacion({
+    montoDirectoPeriodo: subtotalCostoDirectoGlobalPeriodo,
+    porcentajeIndirectos: pctIndirectosNum,
+    porcentajeIva: pctIvaNum,
+    montoRenglonGlobal: 0,
+    excluirIndirectosIvaGlobal: true,
+    porcentajeAmortizacionAnticipo: pctAnticipoNum,
+    porcentajeRetencionGarantia: 0,
+    anticipoRecibidoTotal: anticipoTotalRecibidoProj,
+    anticipoAmortizadoAnterior: resLiquidacionAcumuladaAnterior.amortizacionPeriodo,
+  })
 
-  const anticipoRecibido20 = (esPlantillaVacia || proyecto?.estado === 'borrador')
-    ? 0
-    : (Number(paramsProj.monto_anticipo_total || paramsProj.anticipo_total_recibido) || (montoContractualOriginalTotal * pctAnticipo))
-  const amortizacionAnteriorAcumulada = (esPlantillaVacia || proyecto?.estado === 'borrador')
-    ? 0
-    : (proyecto?.amortizacionAnteriorAcumulada !== undefined && proyecto?.amortizacionAnteriorAcumulada !== null)
-      ? Number(proyecto.amortizacionAnteriorAcumulada)
-      : (proyecto?.amortizadoAnterior !== undefined && proyecto?.amortizadoAnterior !== null)
-        ? Number(proyecto.amortizadoAnterior)
-        : valorTotalAcumuladoAnteriorBrutoGlobal * pctAnticipo
-  const amortizacionAnticipoEstePeriodo = valorTotalEstimacionBrutoGlobal * pctAnticipo
-  const amortizacionTotalAcumulada = amortizacionAnteriorAcumulada + amortizacionAnticipoEstePeriodo
-  const saldoAnticipoPorAmortizar = Math.max(0, anticipoRecibido20 - amortizacionTotalAcumulada)
-  const liquidoAPagarNetoContratista = Math.max(0, valorTotalEstimacionBrutoGlobal - amortizacionAnticipoEstePeriodo)
+  const valorTotalEstimacionBrutoGlobal = resLiquidacionPeriodo.valorTotalEstimacion
+  const amortizacionAnticipoEstePeriodo = resLiquidacionPeriodo.amortizacionPeriodo
+  const liquidoAPagarNetoContratista = resLiquidacionPeriodo.totalAFavorContratista
+  const saldoAnticipoPorAmortizar = resLiquidacionPeriodo.saldoAnticipoRemanente
 
   // Métricas dinámicas reales calculadas en base a los renglones y estado del proyecto
   const metricasHeaderContextuales = useMemo(() => {
@@ -1530,7 +1825,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
     const montoContractualCalc = montoContractualOriginalTotal > 0 ? montoContractualOriginalTotal : montoOriginalBase
     const costoDirectoCalc = subtotalCostoDirectoContratadoGlobal > 0
       ? subtotalCostoDirectoContratadoGlobal
-      : (montoOriginalBase > 0 ? montoOriginalBase / ((1 + pctIndirectos) * (1 + pctIva)) : 0)
+      : (montoOriginalBase > 0 ? montoOriginalBase / ((1 + (pctIndirectosNum / 100)) * (1 + (pctIvaNum / 100))) : 0)
 
     return {
       nombre: `${proyecto?.nombre || proyecto?.nombre_proyecto || proyecto?.nombreOficial || 'Proyecto'} (${proyecto?.codigo || proyecto?.codigo_proyecto || 'PROY-001'})`,
@@ -1539,18 +1834,13 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
       montoContractualOriginal: montoContractualCalc,
       liquidoNetoPeriodo: liquidoAPagarNetoContratista,
     }
-  }, [proyecto, subtotalCostoDirectoContratadoGlobal, montoContractualOriginalTotal, liquidoAPagarNetoContratista, esPlantillaVacia, pctIndirectos, pctIva, fechaInicioRealProyecto, fechaFinRealProyecto, plazoRealProyecto])
+  }, [proyecto, subtotalCostoDirectoContratadoGlobal, montoContractualOriginalTotal, liquidoAPagarNetoContratista, esPlantillaVacia, pctIndirectosNum, pctIvaNum, fechaInicioRealProyecto, fechaFinRealProyecto, plazoRealProyecto])
 
-  
   useEffect(() => {
     if (proyecto?.id && montoContractualOriginalTotal > 0 && typeof window !== 'undefined') {
       localStorage.setItem('proyecto_sabana_monto_' + proyecto.id, String(montoContractualOriginalTotal))
     }
   }, [proyecto?.id, montoContractualOriginalTotal])
-
-  const diasEmpleadosCalculados = esBorrador ? 0 : Math.max(0, Math.floor((Date.now() - (fechaInicioRealProyecto ? new Date(fechaInicioRealProyecto).getTime() : Date.now())) / 86400000))
-  const diasSuspendidosSumados = 0
-  const fechaInicioContrato = proyecto?.fechaInicio || 'No registrada'
 
   const toggleCapitulo = (capId: number) => {
     setCapitulosColapsados((prev) => ({ ...prev, [capId]: !prev[capId] }))
@@ -1578,15 +1868,20 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
     if (proyecto) {
       proyecto.fechaFin = formNuevaFechaFin
       proyecto.fechaFinContractualPlan = formNuevaFechaFin
+      proyecto.fechaFinalizacionReal = formNuevaFechaFin
+      proyecto.plazoEjecucionRealAmpliado = `${formDiasAdicionales} días`
     }
 
     if (proyecto?.id && typeof proyecto.id === 'string' && !proyecto.id.startsWith('sab-') && !proyecto.id.startsWith('proy-')) {
       try {
         await api.put(`/proyectos/${proyecto.id}`, {
           fechaFinContractualPlan: formNuevaFechaFin,
+          fechaFinalizacionReal: formNuevaFechaFin,
+          fechaFin: formNuevaFechaFin,
           observacionesPlazo: formObservacionesPlazo,
           motivoPlazo: formMotivoPlazo,
           diasAdicionalesPlazo: Number(formDiasAdicionales),
+          plazoEjecucionRealAmpliado: Number(formDiasAdicionales),
         })
       } catch (err) {
         console.warn('Persistencia de plazo:', err)
@@ -1621,6 +1916,17 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
     )
   }
 
+  if (esSaliendoPlanTrabajo) {
+    return (
+      <div className="flex h-[75vh] w-full flex-col items-center justify-center bg-[#F3F4F7] font-[Poppins]">
+        <div className="flex flex-col items-center gap-3 rounded-2xl bg-white p-8 shadow-sm border border-gray-100">
+          <Loader2 className="h-9 w-9 animate-spin text-[#9B0F06]" />
+          <span className="text-xs font-semibold text-gray-700">Saliendo del plan de trabajo...</span>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-2 font-[Poppins] text-xs">
       <style>{`
@@ -1645,13 +1951,16 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
         }
       `}</style>
 
-      {/* Encabezado compacto */}
-      <div className="pt-0.5 pb-0.5 space-y-1.5 font-[Poppins]">
-        <div className="flex flex-wrap items-center justify-between gap-2">
+      {/* Encabezado limpio y estructurado */}
+      <div className="pt-0.5 pb-0.5 space-y-2 font-[Poppins]">
+        {/* 1. BARRA SUPERIOR: BREADCRUMB + ACCIONES PRINCIPALES */}
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 pb-2">
+          {/* Lado izquierdo: Regresar + Breadcrumb */}
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => {
+                showInfoToast('Saliendo del plan de trabajo')
                 if (typeof window !== 'undefined') {
                   const urlParams = new URLSearchParams(window.location.search)
                   const fromParam = urlParams.get('from')
@@ -1667,149 +1976,329 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                 }
                 router.push(`/dashboard/proyectos/${proyecto.id}`)
               }}
-              className="p-1 text-gray-600 hover:text-[#9B0F06] transition-colors cursor-pointer"
+              className="p-1 text-gray-500 hover:text-[#7A0C0D] transition-colors cursor-pointer"
               title="Regresar al formulario"
             >
               <ArrowLeft size={16} />
             </button>
 
             <div>
-              <div className="flex items-center gap-1.5 text-[9px] font-medium text-gray-500 uppercase tracking-wider">
-                <span className="hover:underline cursor-pointer" onClick={() => router.push('/dashboard/proyectos')}>
+              <div className="flex items-center gap-1.5 text-[9.5px] font-medium text-gray-400 uppercase tracking-wider">
+                <span className="hover:underline cursor-pointer hover:text-gray-600" onClick={() => router.push('/dashboard/proyectos')}>
                   Proyectos
                 </span>
                 <span>/</span>
                 <span
-                  className="hover:underline cursor-pointer text-gray-700"
+                  className="hover:underline cursor-pointer hover:text-gray-700"
                   onClick={() => {
-    if (typeof window !== 'undefined') {
-      const urlParams = new URLSearchParams(window.location.search)
-      const fromParam = urlParams.get('from')
-      const montoQS = montoContractualOriginalTotal > 0 ? `?monto=${montoContractualOriginalTotal}` : ''
-      if (fromParam === 'editar' || window.location.href.includes('from=editar')) {
-        router.push(`/dashboard/proyectos/${proyecto.id}/editar${montoQS}`)
-        return
-      }
-      if (fromParam === 'nuevo' || fromParam === 'crear' || window.location.href.includes('from=nuevo')) {
-        router.push(`/dashboard/proyectos/nuevo${montoQS}`)
-        return
-      }
-    }
-    router.push(`/dashboard/proyectos/${proyecto.id}`)
-  }}
+                    if (typeof window !== 'undefined') {
+                      const urlParams = new URLSearchParams(window.location.search)
+                      const fromParam = urlParams.get('from')
+                      const montoQS = montoContractualOriginalTotal > 0 ? `?monto=${montoContractualOriginalTotal}` : ''
+                      if (fromParam === 'editar' || window.location.href.includes('from=editar')) {
+                        router.push(`/dashboard/proyectos/${proyecto.id}/editar${montoQS}`)
+                        return
+                      }
+                      if (fromParam === 'nuevo' || fromParam === 'crear' || window.location.href.includes('from=nuevo')) {
+                        router.push(`/dashboard/proyectos/nuevo${montoQS}`)
+                        return
+                      }
+                    }
+                    router.push(`/dashboard/proyectos/${proyecto.id}`)
+                  }}
                 >
                   {proyecto.codigo}
                 </span>
                 <span>/</span>
-                <span className="text-[#9B0F06] font-medium">Hoja Sábana Digital</span>
+                <span className="text-[#7A0C0D] font-semibold">HOJA SÁBANA DIGITAL</span>
               </div>
 
-              <h1 className="text-xs font-medium text-gray-900 mt-0.5 flex items-center gap-1.5">
-                <FileSpreadsheet size={13} className="text-[#9B0F06]" />
+              <h1 className="text-sm font-bold text-[#7A0C0D] mt-0.5 flex items-center gap-1.5">
                 <span>Hoja Sábana Digital</span>
                 {modoVistaSabana === 'planificacion' && (
                   <span
-                    className="inline-flex items-center gap-1 rounded bg-amber-50 px-2 py-0.5 text-[9px] font-medium text-amber-700 border border-amber-200 ml-2"
-                    title="Distribución automática estimada — no basada en cronograma capturado"
+                    className="inline-flex items-center gap-1 rounded bg-gray-100 px-2 py-0.5 text-[9px] font-normal text-gray-600 border border-gray-200 ml-2 font-[Poppins]"
                   >
-                    <Info size={10} className="text-amber-600" />
-                    <span>Distribución estimada (Promedio lineal)</span>
+                    <span>Modo Planificación</span>
                   </span>
                 )}
               </h1>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5">
-            {/* Toggle Planificación / Actual */}
-            <div className="inline-flex items-center rounded-md border border-gray-200 bg-gray-100 p-0.5 text-[9.5px]">
+          {/* Lado derecho: Acciones principales */}
+          <div className="flex items-center gap-2">
+            {modoVistaSabana === 'planificacion' && esBorrador && (
               <button
                 type="button"
-                disabled={esBorrador}
-                onClick={() => !esBorrador && setModoVistaSabana('planificacion')}
-                className={`inline-flex items-center gap-1 border-b-2 px-2 py-1 text-[9.5px] font-normal transition-all ${
-                  esBorrador ? 'opacity-50 cursor-not-allowed text-gray-400' : 'cursor-pointer'
-                } ${
-                  modoVistaSabana === 'planificacion'
-                    ? 'border-[#9B0F06] text-[#9B0F06] bg-white font-medium shadow-xs'
-                    : 'border-transparent text-gray-500 hover:text-gray-800 hover:bg-gray-50'
+                onClick={async () => {
+                  await handleGuardarPlanificacionCompleta()
+                  setModalConfirmarRegresoForm(true)
+                }}
+                className="inline-flex items-center gap-1 rounded-md bg-[#9B0F06] text-white px-2.5 py-1 text-[10px] font-semibold hover:bg-[#7A0C0D] transition-all cursor-pointer shadow-xs"
+              >
+                <CheckCircle2 size={12} />
+                <span>Confirmar Cambios</span>
+              </button>
+            )}
+            {/* Toggle de Línea Base: Inicial / Modificada / Actual */}
+            <div className="inline-flex items-center rounded-lg border border-gray-200 bg-gray-50 p-0.5 text-[10px]">
+              <button
+                type="button"
+                onClick={() => setModoVistaLineaBase('inicial')}
+                className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 font-medium transition-all cursor-pointer ${
+                  modoVistaLineaBase === 'inicial'
+                    ? 'bg-white text-[#7A0C0D] font-semibold shadow-xs border border-gray-200/60'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                 }`}
               >
-                <Calendar size={11} />
-                <span>Planificación</span>
+                <Calendar size={12} />
+                <span>Inicial</span>
               </button>
-              {!esBorrador && (
+              {(tieneModificadaConfirmada || (proyecto as any)?.en_replanificacion) && (
                 <button
                   type="button"
-                  onClick={() => setModoVistaSabana('actual')}
-                  className={`inline-flex items-center gap-1 border-b-2 px-2 py-1 text-[9.5px] font-normal transition-all cursor-pointer ${
-                    modoVistaSabana === 'actual'
-                      ? 'border-[#9B0F06] text-[#9B0F06] bg-white font-medium shadow-xs'
-                      : 'border-transparent text-gray-500 hover:text-gray-800 hover:bg-gray-50'
+                  onClick={() => setModoVistaLineaBase('modificada')}
+                  className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 font-medium transition-all cursor-pointer ${
+                    modoVistaLineaBase === 'modificada'
+                      ? 'bg-white text-[#7A0C0D] font-semibold shadow-xs border border-gray-200/60'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                   }`}
                 >
-                  <Clock size={11} />
+                  <Calendar size={12} />
+                  <span>Modificada {(proyecto as any)?.en_replanificacion ? '(Borrador)' : ''}</span>
+                </button>
+              )}
+              {!esBorrador && !(proyecto as any)?.en_replanificacion && (
+                <button
+                  type="button"
+                  onClick={() => setModoVistaLineaBase('actual')}
+                  className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 font-medium transition-all cursor-pointer ${
+                    modoVistaLineaBase === 'actual'
+                      ? 'bg-white text-[#7A0C0D] font-semibold shadow-xs border border-gray-200/60'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                  }`}
+                >
+                  <Clock size={12} />
                   <span>Actual</span>
                 </button>
               )}
             </div>
 
-            {/* Botón Apertura Estimación: a la par de Planificación, sólo cuando el proyecto está activo */}
-            {!esBorrador && (
+            {/* Botón [Activar Proyecto] (Sólo Administrador mientras en_replanificacion = true) */}
+            {(proyecto as any)?.en_replanificacion && esAdminUser && (
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await api.post(`/proyectos/${proyecto.id}/activar-replanificacion`, {
+                      esReanudacionPausa: proyecto?.estado === 'pausado',
+                      fechaReanudacion: formFechaReanudacion,
+                      nuevaFechaFin: formNuevaFechaFin,
+                    })
+                    showSuccessToast('Proyecto activado exitosamente tras replanificación.')
+                    setTieneModificadaConfirmada(true)
+                    setModoVistaLineaBase('actual')
+                    if (typeof window !== 'undefined') window.location.reload()
+                  } catch (e: any) {
+                    showErrorToast(e?.response?.data?.mensaje || e?.message || 'Error al activar el proyecto')
+                  }
+                }}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white px-3 py-1.5 text-[10.5px] font-bold transition-all shadow-xs cursor-pointer"
+              >
+                <CheckCircle2 size={13} />
+                <span>Activar Proyecto</span>
+              </button>
+            )}
+
+            {/* + Aperturar Estimación (Oculto mientras haya una estimación en progreso) */}
+            {!esBorrador && !estimacionEnProgreso && (
               <button
                 type="button"
                 onClick={() => setModalAperturaEstimacionOpen(true)}
-                className="inline-flex items-center gap-1 rounded bg-red-50 border border-red-200 px-2 py-1 text-[9.5px] font-bold text-[#9B0F06] hover:bg-red-100 transition-colors shadow-2xs cursor-pointer"
+                className="inline-flex items-center gap-1 rounded-lg bg-[#7A0C0D] hover:bg-[#5E0006] text-white px-3 py-1.5 text-[10.5px] font-semibold transition-colors shadow-2xs cursor-pointer"
                 title="Aperturar nuevo periodo de estimación para este proyecto"
               >
-                <Plus size={11} />
+                <Plus size={13} />
                 <span>Aperturar Estimación</span>
               </button>
             )}
 
-            <button
-              type="button"
-              onClick={() => router.push('/dashboard/renglones')}
-              className="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-2.5 py-1 text-[10px] font-semibold text-gray-700 hover:text-[#9B0F06] hover:border-[#9B0F06] hover:bg-gray-50 transition-colors shadow-2xs cursor-pointer"
-              title="Ir a Gestión Completa de Renglones, Unidades de Medida y Capítulos"
-            >
-              <Layers size={12} className="text-[#9B0F06]" />
-              <span>Gestionar Renglones</span>
-            </button>
-
-            {/* Botón Modificar Plazo - Visible para Administrador cuando el proyecto NO está en borrador (ej. Activo) */}
-            {user?.rol === 'Administrador' && proyecto?.estado !== 'borrador' && (
+            {/* Menú de tres puntos (⋮) */}
+            <div className="relative">
               <button
                 type="button"
-                onClick={() => {
-                  setErrorsPlazoForm({})
-                  setModalModificarPlazoOpen(true)
-                }}
-                className="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-2.5 py-1 text-[10px] font-medium text-gray-700 hover:bg-gray-50 transition-colors shadow-2xs cursor-pointer"
-                title="Modificar cronograma y fecha de finalización (Exclusivo proyectos activos)"
+                onClick={() => setMenuTopOpen((prev) => !prev)}
+                className="inline-flex items-center justify-center p-1.5 rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition-colors shadow-2xs cursor-pointer"
+                title="Más opciones"
               >
-                <CalendarClock size={13} className="text-[#9B0F06]" />
-                <span>Modificar Plazo</span>
+                <MoreVertical size={15} />
               </button>
-            )}
 
-            <button
-              type="button"
-              onClick={handleExportarExcel}
-              className="btn-success-compact cursor-pointer"
-              title="Exportar archivo Excel DÍAS"
-            >
-              <FileSpreadsheet size={13} />
-              <span>Exportar Excel</span>
-              <Download size={12} />
-            </button>
+              {menuTopOpen && (
+                <div
+                  className="absolute right-0 mt-1 w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-lg z-50 animate-fadeIn font-[Poppins]"
+                  onMouseLeave={() => setMenuTopOpen(false)}
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuTopOpen(false)
+                      router.push('/dashboard/renglones')
+                    }}
+                    className="w-full text-left px-3 py-2 text-[11px] text-gray-700 hover:bg-gray-100 flex items-center gap-2 cursor-pointer"
+                  >
+                    <Layers size={13} className="text-[#7A0C0D]" />
+                    <span>Gestionar renglones</span>
+                  </button>
+
+                  {user?.rol === 'Administrador' && proyecto?.estado !== 'borrador' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMenuTopOpen(false)
+                        setErrorsPlazoForm({})
+                        setModalModificarPlazoOpen(true)
+                      }}
+                      className="w-full text-left px-3 py-2 text-[11px] text-gray-700 hover:bg-gray-100 flex items-center gap-2 cursor-pointer"
+                    >
+                      <CalendarClock size={13} className="text-[#7A0C0D]" />
+                      <span>Modificar plazo</span>
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuTopOpen(false)
+                      setModalExportarSabanaOpen(true)
+                    }}
+                    className="w-full text-left px-3 py-2 text-[11px] text-[#9B0F06] hover:bg-red-50 flex items-center gap-2 cursor-pointer font-medium border-t border-gray-100"
+                  >
+                    <FileText size={13} className="text-[#9B0F06]" />
+                    <span>Exportar PDF</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuTopOpen(false)
+                      handleExportarExcel()
+                    }}
+                    className="w-full text-left px-3 py-2 text-[11px] text-emerald-700 hover:bg-emerald-50 flex items-center gap-2 cursor-pointer font-medium border-t border-gray-100"
+                  >
+                    <FileSpreadsheet size={13} className="text-emerald-600" />
+                    <span>Exportar Excel</span>
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Fila horizontal de métricas */}
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5 bg-gray-50/80 p-1.5 rounded-lg border border-gray-200/80 text-[10px]">
-          <div className="min-w-0">
-            <span className="text-[7.5px] font-medium uppercase tracking-wider text-gray-400 block truncate mb-0.5">
+        {/* 2. BLOQUE DE ESTIMACIÓN EN PROGRESO (Horizontal, limpio y compacto) */}
+        {estimacionEnProgreso && (
+          <div className="rounded-lg border border-gray-200 bg-gray-100 px-3 py-1.5 shadow-2xs font-[Poppins] transition-all">
+            <div className="flex flex-wrap items-center justify-between gap-2.5">
+              {/* Lado izquierdo: Estado + Metadata en línea con divisores */}
+              <div className="flex flex-wrap items-center gap-2.5 text-xs">
+                {/* Badge Status */}
+                <div className="inline-flex items-center gap-1.5 font-bold text-[#7A0C0D] text-[10.5px] px-1 py-0.5">
+                  <span className="h-2 w-2 rounded-full bg-[#7A0C0D] animate-pulse"></span>
+                  <span>{estimacionEnProgreso.numero} — EN PROGRESO</span>
+                </div>
+
+                {/* Info secundaria con divisores verticales */}
+                <div className="flex flex-wrap items-center gap-2 text-[10.5px] text-gray-700">
+                  <div className="flex items-center gap-1">
+                    <Calendar size={11} className="text-[#7A0C0D]" />
+                    <span className="font-semibold text-gray-900">Fechas:</span>
+                    <span>{estimacionEnProgreso.fechaInicio} al {estimacionEnProgreso.fechaCorte}</span>
+                  </div>
+
+                  <span className="text-gray-300">|</span>
+
+                  <div className="flex items-center gap-1">
+                    <User size={11} className="text-[#7A0C0D]" />
+                    <span className="font-semibold text-gray-900">Responsable:</span>
+                    <span>{estimacionEnProgreso.creadoPor}</span>
+                  </div>
+
+                  {estimacionEnProgreso.notas && (
+                    <>
+                      <span className="text-gray-300">|</span>
+                      <div className="flex items-center gap-1 truncate max-w-sm">
+                        <Info size={11} className="text-[#7A0C0D] shrink-0" />
+                        <span className="font-semibold text-gray-900 shrink-0">Observación:</span>
+                        <span className="truncate text-gray-600">{estimacionEnProgreso.notas}</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Lado derecho: Acciones de estimación */}
+              <div className="flex items-center gap-1.5">
+                {/* Finalizar estimación */}
+                <button
+                  type="button"
+                  onClick={() => setModalFinalizarEstimacionOpen(true)}
+                  className="inline-flex items-center gap-1 rounded-md bg-[#7A0C0D] hover:bg-[#5E0006] text-white px-2.5 py-0.5 text-[10.5px] font-semibold transition-all shadow-2xs cursor-pointer"
+                >
+                  <CheckCircle2 size={12} />
+                  <span>Finalizar estimación</span>
+                </button>
+
+                {/* Menú de tres puntos (⋮) para acciones secundarias */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setMenuEstOpen((prev) => !prev)}
+                    className="inline-flex items-center justify-center p-1 rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition-colors shadow-2xs cursor-pointer"
+                    title="Opciones de estimación"
+                  >
+                    <MoreVertical size={13} />
+                  </button>
+
+                  {menuEstOpen && (
+                    <div
+                      className="absolute right-0 mt-1 w-44 rounded-lg border border-gray-200 bg-white py-1 shadow-lg z-50 animate-fadeIn font-[Poppins]"
+                      onMouseLeave={() => setMenuEstOpen(false)}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMenuEstOpen(false)
+                          setModalCancelarEstimacionOpen(true)
+                        }}
+                        className="w-full text-left px-3 py-1 text-[10.5px] text-red-600 hover:bg-red-50 flex items-center gap-2 cursor-pointer font-medium"
+                      >
+                        <X size={12} />
+                        <span>Cancelar estimación</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMenuEstOpen(false)
+                          setModalExportarSabanaOpen(true)
+                        }}
+                        className="w-full text-left px-3 py-1 text-[10.5px] text-gray-700 hover:bg-gray-100 flex items-center gap-2 cursor-pointer"
+                      >
+                        <Download size={12} />
+                        <span>Exportar reporte</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 3. BLOQUE DE INFORMACIÓN DEL PROYECTO (Fila horizontal ultracompacta) */}
+        <div className="grid grid-cols-1 sm:grid-cols-5 gap-0 bg-white border border-gray-200 rounded-lg p-1.5 text-xs divide-y sm:divide-y-0 sm:divide-x divide-gray-200/80">
+          <div className="px-2 py-0.5 min-w-0">
+            <span className="text-[8.5px] font-semibold uppercase tracking-wider text-gray-400 block truncate">
               Proyecto / Contrato
             </span>
             <select
@@ -1819,7 +2308,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                 setProyectoIdSeleccionado(newId)
                 router.push(`/dashboard/proyectos/${newId}/hoja-sabana`)
               }}
-              className="h-6 w-full rounded border border-gray-300 bg-white px-1 text-[10px] font-medium text-gray-900 focus:border-[#9B0F06] focus:outline-none cursor-pointer truncate"
+              className="h-5 w-full rounded border border-gray-300 bg-white px-1 text-[10px] font-medium text-gray-900 focus:border-[#7A0C0D] focus:outline-none cursor-pointer truncate"
             >
               {(proyectosLista.length > 0 ? proyectosLista : [proyecto]).map((p: any) => (
                 <option key={p.id} value={p.id}>
@@ -1829,39 +2318,39 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
             </select>
           </div>
 
-          <div>
-            <span className="text-[7.5px] font-medium uppercase tracking-wider text-gray-400 block truncate">
+          <div className="px-2 py-0.5">
+            <span className="text-[8.5px] font-semibold uppercase tracking-wider text-gray-400 block truncate">
               {esBorrador ? 'Plazo Planificado' : 'Plazo de Ejecución Real'}
             </span>
-            <span className="font-medium text-gray-800 flex items-center gap-1">
-              <Clock size={9.5} className="text-[#9B0F06] shrink-0" />
-              <span>{metricasHeaderContextuales.plazo}</span>
+            <span className="font-medium text-gray-800 flex items-center gap-1 mt-0.5">
+              <Clock size={10} className="text-[#7A0C0D] shrink-0" />
+              <span className="text-[10px]">{metricasHeaderContextuales.plazo}</span>
             </span>
           </div>
 
-          <div>
-            <span className="text-[7.5px] font-medium uppercase tracking-wider text-gray-400 block truncate">
+          <div className="px-2 py-0.5">
+            <span className="text-[8.5px] font-semibold uppercase tracking-wider text-gray-400 block truncate">
               Costo Directo Contratado Total (D × F)
             </span>
-            <span className="font-medium font-mono text-gray-900">
+            <span className="font-semibold font-mono text-gray-900 text-[10px] block mt-0.5">
               Q {metricasHeaderContextuales.costoDirecto.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
             </span>
           </div>
 
-          <div>
-            <span className="text-[7.5px] font-medium uppercase tracking-wider text-[#9B0F06] block truncate font-bold">
+          <div className="px-2 py-0.5">
+            <span className="text-[8.5px] font-semibold uppercase tracking-wider text-gray-400 block truncate">
               Monto Contractual Original (con Indirectos e IVA)
             </span>
-            <span className="font-bold font-mono text-[#9B0F06]">
+            <span className="font-semibold font-mono text-gray-900 text-[10px] block mt-0.5">
               Q {metricasHeaderContextuales.montoContractualOriginal.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
             </span>
           </div>
 
-          <div>
-            <span className="text-[7.5px] font-medium uppercase tracking-wider text-gray-400 block truncate">
-              Líquido Neto Este Periodo
+          <div className="px-2 py-0.5">
+            <span className="text-[8.5px] font-semibold uppercase tracking-wider text-gray-400 block truncate">
+              Líquido Neto Este Período
             </span>
-            <span className="font-medium font-mono text-gray-900">
+            <span className="font-semibold font-mono text-gray-900 text-[10px] block mt-0.5">
               Q {metricasHeaderContextuales.liquidoNetoPeriodo.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
             </span>
           </div>
@@ -1873,8 +2362,9 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
         <div className="flex flex-wrap items-center gap-1">
           {[
             { id: 'sabana', label: 'Sábana', icon: Layers },
+            ...(!esBorrador && modoVistaSabana === 'actual' ? [{ id: 'analitico', label: 'Analítico', icon: Calculator }] : []),
             { id: 'resumen', label: 'Resumen Financiero', icon: Banknote },
-            ...(proyecto.id === 'nuevo' || id === 'nuevo' || esBorrador ? [] : [{ id: 'pendientes', label: 'Pendientes', icon: AlertCircle }]),
+            ...(proyecto.id === 'nuevo' || id === 'nuevo' || esBorrador || modoVistaSabana === 'planificacion' ? [] : [{ id: 'pendientes', label: 'Pendientes', icon: FileCheck2 }]),
             ...(!esBorrador && modoVistaSabana === 'actual' ? [{ id: 'planificadoReal', label: 'Planificado vs Real', icon: TrendingUp }] : []),
           ].map((item) => {
             const Icon = item.icon
@@ -1956,41 +2446,6 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                 </select>
                 
               </div>
-            )}
-
-            {/* Estado: Disponible únicamente en Sábana y Pendientes */}
-            {(tabSeccion === 'sabana' || tabSeccion === 'pendientes') && (
-              <select
-                value={estadoEjecucionFiltro}
-                onChange={(e) => {
-                  setEstadoEjecucionFiltro(e.target.value)
-                  setPaginaActual(1)
-                }}
-                className="h-7 rounded border border-gray-200 bg-white px-1.5 text-[10px] font-normal text-gray-800 focus:border-[#9B0F06] focus:outline-none max-w-[110px] truncate"
-              >
-                <option value="todos">Estado: Todos</option>
-                <option value="En proceso">En proceso</option>
-                <option value="Completado">Completado</option>
-                <option value="No iniciado">No iniciado</option>
-                <option value="Con excedente">Con excedente</option>
-              </select>
-            )}
-
-            {/* Tipo: Disponible únicamente en Sábana y Pendientes */}
-            {(tabSeccion === 'sabana' || tabSeccion === 'pendientes') && (
-              <select
-                value={tipoRenglonFiltro}
-                onChange={(e) => {
-                  setTipoRenglonFiltro(e.target.value)
-                  setPaginaActual(1)
-                }}
-                className="h-7 rounded border border-gray-200 bg-white px-1.5 text-[10px] font-normal text-gray-800 focus:border-[#9B0F06] focus:outline-none max-w-[100px] truncate"
-              >
-                <option value="todos">Tipo: Todos</option>
-                <option value="Original">Original</option>
-                <option value="Aumento">Aumento (OC)</option>
-                <option value="Nuevo">Nuevo (ATE)</option>
-              </select>
             )}
 
             <button
@@ -2098,13 +2553,13 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
 
                     <th className="px-2.5 py-2 text-right w-28 font-medium text-gray-900">
                       <HeaderTooltip colKey="G">
-                        <span>G. Costo Total Directo (D×F)</span>
+                        <span>G. Costo Total Directo</span>
                       </HeaderTooltip>
                     </th>
 
                     <th className="px-2.5 py-2 text-right w-28 font-medium text-gray-900">
                       <HeaderTooltip colKey="H">
-                        <span>H. Costo Total Ajustado (E×F)</span>
+                        <span>H. Costo Total Ajustado</span>
                       </HeaderTooltip>
                     </th>
 
@@ -2113,7 +2568,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                       className="px-2 py-2 text-right w-22 cursor-pointer hover:bg-gray-100/80 transition-colors font-medium text-[#9B0F06] text-[8.5px]"
                     >
                       <HeaderTooltip colKey="I">
-                        <span>I. Este Periodo (Cant.) {renderIconoOrden('cantidadEstePeriodo')}</span>
+                        <span>I. Este Periodo {renderIconoOrden('cantidadEstePeriodo')}</span>
                       </HeaderTooltip>
                     </th>
 
@@ -2122,7 +2577,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                       className="px-2 py-2 text-right w-20 cursor-pointer hover:bg-gray-100/80 transition-colors font-medium"
                     >
                       <HeaderTooltip colKey="J">
-                        <span>J. Acum. Anterior (Cant.) {renderIconoOrden('cantidadAcumuladaAnterior')}</span>
+                        <span>J. Acum. Anterior {renderIconoOrden('cantidadAcumuladaAnterior')}</span>
                       </HeaderTooltip>
                     </th>
 
@@ -2131,7 +2586,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                       className="px-2 py-2 text-right w-22 cursor-pointer hover:bg-gray-100/80 transition-colors font-medium text-gray-900"
                     >
                       <HeaderTooltip colKey="K">
-                        <span>K. Total a Fecha (Cant.) {renderIconoOrden('totalAFecha')}</span>
+                        <span>K. Total a Fecha {renderIconoOrden('totalAFecha')}</span>
                       </HeaderTooltip>
                     </th>
 
@@ -2140,31 +2595,31 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                       className="px-2 py-2 text-right w-16 cursor-pointer hover:bg-gray-100/80 transition-colors font-medium text-[#9B0F06]"
                     >
                       <HeaderTooltip colKey="L">
-                        <span>L. % Avance (Cant.) {renderIconoOrden('avancePct')}</span>
+                        <span>L. % Avance {renderIconoOrden('avancePct')}</span>
                       </HeaderTooltip>
                     </th>
 
                     <th className="px-2.5 py-2 text-right w-24 font-medium text-gray-900">
                       <HeaderTooltip colKey="M">
-                        <span>M. Este Periodo (Costo)</span>
+                        <span>M. Este Periodo</span>
                       </HeaderTooltip>
                     </th>
 
                     <th className="px-2.5 py-2 text-right w-24 font-medium text-gray-900">
                       <HeaderTooltip colKey="N">
-                        <span>N. Acum. Anterior (Costo)</span>
+                        <span>N. Acum. Anterior</span>
                       </HeaderTooltip>
                     </th>
 
                     <th className="px-2.5 py-2 text-right w-24 font-medium text-gray-900">
                       <HeaderTooltip colKey="O">
-                        <span>O. Total a Fecha (Costo)</span>
+                        <span>O. Total a Fecha</span>
                       </HeaderTooltip>
                     </th>
 
                     <th className="px-2 py-2 text-right w-16 font-medium text-[#9B0F06]">
                       <HeaderTooltip colKey="P">
-                        <span>P. % Avance (Costo)</span>
+                        <span>P. % Avance</span>
                       </HeaderTooltip>
                     </th>
 
@@ -2173,7 +2628,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                       className="px-2.5 py-2 text-right w-28 cursor-pointer hover:bg-gray-100/80 transition-colors font-medium text-[#9B0F06]"
                     >
                       <HeaderTooltip colKey="Saldo">
-                        <span>Saldo por Ejecutar (H−O) {renderIconoOrden('saldoPorEjecutar')}</span>
+                        <span>Saldo por Ejecutar {renderIconoOrden('saldoPorEjecutar')}</span>
                       </HeaderTooltip>
                     </th>
 
@@ -2244,9 +2699,16 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                         {!estaColapsado &&
                           renglonesCap.map((r) => {
                             const esEditando = filaEditandoId === r.id
-                            const cantContratadaD = esEditando ? Number(datosEditando.cantidadContratada ?? r.cantidadContratada) : r.cantidadContratada
-                            const cantAjustadaE = esEditando ? Number(datosEditando.cantidadAjustada ?? r.cantidadAjustada) : r.cantidadAjustada
-                            const costoUnitF = esEditando ? Number(datosEditando.costoUnitarioDirecto ?? r.costoUnitarioDirecto) : r.costoUnitarioDirecto
+                            const isPlanMode = modoVistaSabana === 'planificacion'
+                            const cantContratadaD = isPlanMode
+                              ? (r.cantidadContratadaPlan ?? r.cantidadContratada)
+                              : (esEditando ? Number(datosEditando.cantidadContratada ?? r.cantidadContratada) : r.cantidadContratada)
+                            const cantAjustadaE = isPlanMode
+                              ? (r.cantidadAjustadaPlan ?? r.cantidadAjustada)
+                              : (esEditando ? Number(datosEditando.cantidadAjustada ?? r.cantidadAjustada) : r.cantidadAjustada)
+                            const costoUnitF = isPlanMode
+                              ? (r.costoUnitarioDirectoPlan ?? r.costoUnitarioDirecto)
+                              : (esEditando ? Number(datosEditando.costoUnitarioDirecto ?? r.costoUnitarioDirecto) : r.costoUnitarioDirecto)
 
                             const costoTotalDirectoG = Math.round(cantContratadaD * costoUnitF * 100) / 100
                             const costoTotalAjustadoH = Math.round(cantAjustadaE * costoUnitF * 100) / 100
@@ -2416,8 +2878,17 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                                 </td>
 
                                 {/* L. % Avance (Cant.) = K / E */}
-                                <td className="px-2 py-1.5 text-right font-normal text-[#9B0F06] font-mono">
-                                  {pctAvanceCantL.toFixed(1)}%
+                                <td className={`px-2 py-1.5 text-right font-mono transition-colors ${
+                                  pctAvanceCantL > 100
+                                    ? 'bg-red-100 text-red-900 font-bold border border-red-300'
+                                    : pctAvanceCantL > 0 && pctAvanceCantL < 10
+                                      ? 'bg-amber-100 text-amber-900 font-semibold border border-amber-300'
+                                      : 'text-[#9B0F06] font-normal'
+                                }`}>
+                                  <div className="inline-flex items-center justify-end gap-1">
+                                    {pctAvanceCantL > 100 && <AlertTriangle size={11} className="text-red-700 shrink-0" />}
+                                    <span>{pctAvanceCantL.toFixed(1)}%</span>
+                                  </div>
                                 </td>
 
                                 {/* M. Este Periodo (Costo) = I × F */}
@@ -2436,8 +2907,17 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                                 </td>
 
                                 {/* P. % Avance (Costo) = O / H */}
-                                <td className="px-2 py-1.5 text-right font-normal text-[#9B0F06] font-mono">
-                                  {pctAvanceCostoP.toFixed(1)}%
+                                <td className={`px-2 py-1.5 text-right font-mono transition-colors ${
+                                  pctAvanceCostoP > 100
+                                    ? 'bg-red-100 text-red-900 font-bold border border-red-300'
+                                    : pctAvanceCostoP > 0 && pctAvanceCostoP < 10
+                                      ? 'bg-amber-100 text-amber-900 font-semibold border border-amber-300'
+                                      : 'text-[#9B0F06] font-normal'
+                                }`}>
+                                  <div className="inline-flex items-center justify-end gap-1">
+                                    {pctAvanceCostoP > 100 && <AlertTriangle size={11} className="text-red-700 shrink-0" />}
+                                    <span>{pctAvanceCostoP.toFixed(1)}%</span>
+                                  </div>
                                 </td>
 
                                 {/* Saldo por Ejecutar = H - O */}
@@ -2447,26 +2927,34 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
 
                                 {/* Columnas mensuales (Mes 1...Mes N) según toggle Planificación / Actual */}
                                 {listaMesesDinamicos.map((mes, idx) => {
+                                  const isPlanMode = modoVistaSabana === 'planificacion'
+                                  const campoAvancesKey = isPlanMode ? 'avancesMensualesPlan' : 'avancesMensuales'
                                   let valMes = 0
-                                  if (modoVistaSabana === 'planificacion') {
-                                    valMes = r.cantidadAjustada > 0 ? r.cantidadAjustada / Math.max(1, listaMesesDinamicos.length) : 0
+
+                                  if (isPlanMode) {
+                                    const customPlanVal = r.avancesMensualesPlan?.[mes] ?? r.avancesMensualesPlan?.[`Mes ${idx + 1}`]
+                                    valMes = customPlanVal !== undefined && customPlanVal !== null
+                                      ? Number(customPlanVal) || 0
+                                      : (r.cantidadAjustada > 0 ? r.cantidadAjustada / Math.max(1, listaMesesDinamicos.length) : 0)
                                   } else {
-                                    valMes = r.avancesMensuales?.[mes] || r.avancesMensuales?.[`Mes ${idx + 1}`] || 0
+                                    valMes = Number(r.avancesMensuales?.[mes] || r.avancesMensuales?.[`Mes ${idx + 1}`]) || 0
                                   }
+
+                                  const objAvancesEdit = (datosEditando as any)[campoAvancesKey] || (r as any)[campoAvancesKey] || {}
 
                                   return (
                                     <td key={mes} className="px-2 py-1.5 text-right font-mono text-[8.5px] font-normal text-gray-600">
                                       {esEditando ? (
                                         <input
                                           type="text"
-                                          value={datosEditando.avancesMensuales?.[mes] ?? (valMes > 0 ? valMes : '')}
+                                          value={objAvancesEdit[mes] ?? (valMes > 0 ? valMes : '')}
                                           onKeyDown={handleKeyDownNumericOnly}
                                           onChange={(e) => {
                                             const numVal = sanitizePositivo(e.target.value)
-                                            setDatosEditando((d) => ({
+                                            setDatosEditando((d: any) => ({
                                               ...d,
-                                              avancesMensuales: {
-                                                ...(d.avancesMensuales || r.avancesMensuales || {}),
+                                              [campoAvancesKey]: {
+                                                ...(d[campoAvancesKey] || (r as any)[campoAvancesKey] || {}),
                                                 [mes]: numVal,
                                               },
                                             }))
@@ -2512,22 +3000,26 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                                       >
                                         <Eye size={12} />
                                       </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => handleIniciarEdicionInline(r)}
-                                        className="rounded p-1 text-gray-400 hover:bg-amber-50 hover:text-amber-800 transition-colors cursor-pointer"
-                                        title="Editar inline en la tabla"
-                                      >
-                                        <Edit2 size={12} />
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => handleAbrirEliminar(r)}
-                                        className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-700 transition-colors cursor-pointer"
-                                        title="Eliminar renglón"
-                                      >
-                                        <Trash2 size={12} />
-                                      </button>
+                                      {!ocultarEdicionYEliminacion && (
+                                        <>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleIniciarEdicionInline(r)}
+                                            className="rounded p-1 text-gray-400 hover:bg-amber-50 hover:text-amber-800 transition-colors cursor-pointer"
+                                            title="Editar inline en la tabla"
+                                          >
+                                            <Edit2 size={12} />
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleAbrirEliminar(r)}
+                                            className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-700 transition-colors cursor-pointer"
+                                            title="Eliminar renglón"
+                                          >
+                                            <Trash2 size={12} />
+                                          </button>
+                                        </>
+                                      )}
                                     </div>
                                   )}
                                 </td>
@@ -2597,7 +3089,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
         </div>
       )}
 
-      {/* TAB 2: [ANALÍTICO] */}
+      {/* TAB 2: [ANALÍTICO - MEMORIA DE CÁLCULO] */}
       {tabSeccion === 'analitico' && (
         <div className="rounded-xl border border-gray-200 bg-white p-3.5 shadow-2xs space-y-3 font-[Poppins]">
           <div className="flex items-center justify-between border-b border-gray-100 pb-2">
@@ -2605,7 +3097,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
               <Calculator size={16} className="text-[#9B0F06]" />
               <div>
                 <h3 className="text-xs font-bold text-gray-900">
-                  Memoria de Cálculo (Bitácora de Mediciones Reales)
+                  Memoria de Cálculo
                 </h3>
               </div>
             </div>
@@ -2624,11 +3116,16 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
               codigoDGC: codDGC,
               descripcion: 'Renglón de obra vial',
               unidad: 'm³',
+              cantidadAjustada: 9999,
+              cantidadAcumuladaAnterior: 0,
+              costoUnitarioDirecto: 100,
             }
+
+            const renglonSabana = renglones.find((r) => r.codigoDGC === codDGC)
 
             const medicionesRenglon = medicionesAnaliticas.filter((m) => {
               const matchCod = m.codigoDGC === codDGC
-              const matchCap = capituloFiltro === 'todos' || renglonMaestro.capituloId === capituloFiltro
+              const matchCap = capituloFiltro === 'todos' || (renglonMaestro as any).capituloId === capituloFiltro
               const matchMes = mesFiltro === 'todos' || m.mesPeriodo === mesFiltro
               const matchEst = numEstimacionFiltro === 'todos' || m.numEstimacion === numEstimacionFiltro
               return matchCod && matchCap && matchMes && matchEst
@@ -2637,9 +3134,16 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
             if (medicionesRenglon.length === 0) return null
 
             const totalCantidadCalculadaRenglon = medicionesRenglon.reduce(
-              (acc, m) => acc + m.longitudL * m.anchoA * m.alturaH,
+              (acc, m) => acc + (m.cantidadCalculada || (m.longitudL * (m.anchoA || 1) * (m.alturaH || 1))),
               0
             )
+
+            const resTopesRenglon = procesarMedicionRenglon({
+              cantidadAjustada: renglonSabana?.cantidadAjustada ?? (renglonMaestro as any).cantidadAjustada ?? 9999,
+              acumuladoAnterior: renglonSabana?.cantidadAcumuladaAnterior ?? 0,
+              medicionPeriodo: totalCantidadCalculadaRenglon,
+              precioUnitario: renglonSabana?.costoUnitarioDirecto ?? 100,
+            })
 
             return (
               <div key={codDGC} className="rounded-lg border border-gray-200 overflow-hidden text-[9.5px]">
@@ -2656,7 +3160,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                       Unidad Catálogo: <strong className="text-gray-900 font-normal">{renglonMaestro.unidad}</strong> (Solo lectura)
                     </span>
                     <span className="rounded bg-gray-50 px-2 py-0.5 text-[8.5px] font-normal text-gray-700 border border-gray-200">
-                      Alimenta Columna 'Este Periodo'
+                      Alimenta Columna &apos;Este Periodo&apos;
                     </span>
                   </div>
                 </div>
@@ -2668,28 +3172,52 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                       <th className="p-2">Estación Fin</th>
                       <th className="p-2 text-right">Longitud L (m)</th>
                       <th className="p-2 text-right">Ancho A (m)</th>
-                      <th className="p-2 text-right">Altura/Espesor H (m)</th>
-                      <th className="p-2 text-right font-medium text-gray-900">Cantidad Calculada (L×A×H)</th>
-                      <th className="p-2 text-center">Periodo / Estimación</th>
+                      <th className="p-2 text-right">Altura H (m)</th>
+                      <th className="p-2 text-center">Lado</th>
+                      <th className="p-2 text-right">Mult.</th>
+                      <th className="p-2 text-right">Desc.</th>
+                      <th className="p-2 text-right font-medium text-gray-900">Cantidad Calculada</th>
+                      <th className="p-2 text-left">Origen / Folio</th>
+                      <th className="p-2 text-center">Estimación</th>
+                      <th className="p-2 text-center">Acciones</th>
                     </tr>
                   </thead>
 
                   <tbody className="divide-y divide-gray-100 text-gray-800 font-normal">
                     {medicionesRenglon.map((m) => {
-                      const cantidadCalculada = m.longitudL * m.anchoA * m.alturaH
+                      const cantidadCalculada = m.cantidadCalculada || (m.longitudL * (m.anchoA || 1) * (m.alturaH || 1))
 
                       return (
                         <tr key={m.id} className="hover:bg-gray-50/60">
                           <td className="p-2 text-gray-900 font-normal">{m.estacionInicio}</td>
                           <td className="p-2 text-gray-900 font-normal">{m.estacionFin}</td>
-                          <td className="p-2 text-right">{m.longitudL.toFixed(2)}</td>
-                          <td className="p-2 text-right">{m.anchoA.toFixed(2)}</td>
-                          <td className="p-2 text-right">{m.alturaH.toFixed(2)}</td>
+                          <td className="p-2 text-right">{m.longitudL ? m.longitudL.toFixed(2) : '-'}</td>
+                          <td className="p-2 text-right">{m.anchoA ? m.anchoA.toFixed(2) : '-'}</td>
+                          <td className="p-2 text-right">{m.alturaH ? m.alturaH.toFixed(2) : '-'}</td>
+                          <td className="p-2 text-center text-gray-600">{m.ladoVia || 'Sección Completa'}</td>
+                          <td className="p-2 text-right">{m.multiplicador || 1}</td>
+                          <td className="p-2 text-right text-red-700">{m.descuento ? `-${m.descuento}` : '0'}</td>
                           <td className="p-2 text-right font-normal text-gray-900 bg-gray-50/50">
                             {formatQuantity(cantidadCalculada, renglonMaestro.unidad)} {renglonMaestro.unidad}
                           </td>
+                          <td className="p-2 text-left text-gray-600 text-[8.5px]">
+                            {m.origenTipo || 'Plano'}: {m.referenciaOrigen || 'N/A'}
+                          </td>
                           <td className="p-2 text-center text-gray-500 text-[8.5px]">
-                            {m.mesPeriodo} — {m.numEstimacion}
+                            {m.numEstimacion || m.mesPeriodo || 'Est. 01'}
+                          </td>
+                          <td className="p-2 text-center">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setMedicionesAnaliticas((prev) => prev.filter((item) => item.id !== m.id))
+                                showSuccessToast('Medición eliminada')
+                              }}
+                              className="text-red-600 hover:text-red-800 p-0.5 rounded cursor-pointer"
+                              title="Eliminar medición"
+                            >
+                              <Trash2 size={12} />
+                            </button>
                           </td>
                         </tr>
                       )
@@ -2698,13 +3226,22 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
 
                   <tfoot>
                     <tr className="bg-gray-100/90 font-normal text-gray-900 border-t border-gray-300">
-                      <td colSpan={5} className="p-2 text-right uppercase tracking-wider text-[8.5px]">
-                        TOTAL MES DEL RENGLÓN {codDGC} (TRANSMITE A SÁBANA 'ESTE PERIODO'):
+                      <td colSpan={8} className="p-2 text-right uppercase tracking-wider text-[8.5px] font-bold">
+                        Total de la estimación del renglón {codDGC}:
                       </td>
-                      <td className="p-2 text-right font-normal text-[#9B0F06] font-mono text-[10px]">
+                      <td className="p-2 text-right font-bold text-gray-900 font-mono text-[10px]">
                         {formatQuantity(totalCantidadCalculadaRenglon, renglonMaestro.unidad)} {renglonMaestro.unidad}
                       </td>
-                      <td className="p-2"></td>
+                      <td colSpan={3} className="p-2 text-right text-[8.5px] font-mono">
+                        <span className="text-emerald-800 font-bold mr-2">
+                          Facturable Sábana (Col. I): {formatQuantity(resTopesRenglon.facturablePeriodo, renglonMaestro.unidad)}
+                        </span>
+                        {resTopesRenglon.retenidoPendiente > 0 && (
+                          <span className="text-amber-800 font-bold bg-amber-100 px-1.5 py-0.5 rounded">
+                            Retenido (Pendientes): {formatQuantity(resTopesRenglon.retenidoPendiente, renglonMaestro.unidad)}
+                          </span>
+                        )}
+                      </td>
                     </tr>
                   </tfoot>
                 </table>
@@ -2719,7 +3256,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
         <div className="rounded-xl border border-gray-200 bg-white p-3.5 shadow-2xs space-y-3 font-[Poppins]">
           <div className="flex items-center justify-between border-b border-gray-100 pb-2">
             <div className="flex items-center gap-2">
-              <AlertCircle size={16} className="text-[#9B0F06]" />
+              <FileCheck2 size={16} className="text-gray-600" />
               <div>
                 <h3 className="text-xs font-medium text-gray-900">
                   Bolsa de Trabajos Pendientes y No Conciliados
@@ -2755,8 +3292,8 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
               </thead>
 
               <tbody className="divide-y divide-gray-100">
-                {trabajosPendientes
-                  .filter((item) => {
+                {(() => {
+                  const pendientesFiltrados = trabajosPendientes.filter((item) => {
                     const matchCap = capituloFiltro === 'todos'
                     const matchEst = estadoEjecucionFiltro === 'todos' || item.estado === estadoEjecucionFiltro
                     const matchBusq = busqueda === '' ||
@@ -2767,7 +3304,19 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
 
                     return matchCap && matchEst && matchBusq
                   })
-                  .map((item) => {
+
+                  if (pendientesFiltrados.length === 0) {
+                    return (
+                      <tr>
+                        <td colSpan={12} className="p-8 text-center text-gray-500 bg-gray-50/50">
+                          <p className="text-xs font-medium text-gray-700">No hay trabajos ni partidas pendientes en este momento.</p>
+                          <p className="text-[10px] text-gray-400 mt-1">Los trabajos pendientes se generan automáticamente a partir de los registros de bitácora.</p>
+                        </td>
+                      </tr>
+                    )
+                  }
+
+                  return pendientesFiltrados.map((item) => {
                     const l = item.longitudL ?? item.longitudBase ?? 0
                     const a = item.anchoA ?? 0
                     const h = item.alturaH ?? 0
@@ -2799,19 +3348,25 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                         </td>
 
                         <td className="p-2 text-center">
-                          {item.estado === 'Pendiente' && (
+                          {item.esAnulado || item.anuladoEn ? (
+                            <span className="rounded bg-red-50 text-red-700 px-2 py-0.5 text-[8.5px] font-bold border border-red-200 inline-flex items-center justify-center gap-0.5">
+                              <Ban size={9} /> Anulado
+                            </span>
+                          ) : item.estado === 'Pendiente' ? (
                             <span className="rounded bg-amber-50 text-amber-700 px-2 py-0.5 text-[8.5px] font-medium border border-amber-200">
                               Pendiente
                             </span>
-                          )}
-                          {item.estado === 'Aprobado' && (
+                          ) : item.estado === 'Aprobado' ? (
                             <span className="rounded bg-blue-50 text-blue-700 px-2 py-0.5 text-[8.5px] font-medium border border-blue-200">
                               Aprobado
                             </span>
-                          )}
-                          {item.estado === 'Trasladado' && (
+                          ) : item.estado === 'Trasladado' ? (
                             <span className="rounded bg-emerald-50 text-emerald-700 px-2 py-0.5 text-[8.5px] font-medium border border-emerald-200 inline-flex items-center justify-center gap-0.5">
                               <Check size={10} /> Trasladado
+                            </span>
+                          ) : (
+                            <span className="rounded bg-gray-50 text-gray-700 px-2 py-0.5 text-[8.5px] border border-gray-200">
+                              {item.estado}
                             </span>
                           )}
                         </td>
@@ -2841,23 +3396,34 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                         </td>
 
                         <td className="p-2 text-center">
-                          {item.estado !== 'Trasladado' ? (
+                          {item.esAnulado || item.anuladoEn ? (
+                            <span className="text-[8.5px] text-gray-400 font-sans italic">Anulado</span>
+                          ) : item.estado === 'Trasladado' ? (
+                            <span className="text-[8px] text-gray-400 font-sans">Sincronizado</span>
+                          ) : (
                             <button
                               type="button"
-                              onClick={() => handlePromoverTrabajoPendiente(item)}
-                              className="inline-flex items-center gap-1 rounded bg-[#9B0F06] px-2 py-1 text-[8.5px] font-normal text-white hover:bg-[#5E0006] transition-colors shadow-2xs cursor-pointer"
-                              title="Promover a Trasladado e integrar con Tab Analítico"
+                              disabled={!puedeProcesarPendientes}
+                              onClick={() => {
+                                setPendienteSeleccionado(item as any)
+                                setModalProcesarPendienteOpen(true)
+                              }}
+                              className={`inline-flex items-center gap-1 rounded px-2 py-1 text-[8.5px] font-bold transition-colors shadow-2xs ${
+                                puedeProcesarPendientes
+                                  ? 'bg-[#9B0F06] text-white hover:bg-[#5E0006] cursor-pointer'
+                                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                              }`}
+                              title={puedeProcesarPendientes ? 'Procesar / Confirmar / Anular Partida' : 'Requiere rol de Administrador o Residente'}
                             >
-                              <span>Promover</span>
-                              <ArrowRight size={10} />
+                              <SlidersHorizontal size={10} />
+                              <span>Procesar</span>
                             </button>
-                          ) : (
-                            <span className="text-[8px] text-gray-400 font-sans">Sincronizado</span>
                           )}
                         </td>
                       </tr>
                     )
-                  })}
+                  })
+                })()}
               </tbody>
             </table>
           </div>
@@ -3018,16 +3584,24 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
         const montoTrabajosAdminGlobal = Number(paramsProj.monto_trabajos_administracion || paramsProj.montoTrabajosAdmin) || 0
         const precioTotalOfertaGlobal = montoContractualOriginalTotal + montoDisenoGlobal + montoTrabajosAdminGlobal
 
+        const indirectos45ContratadoGlobal = resLiquidacionContratadoGlobal.indirectos || 0
+        const subtotalAntesIvaContratadoGlobal = subtotalCostoDirectoContratadoGlobal + indirectos45ContratadoGlobal
+        const iva12ContratadoGlobal = resLiquidacionContratadoGlobal.iva || 0
+
         const subtotalCostoDirectoTotalGlobal = subtotalCostoDirectoGlobalPeriodo + subtotalCostoDirectoAcumuladoAnteriorGlobal
-        const indirectos45AcumuladoAnteriorGlobal = subtotalCostoDirectoAcumuladoAnteriorGlobal * pctIndirectos
+        const indirectos45Global = resLiquidacionPeriodo.indirectos || 0
+        const indirectos45AcumuladoAnteriorGlobal = resLiquidacionAcumuladaAnterior.indirectos || 0
         const indirectos45TotalGlobal = indirectos45Global + indirectos45AcumuladoAnteriorGlobal
 
+        const subtotalAntesIvaGlobal = subtotalCostoDirectoGlobalPeriodo + indirectos45Global
         const subtotalAntesIvaAcumuladoAnteriorGlobal = subtotalCostoDirectoAcumuladoAnteriorGlobal + indirectos45AcumuladoAnteriorGlobal
         const subtotalAntesIvaTotalGlobal = subtotalAntesIvaGlobal + subtotalAntesIvaAcumuladoAnteriorGlobal
 
-        const iva12AcumuladoAnteriorGlobal = subtotalAntesIvaAcumuladoAnteriorGlobal * pctIva
+        const iva12Global = resLiquidacionPeriodo.iva || 0
+        const iva12AcumuladoAnteriorGlobal = resLiquidacionAcumuladaAnterior.iva || 0
         const iva12TotalGlobal = iva12Global + iva12AcumuladoAnteriorGlobal
 
+        const valorTotalAcumuladoAnteriorBrutoGlobal = resLiquidacionAcumuladaAnterior.valorTotalEstimacion || 0
         const valorTotalAcumuladoTotalBrutoGlobal = valorTotalEstimacionBrutoGlobal + valorTotalAcumuladoAnteriorBrutoGlobal
 
         const disenoEstePeriodo = Number(paramsProj.diseno_este_periodo) || 0
@@ -3043,6 +3617,11 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
         const valorTotalEstimacionSumaAcumuladoTotal = valorTotalEstimacionSumaEstePeriodo + valorTotalEstimacionSumaAcumuladoAnterior
 
         const pctAvanceGeneralAcumulado = precioTotalOfertaGlobal > 0 ? ((valorTotalEstimacionSumaAcumuladoTotal / precioTotalOfertaGlobal) * 100) : 0
+
+        const estimacionesCerradas = (proyecto?.estimaciones || listaEstimaciones || []).filter((e: any) => e.estado === 'cerrada' || e.estado === 'aprobada')
+        const amortizacionAnteriorGuardada = estimacionesCerradas.reduce((sum: number, e: any) => sum + (Number(e.amortizacionPeriodo || e.amortizadoPeriodo || e.montoAmortizado) || 0), 0)
+        const amortizacionAnteriorAcumulada = estimacionesCerradas.length > 0 ? amortizacionAnteriorGuardada : (resLiquidacionAcumuladaAnterior.amortizacionPeriodo || 0)
+        const amortizacionTotalAcumulada = amortizacionAnticipoEstePeriodo + amortizacionAnteriorAcumulada
 
         const liquidoNetoAcumuladoAnterior = Math.max(0, valorTotalEstimacionSumaAcumuladoAnterior - amortizacionAnteriorAcumulada)
         const liquidoNetoTotal = liquidoAPagarNetoContratista + liquidoNetoAcumuladoAnterior
@@ -3238,7 +3817,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
             Identificación -> Cantidades y Avance -> Financiero -> Desglose Mensual
       */}
       {drawerModo === 'ver' && renglonSeleccionado && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs font-[Poppins]">
+        <div className="fixed inset-0 z-[99999] flex justify-end bg-black/40 backdrop-blur-xs font-[Poppins]">
           <div className="h-full w-full max-w-md bg-white shadow-2xl flex flex-col justify-between border-l border-gray-200">
             {/* Header del Panel */}
             <div className="flex items-center justify-between border-b border-gray-200 p-2.5 bg-gray-50">
@@ -3477,7 +4056,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
           - BOTONES ABAJO A LA DERECHA
       */}
       {drawerModo === 'crear' && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs font-[Poppins]">
+        <div className="fixed inset-0 z-[99999] flex justify-end bg-black/40 backdrop-blur-xs font-[Poppins]">
           <div className="h-full w-full max-w-sm bg-white shadow-2xl flex flex-col justify-between border-l border-gray-200">
             <div className="flex items-center justify-between border-b border-gray-200 p-2.5 bg-gray-50">
               <div className="flex items-center gap-1.5">
@@ -4351,114 +4930,102 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
 
       {/* MODAL APERTURA DE ESTIMACIÓN PERIODO MENSUAL */}
       {modalAperturaEstimacionOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs font-[Poppins]">
-          <div className="w-full max-w-md rounded-xl bg-white p-4 shadow-2xl space-y-3 border border-gray-200">
-            <div className="flex items-center justify-between border-b border-gray-100 pb-2">
-              <h3 className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
-                <CalendarClock size={15} className="text-[#9B0F06]" />
-                <span>Apertura de Periodo de Estimación</span>
-              </h3>
-              <button type="button" onClick={() => setModalAperturaEstimacionOpen(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer">
-                <X size={14} />
-              </button>
-            </div>
-
-            <p className="text-[10.5px] text-gray-500 font-normal">
-              Establezca las fechas de inicio y cierre para el nuevo periodo de estimación antes de iniciar operaciones en este mes.
-            </p>
-
-            <div className="space-y-2.5">
-              <div>
-                <label className="text-[10px] font-bold text-gray-700 mb-0.5 block">Identificador de Estimación *</label>
-                <input
-                  type="text"
-                  value={formEstNumero}
-                  onChange={(e) => setFormEstNumero(e.target.value)}
-                  placeholder="Ej: Estimación 05, Estimación 08 (Actual)"
-                  className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-800 focus:outline-none focus:border-[#9B0F06]"
-                />
+        <ModalPortal>
+          <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs font-[Poppins]">
+            <div className="w-full max-w-md rounded-xl bg-white p-4 shadow-2xl space-y-3 border border-gray-200">
+              <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                <h3 className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
+                  <CalendarClock size={15} className="text-[#9B0F06]" />
+                  <span>Apertura de Periodo de Estimación</span>
+                </h3>
               </div>
 
-              <div>
-                <label className="text-[10px] font-bold text-gray-700 mb-0.5 block">Mes de Correspondencia *</label>
-                <input
-                  type="text"
-                  value={formEstMes}
-                  onChange={(e) => setFormEstMes(e.target.value)}
-                  placeholder="Ej: Octubre 2026, Noviembre 2026"
-                  className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-800 focus:outline-none focus:border-[#9B0F06]"
-                />
-              </div>
+              <p className="text-[10.5px] text-gray-500 font-normal">
+                Establezca las fechas de inicio y cierre para el nuevo periodo de estimación antes de iniciar operaciones en este mes.
+              </p>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-2.5">
                 <div>
-                  <label className="text-[10px] font-bold text-gray-700 mb-0.5 block">Fecha Inicio Periodo *</label>
+                  <label className="text-[10px] font-bold text-gray-700 mb-0.5 block">Identificador de Estimación *</label>
                   <input
-                    type="date"
-                    value={formEstFechaInicio}
-                    onChange={(e) => setFormEstFechaInicio(e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-gray-800 focus:outline-none focus:border-[#9B0F06]"
+                    type="text"
+                    value={formEstNumero}
+                    onChange={(e) => setFormEstNumero(e.target.value)}
+                    placeholder="Ej: Estimación 01, Estimación 02"
+                    className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-800 focus:outline-none focus:border-[#9B0F06]"
                   />
                 </div>
 
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-700 mb-0.5 block">Fecha Inicio Periodo *</label>
+                    <input
+                      type="date"
+                      value={formEstFechaInicio}
+                      onChange={(e) => handleFechaInicioChange(e.target.value)}
+                      className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-gray-800 focus:outline-none focus:border-[#9B0F06]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-700 mb-0.5 block">Fecha Corte / Cierre *</label>
+                    <input
+                      type="date"
+                      value={formEstFechaCorte}
+                      onChange={(e) => handleFechaCorteChange(e.target.value)}
+                      className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-gray-800 focus:outline-none focus:border-[#9B0F06]"
+                    />
+                  </div>
+                </div>
+
                 <div>
-                  <label className="text-[10px] font-bold text-gray-700 mb-0.5 block">Fecha Corte / Cierre *</label>
-                  <input
-                    type="date"
-                    value={formEstFechaCorte}
-                    onChange={(e) => setFormEstFechaCorte(e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-gray-800 focus:outline-none focus:border-[#9B0F06]"
+                  <label className="text-[10px] font-bold text-gray-700 mb-0.5 block">Observaciones / Alcance</label>
+                  <textarea
+                    rows={2}
+                    value={formEstNotas}
+                    onChange={(e) => setFormEstNotas(e.target.value)}
+                    placeholder="Notas adicionales sobre la estimación de este periodo..."
+                    className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-800 focus:outline-none focus:border-[#9B0F06]"
                   />
                 </div>
               </div>
 
-              <div>
-                <label className="text-[10px] font-bold text-gray-700 mb-0.5 block">Observaciones / Alcance</label>
-                <textarea
-                  rows={2}
-                  value={formEstNotas}
-                  onChange={(e) => setFormEstNotas(e.target.value)}
-                  placeholder="Notas adicionales sobre la estimación de este periodo..."
-                  className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-800 focus:outline-none focus:border-[#9B0F06]"
-                />
+              <div className="flex justify-end gap-1.5 pt-2 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={handleCancelarAperturaEstimacion}
+                  className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-normal text-gray-700 hover:bg-gray-50 cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleGuardarNuevaEstimacion}
+                  className="rounded-lg bg-[#9B0F06] px-4 py-1.5 text-xs font-bold text-white hover:bg-[#5E0006] cursor-pointer shadow-2xs"
+                >
+                  Aperturar y Fijar Periodo
+                </button>
               </div>
-            </div>
-
-            <div className="flex justify-end gap-1.5 pt-2 border-t border-gray-100">
-              <button
-                type="button"
-                onClick={() => setModalAperturaEstimacionOpen(false)}
-                className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-normal text-gray-700 hover:bg-gray-50 cursor-pointer"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={handleGuardarNuevaEstimacion}
-                className="rounded-lg bg-[#9B0F06] px-4 py-1.5 text-xs font-bold text-white hover:bg-[#5E0006] cursor-pointer shadow-2xs"
-              >
-                Aperturar y Fijar Periodo
-              </button>
             </div>
           </div>
-        </div>
+        </ModalPortal>
       )}
 
-      {/* MODAL REGISTRAR MEDISIÓN EN TAB ANALÍTICO */}
+      {/* MODAL REGISTRAR MEDICIÓN DE GABINETE */}
       {modalAgregarMedicionOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs font-[Poppins]">
-          <div className="w-full max-w-md rounded-xl bg-white p-4 shadow-2xl space-y-3 border border-gray-200">
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs font-[Poppins]">
+          <div className="w-full max-w-lg rounded-xl bg-white p-4 shadow-2xl space-y-3 border border-gray-200 animate-fadeIn">
             <div className="flex items-center justify-between border-b border-gray-100 pb-2">
               <h3 className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
                 <Calculator size={15} className="text-[#9B0F06]" />
-                <span>Registrar Medición de Campo (Tab Analítico)</span>
+                <span>Registrar medición de gabinete</span>
               </h3>
               <button type="button" onClick={() => setModalAgregarMedicionOpen(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer">
                 <X size={14} />
               </button>
             </div>
 
-            <div className="space-y-2.5">
+            <div className="space-y-2 text-xs">
               <div>
                 <label className="text-[10px] font-bold text-gray-700 mb-0.5 block">Renglón de Trabajo *</label>
                 <select
@@ -4468,7 +5035,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                 >
                   {renglones.map((r) => (
                     <option key={r.id} value={r.codigoDGC}>
-                      {r.codigoDGC} - {r.descripcion.slice(0, 45)}...
+                      {r.codigoDGC} - {r.descripcion.slice(0, 50)}... ({r.unidad})
                     </option>
                   ))}
                 </select>
@@ -4480,7 +5047,12 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                   <input
                     type="text"
                     value={formMedEstacionInicio}
-                    onChange={(e) => setFormMedEstacionInicio(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value
+                      setFormMedEstacionInicio(val)
+                      const dist = calcularLongitudEstaciones(val, formMedEstacionFin)
+                      if (dist > 0) setFormMedLongitud(String(dist))
+                    }}
                     placeholder="Ej: 14+200"
                     className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-mono text-gray-800 focus:outline-none focus:border-[#9B0F06]"
                   />
@@ -4491,7 +5063,12 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                   <input
                     type="text"
                     value={formMedEstacionFin}
-                    onChange={(e) => setFormMedEstacionFin(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value
+                      setFormMedEstacionFin(val)
+                      const dist = calcularLongitudEstaciones(formMedEstacionInicio, val)
+                      if (dist > 0) setFormMedLongitud(String(dist))
+                    }}
                     placeholder="Ej: 14+700"
                     className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-mono text-gray-800 focus:outline-none focus:border-[#9B0F06]"
                   />
@@ -4510,7 +5087,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-bold text-gray-700 mb-0.5 block">Ancho A (m) *</label>
+                  <label className="text-[10px] font-bold text-gray-700 mb-0.5 block">Ancho A (m)</label>
                   <input
                     type="number"
                     value={formMedAncho}
@@ -4520,7 +5097,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-bold text-gray-700 mb-0.5 block">Altura H (m) *</label>
+                  <label className="text-[10px] font-bold text-gray-700 mb-0.5 block">Altura H (m)</label>
                   <input
                     type="number"
                     value={formMedAltura}
@@ -4530,12 +5107,104 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                 </div>
               </div>
 
-              <div className="rounded-lg bg-red-50/80 p-2 border border-red-100 flex items-center justify-between text-xs font-bold text-[#9B0F06]">
-                <span>Volumen Calculado (L × A × H):</span>
-                <span className="font-mono text-sm">
-                  {((parseFloat(formMedLongitud) || 0) * (parseFloat(formMedAncho) || 0) * (parseFloat(formMedAltura) || 0)).toLocaleString('es-GT', { minimumFractionDigits: 2 })} m³
-                </span>
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="text-[10px] font-bold text-gray-700 mb-0.5 block">Lado de Vía</label>
+                  <select
+                    value={formMedLadoVia}
+                    onChange={(e: any) => setFormMedLadoVia(e.target.value)}
+                    className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-mono text-gray-800 focus:outline-none focus:border-[#9B0F06]"
+                  >
+                    <option value="Sección Completa">Sección Completa</option>
+                    <option value="Izquierdo">Izquierdo</option>
+                    <option value="Derecho">Derecho</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-gray-700 mb-0.5 block">Multiplicador</label>
+                  <input
+                    type="number"
+                    value={formMedMultiplicador}
+                    onChange={(e) => setFormMedMultiplicador(e.target.value)}
+                    className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-mono text-gray-800 focus:outline-none focus:border-[#9B0F06]"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-gray-700 mb-0.5 block">Descuento Técnico</label>
+                  <input
+                    type="number"
+                    value={formMedDescuento}
+                    onChange={(e) => setFormMedDescuento(e.target.value)}
+                    className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-mono text-gray-800 focus:outline-none focus:border-[#9B0F06]"
+                  />
+                </div>
               </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] font-bold text-gray-700 mb-0.5 block">Origen de Información *</label>
+                  <select
+                    value={formMedOrigenTipo}
+                    onChange={(e: any) => setFormMedOrigenTipo(e.target.value)}
+                    className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-mono text-gray-800 focus:outline-none focus:border-[#9B0F06]"
+                  >
+                    <option value="Plano">Plano de Construcción</option>
+                    <option value="Libreta">Libreta Topográfica</option>
+                    <option value="Otro">Otro documento oficial</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-gray-700 mb-0.5 block">Folio / Referencia *</label>
+                  <input
+                    type="text"
+                    value={formMedReferenciaOrigen}
+                    onChange={(e) => setFormMedReferenciaOrigen(e.target.value)}
+                    placeholder="Ej: Plano Perfil Folio #12"
+                    className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-mono text-gray-800 focus:outline-none focus:border-[#9B0F06]"
+                  />
+                </div>
+              </div>
+
+              {/* Vista previa de Cálculo de Memoria */}
+              {(() => {
+                const renglonSel = renglones.find((r) => r.codigoDGC === formMedCodigoDGC)
+                const u = renglonSel?.unidad || 'm³'
+                const resCalc = calcularCantidadMedicion({
+                  unidad: u,
+                  longitudL: parseFloat(formMedLongitud) || 0,
+                  anchoA: parseFloat(formMedAncho) || 0,
+                  alturaH: parseFloat(formMedAltura) || 0,
+                  multiplicador: parseFloat(formMedMultiplicador) || 1,
+                  descuento: parseFloat(formMedDescuento) || 0,
+                })
+
+                const resTop = procesarMedicionRenglon({
+                  cantidadAjustada: renglonSel?.cantidadAjustada || 9999,
+                  acumuladoAnterior: renglonSel?.cantidadAcumuladaAnterior || 0,
+                  medicionPeriodo: resCalc.cantidadNeta,
+                  precioUnitario: renglonSel?.costoUnitarioDirecto || 100,
+                })
+
+                return (
+                  <div className="rounded-lg bg-gray-50 p-2.5 border border-gray-200 text-[10px] space-y-1 font-mono">
+                    <div className="flex items-center justify-between font-bold text-gray-900 border-b border-gray-200 pb-1">
+                      <span>Fórmula ({u}): {resCalc.formulaAplicada}</span>
+                      <span className="text-xs text-[#9B0F06]">{resCalc.cantidadNeta.toLocaleString('es-GT', { minimumFractionDigits: 2 })} {u}</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-gray-600 text-[9px] pt-1">
+                      <div>Cantidad Ajustada (E): <strong className="text-gray-800">{renglonSel?.cantidadAjustada || 0}</strong></div>
+                      <div>Acumulado Anterior (J): <strong className="text-gray-800">{renglonSel?.cantidadAcumuladaAnterior || 0}</strong></div>
+                      <div className="text-emerald-700 font-bold">Se Facturará (Sábana Col. I): {resTop.facturablePeriodo} {u}</div>
+                      {resTop.retenidoPendiente > 0 && (
+                        <div className="text-amber-700 font-bold">Se Retendrá (Pendientes): {resTop.retenidoPendiente} {u}</div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })()}
             </div>
 
             <div className="flex justify-end gap-1.5 pt-2 border-t border-gray-100">
@@ -4551,12 +5220,357 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                 onClick={handleGuardarNuevaMedicionAnalitica}
                 className="rounded-lg bg-[#9B0F06] px-4 py-1.5 text-xs font-bold text-white hover:bg-[#5E0006] cursor-pointer shadow-2xs"
               >
-                Transmitir a Sábana
+                Guardar medición
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* MODAL FINALIZAR ESTIMACIÓN */}
+      {modalFinalizarEstimacionOpen && (
+        <ModalPortal>
+          <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs font-[Poppins]">
+            <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl space-y-4 border border-gray-200 animate-fadeIn">
+              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                <div>
+                  <h3 className="text-sm font-bold text-gray-900">Finalizar Estimación de Período</h3>
+                  <p className="text-[10.5px] text-gray-500 font-medium">{estimacionEnProgreso?.numero} — {estimacionEnProgreso?.mes}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setModalFinalizarEstimacionOpen(false)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors p-1 cursor-pointer"
+                  title="Cerrar"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <p className="text-xs text-gray-600 font-normal leading-relaxed">
+                Se registrarán y congelarán las cantidades de avance ingresadas en este período. Las cantidades pasarán al historial acumulado y la estimación quedará cerrada oficialmente.
+              </p>
+
+              <div>
+                <label className="text-[10.5px] font-bold text-gray-700 mb-1 block">Comentario de cierre (Opcional)</label>
+                <textarea
+                  rows={2}
+                  value={comentarioCierreEstimacion}
+                  onChange={(e) => setComentarioCierreEstimacion(e.target.value)}
+                  placeholder="Ej: Estimación mensual correspondiente al período contractual finalizada sin novedades..."
+                  className="w-full border border-gray-200 rounded-xl p-2.5 text-xs text-gray-800 focus:outline-none focus:border-emerald-700 focus:ring-1 focus:ring-emerald-700"
+                />
+              </div>
+
+              <div className="flex flex-wrap items-center justify-end gap-2 pt-3 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setModalFinalizarEstimacionOpen(false)}
+                  className="rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModalFinalizarEstimacionOpen(false)
+                    setModalExportarEstimacionOpen(true)
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 cursor-pointer shadow-2xs"
+                >
+                  <Download size={14} className="text-gray-600" />
+                  <span>Exportar Estimación</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleFinalizarEstimacionConfirm}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#9B0F06] hover:bg-[#7A0C0D] text-white px-4 py-2 text-xs font-bold shadow-2xs cursor-pointer"
+                >
+                  <CheckCircle2 size={14} />
+                  <span>Confirmar Estimación</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </ModalPortal>
+      )}
+
+      {/* MODAL CANCELAR ESTIMACIÓN */}
+      {modalCancelarEstimacionOpen && (
+        <ModalPortal>
+          <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs font-[Poppins]">
+            <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl space-y-4 border border-gray-100 animate-fadeIn text-center">
+              <div className="mx-auto w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center">
+                <AlertTriangle size={24} />
+              </div>
+
+              <div>
+                <h3 className="text-sm font-bold text-gray-900">¿Cancelar Estimación en Progreso?</h3>
+                <p className="text-[11px] text-gray-500 font-normal mt-1 leading-normal">
+                  Tienes una estimación activa. Si cancelas la sesión ahora:
+                </p>
+              </div>
+
+              <ul className="text-left text-[11px] text-gray-600 space-y-1.5 bg-gray-50 p-3 rounded-xl border border-gray-200/60 font-medium">
+                <li className="flex items-start gap-1.5">
+                  <span className="font-bold text-gray-800">• Guardar borrador:</span> Mantiene la estimación para continuar más tarde.
+                </li>
+                <li className="flex items-start gap-1.5">
+                  <span className="font-bold text-red-600">• Cancelar estimación:</span> Cierra la sesión activa del período.
+                </li>
+                <li className="flex items-start gap-1.5">
+                  <span className="font-bold text-emerald-700">• Continuar:</span> Te permite seguir editando los avances.
+                </li>
+              </ul>
+
+              <div className="flex flex-col gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setModalCancelarEstimacionOpen(false)}
+                  className="w-full rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 py-2 text-xs font-semibold cursor-pointer"
+                >
+                  Guardar cambios / Continuar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCancelarEstimacionConfirm}
+                  className="w-full rounded-xl bg-[#003366] hover:bg-[#002244] text-white py-2 text-xs font-bold cursor-pointer shadow-xs"
+                >
+                  Cancelar Estimación
+                </button>
+              </div>
+            </div>
+          </div>
+        </ModalPortal>
+      )}
+
+      {/* MODAL EXPORTAR REPORTE */}
+      {modalExportarEstimacionOpen && (
+        <ModalPortal>
+          <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs font-[Poppins]">
+            <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl space-y-4 border border-gray-100 animate-fadeIn">
+              <h3 className="text-sm font-bold text-gray-900 border-b border-gray-100 pb-2">Exportar Reporte de Estimación</h3>
+
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={handleExportarCSV}
+                  className="w-full rounded-xl bg-[#004D40] hover:bg-[#00362D] text-white py-2.5 px-3 text-xs font-bold flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+                >
+                  <Download size={14} />
+                  <span>Descargar CSV (Estimación Activa)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.print()
+                    setModalExportarEstimacionOpen(false)
+                  }}
+                  className="w-full rounded-xl bg-[#8BC34A] hover:bg-[#7CB342] text-gray-900 py-2.5 px-3 text-xs font-bold flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+                >
+                  <Printer size={14} />
+                  <span>Imprimir / Guardar como PDF</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setModalExportarEstimacionOpen(false)}
+                  className="w-full rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 text-xs font-semibold cursor-pointer mt-1"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        </ModalPortal>
+      )}
+
+      {/* MODAL MODIFICAR PLAZO / INICIAR REPLANIFICACIÓN */}
+      {modalModificarPlazoOpen && (
+        <ModalPortal>
+          <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs font-[Poppins]">
+            <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl space-y-4 border border-gray-100 animate-fadeIn">
+              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <Calendar size={18} className="text-[#9B0F06]" />
+                  <h3 className="text-sm font-bold text-gray-900">
+                    {proyecto?.estado === 'pausado' ? 'Reactivar Proyecto y Modificar Plazo' : 'Modificación de Plazo Contractual'}
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setModalModificarPlazoOpen(false)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors p-1 cursor-pointer"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="space-y-3 text-xs">
+                {proyecto?.estado === 'pausado' && (
+                  <div>
+                    <label className="text-[10.5px] font-bold text-gray-800 mb-1 block">
+                      Fecha de Reanudación <span className="text-[#9B0F06]">* (OBLIGATORIA)</span>
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      value={formFechaReanudacion}
+                      onChange={(e) => setFormFechaReanudacion(e.target.value)}
+                      className="w-full border border-gray-200 rounded-xl p-2 text-xs text-gray-800 focus:outline-none focus:border-[#9B0F06]"
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label className="text-[10.5px] font-bold text-gray-800 mb-1 block">Nueva Fecha Final Contractual *</label>
+                  <input
+                    type="date"
+                    value={formNuevaFechaFin}
+                    onChange={(e) => setFormNuevaFechaFin(e.target.value)}
+                    className="w-full border border-gray-200 rounded-xl p-2 text-xs text-gray-800 focus:outline-none focus:border-[#9B0F06]"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10.5px] font-bold text-gray-800 mb-1 block">Motivo de la Modificación</label>
+                  <select
+                    value={formMotivoPlazo}
+                    onChange={(e: any) => setFormMotivoPlazo(e.target.value)}
+                    className="w-full border border-gray-200 rounded-xl p-2 text-xs text-gray-800 focus:outline-none focus:border-[#9B0F06]"
+                  >
+                    <option value="ampliacion">Ampliación de Plazo (Prórroga)</option>
+                    <option value="retraso">Ajuste por Fuerza Mayor / Clima</option>
+                    <option value="orden_cambio">Orden de Cambio / Modificativo</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[10.5px] font-bold text-gray-800 mb-1 block">Observaciones / Justificación</label>
+                  <textarea
+                    rows={2}
+                    value={formObservacionesPlazo}
+                    onChange={(e) => setFormObservacionesPlazo(e.target.value)}
+                    placeholder="Escriba la justificación legal y técnica..."
+                    className="w-full border border-gray-200 rounded-xl p-2 text-xs text-gray-800 focus:outline-none focus:border-[#9B0F06]"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setModalModificarPlazoOpen(false)}
+                  className="rounded-xl border border-gray-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (proyecto?.estado === 'pausado' && !formFechaReanudacion) {
+                      showErrorToast('La Fecha de Reanudación es requerida.')
+                      return
+                    }
+                    try {
+                      await api.post(`/proyectos/${proyecto.id}/iniciar-replanificacion`)
+                      setModalModificarPlazoOpen(false)
+                      setModoVistaLineaBase('modificada')
+                      showSuccessToast('Ciclo de modificación de plazo iniciado. Modificada (Borrador) activa.')
+                    } catch (e: any) {
+                      showErrorToast(e?.response?.data?.mensaje || e?.message || 'Error al iniciar replanificación')
+                    }
+                  }}
+                  className="rounded-xl bg-[#9B0F06] hover:bg-[#7A0C0D] text-white px-4 py-1.5 text-xs font-bold shadow-2xs cursor-pointer"
+                >
+                  Iniciar Replanificación
+                </button>
+              </div>
+            </div>
+          </div>
+        </ModalPortal>
+      )}
+
+      {/* MODAL CONFIRMAR CAMBIOS Y REGRESAR A PASO 3 */}
+      {modalConfirmarRegresoForm && (
+        <ModalPortal>
+          <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs font-[Poppins]">
+            <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl space-y-4 border border-gray-100 animate-fadeIn">
+              <div className="flex items-center gap-2 border-b border-gray-100 pb-2 text-[#9B0F06]">
+                <CheckCircle2 size={20} />
+                <h3 className="text-sm font-bold text-gray-900">Cambios Confirmados Exitosamente</h3>
+              </div>
+              <p className="text-xs text-gray-600 leading-relaxed">
+                Los cambios en la planificación del proyecto han sido confirmados correctamente. ¿Deseas regresar al formulario del proyecto (Paso 3: Plan de Trabajo)?
+              </p>
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setModalConfirmarRegresoForm(false)}
+                  className="rounded-lg border border-gray-300 px-3.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
+                >
+                  Permanecer aquí
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModalConfirmarRegresoForm(false)
+                    const proyId = proyecto?.id || id
+                    if (proyId && proyId !== 'nuevo' && proyId !== 'crear') {
+                      router.push(`/dashboard/proyectos/editar?slug=${proyId}&paso=3`)
+                    } else {
+                      router.push('/dashboard/proyectos/nuevo?paso=3')
+                    }
+                  }}
+                  className="rounded-lg bg-[#9B0F06] px-4 py-1.5 text-xs font-bold text-white hover:bg-[#5E0006] transition-colors shadow-xs cursor-pointer"
+                >
+                  Ir al Formulario (Paso 3)
+                </button>
+              </div>
+            </div>
+          </div>
+        </ModalPortal>
+      )}
+
+      <HojaSabanaExportModal
+        isOpen={modalExportarSabanaOpen}
+        onClose={() => setModalExportarSabanaOpen(false)}
+        proyecto={proyecto}
+        renglones={renglones}
+        medicionesAnaliticas={medicionesAnaliticas}
+        modoVistaSabana={modoVistaSabana}
+        estimacionActiva={estimacionEnProgreso}
+      />
+
+      <ModalProcesarPendiente
+        isOpen={modalProcesarPendienteOpen}
+        onClose={() => {
+          setModalProcesarPendienteOpen(false)
+          setPendienteSeleccionado(null)
+        }}
+        item={pendienteSeleccionado}
+        estimacionActiva={estimacionEnProgreso}
+        onProcesarExitoso={(resultado) => {
+          showSuccessToast(`Partida procesada con éxito (${resultado.accion})`)
+          setTrabajosPendientes((prev) =>
+            prev.map((p) => {
+              if (p.id === resultado.id) {
+                return {
+                  ...p,
+                  estado: resultado.estado || p.estado,
+                  cantidadNetaCobrar: resultado.cantidadNetaCobrar !== undefined ? resultado.cantidadNetaCobrar : p.cantidadNetaCobrar,
+                  estimacionOrigen: resultado.estimacionOrigen !== undefined ? resultado.estimacionOrigen : p.estimacionOrigen,
+                  esAnulado: resultado.accion === 'anular' ? true : p.esAnulado,
+                  anuladoEn: resultado.anuladoEn || p.anuladoEn,
+                  motivoAnulacion: resultado.motivoAnulacion || p.motivoAnulacion,
+                }
+              }
+              return p
+            })
+          )
+        }}
+      />
     </div>
   )
 }

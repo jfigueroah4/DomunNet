@@ -301,7 +301,7 @@ export default function ProyectoDocumentos({ documentos: iniciales = [] }: Proye
 
               <p className="text-xs text-gray-600 leading-relaxed">
                 ¿Estás seguro que deseas eliminar el documento{' '}
-                <span className="font-bold text-gray-900">"{docAEliminar.nombre}"</span>? Esta acción no se puede deshacer.
+                <span className="font-bold text-gray-900">&quot;{docAEliminar.nombre}&quot;</span>? Esta acción no se puede deshacer.
               </p>
 
               <div className="rounded-lg bg-gray-50 p-2.5 text-[10px] text-gray-600 border border-gray-100 space-y-0.5">

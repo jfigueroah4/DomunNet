@@ -144,3 +144,20 @@ export function showErrorToast(message: string) {
   );
 }
 
+export function showInfoToast(message: string) {
+  toast.dismiss();
+  return toast.custom(
+    (id) => (
+      <Toast
+        id={id}
+        message={message}
+        type="success"
+        onClose={() => toast.dismiss(id)}
+      />
+    ),
+    {
+      duration: 3000,
+    }
+  );
+}
+

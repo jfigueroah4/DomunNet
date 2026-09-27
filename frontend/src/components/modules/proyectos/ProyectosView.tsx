@@ -6,15 +6,16 @@ import { Building2, ChevronLeft, ChevronRight, List, MapPin, Plus, User, LayoutG
 import { api, apiGetDeduplicado, limpiarCacheMemoria } from '@/lib/api/cliente'
 import { EstadoProyecto, Proyecto } from '@/types/proyecto'
 import { useCustomToast } from '@/hooks/useCustomToast'
-import ProyectoCard from '@/components/modules/proyectos/ProyectoCard'
+import { useAuthStore } from '@/stores/useAuthStore'
 import ProyectoFiltros from '@/components/modules/proyectos/ProyectoFiltros'
+import ProyectoCard from '@/components/modules/proyectos/ProyectoCard'
 
 const estadoColor: Record<EstadoProyecto, string> = {
   borrador: '#9CA3AF',
   activo: '#D53E0F',
   en_revision: '#3B82F6',
   completado: '#10B981',
-  cancelado: '#9B0F06',
+  pausado: '#D97706',
 }
 
 function ProyectoListItem({
@@ -236,6 +237,10 @@ export function ProyectosView() {
 
   const handleVistaChange = (v: 'lista' | 'detalles') => {
     setVista(v)
+    if (v === 'detalles') {
+      setPorPagina(3)
+    }
+    setPagina(1)
     localStorage.setItem('proyectos_vista', v)
   }
 
@@ -249,8 +254,31 @@ export function ProyectosView() {
     setPagina(1)
   }
 
+  const usuario = useAuthStore((s: any) => s.profile)
+  const esResidente = useMemo(() => {
+    const rolStr = (usuario?.rol || '').toLowerCase().trim()
+    const cargoStr = (usuario?.cargo || '').toLowerCase().trim()
+    return (rolStr.includes('residente') || cargoStr.includes('residente')) && !rolStr.includes('admin') && !rolStr.includes('director')
+  }, [usuario])
+
   const proyectosFiltrados = useMemo(() => {
     return proyectosReales.filter((proyecto) => {
+      // Si es Residente, solo ver proyectos donde esté asignado
+      if (esResidente && usuario?.id) {
+        const pAny = proyecto as any
+        const uId = usuario.id
+        const uNombre = (usuario.nombre || `${usuario.primer_nombre || ''} ${usuario.primer_apellido || ''}`).toLowerCase().trim()
+
+        const esResp = pAny.responsable_id === uId || pAny.responsableId === uId || pAny.responsable === uId
+        const esDel = pAny.delegadoResidenteId === uId || pAny.delegado_residente_id === uId
+        const enEquipo = Array.isArray(pAny.equipo) && pAny.equipo.some((m: any) => m.id === uId || m.usuarioId === uId || (m.nombre && m.nombre.toLowerCase().trim().includes(uNombre)))
+        const coincideNombre = pAny.responsable && typeof pAny.responsable === 'string' && uNombre.length > 2 && pAny.responsable.toLowerCase().includes(uNombre)
+
+        if (!esResp && !esDel && !enEquipo && !coincideNombre) {
+          return false
+        }
+      }
+
       const texto = `${proyecto.codigo} ${proyecto.nombre} ${proyecto.ubicacion} ${proyecto.responsable}`.toLowerCase()
       const matchBusqueda = texto.includes(busqueda.toLowerCase())
       const matchEstado = estadoFiltro === 'todos' || proyecto.estado === estadoFiltro
@@ -259,6 +287,9 @@ export function ProyectosView() {
       const matchMuni = filtroMuni ? proyecto.ubicacion.toLowerCase().includes(filtroMuni.toLowerCase()) : true
       
       let matchFecha = true
+      if (filtroFechaInicio === 'INVALID' || filtroFechaFin === 'INVALID') {
+        return false
+      }
       if (filtroFechaInicio || filtroFechaFin) {
         const parseFechaSegura = (val?: string | null): Date | null => {
           if (!val) return null
@@ -291,7 +322,7 @@ export function ProyectosView() {
 
       return matchBusqueda && matchEstado && matchDepa && matchMuni && matchFecha
     })
-  }, [proyectosReales, busqueda, estadoFiltro, filtroDepa, filtroMuni, filtroFechaInicio, filtroFechaFin])
+  }, [proyectosReales, busqueda, estadoFiltro, filtroDepa, filtroMuni, filtroFechaInicio, filtroFechaFin, esResidente, usuario])
 
   const totalPaginas = Math.max(1, Math.ceil(proyectosFiltrados.length / porPagina))
   
@@ -359,15 +390,16 @@ export function ProyectosView() {
                 <span className="hidden sm:inline">Gestion de Empresas y Entidades</span>
               </button>
               
-              <button
-                type="button"
-                onClick={() => router.push('/dashboard/proyectos/nuevo')}
-
-              className="inline-flex h-8 items-center gap-1.5 rounded-md bg-[#9B0F06] px-3.5 text-[11px] font-bold text-white transition-colors hover:bg-[#5E0006] shadow-sm"
-            >
-              <Plus size={12} />
-              Nuevo Proyecto
-            </button>
+              {!esResidente && (
+                <button
+                  type="button"
+                  onClick={() => router.push('/dashboard/proyectos/nuevo')}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-md bg-[#9B0F06] px-3.5 text-[11px] font-bold text-white transition-colors hover:bg-[#5E0006] shadow-sm"
+                >
+                  <Plus size={12} />
+                  Nuevo Proyecto
+                </button>
+              )}
           </div>
           <span className="text-[10px] font-medium text-gray-500">
             {proyectosFiltrados.length} proyectos encontrados
@@ -472,6 +504,7 @@ export function ProyectosView() {
                 }}
                 className="h-6 rounded border border-gray-200 bg-gray-50 px-1 text-[11px] font-bold text-gray-700 focus:border-[#9B0F06] focus:outline-none"
               >
+                <option value={3}>3</option>
                 <option value={6}>6</option>
                 <option value={10}>10</option>
                 <option value={20}>20</option>

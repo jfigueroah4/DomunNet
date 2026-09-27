@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import React, { useEffect, memo } from 'react'
 import { ChevronLeft, ChevronRight, X, Calendar, User, MapPin } from 'lucide-react'
 import { Fotografia } from '@/types/fotografia'
 import { FotografiaTipoBadge } from './FotografiaTipoBadge'
@@ -12,7 +12,7 @@ interface FotografiaLightboxProps {
   onNext: () => void
 }
 
-export function FotografiaLightbox({
+export const FotografiaLightbox = memo(function FotografiaLightbox({
   foto,
   onClose,
   onPrev,
@@ -34,12 +34,19 @@ export function FotografiaLightbox({
   if (!foto) return null
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center transition-opacity duration-200">
-      <div className="flex gap-4 max-w-5xl w-full mx-4 items-center">
+    <div
+      className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center transition-opacity duration-200"
+      onClick={onClose}
+    >
+      <div
+        className="flex gap-4 max-w-5xl w-full mx-4 items-center relative"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Botón anterior */}
         <button
+          type="button"
           onClick={onPrev}
-          className="w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors text-white flex-shrink-0"
+          className="w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors text-white shrink-0 cursor-pointer"
           aria-label="Fotografía anterior"
         >
           <ChevronLeft size={24} />
@@ -48,9 +55,10 @@ export function FotografiaLightbox({
         {/* Bloque central */}
         <div className="flex-1 flex flex-col items-center gap-3">
           <img
-            src={foto.url}
-            alt={foto.titulo}
-            className="max-h-[70vh] max-w-full object-contain rounded-xl"
+            src={foto.url || foto.urlMiniatura}
+            alt={foto.titulo || 'Fotografía'}
+            decoding="async"
+            className="max-h-[70vh] max-w-full object-contain rounded-xl shadow-2xl"
           />
 
           <div className="w-full text-center">
@@ -58,29 +66,38 @@ export function FotografiaLightbox({
               <FotografiaTipoBadge tipo={foto.tipo} />
               <h2 className="text-white text-sm font-semibold">{foto.titulo}</h2>
             </div>
-            <p className="text-white/70 text-xs">{foto.descripcion}</p>
+            {foto.descripcion && (
+              <p className="text-white/70 text-xs">{foto.descripcion}</p>
+            )}
           </div>
 
-          <div className="flex items-center justify-center gap-4 text-white/60 text-[10px]">
-            <div className="flex items-center gap-1">
-              <Calendar size={12} />
-              {foto.fecha}
-            </div>
-            <div className="flex items-center gap-1">
-              <User size={12} />
-              {foto.autor}
-            </div>
-            <div className="flex items-center gap-1">
-              <MapPin size={12} />
-              {foto.ubicacionObra}
-            </div>
+          <div className="flex items-center justify-center gap-4 text-white/60 text-[10px] flex-wrap">
+            {foto.fecha && (
+              <div className="flex items-center gap-1">
+                <Calendar size={12} />
+                {foto.fecha}
+              </div>
+            )}
+            {foto.autor && (
+              <div className="flex items-center gap-1">
+                <User size={12} />
+                {foto.autor}
+              </div>
+            )}
+            {foto.ubicacionObra && (
+              <div className="flex items-center gap-1">
+                <MapPin size={12} />
+                {foto.ubicacionObra}
+              </div>
+            )}
           </div>
         </div>
 
         {/* Botón siguiente */}
         <button
+          type="button"
           onClick={onNext}
-          className="w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors text-white flex-shrink-0"
+          className="w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors text-white shrink-0 cursor-pointer"
           aria-label="Siguiente fotografía"
         >
           <ChevronRight size={24} />
@@ -88,8 +105,9 @@ export function FotografiaLightbox({
 
         {/* Botón cerrar */}
         <button
+          type="button"
           onClick={onClose}
-          className="absolute top-4 right-4 w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors text-white/60 hover:text-white"
+          className="absolute -top-8 -right-2 sm:top-0 sm:right-0 w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors text-white/70 hover:text-white cursor-pointer"
           aria-label="Cerrar"
         >
           <X size={18} />
@@ -97,4 +115,5 @@ export function FotografiaLightbox({
       </div>
     </div>
   )
-}
+})
+

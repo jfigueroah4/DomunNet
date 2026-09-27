@@ -171,7 +171,7 @@ export const PROYECTOS_MOCK: Proyecto[] = [
     codigo: 'DOM-VIAL-005',
     nombre: 'Mejoramiento de Drenaje Pluvial CA-9 Sur',
     descripcion: 'Mejoramiento del sistema pluvial con tragantes, cajas y colectores principales.',
-    estado: 'cancelado',
+    estado: 'pausado',
     ubicacion: 'CA-9 Sur, acceso a Palin, Escuintla',
     responsable: 'Ing. Hector Mendez',
     equipo: [{ id: '5-1', nombre: 'Hector Mendez', rol: 'Ingeniero Civil' }],

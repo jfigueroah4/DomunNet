@@ -29,14 +29,19 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
   const [expandedMenus, setExpandedMenus] = useState<string[]>([])
 
   const isActive = (path: string) => {
-    if (path === '/') return pathname === '/' || pathname === '/dashboard'
+    if (path === '/' || path === '/dashboard') {
+      return pathname === '/' || pathname === '/dashboard'
+    }
     return pathname === path || pathname.startsWith(`${path}/`)
   }
 
 
   const { profile } = useAuthStore()
 
+
+
   const navSections = useMemo(() => {
+    const fotosHref = '/dashboard/fotografias';
     const rawSections = [
       {
         label: 'GENERAL',
@@ -60,7 +65,7 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
               { icon: Package, href: '/dashboard/bitacora?tab=campo', label: 'Campo de Trabajo' },
             ],
           },
-          { icon: Camera, href: '/dashboard/fotografias', label: 'Fotografías' },
+          { icon: Camera, href: fotosHref, label: 'Fotografías' },
           {
             icon: BarChart2,
             href: '/dashboard/reportes',
@@ -95,7 +100,7 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
         const basePath = item.href.split('?')[0]
         const permisoRequerido = RUTAS_PERMISOS[basePath]
         if (!permisoRequerido) return true // No permission required
-        return tienePermiso(permisos, permisoRequerido)
+        return tienePermiso(permisos, permisoRequerido, profile?.rol)
       }).map(item => {
         if (!item.submenu) return item
         // Filter submenus
@@ -104,13 +109,13 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
           // If submenu path is same as parent, it requires same perm, or check RUTAS_PERMISOS
           const req = RUTAS_PERMISOS[subBasePath] || RUTAS_PERMISOS[item.href.split('?')[0]]
           if (!req) return true
-          return tienePermiso(permisos, req)
+          return tienePermiso(permisos, req, profile?.rol)
         })
         return { ...item, submenu: filteredSubmenu }
       })
       return { ...section, items: filteredItems }
     }).filter(section => section.items.length > 0)
-  }, [profile?.permisos])
+  }, [profile?.permisos, profile?.rol])
 
   return (
     <aside
@@ -150,6 +155,7 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
                   <div className={`group flex items-center justify-between rounded-lg transition-colors duration-150 ${active ? 'bg-[rgba(155,15,6,0.08)]' : 'hover:bg-gray-50'}`}>
                     <Link
                       href={item.href}
+                      prefetch={true}
                       className={`flex flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-[11px] transition-colors font-[Poppins] ${
                         collapsed ? 'justify-center' : ''
                       } ${active ? 'font-medium text-[#9B0F06]' : 'font-normal text-gray-600'}`}
@@ -181,6 +187,7 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
                               <Link
                                 key={subitem.href}
                                 href={subitem.href}
+                                prefetch={true}
                                 className={`flex items-center rounded-lg px-2 py-1.5 text-[10.5px] transition-colors font-[Poppins] ${
                                   subActive ? 'bg-[rgba(155,15,6,0.04)] font-medium text-[#9B0F06]' : 'text-gray-500 hover:text-gray-800'
                                 }`}

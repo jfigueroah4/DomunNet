@@ -55,7 +55,7 @@ export function DelegadoResidenteSelect({
 
   return (
     <div className={className}>
-      <label className={labelClass}>Delegado Residente de Proyecto</label>
+      <label className={labelClass}>Delegado Residente de Proyecto <span className="text-[#9B0F06]">*</span></label>
       <Combobox
         options={options}
         value={value}

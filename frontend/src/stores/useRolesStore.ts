@@ -1,5 +1,5 @@
-﻿import { create } from 'zustand'
-import { api } from '@/lib/api/cliente'
+import { create } from 'zustand'
+import { apiGetDeduplicado } from '@/lib/api/cliente'
 
 export interface RolMinimo {
   id: string
@@ -12,7 +12,7 @@ interface RolesState {
   roles: RolMinimo[]
   loading: boolean
   error: Error | null
-  fetchRoles: () => Promise<void>
+  fetchRoles: (options?: { bypassCache?: boolean }) => Promise<void>
 }
 
 let rolesPromise: Promise<any> | null = null
@@ -22,7 +22,7 @@ export const useRolesStore = create<RolesState>((set) => ({
   loading: false,
   error: null,
 
-  fetchRoles: async () => {
+  fetchRoles: async (options) => {
     if (rolesPromise) {
       await rolesPromise
       return
@@ -30,7 +30,7 @@ export const useRolesStore = create<RolesState>((set) => ({
 
     set({ loading: true, error: null })
 
-    rolesPromise = api.get('/roles')
+    rolesPromise = apiGetDeduplicado('/roles', options)
       .then(response => {
         set({ roles: response.data?.data || [], loading: false })
       })

@@ -55,42 +55,82 @@ export function ProyectoEditorView({
 
 
 
+  const rolStr = (user?.rol || '').toLowerCase().trim()
+  const cargoStr = (user?.cargo || '').toLowerCase().trim()
+  const esResidente = (rolStr.includes('residente') || cargoStr.includes('residente')) && !rolStr.includes('admin') && !rolStr.includes('director')
+
   // Proteccion: contratantes externos no pueden crear ni editar proyectos
-
   if (user?.rol === 'contratante' || user?.rol === 'contratista') {
-
     return (
-
       <div className="space-y-4">
-
         <button
-
           type="button"
-
           onClick={() => router.push('/dashboard/proyectos')}
-
           className="inline-flex items-center gap-2 text-xs text-gray-500 transition-colors hover:text-[#9B0F06]"
-
         >
-
           <ArrowLeft size={14} />
-
           Volver a proyectos
-
         </button>
-
         <div className="rounded-2xl bg-white p-8 text-center shadow-sm">
-
           <p className="text-sm font-semibold text-gray-700">Acceso denegado</p>
-
           <p className="mt-2 text-xs text-gray-500">No tienes permisos para crear o editar proyectos</p>
-
         </div>
-
       </div>
-
     )
+  }
 
+  // Proteccion: Ingeniero Residente no puede crear proyectos
+  if (!esEditar && esResidente) {
+    return (
+      <div className="space-y-4">
+        <button
+          type="button"
+          onClick={() => router.push('/dashboard/proyectos')}
+          className="inline-flex items-center gap-2 text-xs text-gray-500 transition-colors hover:text-[#9B0F06]"
+        >
+          <ArrowLeft size={14} />
+          Volver a proyectos
+        </button>
+        <div className="rounded-2xl bg-white p-8 text-center shadow-sm">
+          <p className="text-sm font-semibold text-gray-700">Acceso denegado</p>
+          <p className="mt-2 text-xs text-gray-500">El Ingeniero Residente no tiene permisos para crear proyectos nuevos.</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Proteccion: Ingeniero Residente solo puede editar si esta asignado en los campos
+  if (esEditar && esResidente && proyectoActual && user?.id) {
+    const pAny = proyectoActual as any
+    const uId = user.id
+    const uNombre = (user.nombre || `${user.primer_nombre || ''} ${user.primer_apellido || ''}`).toLowerCase().trim()
+
+    const esResp = pAny.responsable_id === uId || pAny.responsableId === uId || pAny.ingeniero_responsable_id === uId
+    const esDel = pAny.delegadoResidenteId === uId || pAny.delegado_residente_id === uId
+    const coincideNombre =
+      (pAny.responsable && typeof pAny.responsable === 'string' && uNombre.length > 2 && pAny.responsable.toLowerCase().includes(uNombre)) ||
+      (pAny.delegadoResidente && typeof pAny.delegadoResidente === 'string' && uNombre.length > 2 && pAny.delegadoResidente.toLowerCase().includes(uNombre))
+
+    if (!esResp && !esDel && !coincideNombre) {
+      return (
+        <div className="space-y-4">
+          <button
+            type="button"
+            onClick={() => router.push('/dashboard/proyectos')}
+            className="inline-flex items-center gap-2 text-xs text-gray-500 transition-colors hover:text-[#9B0F06]"
+          >
+            <ArrowLeft size={14} />
+            Volver a proyectos
+          </button>
+          <div className="rounded-2xl bg-white p-8 text-center shadow-sm">
+            <p className="text-sm font-semibold text-gray-700">Acceso denegado</p>
+            <p className="mt-2 text-xs text-gray-500">
+              Solo puedes editar un proyecto si estás asignado en el formulario como Ingeniero Responsable/Director o Delegado Residente.
+            </p>
+          </div>
+        </div>
+      )
+    }
   }
 
 

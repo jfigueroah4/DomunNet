@@ -727,6 +727,21 @@ export default function RenglonesPage() {
   const [drawerMode, setDrawerMode] = useState<'create' | 'edit' | 'view'>('create')
   const [deleteTarget, setDeleteTarget] = useState<{ type: 'renglon' | 'capitulo' | 'unidad'; item: any } | null>(null)
 
+  const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null
+  const editId = searchParams?.get('edit')
+
+  useEffect(() => {
+    if (editId && renglones.length > 0) {
+      const target = renglones.find((r) => r.id === editId || r.codigoDGC === editId)
+      if (target) {
+        setSelectedItem(target)
+        setDrawerMode('edit')
+        setSubTab('renglones')
+        setOpenRenglonDrawer(true)
+      }
+    }
+  }, [editId, renglones])
+
   // Carga desde Supabase
   useEffect(() => {
     let activo = true
@@ -833,6 +848,10 @@ export default function RenglonesPage() {
     const inicio = (paginaActual - 1) * registrosPorPagina
     return itemsActuales.slice(inicio, inicio + registrosPorPagina)
   }, [itemsActuales, paginaActual, registrosPorPagina])
+
+  useEffect(() => {
+    setPaginaActual(1)
+  }, [busqueda, subTab])
 
   // --- ACCIONES RENGLONES ---
   const handleGuardarRenglon = async (payload: any) => {
@@ -1081,18 +1100,18 @@ export default function RenglonesPage() {
               <tbody className="divide-y divide-gray-100 font-sans">
                 {itemsPaginados.map((r) => (
                   <tr key={r.id} className="hover:bg-gray-50/80 transition-colors">
-                    <td className="px-3 py-2 font-mono font-bold text-[#9B0F06]">{r.codigoDGC}</td>
-                    <td className="px-3 py-2 text-gray-800 font-medium">{r.descripcion}</td>
+                    <td className="px-3 py-2 font-mono font-normal text-[#9B0F06]">{r.codigoDGC}</td>
+                    <td className="px-3 py-2 text-gray-800 font-normal">{r.descripcion}</td>
                     <td className="px-3 py-2 text-gray-600 text-[10.5px]">Capítulo {r.capituloId}</td>
-                    <td className="px-3 py-2 text-center font-mono font-bold text-gray-700">
-                      <span className="inline-block rounded bg-gray-100 px-1.5 py-0.5 border border-gray-200">
+                    <td className="px-3 py-2 text-center font-mono font-normal text-gray-700">
+                      <span className="inline-block px-1.5 py-0.5">
                         {formatearUnidadSymbol(r.unidad)}
                       </span>
                     </td>
-                    <td className="px-3 py-2 text-right font-mono font-semibold text-gray-700">
+                    <td className="px-3 py-2 text-right font-mono font-normal text-gray-700">
                       {formatQuantity(r.cantidadContratada || 0, r.unidad)}
                     </td>
-                    <td className="px-3 py-2 text-right font-mono font-bold text-gray-900">
+                    <td className="px-3 py-2 text-right font-mono font-normal text-gray-900">
                       Q {Number(r.costoUnitarioDirecto || 0).toLocaleString('es-GT', { minimumFractionDigits: 2 })}
                     </td>
                     <td className="px-3 py-2 text-center">
@@ -1153,14 +1172,10 @@ export default function RenglonesPage() {
               <tbody className="divide-y divide-gray-100 font-sans">
                 {itemsPaginados.map((u) => (
                   <tr key={u.id} className="hover:bg-gray-50/80 transition-colors">
-                    <td className="px-3 py-2 text-center font-mono font-bold text-[#9B0F06]">{u.simbolo}</td>
-                    <td className="px-3 py-2 font-semibold text-gray-900">{u.nombre}</td>
-                    <td className="px-3 py-2 text-center">
-                      {u.es_discreta ? (
-                        <span className="inline-block rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-bold text-amber-700 border border-amber-200">Sí</span>
-                      ) : (
-                        <span className="inline-block rounded-full bg-blue-50 px-2 py-0.5 text-[9px] font-bold text-blue-600 border border-blue-200">No</span>
-                      )}
+                    <td className="px-3 py-2 text-center font-mono font-normal text-[#9B0F06]">{u.simbolo}</td>
+                    <td className="px-3 py-2 font-normal text-gray-900">{u.nombre}</td>
+                    <td className="px-3 py-2 text-center font-normal text-black text-[11px]">
+                      {u.es_discreta ? 'Sí' : 'No'}
                     </td>
                     <td className="px-3 py-2 text-center">
                       <div className="flex items-center justify-center gap-1">
@@ -1222,20 +1237,20 @@ export default function RenglonesPage() {
                   const renglonesEnCap = renglones.filter((r) => r.capituloId === c.id)
                   return (
                     <tr key={c.id} className="hover:bg-gray-50/80 transition-colors">
-                      <td className="px-3 py-2 text-center font-mono font-bold text-[#9B0F06]">Cap. {c.id}</td>
-                      <td className="px-3 py-2 font-semibold text-gray-900">{c.nombre}</td>
+                      <td className="px-3 py-2 text-center font-mono font-normal text-[#9B0F06]">Cap. {c.id}</td>
+                      <td className="px-3 py-2 font-normal text-gray-900">{c.nombre}</td>
                       <td className="px-3 py-2">
                         {renglonesEnCap.length === 0 ? (
                           <span className="text-[10px] text-gray-400 italic">No hay renglones asignados</span>
                         ) : (
-                          <div className="flex flex-wrap items-center gap-1 max-h-16 overflow-y-auto">
-                            <span className="text-[9px] font-bold text-gray-600 bg-gray-100 rounded px-1.5 py-0.5 border border-gray-200">
+                          <div className="flex flex-wrap items-center gap-1.5 max-h-16 overflow-y-auto">
+                            <span className="text-[9px] font-normal text-black px-1 py-0.5">
                               Total: {renglonesEnCap.length}
                             </span>
                             {renglonesEnCap.map((r) => (
                               <span
                                 key={r.id}
-                                className="inline-block rounded bg-red-50 px-1.5 py-0.5 font-mono text-[9px] font-semibold text-[#9B0F06] border border-red-200"
+                                className="inline-block font-mono text-[9px] font-normal text-black px-1 py-0.5"
                               >
                                 {r.codigoDGC}
                               </span>

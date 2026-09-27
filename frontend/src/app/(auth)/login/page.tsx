@@ -1,15 +1,16 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useCustomToast } from '@/hooks/useCustomToast';
-import { Eye, EyeOff, User, Lock, Info, X } from 'lucide-react';
+import { Eye, EyeOff, User, Lock, Info, X, ChevronDown, Trash2 } from 'lucide-react';
 import LoginInput from '@/components/ui/LoginInput';
 import LoginButton from '@/components/ui/LoginButton';
 import PasswordRecoveryModal from '@/components/modals/PasswordRecoveryModal';
 import SupportModal from '@/components/modals/SupportModal';
 import { api } from '@/lib/api/cliente';
+
+import { useRef } from 'react';
 
 type AccesoRapido = {
   id: string
@@ -18,6 +19,11 @@ type AccesoRapido = {
   password: string
   role: string
   roleLabel?: string
+}
+
+type SavedAccount = {
+  username: string
+  password?: string
 }
 
 const ACCESOS_RAPIDOS: AccesoRapido[] = [
@@ -45,15 +51,15 @@ const ACCESOS_RAPIDOS: AccesoRapido[] = [
   },
   {
     id: 'laboratorista',
-    name: 'Camila Figueroa',
-    email: 'camila.figueroa@domunnet.test',
+    name: 'Mario Tzul',
+    email: 'mario.tzul@domunnet.test',
     password: 'mariobros25',
     role: 'Laboratorista',
   },
   {
     id: 'auxiliar-campo',
-    name: 'Mario Tzul',
-    email: 'mario.tzul@domunnet.test',
+    name: 'Camila Figueroa',
+    email: 'camila.figueroa@domunnet.test',
     password: 'mariobros25',
     role: 'AuxiliarDeCampo',
     roleLabel: 'Auxiliar de Campo',
@@ -68,7 +74,7 @@ const ACCESOS_RAPIDOS: AccesoRapido[] = [
 ]
 
 export default function LoginPage() {
-  const router = useRouter();
+  const passwordInputRef = useRef<HTMLInputElement>(null);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [emailError, setEmailError] = useState(false);
@@ -79,39 +85,148 @@ export default function LoginPage() {
   const [isSupportOpen, setIsSupportOpen] = useState(false);
   const [isQuickAccessOpen, setIsQuickAccessOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [rememberedAccounts, setRememberedAccounts] = useState<SavedAccount[]>([]);
+  const [showRememberedDropdown, setShowRememberedDropdown] = useState(false);
 
   useEffect(() => {
-    const savedUsername = localStorage.getItem('domun_remembered_username');
-    if (savedUsername) {
-      setUsername(savedUsername);
-      setRememberMe(true);
+    try {
+      const raw = localStorage.getItem('domun_remembered_accounts');
+      let accounts: SavedAccount[] = [];
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        accounts = parsed.map((item: any) =>
+          typeof item === 'string'
+            ? { username: item, password: '' }
+            : { username: item.username, password: item.password || '' }
+        );
+      }
+      const legacyUser = localStorage.getItem('domun_remembered_username');
+      if (legacyUser && !accounts.some(a => a.username.toLowerCase() === legacyUser.toLowerCase())) {
+        accounts.unshift({ username: legacyUser, password: '' });
+      }
+      if (accounts.length > 0) {
+        setRememberedAccounts(accounts);
+        setUsername(accounts[0].username);
+        if (accounts[0].password) {
+          setPassword(accounts[0].password);
+        }
+        setRememberMe(true);
+      }
+    } catch (err) {
+      console.error('Error cargando usuarios recordados:', err);
     }
   }, []);
 
   const { showErrorToast, showSuccessToast } = useCustomToast();
 
-  const iniciarSesion = async (identificador: string, contrasena: string) => {
+  const removeRememberedAccount = (usernameToRemove: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const updated = rememberedAccounts.filter(a => a.username.toLowerCase() !== usernameToRemove.toLowerCase());
+    setRememberedAccounts(updated);
+    localStorage.setItem('domun_remembered_accounts', JSON.stringify(updated));
+    if (username.toLowerCase() === usernameToRemove.toLowerCase()) {
+      if (updated.length > 0) {
+        setUsername(updated[0].username);
+        setPassword(updated[0].password || '');
+      } else {
+        setUsername('');
+        setPassword('');
+        setRememberMe(false);
+        setShowRememberedDropdown(false);
+      }
+    }
+  };
+
+  const selectRememberedAccount = (acc: SavedAccount) => {
+    setUsername(acc.username);
+    setPassword(acc.password || '');
+    setRememberMe(true);
+    setShowRememberedDropdown(false);
+    setEmailError(false);
+    setPasswordError(false);
+    setTimeout(() => {
+      passwordInputRef.current?.focus();
+    }, 50);
+  };
+
+  const iniciarSesion = async (identificador: string, contrasena: string, formElement?: HTMLFormElement) => {
     await api.post('/auth/iniciar-sesion', {
-      correo: identificador, // El backend recibe 'correo' pero el servicio de autenticacion del backend lo procesa como identificador (correo o username)
+      correo: identificador,
       contrasena,
     });
 
     showSuccessToast("¡Sesión iniciada correctamente!");
     localStorage.removeItem('domun_failed_login_attempts');
 
+    // Solicitar al navegador que guarde/actualice las credenciales (Credential Management API)
+    try {
+      if (typeof window !== 'undefined' && 'credentials' in navigator && (window as any).PasswordCredential) {
+        let cred: any = null;
+        if (formElement) {
+          try {
+            cred = new (window as any).PasswordCredential(formElement);
+          } catch (_) {}
+        }
+        if (!cred) {
+          cred = new (window as any).PasswordCredential({
+            id: identificador,
+            password: contrasena,
+            name: identificador,
+          });
+        }
+        if (cred) {
+          await navigator.credentials.store(cred);
+        }
+      }
+    } catch (e) {
+      console.warn('Browser password saving skipped:', e);
+    }
+
     if (rememberMe) {
-      localStorage.setItem('domun_remembered_username', identificador);
+      try {
+        const raw = localStorage.getItem('domun_remembered_accounts');
+        let accounts: SavedAccount[] = [];
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          accounts = parsed.map((item: any) =>
+            typeof item === 'string'
+              ? { username: item, password: '' }
+              : { username: item.username, password: item.password || '' }
+          );
+        }
+        accounts = accounts.filter(a => a.username.toLowerCase() !== identificador.toLowerCase());
+        accounts.unshift({ username: identificador, password: contrasena });
+        localStorage.setItem('domun_remembered_accounts', JSON.stringify(accounts));
+        localStorage.setItem('domun_remembered_username', identificador);
+      } catch {}
     } else {
-      localStorage.removeItem('domun_remembered_username');
+      try {
+        const raw = localStorage.getItem('domun_remembered_accounts');
+        let accounts: SavedAccount[] = [];
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          accounts = parsed.map((item: any) =>
+            typeof item === 'string'
+              ? { username: item, password: '' }
+              : { username: item.username, password: item.password || '' }
+          );
+        }
+        accounts = accounts.filter(a => a.username.toLowerCase() !== identificador.toLowerCase());
+        localStorage.setItem('domun_remembered_accounts', JSON.stringify(accounts));
+        if (localStorage.getItem('domun_remembered_username')?.toLowerCase() === identificador.toLowerCase()) {
+          localStorage.removeItem('domun_remembered_username');
+        }
+      } catch {}
     }
 
     setTimeout(() => {
-      router.replace('/');
-    }, 300);
+      window.location.href = '/';
+    }, 1000);
   };
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    const formEl = e.currentTarget;
 
     if (isSubmitting) {
       return;
@@ -140,10 +255,18 @@ export default function LoginPage() {
     setIsSubmitting(true);
 
     try {
-      await iniciarSesion(username, password);
-    } catch (error) {
+      await iniciarSesion(username, password, formEl);
+    } catch (error: any) {
       setEmailError(true);
       setPasswordError(true);
+
+      const status = error?.response?.status;
+      const serverMsg = error?.response?.data?.mensaje || error?.response?.data?.message;
+
+      if (status === 403 || (serverMsg && serverMsg.toLowerCase().includes('desactivad'))) {
+        showErrorToast(serverMsg || 'Su cuenta se encuentra desactivada. Contacte al administrador.');
+        return;
+      }
 
       let attempts = 1;
       let lockUntil: number | null = null;
@@ -275,13 +398,18 @@ export default function LoginPage() {
 
         {/* Formulario de Login */}
         <form
+          action="#"
           onSubmit={handleLogin}
+          method="POST"
           className="w-full animate-fadeIn"
           style={{ animationDelay: '0.06s' }}
         >
           {/* Input Usuario */}
-          <div className="mb-[14px]">
+          <div className="mb-[14px] relative">
             <LoginInput
+              id="username"
+              name="username"
+              autoComplete="username"
               icon={<User size={16} strokeWidth={1.5} />}
               placeholder="Correo o Usuario"
               value={username}
@@ -290,12 +418,67 @@ export default function LoginPage() {
                 setUsername(e.target.value);
                 if (emailError) setEmailError(false);
               }}
+              rightIcon={
+                rememberedAccounts.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowRememberedDropdown(!showRememberedDropdown)}
+                    className="text-white/60 hover:text-white transition-all p-1 focus:outline-none flex items-center justify-center"
+                    title="Seleccionar usuario guardado"
+                  >
+                    <ChevronDown
+                      size={16}
+                      strokeWidth={1.5}
+                      className={`transition-transform duration-200 ${showRememberedDropdown ? 'rotate-180 text-white' : ''}`}
+                    />
+                  </button>
+                ) : undefined
+              }
             />
+
+            {/* Dropdown de usuarios recordados (desplegado desde el campo, sin extender altura del login) */}
+            {showRememberedDropdown && rememberedAccounts.length > 0 && (
+              <div 
+                className="absolute left-0 right-0 top-[42px] z-50 rounded-lg border border-white/20 bg-[#240303]/95 shadow-2xl backdrop-blur-md overflow-hidden max-h-[150px] overflow-y-auto animate-fadeIn"
+                style={{ fontFamily: 'Poppins, sans-serif' }}
+              >
+                <div className="px-3 py-1.5 border-b border-white/10 text-[10px] uppercase font-semibold text-white/50 tracking-wider flex justify-between items-center bg-black/20">
+                  <span>Usuarios Guardados</span>
+                  <span className="text-[9px] text-white/40">{rememberedAccounts.length}</span>
+                </div>
+                {rememberedAccounts.map((acc, idx) => (
+                  <div
+                    key={idx}
+                    onClick={() => selectRememberedAccount(acc)}
+                    className={`flex items-center justify-between px-3 py-2 cursor-pointer transition-colors hover:bg-white/15 ${
+                      username.toLowerCase() === acc.username.toLowerCase() ? 'bg-white/20' : ''
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 overflow-hidden pr-2">
+                      <User size={13} className="text-red-400 shrink-0" />
+                      <span className="text-[12px] text-white/90 truncate font-medium">{acc.username}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => removeRememberedAccount(acc.username, e)}
+                      className="text-white/40 hover:text-red-400 p-1 transition-colors shrink-0"
+                      title="Eliminar de recordados"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* Input Contraseña */}
+          {/* Input Contraseña (el dropdown se despliega por encima sin desplazar ni ocultar la contraseña) */}
           <div className="mb-[10px]">
             <LoginInput
+              id="password"
+              name="password"
+              autoComplete="current-password"
+              inputRef={passwordInputRef}
               icon={<Lock size={16} strokeWidth={1.5} />}
               type={showPassword ? 'text' : 'password'}
               placeholder="Contraseña"

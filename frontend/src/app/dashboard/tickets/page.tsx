@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { AlertCircle, CheckCircle2, Clock, Plus, Send, X, Search, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Clock, Plus, Send, X, Search, Filter, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
 import { useAuthStore } from '@/stores/useAuthStore';
 
 interface TicketMessage {
@@ -25,6 +25,11 @@ interface SupportTicket {
   createdAt: string;
 }
 
+const getFechaReciente = (horasMenos = 0) => {
+  const d = new Date(Date.now() - horasMenos * 60 * 60 * 1000);
+  return d.toISOString().slice(0, 16).replace('T', ' ');
+};
+
 const INITIAL_TICKETS: SupportTicket[] = [
   {
     id: '1',
@@ -35,21 +40,21 @@ const INITIAL_TICKETS: SupportTicket[] = [
     createdByRole: 'IngenieroResidente',
     createdByEmail: 'luis.arriaga@domunnet.test',
     assignedTo: 'Administrador / Gerencia',
-    createdAt: '2026-05-24 08:25',
+    createdAt: getFechaReciente(2),
     messages: [
       {
         id: '1',
         author: 'Luis Arriaga',
         role: 'user',
         message: 'No puedo ingresar con mi contraseña actual. Solicito apoyo para restablecerla.',
-        timestamp: '2026-05-24 08:25',
+        timestamp: getFechaReciente(2),
       },
       {
         id: '2',
         author: 'Marco Estrada',
         role: 'admin',
         message: 'Se ha enviado un enlace de recuperación a tu correo electrónico. Revísalo en los próximos 10 minutos.',
-        timestamp: '2026-05-24 08:45',
+        timestamp: getFechaReciente(1),
       },
     ],
   },
@@ -62,14 +67,14 @@ const INITIAL_TICKETS: SupportTicket[] = [
     createdByRole: 'Administrador',
     createdByEmail: 'marco.estrada@domunnet.test',
     assignedTo: 'Administrador / Gerencia',
-    createdAt: '2026-05-24 09:10',
+    createdAt: getFechaReciente(5),
     messages: [
       {
         id: '1',
         author: 'Marco Estrada',
         role: 'user',
         message: 'El PDF del informe abre, pero necesito confirmar si incluye todas las fotografías seleccionadas.',
-        timestamp: '2026-05-24 09:10',
+        timestamp: getFechaReciente(5),
       },
     ],
   },
@@ -87,6 +92,8 @@ export default function TicketsPage() {
   const [filtroUsuario, setFiltroUsuario] = useState('todos');
   const [filtroCategoria, setFiltroCategoria] = useState('todos');
   const [filtroEstado, setFiltroEstado] = useState('todos');
+  const [fechaDesde, setFechaDesde] = useState('');
+  const [fechaHasta, setFechaHasta] = useState('');
 
   // Paginación (Máximo 3 tickets por página)
   const [paginaActual, setPaginaActual] = useState(1);
@@ -122,6 +129,15 @@ export default function TicketsPage() {
     }
   };
 
+  const handleDeleteTicket = (ticketId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const updated = tickets.filter((t) => t.id !== ticketId);
+    saveTickets(updated);
+    if (selectedTicket?.id === ticketId) {
+      setSelectedTicket(null);
+    }
+  };
+
   const esEncargado = profile?.rol === 'Administrador' || profile?.rol === 'Gerencia';
   const nombreUsuarioActual = profile ? `${profile.nombre} ${profile.apellido}`.trim() : '';
   const correoUsuarioActual = profile?.correo?.trim().toLowerCase() || '';
@@ -129,8 +145,19 @@ export default function TicketsPage() {
   // Lista de usuarios únicos para el filtro
   const usuariosUnicos = Array.from(new Set(tickets.map((t) => t.createdBy).filter(Boolean)));
 
+  // Función para deduplicar tickets por autor + título + categoría
+  const deduplicarTickets = (lista: SupportTicket[]): SupportTicket[] => {
+    const vistos = new Set<string>();
+    return lista.filter((t) => {
+      const key = `${(t.createdByEmail || t.createdBy).toLowerCase().trim()}_${t.title.toLowerCase().trim()}_${t.category}`;
+      if (vistos.has(key)) return false;
+      vistos.add(key);
+      return true;
+    });
+  };
+
   // Filtrado de tickets
-  const ticketsFiltrados = tickets.filter((t) => {
+  const ticketsFiltrados = deduplicarTickets(tickets).filter((t) => {
     // Si no es Administrador ni Gerencia, solo puede ver sus propios tickets
     if (!esEncargado) {
       const creadoPorLower = (t.createdBy || '').toLowerCase();
@@ -157,13 +184,26 @@ export default function TicketsPage() {
       t.status === filtroEstado ||
       (filtroEstado === 'terminado' && t.status === 'cerrado');
 
-    return coincideBusqueda && coincideUsuario && coincideCategoria && coincideEstado;
+    const tFecha = t.createdAt.slice(0, 10);
+    const coincideFechaDesde = !fechaDesde || tFecha >= fechaDesde;
+    const coincideFechaHasta = !fechaHasta || tFecha <= fechaHasta;
+
+    return coincideBusqueda && coincideUsuario && coincideCategoria && coincideEstado && coincideFechaDesde && coincideFechaHasta;
+  });
+
+  // Ordenar tickets: Los cerrados van al fondo de la lista
+  const ticketsOrdenados = [...ticketsFiltrados].sort((a, b) => {
+    const aCerrado = a.status === 'cerrado';
+    const bCerrado = b.status === 'cerrado';
+    if (aCerrado && !bCerrado) return 1;
+    if (!aCerrado && bCerrado) return -1;
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
 
   // Paginación
-  const totalPaginas = Math.ceil(ticketsFiltrados.length / registrosPorPagina) || 1;
+  const totalPaginas = Math.ceil(ticketsOrdenados.length / registrosPorPagina) || 1;
   const indexInicio = (paginaActual - 1) * registrosPorPagina;
-  const ticketsPaginados = ticketsFiltrados.slice(indexInicio, indexInicio + registrosPorPagina);
+  const ticketsPaginados = ticketsOrdenados.slice(indexInicio, indexInicio + registrosPorPagina);
 
   const openTickets = tickets.filter((ticket) => ticket.status !== 'cerrado').length;
 
@@ -172,7 +212,7 @@ export default function TicketsPage() {
       abierto: 'bg-red-100 text-red-800 ring-red-200',
       en_revision: 'bg-amber-100 text-amber-800 ring-amber-200',
       en_progreso: 'bg-blue-100 text-blue-800 ring-blue-200',
-      cerrado: 'bg-emerald-100 text-emerald-800 ring-emerald-200',
+      cerrado: 'bg-gray-200 text-gray-700 ring-gray-300 font-semibold',
     };
     return styles[status] || 'bg-gray-100 text-gray-700 ring-gray-200';
   };
@@ -191,7 +231,7 @@ export default function TicketsPage() {
     }
   };
 
-  const formatStatus = (status: string) => status.replace(/_/g, ' ');
+  const formatStatus = (status: string) => (status === 'cerrado' ? 'resuelto / cerrado' : status.replace(/_/g, ' '));
 
   const handleSendMessage = () => {
     if (!newMessage.trim() || !selectedTicket) return;
@@ -345,6 +385,33 @@ export default function TicketsPage() {
             <option value="en_progreso">En progreso</option>
             <option value="cerrado">Terminado / Cerrado</option>
           </select>
+
+          {/* Filtros por Rango de Fechas */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-[11px] font-medium text-gray-500">Desde:</span>
+            <input
+              type="date"
+              value={fechaDesde}
+              onChange={(e) => {
+                setFechaDesde(e.target.value);
+                setPaginaActual(1);
+              }}
+              className="rounded-lg border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700 focus:border-red-800 focus:outline-none"
+            />
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <span className="text-[11px] font-medium text-gray-500">Hasta:</span>
+            <input
+              type="date"
+              value={fechaHasta}
+              onChange={(e) => {
+                setFechaHasta(e.target.value);
+                setPaginaActual(1);
+              }}
+              className="rounded-lg border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700 focus:border-red-800 focus:outline-none"
+            />
+          </div>
         </div>
       </div>
 
@@ -384,11 +451,23 @@ export default function TicketsPage() {
                     setShowCreateForm(false);
                   }}
                   className={`w-full rounded-lg border p-3 text-left transition-all hover:border-gray-300 ${
-                    selectedTicket?.id === ticket.id ? 'border-red-700 bg-white ring-1 ring-red-700/20 shadow-xs' : 'border-gray-200 bg-white hover:bg-gray-50'
+                    selectedTicket?.id === ticket.id
+                      ? 'border-red-700 bg-white ring-1 ring-red-700/20 shadow-xs'
+                      : ticket.status === 'cerrado'
+                      ? 'border-gray-200 bg-gray-100/80 hover:bg-gray-100 text-gray-700'
+                      : 'border-gray-200 bg-white hover:bg-gray-50'
                   }`}
                 >
                   <div className="mb-1.5 flex items-start justify-between gap-2">
                     <h3 className="line-clamp-2 flex-1 text-xs font-bold leading-snug text-gray-900">{ticket.title}</h3>
+                    <button
+                      type="button"
+                      title="Eliminar ticket"
+                      onClick={(e) => handleDeleteTicket(ticket.id, e)}
+                      className="p-1 text-gray-400 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
+                    >
+                      <Trash2 size={13} />
+                    </button>
                   </div>
                   <div className="mb-2 flex flex-wrap items-center justify-between gap-1">
                     <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ${getStatusBadge(ticket.status)}`}>
@@ -545,6 +624,14 @@ export default function TicketsPage() {
                         {formatStatus(selectedTicket.status)}
                       </span>
                     )}
+                    <button
+                      type="button"
+                      title="Eliminar ticket"
+                      onClick={() => handleDeleteTicket(selectedTicket.id)}
+                      className="ml-1 p-1.5 text-gray-500 hover:text-red-700 hover:bg-red-50 border border-gray-200 rounded-md transition-colors"
+                    >
+                      <Trash2 size={14} />
+                    </button>
                   </div>
                 </div>
               </div>

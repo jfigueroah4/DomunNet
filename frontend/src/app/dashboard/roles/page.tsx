@@ -5,7 +5,7 @@ import { useMemo, useState } from 'react'
 import { Plus, ChevronLeft, ChevronRight, ArrowLeft } from 'lucide-react'
 
 import { type RoleDrawerMode } from '@/components/modules/roles/RoleDrawer'
-import { showSuccessToast } from '@/hooks/useCustomToast'
+import { showSuccessToast, showErrorToast } from '@/hooks/useCustomToast'
 
 import dynamic from 'next/dynamic'
 import { useEffect } from 'react'
@@ -14,20 +14,18 @@ import { RolTabla } from '@/components/modules/roles/RolTabla'
 
 const RoleDrawer = dynamic(() => import('@/components/modules/roles/RoleDrawer').then(m => m.RoleDrawer), { ssr: false })
 const RoleDeleteModal = dynamic(() => import('@/components/modules/roles/RoleDeleteModal').then(m => m.RoleDeleteModal), { ssr: false })
-
+const RoleInactivateModal = dynamic(() => import('@/components/modules/roles/RoleInactivateModal').then(m => m.RoleInactivateModal), { ssr: false })
 
 export default function RolesPage() {
   const [roles, setRoles] = useState<any[]>([])
     
-  const fetchRoles = async () => {
+  const fetchRoles = async (bypassCache = false) => {
     try {
-      const { api } = await import('@/lib/api/cliente');
-      const res = await api.get('/roles');
+      const { apiGetDeduplicado } = await import('@/lib/api/cliente');
+      const res = await apiGetDeduplicado('/roles', { bypassCache });
       setRoles(res.data?.data || []);
     } catch (e) {
       console.error(e);
-    } finally {
-      ;
     }
   }
   
@@ -39,6 +37,8 @@ export default function RolesPage() {
   const [roleActivo, setRoleActivo] = useState<any | undefined>()
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [roleEliminar, setRoleEliminar] = useState<any | undefined>()
+  const [inactivateOpen, setInactivateOpen] = useState(false)
+  const [pendingInactivatePayload, setPendingInactivatePayload] = useState<any | undefined>()
   
   const [busqueda, setBusqueda] = useState('')
   const [debouncedBusqueda, setDebouncedBusqueda] = useState('')
@@ -109,12 +109,21 @@ export default function RolesPage() {
     console.log('PAYLOAD RECIBIDO:', payload);
     const ejecutarGuardado = async () => {
       try {
-        const { api } = await import('@/lib/api/cliente');
+        const { api, limpiarCacheMemoria } = await import('@/lib/api/cliente');
+        const nivelJerarquicoMap: Record<string, number> = {
+          'Alta Gerencia': 100,
+          'Mando Medio': 70,
+          'Operativo': 40,
+          'Externo': 20,
+          'Personalizado': 50,
+        };
+
         const payloadApi = {
           nombre: payload.name,
           descripcion: payload.descripcion,
           color: payload.color || '#6d28d9',
           estado: payload.estado || 'Activo',
+          nivel: nivelJerarquicoMap[payload.nivelJerarquico || 'Operativo'] || 40,
           permisos: payload.permisos,
           usuariosAsignados: payload.usuariosAsignados
         };
@@ -126,27 +135,19 @@ export default function RolesPage() {
           await api.post('/roles', payloadApi);
           showSuccessToast('Rol creado exitosamente');
         }
-        await fetchRoles(); // Reload from DB
+        limpiarCacheMemoria();
+        await fetchRoles(true); // Reload from DB bypassing cache
         closeDrawer();
-      } catch (e) {
+      } catch (e: any) {
         console.error(e);
+        const msg = e?.response?.data?.mensaje || e?.response?.data?.message || 'Error al procesar la solicitud del rol';
+        showErrorToast(msg);
       }
     }
 
-    if (payload.estado === 'Inactivo' && roleActivo?.estado !== 'Inactivo' && payload.usuariosAsignados.length > 0) {
-      const { toast } = await import('sonner');
-      toast('Confirmación requerida', {
-        description: `Se inhabilitarán ${payload.usuariosAsignados.length} usuarios asociados a este rol. ¿Deseas continuar?`,
-        duration: 10000,
-        action: {
-          label: 'Continuar',
-          onClick: () => ejecutarGuardado(),
-        },
-        cancel: {
-          label: 'Cancelar',
-          onClick: () => {},
-        },
-      });
+    if (payload.estado === 'Inactivo' && (roleActivo?.estado !== 'Inactivo' || payload.usuariosAsignados.length > 0)) {
+      setPendingInactivatePayload(payload);
+      setInactivateOpen(true);
       return;
     }
 
@@ -298,14 +299,68 @@ export default function RolesPage() {
               await api.delete(`/roles/${roleEliminar.id}`);
               showSuccessToast('Rol eliminado exitosamente');
               await fetchRoles(); // Reload from DB
-            } catch (e) {
+            } catch (e: any) {
               console.error(e);
+              const msg = e?.response?.data?.mensaje || e?.response?.data?.message || 'Error al eliminar el rol';
+              showErrorToast(msg);
             }
           }
           setDeleteOpen(false)
           setRoleEliminar(undefined)
         }}
         role={roleEliminar}
+      />
+
+      <RoleInactivateModal
+        isOpen={inactivateOpen}
+        onClose={() => {
+          setInactivateOpen(false)
+          setPendingInactivatePayload(undefined)
+        }}
+        onConfirm={async () => {
+          const payload = pendingInactivatePayload
+          setInactivateOpen(false)
+          setPendingInactivatePayload(undefined)
+          if (payload) {
+            try {
+              const { api, limpiarCacheMemoria } = await import('@/lib/api/cliente');
+              const nivelJerarquicoMap: Record<string, number> = {
+                'Alta Gerencia': 100,
+                'Mando Medio': 70,
+                'Operativo': 40,
+                'Externo': 20,
+                'Personalizado': 50,
+              };
+
+              const payloadApi = {
+                nombre: payload.name,
+                descripcion: payload.descripcion,
+                color: payload.color || '#6d28d9',
+                estado: payload.estado || 'Activo',
+                nivel: nivelJerarquicoMap[payload.nivelJerarquico || 'Operativo'] || 40,
+                permisos: payload.permisos,
+                usuariosAsignados: payload.usuariosAsignados
+              };
+
+              if (drawerMode === 'edit' && roleActivo) {
+                await api.put(`/roles/${roleActivo.id}`, payloadApi);
+                showSuccessToast('Rol actualizado exitosamente');
+              } else {
+                await api.post('/roles', payloadApi);
+                showSuccessToast('Rol creado exitosamente');
+              }
+              limpiarCacheMemoria();
+              await fetchRoles(true);
+              closeDrawer();
+            } catch (e: any) {
+              console.error(e);
+              const msg = e?.response?.data?.mensaje || e?.response?.data?.message || 'Error al inactivar el rol';
+              showErrorToast(msg);
+            }
+          }
+        }}
+        roleName={pendingInactivatePayload?.name || roleActivo?.name || roleActivo?.nombre}
+        numUsuarios={pendingInactivatePayload?.usuariosAsignados?.length || roleActivo?.usuariosAsignados?.length || 0}
       />
     </div>
   )

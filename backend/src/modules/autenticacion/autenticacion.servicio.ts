@@ -141,11 +141,11 @@ export async function iniciarSesion(identificador: string, contrasena: string, i
   }
 
   if (!usuarioFila.activo) {
-    console.error('[autenticacion.servicio] Usuario inactivo', {
+    console.error('[autenticacion.servicio] Usuario inactivo / desactivado', {
       usuarioId: usuarioFila.id,
       correo: usuarioFila.correo,
     })
-    return null
+    throw new Error('DESACTIVADO')
   }
 
   let rol: { nombre: string; permisos: string[]; nivel_permisos: number } = { nombre: 'Sin rol asignado', permisos: [], nivel_permisos: 0 };

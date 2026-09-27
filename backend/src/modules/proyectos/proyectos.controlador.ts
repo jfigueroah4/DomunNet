@@ -1,7 +1,17 @@
 import { Request, Response } from 'express'
 import { z } from 'zod'
 import { sendError, sendResponse } from '@/shared/response'
-import { actualizarEstadoProyecto, actualizarProyecto, obtenerProyectoPorId, obtenerProyectos, obtenerPendientesPorProyecto, ValidationError } from './proyectos.servicio'
+import {
+  actualizarEstadoProyecto,
+  activarReplanificacionProyecto,
+  actualizarProyecto,
+  iniciarReplanificacionProyecto,
+  obtenerProyectoPorId,
+  obtenerProyectos,
+  obtenerPendientesPorProyecto,
+  procesarPendienteProyecto,
+  ValidationError
+} from './proyectos.servicio'
 
 const cambiarEstadoSchema = z.object({
   estado_codigo: z.string().min(1)
@@ -72,6 +82,45 @@ export async function cambiarEstadoControlador(req: Request, res: Response) {
   }
 }
 
+export async function iniciarReplanificacionControlador(req: Request, res: Response) {
+  try {
+    const { id } = req.params
+    await iniciarReplanificacionProyecto(id)
+    return sendResponse(res, 200, { en_replanificacion: true }, 'Ciclo de replanificación iniciado')
+  } catch (error: any) {
+    console.error('Error en iniciarReplanificacionControlador:', error)
+    return sendError(res, 500, error.message || 'Error interno del servidor')
+  }
+}
+
+export async function activarReplanificacionControlador(req: Request, res: Response) {
+  try {
+    const rolNorm = ((req as any).usuario?.rol || '').toLowerCase().trim()
+    const esAdmin = rolNorm === 'administrador' || rolNorm === 'admin'
+    if (!esAdmin) {
+      return sendError(res, 403, 'Acceso denegado: Solo el rol de Administrador puede activar el proyecto.')
+    }
+
+    const { id } = req.params
+    const body = req.body || {}
+    await activarReplanificacionProyecto({
+      proyectoId: id,
+      esReanudacionPausa: body.esReanudacionPausa,
+      fechaReanudacion: body.fechaReanudacion,
+      nuevaFechaFin: body.nuevaFechaFin,
+      nuevosDiasContractuales: body.nuevosDiasContractuales
+    })
+
+    return sendResponse(res, 200, { ok: true }, 'Proyecto activado exitosamente tras replanificación.')
+  } catch (error: any) {
+    if (error instanceof ValidationError) {
+      return sendError(res, 400, error.message, { campo: error.field })
+    }
+    console.error('Error en activarReplanificacionControlador:', error)
+    return sendError(res, 500, error.message || 'Error interno del servidor')
+  }
+}
+
 export async function actualizarProyectoControlador(req: Request, res: Response) {
   try {
     const body = actualizarProyectoSchema.parse(req.body)
@@ -113,6 +162,55 @@ export async function obtenerPendientesControlador(req: Request, res: Response) 
   } catch (error: any) {
     console.error('Error en obtenerPendientesControlador:', error)
     return sendError(res, 500, error.message || 'Error al obtener pendientes')
+  }
+}
+
+export async function procesarPendienteControlador(req: Request, res: Response) {
+  try {
+    const { id, proyectoId } = req.params
+    const pendienteId = id || req.params.pendienteId
+    const proyId = proyectoId || req.params.id
+    const {
+      accion,
+      motivo,
+      ancho,
+      alturaEspesor,
+      ladoVia,
+      multiplicador,
+      descuentoAplicadoId,
+      descuentoMonto,
+      observaciones,
+      estimacionNum
+    } = req.body
+    const usuarioId = (req as any).usuario?.id
+
+    if (!accion || !['confirmar', 'pendiente', 'anular'].includes(accion)) {
+      return sendError(res, 400, 'Acción inválida. Debe ser confirmar, pendiente o anular.')
+    }
+
+    const resultado = await procesarPendienteProyecto({
+      pendienteId,
+      proyectoId: proyId,
+      usuarioId,
+      accion,
+      motivo,
+      ancho,
+      alturaEspesor,
+      ladoVia,
+      multiplicador,
+      descuentoAplicadoId,
+      descuentoMonto,
+      observaciones,
+      estimacionNum
+    })
+
+    return sendResponse(res, 200, resultado, `Pendiente procesado correctamente (${accion})`)
+  } catch (error: any) {
+    if (error instanceof ValidationError) {
+      return sendError(res, 400, error.message, [{ campo: error.field, mensaje: error.message }])
+    }
+    console.error('Error en procesarPendienteControlador:', error)
+    return sendError(res, 500, error.message || 'Error al procesar pendiente')
   }
 }
 

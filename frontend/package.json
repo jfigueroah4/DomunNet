@@ -10,7 +10,10 @@
     "lint": "next lint",
     "clean": "node -e \"require('fs').rmSync('.next',{recursive:true,force:true})\"",
     "type-check": "tsc --noEmit",
-    "test": "node run-tests.js"
+    "test": "vitest run --reporter=verbose",
+    "test:wiring": "vitest run scripts/test-wiring.test.ts --reporter=verbose",
+    "test:mutation": "node --experimental-strip-types scripts/test-mutation.ts",
+    "test:integration": "vitest run scripts/test-integration.test.ts --reporter=verbose"
   },
   "dependencies": {
     "@supabase/ssr": "^0.0.10",
@@ -37,8 +40,10 @@
     "@types/node": "^20.8.0",
     "@types/react": "^18.2.37",
     "@types/react-dom": "^18.2.15",
+    "decimal.js": "^10.6.0",
     "eslint": "^8.51.0",
     "eslint-config-next": "^14.0.0",
-    "typescript": "^5.2.2"
+    "typescript": "^5.2.2",
+    "vitest": "^5.0.1"
   }
 }

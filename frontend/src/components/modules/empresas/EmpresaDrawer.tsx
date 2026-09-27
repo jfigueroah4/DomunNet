@@ -130,7 +130,7 @@ export function EmpresaDrawer({ isOpen, onClose, onSave, mode = 'create', empres
  }
 
  if (name === 'telefono_empresa' || name === 'telefono_contacto') {
- value = value.replace(/\D/g, '')
+ value = value.replace(/\D/g, '').slice(0, 8)
  }
 
  if (type === 'checkbox') {
@@ -407,7 +407,7 @@ export function EmpresaDrawer({ isOpen, onClose, onSave, mode = 'create', empres
  {errors.primer_nombre_invalido && <p className="mt-1 text-[8px] font-medium text-red-500">Solo letras</p>}
  </div>
  <div>
- <label className="mb-1.5 block text-[8px] font-bold uppercase tracking-wide text-gray-600">Segundo Nombre</label>
+ <label className="mb-1.5 block text-[8px] font-bold uppercase tracking-wide text-gray-600">Resto del Nombre</label>
  <input type="text" name="segundo_nombre" value={formData.segundo_nombre} onChange={handleChange} className={`w-full rounded-xl border ${errors.segundo_nombre_invalido ? 'border-red-400 bg-white' : 'border-gray-200 bg-white'} px-3.5 py-2 text-xs focus:border-[#9B0F06] focus:ring-1 focus:ring-[#9B0F06] disabled:bg-gray-100 disabled:text-gray-500`} disabled={mode === 'view'} />
  {errors.segundo_nombre_invalido && <p className="mt-1 text-[8px] font-medium text-red-500">Solo letras</p>}
  </div>
@@ -421,7 +421,7 @@ export function EmpresaDrawer({ isOpen, onClose, onSave, mode = 'create', empres
  {errors.primer_apellido_invalido && <p className="mt-1 text-[8px] font-medium text-red-500">Solo letras</p>}
  </div>
  <div>
- <label className="mb-1.5 block text-[8px] font-bold uppercase tracking-wide text-gray-600">Segundo Apellido</label>
+ <label className="mb-1.5 block text-[8px] font-bold uppercase tracking-wide text-gray-600">Resto del Apellido</label>
  <input type="text" name="segundo_apellido" value={formData.segundo_apellido} onChange={handleChange} className={`w-full rounded-xl border ${errors.segundo_apellido_invalido ? 'border-red-400 bg-white' : 'border-gray-200 bg-white'} px-3.5 py-2 text-xs focus:border-[#9B0F06] focus:ring-1 focus:ring-[#9B0F06] disabled:bg-gray-100 disabled:text-gray-500`} disabled={mode === 'view'} />
  {errors.segundo_apellido_invalido && <p className="mt-1 text-[8px] font-medium text-red-500">Solo letras</p>}
  </div>

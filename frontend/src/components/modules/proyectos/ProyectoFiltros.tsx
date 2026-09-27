@@ -36,6 +36,7 @@ interface ProyectoFiltrosProps {
   setModoSeleccion?: React.Dispatch<React.SetStateAction<boolean>>
   seleccionados?: string[]
   onAbrirModalEliminar?: () => void
+  ocultarBorrador?: boolean
 }
 
 export default function ProyectoFiltros({
@@ -55,39 +56,49 @@ export default function ProyectoFiltros({
   onLimpiar,
   modoSeleccion = false,
   setModoSeleccion,
+  ocultarBorrador = false,
 }: ProyectoFiltrosProps) {
   const [departamentos, setDepartamentos] = useState<Departamento[]>([])
   const [municipiosData, setMunicipiosData] = useState<Municipio[]>([])
   const { showErrorToast } = useCustomToast()
 
-  useEffect(() => {
-    const controller = new AbortController()
-    const fetchLocations = async () => {
-      try {
-        const [resDep, resMun] = await Promise.all([
-          apiGetDeduplicado('/mantenimiento/departamento?limite=500'),
-          apiGetDeduplicado('/mantenimiento/municipio?limite=500')
-        ])
-        if (resDep.data?.success) setDepartamentos(resDep.data.data)
-        if (resMun.data?.success) setMunicipiosData(resMun.data.data)
-      } catch (error: any) {
-        if (error.name !== 'CanceledError') {
-          console.error('Error fetching locations:', error)
-        }
-      }
-    }
-    fetchLocations()
-    return () => controller.abort()
-  }, [])
+  const [locationsLoaded, setLocationsLoaded] = useState(false)
 
-  const estados: Array<{ value: EstadoProyecto | 'todos'; label: string }> = [
-    { value: 'todos', label: 'Todos' },
-    { value: 'borrador', label: 'Borradores' },
-    { value: 'activo', label: 'Activo' },
-    { value: 'en_revision', label: 'En Revisión' },
-    { value: 'completado', label: 'Completado' },
-    { value: 'cancelado', label: 'Cancelado' },
-  ]
+  const cargarUbicaciones = async () => {
+    if (locationsLoaded) return
+    try {
+      setLocationsLoaded(true)
+      const [resDep, resMun] = await Promise.all([
+        apiGetDeduplicado('/mantenimiento/departamento?limite=500'),
+        apiGetDeduplicado('/mantenimiento/municipio?limite=500')
+      ])
+      if (resDep.data?.success) setDepartamentos(resDep.data.data)
+      if (resMun.data?.success) setMunicipiosData(resMun.data.data)
+    } catch (error: any) {
+      console.error('Error fetching locations:', error)
+    }
+  }
+
+  useEffect(() => {
+    if (filtroDepa) {
+      void cargarUbicaciones()
+    }
+  }, [filtroDepa])
+
+  const estados: Array<{ value: EstadoProyecto | 'todos'; label: string }> = useMemo(() => {
+    const todosEstados: Array<{ value: EstadoProyecto | 'todos'; label: string }> = [
+      { value: 'todos', label: 'Todos' },
+      { value: 'borrador', label: 'Borradores' },
+      { value: 'activo', label: 'Activo' },
+      { value: 'en_revision', label: 'En Revisión' },
+      { value: 'completado', label: 'Completado' },
+      { value: 'pausado', label: 'Pausado' },
+    ]
+    if (ocultarBorrador) {
+      return todosEstados.filter((e) => e.value !== 'borrador')
+    }
+    return todosEstados
+  }, [ocultarBorrador])
 
   // Mostrar únicamente departamentos que cuentan con al menos 1 proyecto creado
   const departamentosConProyectos = useMemo(() => {
@@ -126,6 +137,9 @@ export default function ProyectoFiltros({
     )
   }, [filtroDepa, departamentos, municipiosData, proyectos])
 
+  const [fechaInicioError, setFechaInicioError] = useState(false)
+  const [fechaFinError, setFechaFinError] = useState(false)
+
   const getDiasEnMes = (mes: number, ano: number): number => {
     return new Date(ano, mes, 0).getDate()
   }
@@ -142,28 +156,42 @@ export default function ProyectoFiltros({
     if (month < 1 || month > 12) return { valida: false, error: 'Mes inválido' }
     const maxDias = getDiasEnMes(month, year)
     if (day > maxDias) {
-      return { valida: false, error: `${nombresMeses[month]} solo tiene hasta ${maxDias} días` }
+      return { valida: false, error: `La fecha no es válida. ${nombresMeses[month]} solo tiene hasta ${maxDias} días` }
     }
     if (day < 1) return { valida: false, error: 'Día inválido' }
-    if (year < 1900 || year > 2100) return { valida: false, error: 'Año inválido' }
+    if (year < 1900 || year > 2100) return { valida: false, error: 'Año fuera de rango' }
 
     return { valida: true }
   }
 
-  const handleFechaInicioChange = (val: string) => {
+  const handleFechaInicioChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const isBadInput = e.target.validity?.badInput
+    const val = e.target.value
+
+    if (isBadInput) {
+      setFechaInicioError(true)
+      setFiltroFechaInicio('INVALID')
+      showErrorToast('La fecha ingresada no existe en el calendario. Verifica el día y el mes.')
+      return
+    }
+
     if (!val) {
+      setFechaInicioError(false)
       setFiltroFechaInicio('')
       return
     }
+
     if (val.length === 10) {
       const resVal = esFechaCalendarioValida(val)
       if (!resVal.valida) {
+        setFechaInicioError(true)
+        setFiltroFechaInicio('INVALID')
         showErrorToast(resVal.error || 'La fecha ingresada no existe en el calendario')
-        setFiltroFechaInicio('')
         return
       }
+      setFechaInicioError(false)
       setFiltroFechaInicio(val)
-      if (filtroFechaFin && esFechaCalendarioValida(filtroFechaFin).valida) {
+      if (filtroFechaFin && filtroFechaFin !== 'INVALID' && esFechaCalendarioValida(filtroFechaFin).valida) {
         const inicio = new Date(val)
         const fin = new Date(filtroFechaFin)
         if (fin <= inicio) {
@@ -172,24 +200,39 @@ export default function ProyectoFiltros({
         }
       }
     } else {
+      setFechaInicioError(false)
       setFiltroFechaInicio(val)
     }
   }
 
-  const handleFechaFinChange = (val: string) => {
+  const handleFechaFinChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const isBadInput = e.target.validity?.badInput
+    const val = e.target.value
+
+    if (isBadInput) {
+      setFechaFinError(true)
+      setFiltroFechaFin('INVALID')
+      showErrorToast('La fecha ingresada no existe en el calendario. Verifica el día y el mes.')
+      return
+    }
+
     if (!val) {
+      setFechaFinError(false)
       setFiltroFechaFin('')
       return
     }
+
     if (val.length === 10) {
       const resVal = esFechaCalendarioValida(val)
       if (!resVal.valida) {
+        setFechaFinError(true)
+        setFiltroFechaFin('INVALID')
         showErrorToast(resVal.error || 'La fecha ingresada no existe en el calendario')
-        setFiltroFechaFin('')
         return
       }
+      setFechaFinError(false)
       setFiltroFechaFin(val)
-      if (filtroFechaInicio && esFechaCalendarioValida(filtroFechaInicio).valida) {
+      if (filtroFechaInicio && filtroFechaInicio !== 'INVALID' && esFechaCalendarioValida(filtroFechaInicio).valida) {
         const inicio = new Date(filtroFechaInicio)
         const fin = new Date(val)
         if (fin <= inicio) {
@@ -198,12 +241,13 @@ export default function ProyectoFiltros({
         }
       }
     } else {
+      setFechaFinError(false)
       setFiltroFechaFin(val)
     }
   }
 
   return (
-    <div className="w-full rounded-lg border border-gray-200 bg-white p-2 shadow-sm font-[Poppins]">
+    <div className="w-full rounded-lg border border-gray-200 bg-white p-2 shadow-sm font-[Poppins] relative z-20">
       <div className="flex flex-wrap items-center gap-2">
         {/* Búsqueda */}
         <div className="relative min-w-[200px] flex-1">
@@ -231,6 +275,8 @@ export default function ProyectoFiltros({
         {/* Departamento Dropdown */}
         <select
           value={filtroDepa}
+          onFocus={cargarUbicaciones}
+          onMouseEnter={cargarUbicaciones}
           onChange={(e) => {
             setFiltroDepa(e.target.value)
             setFiltroMuni('')
@@ -257,24 +303,28 @@ export default function ProyectoFiltros({
         </select>
 
         {/* Fecha Inicio */}
-        <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-md px-2 h-[32px] focus-within:border-[#9B0F06]">
-          <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Desde:</span>
+        <div className={`flex items-center gap-1 bg-white border rounded-md px-2 h-[32px] transition-colors ${
+          fechaInicioError ? 'border-red-500 ring-1 ring-red-400 bg-red-50/20' : 'border-gray-200 focus-within:border-[#9B0F06]'
+        }`}>
+          <span className={`text-[10px] font-bold uppercase tracking-wider ${fechaInicioError ? 'text-red-500' : 'text-gray-400'}`}>Desde:</span>
           <input
             type="date"
-            value={filtroFechaInicio}
-            onChange={(e) => handleFechaInicioChange(e.target.value)}
+            value={filtroFechaInicio === 'INVALID' ? '' : filtroFechaInicio}
+            onChange={handleFechaInicioChange}
             className="border-none bg-transparent text-[11px] font-medium text-gray-700 focus:outline-none"
           />
         </div>
 
         {/* Fecha Fin */}
-        <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-md px-2 h-[32px] focus-within:border-[#9B0F06]">
-          <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Hasta:</span>
+        <div className={`flex items-center gap-1 bg-white border rounded-md px-2 h-[32px] transition-colors ${
+          fechaFinError ? 'border-red-500 ring-1 ring-red-400 bg-red-50/20' : 'border-gray-200 focus-within:border-[#9B0F06]'
+        }`}>
+          <span className={`text-[10px] font-bold uppercase tracking-wider ${fechaFinError ? 'text-red-500' : 'text-gray-400'}`}>Hasta:</span>
           <input
             type="date"
-            value={filtroFechaFin}
-            min={filtroFechaInicio || undefined}
-            onChange={(e) => handleFechaFinChange(e.target.value)}
+            value={filtroFechaFin === 'INVALID' ? '' : filtroFechaFin}
+            min={filtroFechaInicio && filtroFechaInicio !== 'INVALID' ? filtroFechaInicio : undefined}
+            onChange={handleFechaFinChange}
             className="border-none bg-transparent text-[11px] font-medium text-gray-700 focus:outline-none"
           />
         </div>
@@ -282,7 +332,11 @@ export default function ProyectoFiltros({
         {/* Limpiar */}
         <button
           type="button"
-          onClick={onLimpiar}
+          onClick={() => {
+            setFechaInicioError(false)
+            setFechaFinError(false)
+            onLimpiar()
+          }}
           className="inline-flex shrink-0 items-center gap-1 rounded-md bg-gray-100 px-3 h-[32px] text-[10px] font-bold text-gray-600 transition-colors hover:bg-gray-200 cursor-pointer"
         >
           <X size={12} />

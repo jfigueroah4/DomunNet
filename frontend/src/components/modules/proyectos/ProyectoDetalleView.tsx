@@ -243,9 +243,8 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
   }
 
   const tabs: Array<{ id: TabType; label: string; icon: typeof Info; badge?: number }> = [
-    { id: 'info', label: 'Info', icon: Info },
-    { id: 'programa', label: 'Programa de Trabajo', icon: CalendarDays },
-    { id: 'documentos', label: 'Documentos', icon: FolderOpen, badge: proyecto.documentos?.length || 0 },
+    { id: 'info', label: 'Informacion General', icon: Info },
+    { id: 'programa', label: 'Informacion Financiera', icon: CalendarDays },
   ]
 
   const equipoCompleto = proyecto.equipo || []

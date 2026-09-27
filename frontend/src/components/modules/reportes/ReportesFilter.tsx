@@ -17,6 +17,7 @@ interface ReportesFilterProps {
   todayStr: string
   seleccionarTodo: () => void
   limpiarSeleccion: () => void
+  proyectosList?: any[]
 }
 
 export function ReportesFilter({
@@ -46,8 +47,12 @@ export function ReportesFilter({
 export function ReportesSelects({
   proyectoId, handleCambiarProyecto, fechaDesde, setFechaDesde,
   fechaHasta, setFechaHasta, renglonFiltro, setRenglonFiltro,
-  renglonesProyectoActual, todayStr
+  renglonesProyectoActual, todayStr, proyectosList = PROYECTOS_MOCK
 }: ReportesFilterProps) {
+  const listaProyectosValidos = (proyectosList || PROYECTOS_MOCK).filter(
+    (p: any) => p.estado !== 'borrador' && p.estado_codigo !== 'borrador'
+  )
+
   return (
     <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
       <label className="text-[10px] font-semibold text-gray-500 flex flex-col min-w-0">
@@ -57,9 +62,9 @@ export function ReportesSelects({
           onChange={(event) => handleCambiarProyecto(event.target.value)}
           className="mt-1 h-8 w-full rounded-md border border-gray-200 px-2 text-[10px] text-gray-800 outline-none focus:border-[#9B0F06] font-medium cursor-pointer"
         >
-          {PROYECTOS_MOCK.map((proyecto) => (
+          {listaProyectosValidos.map((proyecto: any) => (
             <option key={proyecto.id} value={proyecto.id}>
-              {proyecto.codigo} · {proyecto.nombre}
+              {proyecto.codigo || 'PROY'} · {proyecto.nombre || proyecto.nombre_oficial}
             </option>
           ))}
         </select>
