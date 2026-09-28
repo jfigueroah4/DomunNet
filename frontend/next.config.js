@@ -66,10 +66,12 @@ const nextConfig = {
     ];
   },
   async rewrites() {
+    const rawUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+    const baseUrl = rawUrl.replace(/\/api\/?$/, '').replace(/\/$/, '');
     return [
       {
         source: '/api/:path*',
-        destination: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/:path*',
+        destination: `${baseUrl}/api/:path*`,
       },
     ];
   },
