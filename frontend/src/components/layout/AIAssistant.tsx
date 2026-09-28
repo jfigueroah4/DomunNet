@@ -22,12 +22,12 @@ const getRoleSuggestions = (userRole?: string) => {
   if (roleLower.includes('admin') || roleLower.includes('director') || roleLower.includes('gerente')) {
     return {
       roleTitle: userRole || 'Administrador',
-      title: 'Consultas sugeridas:',
+      title: 'Consultas sugeridas sobre módulos:',
       items: [
-        { label: '📁 Resumen de proyectos', query: 'Generar un resumen ejecutivo de los proyectos activos' },
-        { label: '⚠️ Incidentes críticos', query: 'Listar incidentes críticos abiertos en obra' },
-        { label: '📊 Estado presupuestario', query: 'Status general de presupuestos y ejecución' },
-        { label: '👥 Usuarios del sistema', query: 'Resumen de usuarios y roles activos' },
+        { label: 'Resumen de proyectos', query: 'Generar un resumen ejecutivo de los proyectos activos' },
+        { label: 'Incidentes críticos', query: 'Listar incidentes críticos abiertos en obra' },
+        { label: 'Estado presupuestario', query: 'Status general de presupuestos y ejecución' },
+        { label: 'Usuarios del sistema', query: 'Resumen de usuarios y roles activos' },
       ]
     };
   }
@@ -35,27 +35,33 @@ const getRoleSuggestions = (userRole?: string) => {
   if (roleLower.includes('supervis') || roleLower.includes('resident') || roleLower.includes('ingenier')) {
     return {
       roleTitle: userRole || 'Supervisor / Residente',
-      title: 'Consultas sugeridas:',
+      title: 'Consultas sugeridas sobre módulos:',
       items: [
-        { label: '📋 Bitácoras de hoy', query: 'Bitácoras pendientes de validación hoy' },
-        { label: '📈 Avance de obra', query: 'Avance físico vs planificado del proyecto' },
-        { label: '📸 Fotos de inspección', query: 'Fotos de inspección de campo recientes' },
-        { label: '🏗️ Renglones en curso', query: 'Renglones de trabajo en ejecución' },
+        { label: 'Bitácoras de hoy', query: 'Bitácoras pendientes de validación hoy' },
+        { label: 'Avance de obra', query: 'Avance físico vs planificado del proyecto' },
+        { label: 'Fotos de inspección', query: 'Fotos de inspección de campo recientes' },
+        { label: 'Renglones en curso', query: 'Renglones de trabajo en ejecución' },
       ]
     };
   }
 
   return {
     roleTitle: userRole || 'Usuario DomunNet',
-    title: 'Consultas sugeridas:',
+    title: 'Consultas sugeridas sobre módulos:',
     items: [
-      { label: '📁 Proyectos activos', query: 'Tabla de proyectos activos' },
-      { label: '📋 Estado de bitácora', query: 'Estadísticas generales de bitácora' },
-      { label: '⚠️ Incidentes abiertos', query: 'Mostrar incidentes abiertos' },
-      { label: '📸 Galería de fotos', query: 'Ver fotos recientes de obras' },
+      { label: 'Proyectos activos', query: 'Tabla de proyectos activos' },
+      { label: 'Estado de bitácora', query: 'Estadísticas generales de bitácora' },
+      { label: 'Incidentes abiertos', query: 'Mostrar incidentes abiertos' },
+      { label: 'Galería de fotos', query: 'Ver fotos recientes de obras' },
     ]
   };
 };
+
+function formatCleanMessage(text: string) {
+  if (!text) return '';
+  // Eliminar signos de numeral de encabezados Markdown (##, ###)
+  return text.replace(/^#{1,6}\s+/gm, '');
+}
 
 export default function AIAssistant({ isOpen, onClose }: AIAssistantProps) {
   const { profile } = useAuthStore();
@@ -212,31 +218,33 @@ export default function AIAssistant({ isOpen, onClose }: AIAssistantProps) {
           </div>
         </div>
 
-        {/* Opciones de Mensajes / Sugerencias Rápidas para el Chat */}
-        <div className="border-b border-[#E8DEC8] bg-[#FAF7F0] px-3.5 py-2.5">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[10px] font-semibold text-[#8C7A6B] uppercase tracking-wider">
-              {roleData.title}
-            </span>
-            {roleData.roleTitle && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#EFE8DC] text-[#6B5A4B] text-[9px] font-medium">
-                <UserCheck size={10} className="text-[#78350F]" />
-                {roleData.roleTitle}
+        {/* Opciones de Mensajes / Sugerencias Rápidas para el Chat (Solo al inicio del chat) */}
+        {messages.length <= 1 && (
+          <div className="border-b border-[#E8DEC8] bg-[#FAF7F0] px-3.5 py-2.5">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[10px] font-semibold text-[#8C7A6B] uppercase tracking-wider">
+                {roleData.title}
               </span>
-            )}
+              {roleData.roleTitle && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#EFE8DC] text-[#6B5A4B] text-[9px] font-medium">
+                  <UserCheck size={10} className="text-[#78350F]" />
+                  {roleData.roleTitle}
+                </span>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {roleData.items.map((suggestion) => (
+                <button
+                  key={suggestion.label}
+                  onClick={() => handleSendMessage(suggestion.query)}
+                  className="rounded-full border border-[#DFD3BE] bg-white px-2.5 py-1 text-left text-[10.5px] font-medium text-[#5A4839] transition-all hover:border-[#78350F]/40 hover:bg-[#F2EADB] hover:text-[#78350F] shadow-xs active:scale-95"
+                >
+                  {suggestion.label}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="flex flex-wrap gap-1.5">
-            {roleData.items.map((suggestion) => (
-              <button
-                key={suggestion.label}
-                onClick={() => handleSendMessage(suggestion.query)}
-                className="rounded-full border border-[#DFD3BE] bg-white px-2.5 py-1 text-left text-[10.5px] font-medium text-[#5A4839] transition-all hover:border-[#78350F]/40 hover:bg-[#F2EADB] hover:text-[#78350F] shadow-xs active:scale-95"
-              >
-                {suggestion.label}
-              </button>
-            ))}
-          </div>
-        </div>
+        )}
 
         {/* Área de Mensajes */}
         <div className="flex-1 space-y-3 overflow-y-auto bg-[#FDFBF7] p-4">
@@ -245,11 +253,11 @@ export default function AIAssistant({ isOpen, onClose }: AIAssistantProps) {
               <div
                 className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-xs leading-relaxed ${
                   msg.role === 'user'
-                    ? 'rounded-br-none bg-[#EFE6D8] text-[#3B2D22] border border-[#DFCFA] shadow-xs font-medium'
+                    ? 'rounded-br-none bg-[#EFE6D8] text-[#3B2D22] border border-[#DFCFA4] shadow-xs font-medium'
                     : 'rounded-bl-none border border-[#E7DEC8] bg-white text-slate-800 shadow-sm'
                 }`}
               >
-                {msg.content}
+                {formatCleanMessage(msg.content)}
               </div>
               {msg.timestamp && (
                 <span className="mt-1 px-1 text-[9px] text-[#A39486]">{msg.timestamp}</span>

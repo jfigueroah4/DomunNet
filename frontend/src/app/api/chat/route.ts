@@ -10,9 +10,14 @@ export async function POST(req: Request) {
     const groqKey = process.env.GROQ_API_KEY || process.env.NEXT_PUBLIC_GROQ_API_KEY;
     const grokKey = process.env.GROK_API_KEY || process.env.NEXT_PUBLIC_GROK_API_KEY;
 
-    const nameContext = userFirstName ? ` El usuario se llama ${userFirstName}. Puedes dirigirte a él o saludarlo amablemente por su primer nombre.` : '';
+    const nameContext = userFirstName ? ` El usuario se llama ${userFirstName}. Dirígete a él o salúdalo con respeto por su primer nombre.` : '';
     const roleContext = userRole ? ` Su rol en el sistema es "${userRole}".` : '';
-    const systemPrompt = `Eres DomunBot, el asistente inteligente oficial del sistema DomunNet (Control de Obras y Supervisión de Proyectos).${nameContext}${roleContext} Responde siempre de forma clara, profesional, concisa, estructurada en formato Markdown, en español y con un estilo sobrio y corporativo (sin utilizar emojis).`;
+    const systemPrompt = `Eres DomunBot, el asistente inteligente oficial de DomunNet (Control de Obras y Supervisión).${nameContext}${roleContext}
+REGLAS ESTRICTAS DE RESPUESTA:
+- Responde siempre en español, de forma clara, directa, profesional y concisa.
+- NUNCA uses emojis de ningún tipo.
+- NUNCA uses símbolos de numeral (# o ##) para encabezados ni caracteres especiales decorativos. Usa texto limpio y títulos en mayúsculas o negrita suave si es necesario.
+- Puedes usar listas con guiones (-) simples para enumerar puntos.`;
 
     // 1. Proveedor: Google Gemini (100% GRATIS sin tarjeta en aistudio.google.com)
     if (geminiKey) {
