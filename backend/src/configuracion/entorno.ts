@@ -31,6 +31,13 @@ export const entorno = {
   gcsProjectId: process.env.GCS_PROJECT_ID || '',
   gcsKeyFile: process.env.GCS_KEY_FILE || '',
   gcsBucketName: process.env.GCS_BUCKET_NAME || '',
+  b2: {
+    endpoint: process.env.B2_ENDPOINT || '',
+    region: process.env.B2_REGION || 'us-east-005',
+    bucketName: process.env.B2_BUCKET_NAME || '',
+    keyId: process.env.B2_KEY_ID || '',
+    applicationKey: process.env.B2_APPLICATION_KEY || '',
+  },
 }
 
 export function validarEntorno() {
