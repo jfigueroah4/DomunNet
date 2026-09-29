@@ -415,7 +415,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
       {/* CONTENIDO DE PESTAÑA: INFORMACIÓN GENERAL */}
       {tabMaestra === 'general' && (
         <div className="space-y-3">
-          {/* Sub-Pestañas Horizontales de Información General (Tamaño de fuente compacto) */}
+          {/* Sub-Pestañas Horizontales de Información General (Tamaño compacto y color gris-beige) */}
           <div className="flex flex-wrap items-center gap-1 rounded-xl border border-gray-200 bg-white p-1 shadow-2xs">
             {subTabsGeneral.map((st) => {
               const Icon = st.icon
@@ -425,13 +425,13 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                   key={st.id}
                   type="button"
                   onClick={() => setSubTabGeneral(st.id)}
-                  className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[10px] font-bold transition-all ${
+                  className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[9.5px] font-bold transition-all ${
                     active
-                      ? 'bg-[#9B0F06] text-white shadow-2xs'
-                      : 'bg-transparent text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                      ? 'bg-[#EAE4DC] text-[#332A22] border border-[#D5CCC0] shadow-2xs'
+                      : 'bg-transparent text-gray-500 hover:bg-gray-100 hover:text-gray-800'
                   }`}
                 >
-                  <Icon size={11} />
+                  <Icon size={11} className={active ? 'text-[#78350F]' : 'text-gray-400'} />
                   <span>{st.label}</span>
                 </button>
               )
