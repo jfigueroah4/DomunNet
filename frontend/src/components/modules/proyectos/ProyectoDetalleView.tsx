@@ -380,7 +380,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
               type="button"
               onClick={() => setTabMaestra('general')}
               className={`flex h-8 items-center gap-1.5 px-3 text-[10px] font-bold transition-colors ${
-                tabMaestra === 'general' ? 'bg-[#9B0F06] text-white' : 'text-gray-600 hover:bg-gray-50'
+                tabMaestra === 'general' ? 'bg-gray-800 text-white' : 'text-gray-600 hover:bg-gray-50'
               }`}
             >
               <Info size={12} />
@@ -391,7 +391,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
               type="button"
               onClick={() => setTabMaestra('financiera')}
               className={`flex h-8 items-center gap-1.5 px-3 text-[10px] font-bold transition-colors ${
-                tabMaestra === 'financiera' ? 'bg-[#9B0F06] text-white' : 'text-gray-600 hover:bg-gray-50'
+                tabMaestra === 'financiera' ? 'bg-gray-800 text-white' : 'text-gray-600 hover:bg-gray-50'
               }`}
             >
               <CalendarDays size={12} />
@@ -1037,11 +1037,11 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
           {subTabGeneral === 'ubicacion' && (
             <div className="space-y-3">
               {/* Resumen del Tramo y Coordenadas */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
                 {/* Origen */}
-                <div className="rounded-xl border border-gray-200 bg-white p-3.5 shadow-2xs space-y-2">
-                  <div className="flex items-center gap-1.5 text-[#9B0F06] font-bold text-xs">
-                    <MapPin size={14} />
+                <div className="rounded-xl border border-gray-200 bg-white p-3 shadow-2xs space-y-1.5">
+                  <div className="flex items-center gap-1.5 text-[#9B0F06] font-bold text-[11px]">
+                    <MapPin size={13} />
                     <span>DIRECCIÓN INICIAL / ORIGEN</span>
                   </div>
                   <InfoField
@@ -1065,9 +1065,9 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                 </div>
 
                 {/* Destino */}
-                <div className="rounded-xl border border-gray-200 bg-white p-3.5 shadow-2xs space-y-2">
-                  <div className="flex items-center gap-1.5 text-blue-700 font-bold text-xs">
-                    <Navigation size={14} />
+                <div className="rounded-xl border border-gray-200 bg-white p-3 shadow-2xs space-y-1.5">
+                  <div className="flex items-center gap-1.5 text-blue-700 font-bold text-[11px]">
+                    <Navigation size={13} />
                     <span>DIRECCIÓN FINAL / DESTINO</span>
                   </div>
                   <InfoField
@@ -1090,25 +1090,25 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                   />
                 </div>
 
-                {/* Distancia y Coordenadas */}
-                <div className="rounded-xl border border-gray-200 bg-gradient-to-br from-gray-900 to-gray-800 p-4 text-white shadow-2xs flex flex-col justify-between">
+                {/* Distancia y Coordenadas (Tarjeta Blanca) */}
+                <div className="rounded-xl border border-gray-200 bg-white p-3 shadow-2xs flex flex-col justify-between">
                   <div>
-                    <div className="flex items-center gap-1.5 text-red-400 font-bold text-xs mb-2">
-                      <Route size={14} />
+                    <div className="flex items-center gap-1.5 text-gray-800 font-bold text-[11px] mb-1">
+                      <Route size={13} className="text-[#9B0F06]" />
                       <span>DISTANCIA DEL TRAMO</span>
                     </div>
-                    <p className="text-2xl font-black text-white">
+                    <p className="text-xl font-black text-gray-900">
                       {Math.max(1, (Number(pAny.kilometroFin || 10) - Number(pAny.kilometroInicio || 5))).toFixed(1)} km
                     </p>
-                    <p className="text-[10px] text-gray-300">
+                    <p className="text-[9.5px] text-gray-400">
                       ({(Math.max(1, (Number(pAny.kilometroFin || 10) - Number(pAny.kilometroInicio || 5))) * 1000).toLocaleString('es-GT')} m)
                     </p>
                   </div>
 
-                  <div className="border-t border-white/10 pt-2 text-[9px] font-mono text-gray-300 space-y-0.5">
+                  <div className="border-t border-gray-100 pt-2 text-[9px] font-mono text-gray-600 space-y-0.5 mt-2">
                     <p>Lat: {pAny.latitud ?? 14.623783}°</p>
                     <p>Lng: {pAny.longitud ?? -90.344353}°</p>
-                    <p className="text-[8px] text-gray-400">Sistema Geodésico WGS84</p>
+                    <p className="text-[8px] text-gray-400 font-sans">Sistema Geodésico WGS84</p>
                   </div>
                 </div>
               </div>
