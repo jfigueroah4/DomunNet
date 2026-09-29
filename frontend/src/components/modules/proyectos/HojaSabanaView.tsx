@@ -1,6 +1,6 @@
 // @ts-nocheck
 'use client'
-import React, { useState, useEffect, useMemo, Fragment } from 'react'
+import React, { useState, useEffect, useMemo, useRef, Fragment } from 'react'
 import { createPortal } from 'react-dom'
 import { api, apiGetDeduplicado } from '@/lib/api/cliente'
 import { useAuthStore } from '@/stores/useAuthStore'
@@ -628,6 +628,18 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
   const userRolNorm = ((userProfile as any)?.rol?.nombre || (userProfile as any)?.rol || '').toLowerCase().trim()
   const puedeProcesarPendientes = esAdminUser || userRolNorm.includes('admin') || userRolNorm.includes('residente') || ((userProfile as any)?.nivel_permisos || 0) >= 70
 
+  const tableScrollRef = useRef<HTMLDivElement>(null)
+
+  const scrollTable = (direction: 'left' | 'right') => {
+    if (tableScrollRef.current) {
+      const scrollAmount = tableScrollRef.current.clientWidth * 0.75
+      tableScrollRef.current.scrollBy({
+        left: direction === 'right' ? scrollAmount : -scrollAmount,
+        behavior: 'smooth',
+      })
+    }
+  }
+
   const [tabSeccion, setTabSeccion] = useState<'sabana' | 'analitico' | 'pendientes' | 'planificadoReal' | 'resumen'>('sabana')
   const [modoVistaLineaBase, setModoVistaLineaBase] = useState<'inicial' | 'modificada' | 'actual'>('actual')
   const modoVistaSabana = modoVistaLineaBase === 'actual' ? 'actual' : 'planificacion'
@@ -658,6 +670,17 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
     creadoEn: string
     creadoPor: string
   } | null>(null)
+
+  const diasRestantesEstimacion = useMemo(() => {
+    if (!estimacionEnProgreso?.fechaCorte) return null
+    const parsed = parseFechaRobust(estimacionEnProgreso.fechaCorte)
+    if (!parsed) return null
+    const hoy = new Date()
+    hoy.setHours(0, 0, 0, 0)
+    parsed.setHours(0, 0, 0, 0)
+    const diffMs = parsed.getTime() - hoy.getTime()
+    return Math.ceil(diffMs / (1000 * 60 * 60 * 24))
+  }, [estimacionEnProgreso?.fechaCorte])
 
   const [modalFinalizarEstimacionOpen, setModalFinalizarEstimacionOpen] = useState(false)
   const [modalCancelarEstimacionOpen, setModalCancelarEstimacionOpen] = useState(false)
@@ -855,7 +878,12 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                 avancesMensualesPlan: r.avances_mensuales_plan || r.avancesMensualesPlan || {},
               }))
               setRenglones(mapeados)
+            } else {
+              // Si el proyecto está en borrador o no tiene renglones configurados, cargar catálogo estandarizado en 0.00
+              setRenglones(GENERAR_RENGLONES_VACIOS())
             }
+          } else {
+            setRenglones(GENERAR_RENGLONES_VACIOS())
           }
         }
 
@@ -1681,6 +1709,39 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
     }
   }
 
+  const handleAbrirModalNuevaMedicion = () => {
+    setMedicionEnEdicion({
+      id: '',
+      codigoDGC: renglones[0]?.codigoDGC || '',
+      estacionInicio: '',
+      estacionFin: '',
+      longitudL: 0,
+      anchoA: 0,
+      alturaH: 0,
+      areaA: 0,
+      formulaNombre: 'Rectangular',
+      factorFormaK: 1,
+      volumenV: 0,
+      origenInfo: 'Libreta',
+      referenciaOrigen: '',
+      observaciones: '',
+      autorUsuarioId: '',
+      origenEntradaId: '',
+      creadoEn: new Date().toISOString()
+    })
+    setFormMedCodigoDGC(renglones[0]?.codigoDGC || '')
+    setFormMedEstacionInicio('')
+    setFormMedEstacionFin('')
+    setFormMedLongitud('0')
+    setFormMedAncho('0')
+    setFormMedAltura('0')
+    setFormMedFormula('Rectangular')
+    setFormMedFactorAjuste('1')
+    setFormMedOrigen('Libreta')
+    setFormMedReferenciaOrigen('')
+    setFormMedObservaciones('')
+  }
+
   const handleAbrirModalEditarMedicion = (m: MedicionAnaliticaCampo) => {
     setMedicionEnEdicion(m)
     setFormMedCodigoDGC(m.codigoDGC)
@@ -2278,6 +2339,24 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                     <span>{estimacionEnProgreso.creadoPor}</span>
                   </div>
 
+                  {diasRestantesEstimacion !== null && diasRestantesEstimacion <= 5 && (
+                    <>
+                      <span className="text-gray-300">|</span>
+                      <div className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9.5px] font-bold border ${
+                        diasRestantesEstimacion < 0
+                          ? 'bg-red-50 text-red-700 border-red-200'
+                          : 'bg-amber-50 text-amber-800 border-amber-200'
+                      }`}>
+                        <AlertTriangle size={11} className={diasRestantesEstimacion < 0 ? 'text-red-600' : 'text-amber-600'} />
+                        <span>
+                          {diasRestantesEstimacion < 0
+                            ? `Corte vencido (${Math.abs(diasRestantesEstimacion)} días)`
+                            : `Vence ${diasRestantesEstimacion === 0 ? 'hoy' : `en ${diasRestantesEstimacion} días`}`}
+                        </span>
+                      </div>
+                    </>
+                  )}
+
                   {estimacionEnProgreso.notas && (
                     <>
                       <span className="text-gray-300">|</span>
@@ -2533,7 +2612,29 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
 
       {/* TAB 1: [SÁBANA] — TABLA CON FUENTE POPPINS, REGULAR SALVO CÓDIGO */}
       {tabSeccion === 'sabana' && (
-        <div className="bg-white overflow-hidden rounded-md border-b border-gray-200/80 font-[Poppins]">
+        <div className="relative bg-white overflow-hidden rounded-md border-b border-gray-200/80 font-[Poppins] group">
+          {/* Botón Flotante para Desplazarse a Columnas I-R */}
+          <button
+            type="button"
+            onClick={() => scrollTable('right')}
+            className="absolute right-2 top-14 z-30 bg-white/90 hover:bg-white text-[#9B0F06] shadow-md backdrop-blur-xs border border-red-200 rounded-full px-2.5 py-1 transition-all hover:scale-105 flex items-center gap-1 text-[9.5px] font-semibold opacity-75 hover:opacity-100 cursor-pointer"
+            title="Desplazarse a columnas financieras (I a R)"
+          >
+            <span>Ver Col. I-R</span>
+            <ChevronRight size={13} />
+          </button>
+
+          {/* Botón Flotante para Regresar a Columnas A-H */}
+          <button
+            type="button"
+            onClick={() => scrollTable('left')}
+            className="absolute left-2 top-14 z-30 bg-white/90 hover:bg-white text-gray-700 shadow-md backdrop-blur-xs border border-gray-200 rounded-full px-2.5 py-1 transition-all hover:scale-105 flex items-center gap-1 text-[9.5px] font-semibold opacity-75 hover:opacity-100 cursor-pointer"
+            title="Regresar a columnas base (A a H)"
+          >
+            <ChevronLeft size={13} />
+            <span>Ver Col. A-H</span>
+          </button>
+
           {totalItems === 0 ? (
             <div className="p-8 text-center space-y-2">
               <AlertCircle size={24} className="mx-auto text-gray-400" />
@@ -2547,7 +2648,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
               </button>
             </div>
           ) : (
-            <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-270px)]">
+            <div ref={tableScrollRef} className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-270px)] scroll-smooth">
               <table className="w-full text-[9.5px] leading-tight">
                 <thead className="sticky top-0 z-20 bg-gray-50 shadow-2xs">
                   <tr className="border-b border-gray-300 bg-gray-50 text-gray-600 font-medium uppercase tracking-wider text-left text-[8.5px] whitespace-nowrap select-none">
