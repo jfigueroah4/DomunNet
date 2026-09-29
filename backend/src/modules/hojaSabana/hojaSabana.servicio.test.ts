@@ -68,6 +68,19 @@ describe('Módulo de Backend Hoja Sábana y Analítico (hojaSabana.servicio.ts)'
 
   it('debe bloquear nuevas mediciones, edición y eliminación cuando la estimación está finalizada', async () => {
     const estNum = 'Est. 09-BLOQUEADA'
+
+    // Crear una medición inicial para abrir la estimación
+    await HojaSabanaServicio.crearMedicion({
+      proyectoId: proyId,
+      codigoDGC: '201.01',
+      estacionInicio: '14+200',
+      estacionFin: '14+700',
+      longitudL: 500,
+      anchoA: 7.3,
+      origenTipo: 'Plano',
+      referenciaOrigen: 'Folio #98',
+      estimacionNum: estNum,
+    })
     
     // Finalizar la estimación
     await HojaSabanaServicio.finalizarEstimacion(proyId, estNum)

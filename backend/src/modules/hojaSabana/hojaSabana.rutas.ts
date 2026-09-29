@@ -4,6 +4,7 @@ import { requierePermisos } from '@/middlewares/permisos.middleware'
 import {
   listarMedicionesControlador,
   crearMedicionControlador,
+  actualizarMedicionControlador,
   eliminarMedicionControlador,
   finalizarEstimacionControlador,
 } from './hojaSabana.controlador'
@@ -22,6 +23,12 @@ hojaSabanaRutas.post(
   '/:proyectoId/mediciones',
   requierePermisos('hoja_sabana.crear', 'proyectos.actualizar'),
   crearMedicionControlador
+)
+
+hojaSabanaRutas.patch(
+  '/:proyectoId/mediciones/:medicionId',
+  requierePermisos('hoja_sabana.crear', 'proyectos.actualizar'),
+  actualizarMedicionControlador
 )
 
 hojaSabanaRutas.delete(

@@ -1,11 +1,13 @@
 import { clienteSupabase } from '../../configuracion/cliente-supabase'
-import { validarOperacionProyectoPermitida } from '../proyectos/proyectos.servicio'
+import { validarOperacionProyectoPermitida, ValidationError } from '../proyectos/proyectos.servicio'
 import {
   calcularCantidadMedicion,
   calcularLongitudEstaciones,
   parseEstacionAMetros,
   ResultadoCantidadMedicion,
   procesarMedicionRenglon,
+  redondearCentavos,
+  calcularLiquidacionEstimacion,
 } from '../../lib/calculos'
 
 export interface MedicionAnaliticaPayload {
@@ -225,6 +227,95 @@ export class HojaSabanaServicio {
     return registroNuevo
   }
 
+  static async actualizarMedicion(proyectoId: string, medicionId: string, updates: Partial<MedicionAnaliticaPayload>) {
+    if (!proyectoId || !medicionId) {
+      throw new Error('ID del proyecto y de la medición son requeridos.')
+    }
+
+    // Comprobar bloqueo de estimación finalizada
+    const list = medicionesAnaliticasMemoriaStore.get(proyectoId) || []
+    const enc = list.find((m) => m.id === medicionId)
+    const estNum = updates.estimacionNum || enc?.estimacion_num || enc?.estimacionNum || 'Est. 01'
+    const keyEst = `${proyectoId}_${estNum}`
+
+    if (estimacionesFinalizadasSet.has(keyEst)) {
+      throw new Error(`La estimación ${estNum} está finalizada. No se pueden modificar mediciones.`)
+    }
+
+    // Recalcular si se enviaron dimensiones o estaciones
+    let longitudUsar = updates.longitudL
+    if (updates.estacionInicio && updates.estacionFin) {
+      const calcL = calcularLongitudEstaciones(updates.estacionInicio, updates.estacionFin)
+      longitudUsar = updates.longitudL && updates.longitudL > 0 ? updates.longitudL : calcL
+    } else if (enc && (!updates.longitudL || updates.longitudL <= 0)) {
+      longitudUsar = enc.longitud_l || enc.longitudL || 0
+    }
+
+    const resMemoria = calcularCantidadMedicion({
+      unidad: updates.unidad || enc?.unidad || 'm3',
+      longitudL: longitudUsar ?? enc?.longitud_l ?? 0,
+      anchoA: updates.anchoA ?? enc?.ancho_a ?? enc?.anchoA ?? 0,
+      alturaH: updates.alturaH ?? enc?.altura_h ?? enc?.alturaH ?? 0,
+      multiplicador: updates.multiplicador ?? enc?.multiplicador ?? 1,
+      descuento: updates.descuento ?? enc?.descuento ?? 0,
+      tipoDescuento: updates.tipoDescuento ?? enc?.tipo_descuento ?? 'monto',
+      cantidadDirecta: updates.cantidadDirecta ?? enc?.cantidadDirecta,
+    })
+
+    const cantAjustada = updates.cantidadAjustada ?? enc?.cantidadAjustada ?? 999999
+    const acumuladoAnt = updates.acumuladoAnterior ?? enc?.acumuladoAnterior ?? 0
+    const precioUnit = updates.precioUnitario ?? enc?.precioUnitario ?? 1
+
+    const resTopes = procesarMedicionRenglon({
+      cantidadAjustada: cantAjustada,
+      acumuladoAnterior: acumuladoAnt,
+      medicionPeriodo: resMemoria.cantidadNeta || 0,
+      precioUnitario: precioUnit,
+    })
+
+    const camposActualizados: any = {
+      ...(updates.codigoDGC ? { codigo_dgc: updates.codigoDGC, codigoDGC: updates.codigoDGC } : {}),
+      ...(updates.estacionInicio ? { estacion_inicio: updates.estacionInicio, estacionInicio: updates.estacionInicio } : {}),
+      ...(updates.estacionFin ? { estacion_fin: updates.estacionFin, estacionFin: updates.estacionFin } : {}),
+      ...(longitudUsar !== undefined ? { longitud_l: longitudUsar, longitudL: longitudUsar } : {}),
+      ...(updates.anchoA !== undefined ? { ancho_a: updates.anchoA, anchoA: updates.anchoA } : {}),
+      ...(updates.alturaH !== undefined ? { altura_h: updates.alturaH, alturaH: updates.alturaH } : {}),
+      ...(updates.ladoVia ? { lado_via: updates.ladoVia, ladoVia: updates.ladoVia } : {}),
+      ...(updates.multiplicador !== undefined ? { multiplicador: updates.multiplicador } : {}),
+      ...(updates.descuento !== undefined ? { descuento: updates.descuento } : {}),
+      ...(updates.tipoDescuento ? { tipo_descuento: updates.tipoDescuento, tipoDescuento: updates.tipoDescuento } : {}),
+      cantidad_calculada: resMemoria.cantidadNeta,
+      cantidadCalculada: resMemoria.cantidadNeta,
+      cantidad_facturable: resTopes.facturablePeriodo,
+      cantidadFacturable: resTopes.facturablePeriodo,
+      cantidad_retenida: resTopes.retenidoPendiente,
+      cantidadRetenida: resTopes.retenidoPendiente,
+      ...(updates.referenciaOrigen ? { referencia_origen: updates.referenciaOrigen, referenciaOrigen: updates.referenciaOrigen } : {}),
+      ...(updates.observaciones !== undefined ? { observaciones: updates.observaciones } : {}),
+      updated_at: new Date().toISOString(),
+    }
+
+    try {
+      const { data, error } = await clienteSupabase
+        .from('medicion_analitica')
+        .update(camposActualizados)
+        .eq('id', medicionId)
+        .select()
+        .single()
+
+      if (!error && data) {
+        return data
+      }
+    } catch (e) {}
+
+    // Fallback memoria
+    const storeActual = medicionesAnaliticasMemoriaStore.get(proyectoId) || []
+    const updatedStore = storeActual.map((item) => (item.id === medicionId ? { ...item, ...camposActualizados } : item))
+    medicionesAnaliticasMemoriaStore.set(proyectoId, updatedStore)
+
+    return { id: medicionId, ...camposActualizados }
+  }
+
   static async eliminarMedicion(proyectoId: string, medicionId: string) {
     const list = medicionesAnaliticasMemoriaStore.get(proyectoId) || []
     const enc = list.find((m) => m.id === medicionId)
@@ -245,27 +336,321 @@ export class HojaSabanaServicio {
     return { ok: true }
   }
 
-  static async finalizarEstimacion(proyectoId: string, estimacionNum: string) {
-    const keyEst = `${proyectoId}_${estimacionNum}`
-    estimacionesFinalizadasSet.add(keyEst)
+  static async finalizarEstimacion(proyectoId: string, estimacionIdOrNum?: string, usuarioId?: string) {
+    if (!proyectoId) {
+      throw new ValidationError('El ID del proyecto es obligatorio', 'proyectoId')
+    }
 
-    try {
-      await clienteSupabase
-        .from('medicion_analitica')
-        .update({ estado_linea: 'Bloqueada' })
-        .eq('proyecto_id', proyectoId)
-        .eq('estimacion_num', estimacionNum)
-    } catch (e) {}
+    // 1. Obtener la estimación que se desea cerrar
+    let estimacionQuery = clienteSupabase.from('estimacion').select('*').eq('proyecto_id', proyectoId)
 
-    const list = medicionesAnaliticasMemoriaStore.get(proyectoId) || []
-    const updated = list.map((m) => {
-      if (m.estimacion_num === estimacionNum || m.estimacionNum === estimacionNum) {
-        return { ...m, estado_linea: 'Bloqueada', estadoLinea: 'Bloqueada' }
+    if (estimacionIdOrNum) {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(estimacionIdOrNum)
+      if (isUuid) {
+        estimacionQuery = estimacionQuery.eq('id', estimacionIdOrNum)
+      } else {
+        const numInt = parseInt(estimacionIdOrNum.replace(/[^\d]/g, ''), 10) || 1
+        estimacionQuery = estimacionQuery.eq('numero_estimacion', numInt)
       }
-      return m
-    })
-    medicionesAnaliticasMemoriaStore.set(proyectoId, updated)
+    } else {
+      estimacionQuery = estimacionQuery.eq('estado', 'En progreso')
+    }
 
-    return { ok: true, mensaje: `Estimación ${estimacionNum} finalizada y bloqueada exitosamente.` }
+    const { data: est, error: errEst } = await estimacionQuery.maybeSingle()
+
+    if (errEst || !est) {
+      if (estimacionIdOrNum) {
+        estimacionesFinalizadasSet.add(`${proyectoId}_${estimacionIdOrNum}`)
+        return {
+          ok: true,
+          mensaje: `Estimación ${estimacionIdOrNum} finalizada con éxito.`,
+        }
+      }
+      throw new ValidationError('No existe una estimación en progreso para el proyecto especificado.', 'estimacion')
+    }
+
+    if (est.estado === 'Finalizada') {
+      throw new ValidationError(`La estimación ${est.numero_estimacion} (${est.codigo_estimacion}) ya se encuentra finalizada e inmutable.`, 'estado')
+    }
+
+    const estId = est.id
+    const estNum = est.numero_estimacion
+
+    // 2. Seleccionar filas aprobadas en bitacora_pendiente para esta estimación
+    const { data: pendientesAprobados, error: errPend } = await clienteSupabase
+      .from('bitacora_pendiente')
+      .select(`
+        *,
+        renglon:renglon_id(
+          id,
+          codigo,
+          descripcion,
+          cantidad_contractual,
+          cantidad_ajustada,
+          precio_unitario_directo,
+          tipo_renglon,
+          aplica_indirectos,
+          aplica_iva
+        )
+      `)
+      .eq('proyecto_id', proyectoId)
+      .eq('estado_conciliacion', 'Aprobado')
+      .is('anulado_en', null)
+      .or(`estimacion_id.eq.${estId},estimacion_origen.eq.${estNum}`)
+
+    if (errPend || !pendientesAprobados || pendientesAprobados.length === 0) {
+      throw new ValidationError(`No hay registros aprobados para trasladar en la estimación ${estNum}.`, 'pendientes')
+    }
+
+    // 3. Agrupar pendientes por renglon_id
+    const pendientesPorRenglon = new Map<string, any[]>()
+    for (const p of pendientesAprobados) {
+      const list = pendientesPorRenglon.get(p.renglon_id) || []
+      list.push(p)
+      pendientesPorRenglon.set(p.renglon_id, list)
+    }
+
+    // 4. Procesar cada renglón: disponible, topes, split y fotografia en estimacion_detalle
+    const detallesInsertar: any[] = []
+    let sumaMontoDirectoPeriodo = 0
+    let sumaMontoRenglonGlobal = 0
+
+    for (const [renglonId, filasPendientes] of pendientesPorRenglon.entries()) {
+      const primerPend = filasPendientes[0]
+      const renglon = Array.isArray(primerPend.renglon) ? (primerPend.renglon[0] || {}) : (primerPend.renglon || {})
+
+      const cantContractual = Number(renglon.cantidad_contractual) || 0
+      const cantAjustada = Number(renglon.cantidad_ajustada) || 0
+      const precioUnitario = Number(renglon.precio_unitario_directo) || 0
+      const tipoRenglon = renglon.tipo_renglon || 'COSTO_DIRECTO'
+      const aplicaIndirectos = renglon.aplica_indirectos !== false
+
+      // Consultar acumulado anterior exclusivamente de la última estimación 'Finalizada' en estimacion_detalle
+      const { data: ultDetalle } = await clienteSupabase
+        .from('estimacion_detalle')
+        .select('cantidad_acumulada, estimacion:estimacion_id!inner(estado, proyecto_id)')
+        .eq('renglon_id', renglonId)
+        .eq('estimacion.proyecto_id', proyectoId)
+        .eq('estimacion.estado', 'Finalizada')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      const cantidadAnterior = Number(ultDetalle?.cantidad_acumulada) || 0
+      const cantidadDisponible = Math.max(0, cantAjustada - cantidadAnterior)
+
+      let disponibleRestante = cantidadDisponible
+      let cantidadPeriodoTrasladada = 0
+
+      for (const fila of filasPendientes) {
+        const montoFila = Number(fila.cantidad_neta_cobrar) || 0
+
+        if (montoFila <= disponibleRestante) {
+          // Caso A: Cabe completo dentro del disponible
+          disponibleRestante -= montoFila
+          cantidadPeriodoTrasladada += montoFila
+
+          await clienteSupabase
+            .from('bitacora_pendiente')
+            .update({
+              estimacion_id: estId,
+              estimacion_origen: estNum,
+              estado_conciliacion: 'Trasladado' // Dispara trigger a bitacora_avance
+            })
+            .eq('id', fila.id)
+        } else if (disponibleRestante > 0) {
+          // Caso B: Excede el disponible. Realizar SPLIT.
+          const porcionTrasladable = disponibleRestante
+          const excesoRemanente = montoFila - porcionTrasladable
+          disponibleRestante = 0
+          cantidadPeriodoTrasladada += porcionTrasladable
+
+          // Update fila original con porcion dentro del tope y traslada
+          await clienteSupabase
+            .from('bitacora_pendiente')
+            .update({
+              cantidad_neta_cobrar: porcionTrasladable,
+              estimacion_id: estId,
+              estimacion_origen: estNum,
+              estado_conciliacion: 'Trasladado'
+            })
+            .eq('id', fila.id)
+
+          const insertPayload: any = {
+            proyecto_id: proyectoId,
+            renglon_id: renglonId,
+            bitacora_entrada_id: fila.bitacora_entrada_id,
+            registrado_por: fila.registrado_por,
+            fecha_medicion: fila.fecha_medicion,
+            estacion_inicial: fila.estacion_inicial,
+            estacion_final: fila.estacion_final,
+            longitud_medida: null,
+            ancho: null,
+            altura_espesor: null,
+            cantidad_neta_cobrar: excesoRemanente,
+            estado_conciliacion: 'Aprobado',
+            estimacion_id: null,
+            estimacion_origen: null,
+            observaciones: `Exceso derivado por tope contractual en Est. ${estNum} (Origen: ${fila.id})`
+          }
+
+          const { error: errSplit } = await clienteSupabase
+            .from('bitacora_pendiente')
+            .insert({
+              ...insertPayload,
+              bitacora_pendiente_origen_id: fila.id
+            })
+
+          if (errSplit) {
+            // Si la columna bitacora_pendiente_origen_id no existe aún en la BD (error PG 42703 o PostgREST PGRST204), reintentar sin ella
+            if (errSplit.code === '42703' || errSplit.code === 'PGRST204' || errSplit.message?.includes('bitacora_pendiente_origen_id')) {
+              const { error: errSplitFallback } = await clienteSupabase
+                .from('bitacora_pendiente')
+                .insert(insertPayload)
+              if (errSplitFallback) {
+                throw new Error(`Error al crear fila remanente de split: ${errSplitFallback.message}`)
+              }
+            } else {
+              throw new Error(`Error al crear fila remanente de split: ${errSplit.message}`)
+            }
+          }
+        } else {
+          // Disponible agotado: Permanece 'Aprobado' con estimacion_id = NULL
+          await clienteSupabase
+            .from('bitacora_pendiente')
+            .update({
+              estimacion_id: null,
+              estimacion_origen: null,
+              observaciones: `Sin cantidad contractual disponible en Est. ${estNum}`
+            })
+            .eq('id', fila.id)
+        }
+      }
+
+      // Guard contra división por cero
+      const cantidadAcumulada = cantidadAnterior + cantidadPeriodoTrasladada
+      const montoAnterior = redondearCentavos(cantidadAnterior * precioUnitario)
+      const montoPeriodo = redondearCentavos(cantidadPeriodoTrasladada * precioUnitario)
+      const montoAcumulado = redondearCentavos(cantidadAcumulada * precioUnitario)
+
+      const pctAvancePeriodo = cantAjustada > 0 ? Number(((cantidadPeriodoTrasladada / cantAjustada) * 100).toFixed(2)) : 0
+      const pctAvanceAcumulado = cantAjustada > 0 ? Number(((cantidadAcumulada / cantAjustada) * 100).toFixed(2)) : 0
+
+      // Clasificar monto en las bolsas según tipo_renglon y aplica_indirectos
+      if (tipoRenglon === 'COSTO_DIRECTO' || aplicaIndirectos) {
+        sumaMontoDirectoPeriodo += montoPeriodo
+      } else {
+        sumaMontoRenglonGlobal += montoPeriodo
+      }
+
+      detallesInsertar.push({
+        estimacion_id: estId,
+        renglon_id: renglonId,
+        cantidad_contractual: cantContractual,
+        cantidad_ajustada: cantAjustada,
+        cantidad_anterior: cantidadAnterior,
+        cantidad_periodo: cantidadPeriodoTrasladada,
+        cantidad_acumulada: cantidadAcumulada,
+        precio_unitario: precioUnitario,
+        monto_anterior: montoAnterior,
+        monto_periodo: montoPeriodo,
+        monto_acumulado: montoAcumulado,
+        porcentaje_avance_periodo: pctAvancePeriodo,
+        porcentaje_avance_acumulado: pctAvanceAcumulado
+      })
+    }
+
+    // Insertar fotografías en estimacion_detalle
+    const { error: errDet } = await clienteSupabase
+      .from('estimacion_detalle')
+      .insert(detallesInsertar)
+
+    if (errDet) {
+      throw new Error(`Error al registrar detalle de estimación: ${errDet.message}`)
+    }
+
+    // 5. Consultar parametro_proyecto para parámetros reales
+    const { data: paramProy } = await clienteSupabase
+      .from('parametro_proyecto')
+      .select('*')
+      .eq('proyecto_id', proyectoId)
+      .maybeSingle()
+
+    const normalizarPorcentaje = (val: any, fallback: number = 0): number => {
+      const num = Number(val)
+      if (isNaN(num) || num === 0) return fallback
+      return num > 0 && num <= 1 ? num * 100 : num
+    }
+
+    const porcentajeIndirectos = normalizarPorcentaje(paramProy?.porcentaje_indirectos ?? est.porcentaje_indirectos, 0)
+    const porcentajeIva = normalizarPorcentaje(paramProy?.porcentaje_iva ?? est.porcentaje_iva, 12.00)
+    const porcentajeAmortAnticipo = normalizarPorcentaje(paramProy?.porcentaje_amortizacion_anticipo ?? est.porcentaje_amortizacion_anticipo, 0)
+    const porcentajeRetencionGarantia = normalizarPorcentaje(paramProy?.porcentaje_retencion_garantia ?? est.porcentaje_retencion_garantia, 0)
+
+    // Consultar total anticipo y amortización acumulada anterior
+    const { data: estsPrevias } = await clienteSupabase
+      .from('estimacion')
+      .select('monto_amortizacion_anticipo')
+      .eq('proyecto_id', proyectoId)
+      .eq('estado', 'Finalizada')
+
+    const anticipoAmortizadoAnterior = (estsPrevias || []).reduce((sum, e) => sum + (Number(e.monto_amortizacion_anticipo) || 0), 0)
+    const anticipoRecibidoTotal = Number(paramProy?.monto_anticipo_total ?? paramProy?.monto_anticipo ?? paramProy?.anticipo_total_recibido) || 0
+
+    // Invocar liquidacion.ts
+    const resLiq = calcularLiquidacionEstimacion({
+      montoDirectoPeriodo: sumaMontoDirectoPeriodo,
+      porcentajeIndirectos,
+      porcentajeIva,
+      montoRenglonGlobal: sumaMontoRenglonGlobal,
+      excluirIndirectosIvaGlobal: sumaMontoRenglonGlobal > 0,
+      porcentajeAmortizacionAnticipo: porcentajeAmortAnticipo,
+      porcentajeRetencionGarantia: porcentajeRetencionGarantia,
+      anticipoRecibidoTotal,
+      anticipoAmortizadoAnterior
+    })
+
+    // 6. Marcar estimación como 'Finalizada' con la auditoría exigida
+    const fechaActual = new Date().toISOString()
+    const updatesEst = {
+      monto_costo_directo_periodo: sumaMontoDirectoPeriodo,
+      porcentaje_indirectos: porcentajeIndirectos,
+      monto_indirectos: resLiq.indirectos,
+      monto_renglones_globales: sumaMontoRenglonGlobal,
+      porcentaje_iva: porcentajeIva,
+      monto_iva: resLiq.iva,
+      monto_subtotal: resLiq.valorTotalEstimacion - resLiq.iva,
+      monto_total_estimacion: resLiq.valorTotalEstimacion,
+      porcentaje_amortizacion_anticipo: porcentajeAmortAnticipo,
+      monto_amortizacion_anticipo: resLiq.amortizacionPeriodo,
+      porcentaje_retencion_garantia: porcentajeRetencionGarantia,
+      monto_retencion_garantia: resLiq.retencionGarantia,
+      monto_neto_pagar: resLiq.totalAFavorContratista,
+      saldo_anticipo_remanente: resLiq.saldoAnticipoRemanente,
+      estado: 'Finalizada',
+      finalizada_en: fechaActual,
+      finalizada_por: usuarioId || null
+    }
+
+    const { error: errUpdEst } = await clienteSupabase
+      .from('estimacion')
+      .update(updatesEst)
+      .eq('id', estId)
+
+    if (errUpdEst) {
+      throw new Error(`Error al finalizar la estimación: ${errUpdEst.message}`)
+    }
+
+    return {
+      ok: true,
+      estimacionId: estId,
+      numeroEstimacion: estNum,
+      codigoEstimacion: est.codigo_estimacion,
+      estado: 'Finalizada',
+      montoDirectoPeriodo: sumaMontoDirectoPeriodo,
+      montoTotalEstimacion: resLiq.valorTotalEstimacion,
+      montoNetoPagar: resLiq.totalAFavorContratista,
+      detallesContados: detallesInsertar.length
+    }
   }
 }

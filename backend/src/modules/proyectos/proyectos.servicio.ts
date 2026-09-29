@@ -194,6 +194,7 @@ export async function activarReplanificacionProyecto(params: {
       .eq('proyecto_id', proyectoId)
   }
 
+  invalidarCacheProyectos()
   return true
 }
 
@@ -219,7 +220,6 @@ export async function actualizarEstadoProyecto(proyectoId: string, nuevoEstadoCo
         proyecto_detalle (
           monto_original,
           empresa_contratista_id,
-          empresa_contratista_ejecutora,
           fecha_inicio_contractual,
           fecha_adjudicacion
         )
@@ -243,12 +243,11 @@ export async function actualizarEstadoProyecto(proyectoId: string, nuevoEstadoCo
     }
 
     const tieneContratista = Boolean(
-      (detalle.empresa_contratista_id && String(detalle.empresa_contratista_id).trim() !== '') ||
-      (detalle.empresa_contratista_ejecutora && String(detalle.empresa_contratista_ejecutora).trim() !== '')
+      detalle.empresa_contratista_id && String(detalle.empresa_contratista_id).trim() !== ''
     )
 
     if (!tieneContratista) {
-      throw new ValidationError('No se puede activar: Debe asignar una Empresa Contratista Ejecutora.', 'empresa_contratista_ejecutora')
+      throw new ValidationError('No se puede activar: Debe asignar una Empresa Contratista Ejecutora.', 'empresa_contratista_id')
     }
 
     if (!detalle.fecha_inicio_contractual || !detalle.fecha_adjudicacion) {
@@ -279,6 +278,7 @@ export async function actualizarEstadoProyecto(proyectoId: string, nuevoEstadoCo
       })
   }
 
+  invalidarCacheProyectos()
   return true
 }
 
@@ -499,66 +499,111 @@ export async function obtenerProyectoPorId(proyectoId: string) {
     }
     const plazoStrCalc = plazoNumCalc ? `${plazoNumCalc} días` : (fInicioCalc && fFinCalc ? `${Math.round((new Date(fFinCalc).getTime() - new Date(fInicioCalc).getTime()) / 86400000)} días` : '')
 
-    return {
-      id: proyecto.id,
-      codigo: proyecto.codigo,
-      nombre: proyecto.nombre,
-      descripcion: detalle.descripcion_proyecto ?? proyecto.descripcion ?? '',
-      ubicacion: detalle.tramo ?? proyecto.ubicacion ?? '',
-      nombreOficial: detalle.nombre_oficial ?? proyecto.nombre,
-      ubicacionFisica: detalle.tramo ?? proyecto.ubicacion ?? '',
-      direccion: detalle.direccion ?? '',
-      latitud: detalle.latitud,
-      longitud: detalle.longitud,
-      coordenadasMapa: detalle.latitud != null && detalle.longitud != null
-        ? { lat: Number(detalle.latitud), lng: Number(detalle.longitud), puntoTexto: detalle.direccion ?? 'Punto de obra' }
-        : undefined,
-      municipioId: detalle.municipio_id,
-      departamentoId: detalle.departamento_id,
-      municipioFinId: detalle.municipio_fin_id,
-      departamentoFinId: detalle.departamento_fin_id,
-      direccionFin: detalle.direccion_fin ?? '',
-      kilometroInicio: detalle.kilometro_inicio,
-      kilometroFin: detalle.kilometro_fin,
-      empresaContratanteId: detalle.empresa_contratante_id ?? null,
-      entidadContratante: entidadContratanteNombre,
-      empresaContratistaId: detalle.empresa_contratista_id ?? null,
-      empresaContratista: empresaContratistaNombre,
-      empresaSupervisora: detalle.empresa_supervisora ?? '',
-      delegadoResidenteId: detalle.delegado_residente_id ?? null,
-      delegadoResidente: delegadoResidenteNombre,
-      responsableId: proyecto.responsable_id ?? null,
-      responsable_id: proyecto.responsable_id ?? null,
-      responsable: proyecto.responsable_id ?? null,
-      responsableNombre: responsableNombre || delegadoResidenteNombre || 'No asignado',
-      fechaAdjudicacion: detalle.fecha_adjudicacion ?? '',
-      fechaInicioContractual: detalle.fecha_inicio_contractual ?? fInicioCalc,
-      fechaInicio: fInicioCalc,
-      fechaFin: fFinCalc,
-      fechaFinContractualPlan: fFinCalc,
-      fechaFinalContractual: fFinCalc,
-      numeroEscrituraPublica: detalle.numero_escritura_publica ?? '',
-      montoContractualOriginal: detalle.monto_original ?? null,
-      presupuesto: detalle.monto_original ?? 0,
-      plazo: plazoStrCalc,
-      plazoContractual: plazoStrCalc,
-      plazo_ejecucion_original: detalle.plazo_ejecucion_original ?? null,
-      plazoEjecucionOriginal: detalle.plazo_ejecucion_original ?? null,
-      plazoEjecucionContractualOriginal: plazoStrCalc,
-      fechaFinalizacionReal: detalle.fecha_finalizacion_real ?? '',
-      plazoEjecucionRealAmpliado: detalle.plazo_ejecucion_ampliado ? `${detalle.plazo_ejecucion_ampliado} días` : '',
-      montoFinancieroFinalEjecutado: detalle.monto_final ?? null,
-      montoFinal: detalle.monto_final ?? null,
-      equipo,
-      estado: await resolverCodigoEstado(proyecto.estado_id),
-      parametro_proyecto: paramRow || null,
-      parametroProyecto: paramRow || null,
-      planTrabajo: mappedRenglones,
-      renglones: mappedRenglones,
-      paso2: {},
-      paso3: {},
+  let contratos: any[] = []
+  try {
+    const { data: cRows } = await clienteSupabase
+      .from('proyecto_contrato')
+      .select('*')
+      .eq('proyecto_id', proyectoId)
+    if (cRows && cRows.length > 0) {
+      contratos = cRows.map((c: any) => ({
+        id: c.id,
+        proyectoId: c.proyecto_id,
+        tipo: c.tipo,
+        empresaNombre: c.empresa_nombre,
+        propietario: c.propietario,
+        registroMercantil: c.registro_mercantil,
+        direccion: c.direccion,
+        telefono: c.telefono,
+        correo: c.correo,
+        responsable: c.responsable,
+        licitacionNumero: c.licitacion_numero,
+        actaInicioNumero: c.acta_inicio_numero,
+        programa: c.programa,
+        subprograma: c.subprograma,
+        fuenteFinanciamiento: c.fuente_financiamiento,
+        partidaFondos: c.partida_fondos,
+        cdp: c.cdp,
+        contratoNumero: c.contrato_numero,
+        acuerdoMinisterial: c.acuerdo_ministerial,
+        montoOriginal: Number(c.monto_original) || 0,
+        porcentajeAnticipo: Number(c.porcentaje_anticipo) || 0,
+        montoAnticipo: Number(c.monto_anticipo) || 0,
+        fechaInicio: c.fecha_inicio,
+        plazoMesesDetalle: c.plazo_meses_detalle,
+        fechaFin: c.fecha_fin,
+      }))
     }
+  } catch (err) {
+    console.error('Error cargando proyecto_contrato:', err)
   }
+
+  const contratoEjecucion = contratos.find((c) => c.tipo === 'EJECUCION') || null
+  const contratoSupervision = contratos.find((c) => c.tipo === 'SUPERVISION') || null
+
+  return {
+    id: proyecto.id,
+    codigo: proyecto.codigo,
+    nombre: proyecto.nombre,
+    descripcion: detalle.descripcion_proyecto ?? proyecto.descripcion ?? '',
+    ubicacion: detalle.tramo ?? proyecto.ubicacion ?? '',
+    nombreOficial: detalle.nombre_oficial ?? proyecto.nombre,
+    ubicacionFisica: detalle.tramo ?? proyecto.ubicacion ?? '',
+    direccion: detalle.direccion ?? '',
+    latitud: detalle.latitud,
+    longitud: detalle.longitud,
+    coordenadasMapa: detalle.latitud != null && detalle.longitud != null
+      ? { lat: Number(detalle.latitud), lng: Number(detalle.longitud), puntoTexto: detalle.direccion ?? 'Punto de obra' }
+      : undefined,
+    municipioId: detalle.municipio_id,
+    departamentoId: detalle.departamento_id,
+    municipioFinId: detalle.municipio_fin_id,
+    departamentoFinId: detalle.departamento_fin_id,
+    direccionFin: detalle.direccion_fin ?? '',
+    kilometroInicio: detalle.kilometro_inicio,
+    kilometroFin: detalle.kilometro_fin,
+    empresaContratanteId: detalle.empresa_contratante_id ?? null,
+    entidadContratante: entidadContratanteNombre,
+    empresaContratistaId: detalle.empresa_contratista_id ?? null,
+    empresaContratista: empresaContratistaNombre,
+    empresaSupervisora: detalle.empresa_supervisora ?? '',
+    delegadoResidenteId: detalle.delegado_residente_id ?? null,
+    delegadoResidente: delegadoResidenteNombre,
+    responsableId: proyecto.responsable_id ?? null,
+    responsable_id: proyecto.responsable_id ?? null,
+    responsable: proyecto.responsable_id ?? null,
+    responsableNombre: responsableNombre || delegadoResidenteNombre || 'No asignado',
+    fechaAdjudicacion: detalle.fecha_adjudicacion ?? '',
+    fechaInicioContractual: detalle.fecha_inicio_contractual ?? fInicioCalc,
+    fechaInicio: fInicioCalc,
+    fechaFin: fFinCalc,
+    fechaFinContractualPlan: fFinCalc,
+    fechaFinalContractual: fFinCalc,
+    numeroEscrituraPublica: detalle.numero_escritura_publica ?? '',
+    montoContractualOriginal: detalle.monto_original ?? null,
+    presupuesto: detalle.monto_original ?? 0,
+    plazo: plazoStrCalc,
+    plazoContractual: plazoStrCalc,
+    plazo_ejecucion_original: detalle.plazo_ejecucion_original ?? null,
+    plazoEjecucionOriginal: detalle.plazo_ejecucion_original ?? null,
+    plazoEjecucionContractualOriginal: plazoStrCalc,
+    fechaFinalizacionReal: detalle.fecha_finalizacion_real ?? '',
+    plazoEjecucionRealAmpliado: detalle.plazo_ejecucion_ampliado ? `${detalle.plazo_ejecucion_ampliado} días` : '',
+    montoFinancieroFinalEjecutado: detalle.monto_final ?? null,
+    montoFinal: detalle.monto_final ?? null,
+    equipo,
+    estado: await resolverCodigoEstado(proyecto.estado_id),
+    parametro_proyecto: paramRow || null,
+    parametroProyecto: paramRow || null,
+    planTrabajo: mappedRenglones,
+    renglones: mappedRenglones,
+    contratoEjecucion,
+    contratoSupervision,
+    contratos,
+    paso2: {},
+    paso3: {},
+  }
+}
 
 async function resolverCodigoEstado(estadoId: string | null): Promise<string> {
   if (!estadoId) return 'borrador'
@@ -570,7 +615,22 @@ async function resolverCodigoEstado(estadoId: string | null): Promise<string> {
   return (data?.codigo || 'borrador').toLowerCase()
 }
 
+let cacheProyectosList: { data: any[]; timestamp: number } | null = null
+const TTL_CACHE_PROYECTOS_MS = 30 * 1000 // 30s de caché en memoria backend
+let cacheEstadoItems: Map<string, string> | null = null
+let cacheEstadoItemsTimestamp = 0
+
+export function invalidarCacheProyectos() {
+  cacheProyectosList = null
+}
+
 export async function obtenerProyectos() {
+  if (cacheProyectosList && Date.now() - cacheProyectosList.timestamp < TTL_CACHE_PROYECTOS_MS) {
+    return cacheProyectosList.data
+  }
+
+  const necesitanEstados = !cacheEstadoItems || (Date.now() - cacheEstadoItemsTimestamp > 10 * 60 * 1000)
+  
   const [proyectosRes, estadoItemsRes] = await Promise.all([
     clienteSupabase
       .from('proyecto')
@@ -607,23 +667,28 @@ export async function obtenerProyectos() {
         )
       `)
       .order('created_at', { ascending: false }),
-    clienteSupabase
-      .from('catalogo_item')
-      .select('id, codigo, catalogo!inner(codigo)')
-      .eq('catalogo.codigo', 'estado_proyecto'),
+    necesitanEstados
+      ? clienteSupabase
+          .from('catalogo_item')
+          .select('id, codigo, catalogo!inner(codigo)')
+          .eq('catalogo.codigo', 'estado_proyecto')
+      : Promise.resolve({ data: null, error: null }),
   ])
 
   if (proyectosRes.error) {
     console.error('Error obteniendo lista de proyectos:', proyectosRes.error)
-    return []
+    return cacheProyectosList?.data || []
   }
 
-  const estadoMapa = new Map<string, string>()
-  if (estadoItemsRes.data) {
+  if (estadoItemsRes.data && Array.isArray(estadoItemsRes.data)) {
+    cacheEstadoItems = new Map<string, string>()
     for (const item of estadoItemsRes.data) {
-      estadoMapa.set(item.id, item.codigo.toLowerCase())
+      cacheEstadoItems.set(item.id, item.codigo.toLowerCase())
     }
+    cacheEstadoItemsTimestamp = Date.now()
   }
+
+  const estadoMapa = cacheEstadoItems || new Map<string, string>()
 
   const delegadoIds = Array.from(
     new Set(
@@ -652,7 +717,7 @@ export async function obtenerProyectos() {
     }
   }
 
-  return (proyectosRes.data || []).map((p: any) => {
+  const resultado = (proyectosRes.data || []).map((p: any) => {
     const d = Array.isArray(p.proyecto_detalle) ? p.proyecto_detalle[0] : p.proyecto_detalle || {}
     const fInicio = d.fecha_inicio_contractual || p.fecha_inicio || d.fecha_adjudicacion || ''
     const plazoNum = d.plazo_ejecucion_original || d.plazo_ejecucion_ampliado || null
@@ -700,9 +765,16 @@ export async function obtenerProyectos() {
       responsable: responsableNombre,
     }
   })
+
+  return resultado
 }
 
 export async function crearProyecto(datosFormulario: any) {
+  const nombreFinal = (datosFormulario.nombreOficial || datosFormulario.nombre || '').trim()
+  if (!nombreFinal) {
+    throw new ValidationError('El nombre del proyecto es obligatorio.', 'nombre')
+  }
+
   // 1. Resolver estado ('borrador', 'activo', etc.) desde datosFormulario
   const estadoCodigo = (datosFormulario.estado || 'borrador').toLowerCase()
   const estadoId = await obtenerEstadoIdPorCodigo(estadoCodigo)
@@ -724,9 +796,9 @@ export async function crearProyecto(datosFormulario: any) {
     .from('proyecto')
     .insert({
       codigo: datosFormulario.codigo || `PROY-${Math.floor(Math.random()*10000)}`, // Provisional
-      nombre: datosFormulario.nombreOficial,
-      descripcion: datosFormulario.descripcion,
-      ubicacion: datosFormulario.ubicacionFisica,
+      nombre: nombreFinal,
+      descripcion: datosFormulario.descripcion || null,
+      ubicacion: datosFormulario.ubicacionFisica || null,
       fecha_inicio: fechaInicio,
       fecha_fin_estimada: fechaFinEstimada,
       responsable_id: datosFormulario.responsable || null,
@@ -828,6 +900,9 @@ export async function crearProyecto(datosFormulario: any) {
       monto_anticipo_total: 0
     });
   if (errorParam) console.error('PARAMETRO_PROYECTO AUTO-INSERT ERROR:', errorParam);
+
+  await guardarContratosProyecto(proyecto.id, datosFormulario);
+  invalidarCacheProyectos();
 
   return proyecto.id
 }
@@ -970,7 +1045,74 @@ export async function actualizarProyecto(proyectoId: string, datosFormulario: Re
     }
   }
 
+  await guardarContratosProyecto(proyectoId, datosFormulario)
+  invalidarCacheProyectos()
+
   return { id: proyectoId }
+}
+
+async function guardarContratosProyecto(proyectoId: string, datosFormulario: any) {
+  try {
+    const listaContratos: any[] = []
+    if (datosFormulario.contratoEjecucion) {
+      listaContratos.push({ ...datosFormulario.contratoEjecucion, tipo: 'EJECUCION' })
+    }
+    if (datosFormulario.contratoSupervision) {
+      listaContratos.push({ ...datosFormulario.contratoSupervision, tipo: 'SUPERVISION' })
+    }
+    if (Array.isArray(datosFormulario.contratos)) {
+      for (const c of datosFormulario.contratos) {
+        if (c && c.tipo && !listaContratos.some((x) => x.tipo === c.tipo)) {
+          listaContratos.push(c)
+        }
+      }
+    }
+
+    for (const c of listaContratos) {
+      const row: any = {
+        proyecto_id: proyectoId,
+        tipo: c.tipo,
+        empresa_nombre: c.empresaNombre || c.empresa_nombre || null,
+        propietario: c.propietario || null,
+        registro_mercantil: c.registroMercantil || c.registro_mercantil || null,
+        direccion: c.direccion || null,
+        telefono: c.telefono || null,
+        correo: c.correo || null,
+        responsable: c.responsable || null,
+        licitacion_numero: c.licitacionNumero || c.licitacion_numero || null,
+        acta_inicio_numero: c.actaInicioNumero || c.acta_inicio_numero || null,
+        programa: c.programa || null,
+        subprograma: c.subprograma || null,
+        fuente_financiamiento: c.fuenteFinanciamiento || c.fuente_financiamiento || null,
+        partida_fondos: c.partidaFondos || c.partida_fondos || null,
+        cdp: c.cdp || null,
+        contrato_numero: c.contratoNumero || c.contrato_numero || null,
+        acuerdo_ministerial: c.acuerdoMinisterial || c.acuerdo_ministerial || null,
+        monto_original: Number(c.montoOriginal || c.monto_original) || 0,
+        porcentaje_anticipo: Number(c.porcentajeAnticipo || c.porcentaje_anticipo) || 0,
+        monto_anticipo: Number(c.montoAnticipo || c.monto_anticipo) || 0,
+        fecha_inicio: c.fechaInicio || c.fecha_inicio || null,
+        plazo_meses_detalle: c.plazoMesesDetalle || c.plazo_meses_detalle || null,
+        fecha_fin: c.fechaFin || c.fecha_fin || null,
+        updated_at: new Date().toISOString(),
+      }
+
+      const { data: existing } = await clienteSupabase
+        .from('proyecto_contrato')
+        .select('id')
+        .eq('proyecto_id', proyectoId)
+        .eq('tipo', c.tipo)
+        .maybeSingle()
+
+      if (existing?.id) {
+        await clienteSupabase.from('proyecto_contrato').update(row).eq('id', existing.id)
+      } else {
+        await clienteSupabase.from('proyecto_contrato').insert(row)
+      }
+    }
+  } catch (err) {
+    console.error('Error en guardarContratosProyecto:', err)
+  }
 }
 
 export async function eliminarProyecto(id: string) {
@@ -978,6 +1120,7 @@ export async function eliminarProyecto(id: string) {
   await clienteSupabase.from('proyecto_usuario').delete().eq('proyecto_id', id)
   const { error } = await clienteSupabase.from('proyecto').delete().eq('id', id)
   if (error) throw new Error(error.message)
+  invalidarCacheProyectos()
   return true
 }
 

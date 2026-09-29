@@ -40,6 +40,22 @@ export async function crearMedicionControlador(req: SolicitudAutenticada, res: R
   }
 }
 
+export async function actualizarMedicionControlador(req: SolicitudAutenticada, res: Response) {
+  try {
+    const { proyectoId, medicionId } = req.params
+    const body = req.body
+
+    if (!proyectoId || !medicionId) {
+      return sendError(res, 400, 'ID del proyecto y de la medición son obligatorios')
+    }
+
+    const registro = await HojaSabanaServicio.actualizarMedicion(proyectoId, medicionId, body)
+    return sendResponse(res, 200, registro, 'Medición actualizada exitosamente')
+  } catch (error: any) {
+    return sendError(res, 400, error.message || 'Error al actualizar medición analítica')
+  }
+}
+
 export async function eliminarMedicionControlador(req: SolicitudAutenticada, res: Response) {
   try {
     const { proyectoId, medicionId } = req.params
@@ -58,15 +74,19 @@ export async function eliminarMedicionControlador(req: SolicitudAutenticada, res
 export async function finalizarEstimacionControlador(req: SolicitudAutenticada, res: Response) {
   try {
     const { proyectoId } = req.params
-    const { estimacionNum } = req.body
+    const { estimacionNum, estimacionId } = req.body
 
-    if (!proyectoId || !estimacionNum) {
-      return sendError(res, 400, 'El ID del proyecto y número de estimación son obligatorios')
+    if (!proyectoId) {
+      return sendError(res, 400, 'El ID del proyecto es obligatorio')
     }
 
-    const resFin = await HojaSabanaServicio.finalizarEstimacion(proyectoId, estimacionNum)
-    return sendResponse(res, 200, resFin, 'Estimación finalizada')
+    const targetEst = estimacionId || estimacionNum
+    const usuarioId = (req.usuario as any)?.id
+
+    const resFin = await HojaSabanaServicio.finalizarEstimacion(proyectoId, targetEst, usuarioId)
+    return sendResponse(res, 200, resFin, 'Estimación finalizada exitosamente')
   } catch (error: any) {
-    return sendError(res, 400, error.message || 'Error al finalizar estimación')
+    const status = error.name === 'ValidationError' ? 400 : 500
+    return sendError(res, status, error.message || 'Error al finalizar estimación')
   }
 }
