@@ -21,7 +21,9 @@ export function BitacoraCard({ registro, onClick }: BitacoraCardProps) {
   }
 
   const tipoConfig = getTipoConfig(registro.tipo)
-  const tieneFotos = registro.adjuntos.some((a) => a.tipo === 'imagen') || registro.adjuntos.length > 0
+  const adjuntos = Array.isArray(registro.adjuntos) ? registro.adjuntos : []
+  const etiquetas = Array.isArray(registro.etiquetas) ? registro.etiquetas : []
+  const tieneFotos = adjuntos.some((a) => a.tipo === 'imagen') || adjuntos.length > 0
 
   return (
     <div
@@ -46,11 +48,33 @@ export function BitacoraCard({ registro, onClick }: BitacoraCardProps) {
               >
                 {registro.tipoIngreso === 'laboratorio' ? 'Laboratorio' : tipoConfig.label}
               </span>
+
+              {/* Renglón de Trabajo (pequeño) */}
+              {(() => {
+                const renglonTexto =
+                  (registro as any).renglon_nombre ||
+                  (registro as any).renglonNombre ||
+                  (registro as any).renglon?.descripcion ||
+                  (registro as any).renglon?.codigo ||
+                  (registro as any).categoriaTrabajo ||
+                  (registro as any).renglones?.[0]?.descripcion ||
+                  (registro as any).renglones?.[0]?.codigoDgc ||
+                  (registro.etiquetas && registro.etiquetas[0]) ||
+                  'Terracería'
+
+                return (
+                  <span className="text-[8px] font-semibold text-amber-900 bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded-md font-mono truncate max-w-[150px]">
+                    Renglón: {renglonTexto}
+                  </span>
+                )
+              })()}
+
               {/* Badge estado (Borrador, En Revisión, Aprobado, Publicado) */}
               <BitacoraEstadoBadge estado={registro.estado} />
-              {/* Etiquetas */}
-              {registro.etiquetas.map((etiqueta) => (
-                <span key={etiqueta} className="text-[8.5px] bg-gray-100 text-gray-600 px-1.5 py-0.2 rounded-full font-medium">
+              
+              {/* Etiquetas adicionales */}
+              {etiquetas.slice(1).map((etiqueta) => (
+                <span key={etiqueta} className="text-[8px] bg-gray-100 text-gray-600 px-1.5 py-0.2 rounded-md font-medium">
                   {etiqueta}
                 </span>
               ))}
@@ -86,7 +110,7 @@ export function BitacoraCard({ registro, onClick }: BitacoraCardProps) {
             {tieneFotos && (
               <span className="rounded bg-red-50 px-1.5 py-0.2 text-[8.5px] font-bold text-[#9B0F06] border border-red-100 flex items-center gap-1">
                 <Camera size={9} />
-                <span>Evidencia Fotos/GPS ({registro.adjuntos.length})</span>
+                <span>Evidencia Fotos/GPS ({adjuntos.length})</span>
               </span>
             )}
           </div>

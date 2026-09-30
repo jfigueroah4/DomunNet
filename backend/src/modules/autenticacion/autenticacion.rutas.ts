@@ -9,6 +9,7 @@ import {
 const router = Router()
 
 router.post('/iniciar-sesion', iniciarSesionControlador)
+router.post('/login', iniciarSesionControlador)
 router.post('/cerrar-sesion', cerrarSesionControlador)
 router.post('/logout', cerrarSesionControlador)
 router.get('/perfil', autenticarSolicitud, obtenerPerfilControlador)

@@ -186,7 +186,28 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
         const sabanaStored = localStorage.getItem('domun_alertas_sabana')
         if (sabanaStored) {
           const parsed = JSON.parse(sabanaStored)
-          if (Array.isArray(parsed)) sabanaNotifs = parsed
+          if (Array.isArray(parsed)) {
+            // Filtrar alertas: si es alerta de vencimiento de estimación, solo mostrársela al que creó la estimación
+            const currentUserName = (profile?.nombre || '').toLowerCase().trim()
+            const currentUsername = (profile?.username || '').toLowerCase().trim()
+            const currentUserId = profile?.id || ''
+            const currentUserEmail = ((profile as any)?.email || profile?.correo || '').toLowerCase().trim()
+
+            sabanaNotifs = parsed.filter((notif: any) => {
+              if (notif.tipo === 'vencimiento_hoy' && (notif.creadoPor || notif.creadoPorId)) {
+                const cPor = String(notif.creadoPor || '').toLowerCase().trim()
+                const cId = String(notif.creadoPorId || '')
+
+                const matchName = currentUserName && (cPor === currentUserName || cPor.includes(currentUserName) || currentUserName.includes(cPor))
+                const matchUser = currentUsername && (cPor === currentUsername || cPor.includes(currentUsername))
+                const matchEmail = currentUserEmail && (cPor === currentUserEmail)
+                const matchId = currentUserId && (cId === currentUserId)
+
+                return matchName || matchUser || matchEmail || matchId
+              }
+              return true
+            })
+          }
         }
         setNotificacionesSabana(sabanaNotifs)
 
@@ -364,7 +385,7 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
       <div className="flex items-center gap-2 sm:gap-4">
         {/* AI Button */}
         <button
-          onClick={() => setIsAIOpen(true)}
+          onClick={() => setIsAIOpen((prev) => !prev)}
           className="p-1.5 sm:p-2 rounded-full hover:bg-gray-100 transition-colors text-gray-600 hover:text-gray-800"
           title="Asistente IA"
         >
@@ -379,7 +400,7 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
         >
           <Ticket size={15} />
           {openTicketsCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 bg-[#9B0F06] text-white text-[8px] font-bold w-3.5 h-3.5 rounded-full flex items-center justify-center animate-pulse">
+            <span className="absolute -top-0.5 -right-0.5 bg-[#9B0F06] text-white text-[8px] font-bold w-3.5 h-3.5 rounded-full flex items-center justify-center">
               {openTicketsCount}
             </span>
           )}
@@ -393,7 +414,11 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
           >
             <Bell size={15} className="text-[#9B0F06]" />
             {unreadCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-[#9B0F06] text-white text-[8px] font-bold w-3.5 h-3.5 rounded-full flex items-center justify-center animate-pulse">
+              <span className={`absolute -top-1 -right-1 text-[8px] font-extrabold w-3.5 h-3.5 rounded-full flex items-center justify-center ${
+                notificacionesSabana.some((n: any) => n.tipo === 'vencimiento_hoy')
+                  ? 'bg-yellow-400 text-yellow-950 border border-yellow-500 shadow-xs'
+                  : 'bg-[#9B0F06] text-white'
+              }`}>
                 {unreadCount}
               </span>
             )}
@@ -421,31 +446,54 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
 
               <div className="max-h-64 overflow-y-auto divide-y divide-gray-100">
                 {[...notificacionesSabana, ...notificacionesTickets].length > 0 ? (
-                  [...notificacionesSabana, ...notificacionesTickets].slice(0, 8).map((notif: any) => (
-                    <button
-                      key={notif.id}
-                      onClick={() => {
-                        closeNotifications()
-                        router.push(notif.link || '/dashboard/tickets')
-                      }}
-                      className="w-full text-left p-3 hover:bg-gray-50 transition-colors flex items-start gap-2.5 cursor-pointer"
-                    >
-                      <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
-                        notif.tipo === 'hoja_sabana' ? 'bg-amber-100 text-amber-800' : 'bg-red-50 text-[#9B0F06]'
-                      }`}>
-                        {notif.tipo === 'hoja_sabana' ? <AlertTriangle size={12} /> : <Ticket size={12} />}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[10.5px] font-semibold text-gray-800 leading-tight truncate">
-                          {notif.title}
-                        </p>
-                        <p className="text-[9px] text-gray-400 mt-0.5 flex items-center justify-between">
-                          <span className="truncate">{notif.author}</span>
-                          <span>{notif.time}</span>
-                        </p>
-                      </div>
-                    </button>
-                  ))
+                  [...notificacionesSabana, ...notificacionesTickets].slice(0, 8).map((notif: any) => {
+                    const esVencimientoHoy = notif.tipo === 'vencimiento_hoy'
+                    return (
+                      <button
+                        key={notif.id}
+                        onClick={() => {
+                          closeNotifications()
+                          router.push(notif.link || '/dashboard/tickets')
+                        }}
+                        className={`w-full text-left p-3 transition-colors flex items-start gap-2.5 cursor-pointer border-b ${
+                          esVencimientoHoy
+                            ? 'bg-yellow-400 hover:bg-yellow-500 text-yellow-950 border-yellow-500 shadow-2xs'
+                            : 'hover:bg-gray-50 border-gray-100 text-gray-800'
+                        }`}
+                      >
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
+                          esVencimientoHoy
+                            ? 'bg-yellow-500 text-yellow-950 border border-yellow-600'
+                            : notif.tipo === 'hoja_sabana'
+                            ? 'bg-amber-100 text-amber-800'
+                            : 'bg-red-50 text-[#9B0F06]'
+                        }`}>
+                          {esVencimientoHoy ? (
+                            <AlertTriangle size={12} className="stroke-[2.5]" />
+                          ) : notif.tipo === 'hoja_sabana' ? (
+                            <AlertTriangle size={12} />
+                          ) : (
+                            <Ticket size={12} />
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className={`text-[10.5px] leading-tight truncate ${
+                            esVencimientoHoy ? 'font-black text-yellow-950' : 'font-semibold text-gray-800'
+                          }`}>
+                            {notif.title}
+                          </p>
+                          <p className={`text-[9px] mt-0.5 flex items-center justify-between ${
+                            esVencimientoHoy ? 'text-yellow-900 font-bold' : 'text-gray-400'
+                          }`}>
+                            <span className="truncate">{notif.author}</span>
+                            <span className={esVencimientoHoy ? 'bg-yellow-500 text-yellow-950 px-1.5 py-0.2 rounded text-[8px] font-black border border-yellow-600' : ''}>
+                              {notif.time}
+                            </span>
+                          </p>
+                        </div>
+                      </button>
+                    )
+                  })
                 ) : (
                   <div className="px-4 py-7 text-center flex flex-col items-center justify-center">
                     <Bell size={20} className="text-gray-300 mb-2 transition-transform duration-500 hover:rotate-12" />

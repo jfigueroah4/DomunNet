@@ -1,24 +1,27 @@
 import { TablaConfig } from '../mantenimiento.types';
 
 export const tipoEnsayoConfig: TablaConfig = {
-  "nombreTablaDb": "tipo_ensayo",
-  "permisoRequerido": "catalogos.write",
-  "columnasVisibles": "id, nombre, descripcion, unidad_resultado, activo",
-  "columnasFiltroOrden": [
+  nombreTablaDb: 'tipo_ensayo',
+  permisoRequerido: 'catalogos.write',
+  columnasVisibles: 'id, nombre, descripcion, unidad_resultado, activo',
+  columnasFiltroOrden: [
     "id",
     "nombre",
     "descripcion",
     "unidad_resultado",
     "activo"
-  ],
-  "columnasFiltroMenu": [
+],
+  dependenciasDelete: [
     {
-      "columna": "activo",
-      "tipo": "boolean",
-      "opciones": [
-        "true",
-        "false"
-      ]
+        "tablaDependiente": "ensayo_laboratorio",
+        "columnaFk": "tipo_ensayo_id",
+        "nombreLegible": "ensayo laboratorio"
     }
-  ]
+],
+  
+  
+  
+  
+  
+  
 };

@@ -153,6 +153,7 @@ export function ProyectosView() {
         `Se ${seleccionados.length === 1 ? 'eliminó el proyecto' : `eliminaron ${seleccionados.length} proyectos`} exitosamente`
       )
       limpiarCacheMemoria('/proyectos')
+      try { sessionStorage.removeItem('domun_proyectos_cache') } catch (e) {}
       setSeleccionados([])
       setModoSeleccion(false)
       setShowModalEliminar(false)
@@ -179,6 +180,7 @@ export function ProyectosView() {
           municipioNombre: p.municipioNombre || p.municipio_nombre || '',
         }))
         setProyectosReales(mapeados)
+        try { sessionStorage.setItem('domun_proyectos_cache', JSON.stringify(mapeados)) } catch (e) {}
       } else {
         setProyectosReales([])
       }
@@ -196,10 +198,28 @@ export function ProyectosView() {
     if (saved === 'lista' || saved === 'detalles') {
       setVista(saved)
     }
+
+    // 1. Carga instantánea desde caché local para evitar esperas visuales
+    try {
+      const cached = sessionStorage.getItem('domun_proyectos_cache')
+      if (cached) {
+        const parsed = JSON.parse(cached)
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setProyectosReales(parsed)
+          setLoadingProyectos(false)
+        }
+      }
+    } catch (e) {
+      // Ignorar error de parsing en caché local
+    }
   }, [])
 
   useEffect(() => {
-    setLoadingProyectos(true)
+    // Si no hay datos en memoria/caché previa, mostrar indicador de carga
+    if (proyectosReales.length === 0) {
+      setLoadingProyectos(true)
+    }
+
     apiGetDeduplicado('/proyectos')
       .then((res) => {
         if (res.data?.success && Array.isArray(res.data.data)) {
@@ -222,13 +242,15 @@ export function ProyectosView() {
             municipioNombre: p.municipioNombre || p.municipio_nombre || '',
           }))
           setProyectosReales(mapeados)
+          try {
+            sessionStorage.setItem('domun_proyectos_cache', JSON.stringify(mapeados))
+          } catch (e) {}
         } else {
           setProyectosReales([])
         }
       })
       .catch((err) => {
         console.error('Error al cargar proyectos de la base de datos:', err)
-        setProyectosReales([])
       })
       .finally(() => {
         setLoadingProyectos(false)
@@ -255,16 +277,21 @@ export function ProyectosView() {
   }
 
   const usuario = useAuthStore((s: any) => s.profile)
-  const esResidente = useMemo(() => {
+  const esResidenteODelegado = useMemo(() => {
     const rolStr = (usuario?.rol || '').toLowerCase().trim()
     const cargoStr = (usuario?.cargo || '').toLowerCase().trim()
-    return (rolStr.includes('residente') || cargoStr.includes('residente')) && !rolStr.includes('admin') && !rolStr.includes('director')
+    return (
+      rolStr.includes('residente') ||
+      rolStr.includes('delegado') ||
+      cargoStr.includes('residente') ||
+      cargoStr.includes('delegado')
+    ) && !rolStr.includes('admin') && !rolStr.includes('director') && !rolStr.includes('gerencia')
   }, [usuario])
 
   const proyectosFiltrados = useMemo(() => {
     return proyectosReales.filter((proyecto) => {
-      // Si es Residente, solo ver proyectos donde esté asignado
-      if (esResidente && usuario?.id) {
+      // Si es Residente o Delegado, solo ver proyectos donde esté asignado
+      if (esResidenteODelegado && usuario?.id) {
         const pAny = proyecto as any
         const uId = usuario.id
         const uNombre = (usuario.nombre || `${usuario.primer_nombre || ''} ${usuario.primer_apellido || ''}`).toLowerCase().trim()
@@ -322,7 +349,7 @@ export function ProyectosView() {
 
       return matchBusqueda && matchEstado && matchDepa && matchMuni && matchFecha
     })
-  }, [proyectosReales, busqueda, estadoFiltro, filtroDepa, filtroMuni, filtroFechaInicio, filtroFechaFin, esResidente, usuario])
+  }, [proyectosReales, busqueda, estadoFiltro, filtroDepa, filtroMuni, filtroFechaInicio, filtroFechaFin, esResidenteODelegado, usuario])
 
   const totalPaginas = Math.max(1, Math.ceil(proyectosFiltrados.length / porPagina))
   
@@ -390,7 +417,7 @@ export function ProyectosView() {
                 <span className="hidden sm:inline">Gestion de Empresas y Entidades</span>
               </button>
               
-              {!esResidente && (
+              {!esResidenteODelegado && (
                 <button
                   type="button"
                   onClick={() => router.push('/dashboard/proyectos/nuevo')}

@@ -262,14 +262,14 @@ const CATALOGO_BASE_RENGLONES: RenglonItemFinanciero[] = [
   },
 ]
 
-type SubTabFinanciera = 'programa' | 'estimaciones' | 'curva'
+type SubTabFinanciera = 'resumen' | 'estimaciones'
 
 export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: ProyectoType | undefined }) {
   const router = useRouter()
   const { profile: user } = useAuthStore()
 
-  // Sub-Pestañas: Programa de Trabajo, Control de Estimaciones, Gráfico Financiero
-  const [subTab, setSubTab] = useState<SubTabFinanciera>('programa')
+  // Sub-Pestañas: Resumen Financiero y Control de Estimaciones (dividido en 2 partes: Resumen + Curva S)
+  const [subTab, setSubTab] = useState<SubTabFinanciera>('resumen')
 
   // Perspectiva Doble en Control de Estimaciones: Empresa Ejecutora vs Supervisora
   const [perspectivaEstimacion, setPerspectivaEstimacion] = useState<'ejecutora' | 'supervisora'>('ejecutora')
@@ -620,20 +620,20 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
         </div>
       </div>
 
-      {/* Sub-Pestañas Horizontales Estilo Hoja Sábana */}
-      <div className="border-b border-gray-200 bg-white px-2 rounded-t-md font-[Poppins] flex items-center justify-between">
-        <div className="flex flex-wrap items-center gap-1">
+      {/* Sub-Pestañas Horizontales Estilo Hoja Sábana (Image 2) */}
+      <div className="border-b border-gray-200 bg-white px-2">
+        <nav className="-mb-px flex space-x-6">
           <button
             type="button"
-            onClick={() => setSubTab('programa')}
-            className={`flex items-center gap-1.5 border-b-2 px-3 py-1.5 text-[10px] transition-all cursor-pointer ${
-              subTab === 'programa'
-                ? 'border-[#9B0F06] text-[#9B0F06] font-bold bg-red-50/30'
-                : 'border-transparent text-gray-500 hover:text-gray-800 hover:bg-gray-50 font-normal'
+            onClick={() => setSubTab('resumen')}
+            className={`cursor-pointer whitespace-nowrap py-2.5 px-1 border-b-2 text-[11px] font-semibold transition-all duration-200 flex items-center gap-1.5 ${
+              subTab === 'resumen'
+                ? 'border-[#9B0F06] text-[#9B0F06]'
+                : 'border-transparent text-gray-500 hover:text-gray-900 hover:border-gray-300'
             }`}
           >
-            <Layers size={11} className={subTab === 'programa' ? 'text-[#9B0F06]' : 'text-gray-400'} />
-            <span>Programa de Trabajo</span>
+            <Layers size={12} className={subTab === 'resumen' ? 'text-[#9B0F06]' : 'text-gray-400'} />
+            <span>Resumen Financiero</span>
             <span className="ml-1 rounded-full bg-gray-100 px-1.5 py-0.2 text-[8px] text-gray-600 font-bold border border-gray-200">
               {CATALOGO_BASE_RENGLONES.length}
             </span>
@@ -642,38 +642,25 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
           <button
             type="button"
             onClick={() => setSubTab('estimaciones')}
-            className={`flex items-center gap-1.5 border-b-2 px-3 py-1.5 text-[10px] transition-all cursor-pointer ${
+            className={`cursor-pointer whitespace-nowrap py-2.5 px-1 border-b-2 text-[11px] font-semibold transition-all duration-200 flex items-center gap-1.5 ${
               subTab === 'estimaciones'
-                ? 'border-[#9B0F06] text-[#9B0F06] font-bold bg-red-50/30'
-                : 'border-transparent text-gray-500 hover:text-gray-800 hover:bg-gray-50 font-normal'
+                ? 'border-[#9B0F06] text-[#9B0F06]'
+                : 'border-transparent text-gray-500 hover:text-gray-900 hover:border-gray-300'
             }`}
           >
-            <Receipt size={11} className={subTab === 'estimaciones' ? 'text-[#9B0F06]' : 'text-gray-400'} />
+            <Receipt size={12} className={subTab === 'estimaciones' ? 'text-[#9B0F06]' : 'text-gray-400'} />
             <span>Control de Estimaciones</span>
             <span className="ml-1 rounded-full bg-red-100 px-1.5 py-0.2 text-[8px] text-[#9B0F06] font-bold">
               {estimacionesGeneradas.length / 2}
             </span>
           </button>
-
-          <button
-            type="button"
-            onClick={() => setSubTab('curva')}
-            className={`flex items-center gap-1.5 border-b-2 px-3 py-1.5 text-[10px] transition-all cursor-pointer ${
-              subTab === 'curva'
-                ? 'border-[#9B0F06] text-[#9B0F06] font-bold bg-red-50/30'
-                : 'border-transparent text-gray-500 hover:text-gray-800 hover:bg-gray-50 font-normal'
-            }`}
-          >
-            <TrendingUp size={11} className={subTab === 'curva' ? 'text-[#9B0F06]' : 'text-gray-400'} />
-            <span>Gráfico Financiero (Curva S)</span>
-          </button>
-        </div>
+        </nav>
       </div>
 
       {/* ========================================================================= */}
-      {/* 1. SUB-TAB 1: PROGRAMA DE TRABAJO (2 FILTROS + PAGINACIÓN + REDIRECCIÓN) */}
+      {/* 1. SUB-TAB 1: RESUMEN FINANCIERO (PROGRAMA DE TRABAJO CON 2 FILTROS)     */}
       {/* ========================================================================= */}
-      {subTab === 'programa' && (
+      {subTab === 'resumen' && (
         <div className="space-y-2">
           {/* Barra con los 2 Filtros Solicitados */}
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-gray-200 bg-white p-2 shadow-2xs">
@@ -848,197 +835,199 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
       )}
 
       {/* ========================================================================= */}
-      {/* 2. SUB-TAB 2: CONTROL DE ESTIMACIONES (NOMBRES DE EMPRESA + SIN FONDOS)   */}
+      {/* 2. SUB-TAB 2: CONTROL DE ESTIMACIONES (DIVIDIDO EN 2 PARTES)              */}
+      {/* Parte 1: Resumen de Estimaciones (Selector Contratista vs Supervisora)     */}
+      {/* Parte 2: Gráfico Financiero / Curva S Interactiva                         */}
       {/* ========================================================================= */}
       {subTab === 'estimaciones' && (
-        <div className="space-y-2">
-          {/* Selector de Perspectiva Doble con Nombre de Empresa Entre Paréntesis */}
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-gray-200 bg-white p-2 shadow-2xs">
-            <div className="flex items-center gap-2">
-              <span className="text-[9px] font-extrabold uppercase tracking-wider text-gray-500">
-                Perspectiva:
-              </span>
-              <div className="inline-flex rounded-lg bg-gray-100 p-0.5 border border-gray-200">
-                <button
-                  type="button"
-                  onClick={() => setPerspectivaEstimacion('ejecutora')}
-                  className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[10px] font-bold transition-all cursor-pointer ${
-                    perspectivaEstimacion === 'ejecutora'
-                      ? 'bg-white text-[#9B0F06] shadow-xs'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  <Building2 size={11} />
-                  <span>Empresa Ejecutora ({nombreEmpresaEjecutora})</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPerspectivaEstimacion('supervisora')}
-                  className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[10px] font-bold transition-all cursor-pointer ${
-                    perspectivaEstimacion === 'supervisora'
-                      ? 'bg-white text-blue-800 shadow-xs'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  <UserCheck size={11} />
-                  <span>Empresa Supervisora ({nombreEmpresaSupervisora})</span>
-                </button>
+        <div className="space-y-4">
+          {/* PARTE 1: Resumen de Estimaciones */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <h3 className="text-[11px] font-bold text-gray-900 flex items-center gap-1.5">
+                <Receipt size={13} className="text-[#9B0F06]" />
+                <span>Parte 1: Resumen Detallado de Estimaciones</span>
+              </h3>
+            </div>
+
+            {/* Selector de Perspectiva Doble con Nombre de Empresa Entre Paréntesis */}
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-gray-200 bg-white p-2 shadow-2xs">
+              <div className="flex items-center gap-2">
+                <span className="text-[9px] font-extrabold uppercase tracking-wider text-gray-500">
+                  Perspectiva:
+                </span>
+                <div className="inline-flex rounded-lg bg-gray-100 p-0.5 border border-gray-200">
+                  <button
+                    type="button"
+                    onClick={() => setPerspectivaEstimacion('ejecutora')}
+                    className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[10px] font-bold transition-all cursor-pointer ${
+                      perspectivaEstimacion === 'ejecutora'
+                        ? 'bg-white text-[#9B0F06] shadow-xs'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    <Building2 size={11} />
+                    <span>Empresa Ejecutora ({nombreEmpresaEjecutora})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPerspectivaEstimacion('supervisora')}
+                    className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[10px] font-bold transition-all cursor-pointer ${
+                      perspectivaEstimacion === 'supervisora'
+                        ? 'bg-white text-blue-800 shadow-xs'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    <UserCheck size={11} />
+                    <span>Empresa Supervisora ({nombreEmpresaSupervisora})</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="text-[9px] text-gray-400 font-medium">
+                Viendo {estimacionesFiltradas.length} estimaciones
               </div>
             </div>
 
-            <div className="text-[9px] text-gray-400 font-medium">
-              Viendo {estimacionesFiltradas.length} estimaciones
-            </div>
-          </div>
-
-          {/* Tabla de Estimaciones (img3 corregido: sin fondos llamativos, texto limpio) */}
-          <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xs">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left font-sans text-[10px]">
-                <thead>
-                  <tr className="border-b border-gray-200 bg-gray-100/75 text-[8px] font-extrabold uppercase tracking-wider text-gray-600">
-                    <th className="px-2.5 py-1.5 min-w-[160px]">No. Estimación / Título</th>
-                    <th className="px-2.5 py-1.5 min-w-[130px]">Delegado Residente</th>
-                    <th className="px-2.5 py-1.5 min-w-[120px]">Período (Inicio / Fin)</th>
-                    <th className="px-2.5 py-1.5 text-center min-w-[100px]">Retraso</th>
-                    <th className="px-2.5 py-1.5 text-center min-w-[110px]">Rendimiento</th>
-                    <th className="px-2.5 py-1.5 text-right min-w-[110px]">Anticipo Aplicado</th>
-                    <th className="px-2.5 py-1.5 text-right min-w-[110px]">Valor Bruto (Q)</th>
-                    <th className="px-2.5 py-1.5 text-right min-w-[110px]">Líquido a Pagar (Q)</th>
-                    <th className="px-2.5 py-1.5 text-right min-w-[110px]">Saldo Restante</th>
-                    <th className="px-2.5 py-1.5 text-center w-20">Acción</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 font-mono text-[10px]">
-                  {estimacionesFiltradas.map((est) => (
-                    <tr key={est.id} className="hover:bg-red-50/30 transition-colors">
-                      {/* No. Estimación & Nombre */}
-                      <td className="px-2.5 py-1.5 font-sans">
-                        <div className="flex items-center gap-1">
-                          <span className="font-bold text-gray-900">{est.numero}</span>
-                          <span className="text-[8px] text-gray-400 font-mono">({est.estado.toUpperCase()})</span>
-                        </div>
-                        <p className="text-[9px] text-gray-500 font-medium truncate max-w-[180px]" title={est.nombreEstimacion}>
-                          {est.nombreEstimacion}
-                        </p>
-                      </td>
-
-                      {/* Delegado Residente */}
-                      <td className="px-2.5 py-1.5 font-sans">
-                        <div className="flex items-center gap-1 text-gray-800 font-semibold text-[9.5px]">
-                          <User size={9} className="text-[#9B0F06] shrink-0" />
-                          <span className="truncate max-w-[120px]">{est.delegadoResidente}</span>
-                        </div>
-                        <p className="text-[8px] text-gray-400 font-normal truncate max-w-[120px]">{est.supervisadoPor}</p>
-                      </td>
-
-                      {/* Período */}
-                      <td className="px-2.5 py-1.5 font-mono text-[9px] text-gray-600">
-                        <div className="flex items-center gap-1">
-                          <Calendar size={9} className="text-gray-400 shrink-0" />
-                          <span>{est.fechaInicio} al {est.fechaFin}</span>
-                        </div>
-                        <span className="text-[8px] text-gray-400 block font-sans">{est.mes}</span>
-                      </td>
-
-                      {/* Retraso (Sin fondos pesados según img3) */}
-                      <td className="px-2.5 py-1.5 text-center font-sans">
-                        {est.diasRetraso === 0 ? (
-                          <span className="text-emerald-700 font-semibold text-[9px] inline-flex items-center gap-0.5">
-                            <CheckCircle2 size={9} />
-                            En tiempo (0d)
-                          </span>
-                        ) : (
-                          <span className={`font-semibold text-[9px] inline-flex items-center gap-0.5 ${
-                            est.diasRetraso <= 5 ? 'text-amber-700' : 'text-[#9B0F06]'
-                          }`}>
-                            <AlertTriangle size={9} />
-                            +{est.diasRetraso}d retraso
-                          </span>
-                        )}
-                      </td>
-
-                      {/* Rendimiento / Calificación (Sin fondos pesados según img3) */}
-                      <td className="px-2.5 py-1.5 text-center font-sans">
-                        <span
-                          className={`font-bold text-[9px] ${
-                            est.calificacionDesempeno === 'bueno'
-                              ? 'text-emerald-700'
-                              : est.calificacionDesempeno === 'regular'
-                              ? 'text-amber-700'
-                              : 'text-[#9B0F06]'
-                          }`}
-                        >
-                          {est.porcentajeRendimiento.toFixed(1)}% ({est.calificacionDesempeno.toUpperCase()})
-                        </span>
-                      </td>
-
-                      {/* Anticipo Aplicado (Monto + %) */}
-                      <td className="px-2.5 py-1.5 text-right">
-                        <span className="text-amber-800 font-semibold block font-mono text-[9.5px]">
-                          − Q {est.montoAmortizacion.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
-                        </span>
-                        <span className="text-[7.5px] text-gray-400 font-sans">
-                          ({est.porcentajeAmortizacion.toFixed(0)}% amortizado)
-                        </span>
-                      </td>
-
-                      {/* Valor Bruto */}
-                      <td className="px-2.5 py-1.5 text-right font-semibold text-gray-900 font-mono text-[9.5px]">
-                        Q {est.valorBrutoTrabajado.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
-                      </td>
-
-                      {/* Monto Líquido a Pagar */}
-                      <td className="px-2.5 py-1.5 text-right font-black text-[#9B0F06] font-mono text-[9.5px]">
-                        Q {est.montoLiquidoAPagar.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
-                      </td>
-
-                      {/* Saldo Contractual */}
-                      <td className="px-2.5 py-1.5 text-right font-medium text-gray-600 font-mono text-[9px]">
-                        Q {est.saldoContractualRestante.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
-                      </td>
-
-                      {/* Botón Acción: Hoja Sábana */}
-                      <td className="px-2.5 py-1.5 text-center font-sans">
-                        <button
-                          type="button"
-                          onClick={() => navegarAHojaSabana({ estimacion: est.numero })}
-                          disabled={!tieneAccesoHojaSabana}
-                          className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[8.5px] font-bold transition-all ${
-                            tieneAccesoHojaSabana
-                              ? 'bg-[#9B0F06] text-white hover:bg-[#5E0006] shadow-2xs cursor-pointer'
-                              : 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200'
-                          }`}
-                          title={tieneAccesoHojaSabana ? `Abrir Hoja Sábana para ${est.numero}` : 'Solo el Delegado Residente o Administrador tiene acceso'}
-                        >
-                          {tieneAccesoHojaSabana ? <Eye size={9} /> : <Lock size={9} />}
-                          <span>Sábana</span>
-                        </button>
-                      </td>
+            {/* Tabla de Estimaciones */}
+            <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xs">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left font-sans text-[10px]">
+                  <thead>
+                    <tr className="border-b border-gray-200 bg-gray-100/75 text-[8px] font-extrabold uppercase tracking-wider text-gray-600">
+                      <th className="px-2.5 py-1.5 min-w-[160px]">No. Estimación / Título</th>
+                      <th className="px-2.5 py-1.5 min-w-[130px]">Delegado Residente / Responsable</th>
+                      <th className="px-2.5 py-1.5 min-w-[120px]">Período (Inicio / Fin)</th>
+                      <th className="px-2.5 py-1.5 text-center min-w-[100px]">Retraso</th>
+                      <th className="px-2.5 py-1.5 text-center min-w-[110px]">Rendimiento</th>
+                      <th className="px-2.5 py-1.5 text-right min-w-[110px]">Anticipo Aplicado</th>
+                      <th className="px-2.5 py-1.5 text-right min-w-[110px]">Valor Bruto (Q)</th>
+                      <th className="px-2.5 py-1.5 text-right min-w-[110px]">Líquido a Pagar (Q)</th>
+                      <th className="px-2.5 py-1.5 text-right min-w-[110px]">Saldo Restante</th>
+                      <th className="px-2.5 py-1.5 text-center w-20">Acción</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 font-mono text-[10px]">
+                    {estimacionesFiltradas.map((est) => (
+                      <tr key={est.id} className="hover:bg-red-50/30 transition-colors">
+                        {/* No. Estimación & Nombre */}
+                        <td className="px-2.5 py-1.5 font-sans">
+                          <div className="flex items-center gap-1">
+                            <span className="font-bold text-gray-900">{est.numero}</span>
+                            <span className="text-[8px] text-gray-400 font-mono">({est.estado.toUpperCase()})</span>
+                          </div>
+                          <p className="text-[9px] text-gray-500 font-medium truncate max-w-[180px]" title={est.nombreEstimacion}>
+                            {est.nombreEstimacion}
+                          </p>
+                        </td>
+
+                        {/* Delegado Residente */}
+                        <td className="px-2.5 py-1.5 font-sans">
+                          <div className="flex items-center gap-1 text-gray-800 font-semibold text-[9.5px]">
+                            <User size={9} className="text-[#9B0F06] shrink-0" />
+                            <span className="truncate max-w-[120px]">{est.delegadoResidente}</span>
+                          </div>
+                          <p className="text-[8px] text-gray-400 font-normal truncate max-w-[120px]">{est.supervisadoPor}</p>
+                        </td>
+
+                        {/* Período */}
+                        <td className="px-2.5 py-1.5 font-mono text-[9px] text-gray-600">
+                          <div className="flex items-center gap-1">
+                            <Calendar size={9} className="text-gray-400 shrink-0" />
+                            <span>{est.fechaInicio} al {est.fechaFin}</span>
+                          </div>
+                          <span className="text-[8px] text-gray-400 block font-sans">{est.mes}</span>
+                        </td>
+
+                        {/* Retraso */}
+                        <td className="px-2.5 py-1.5 text-center font-sans">
+                          {est.diasRetraso === 0 ? (
+                            <span className="text-emerald-700 font-semibold text-[9px] inline-flex items-center gap-0.5">
+                              <CheckCircle2 size={9} />
+                              En tiempo (0d)
+                            </span>
+                          ) : (
+                            <span className={`font-semibold text-[9px] inline-flex items-center gap-0.5 ${
+                              est.diasRetraso <= 5 ? 'text-amber-700' : 'text-[#9B0F06]'
+                            }`}>
+                              <AlertTriangle size={9} />
+                              +{est.diasRetraso}d retraso
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Rendimiento / Calificación */}
+                        <td className="px-2.5 py-1.5 text-center font-sans">
+                          <span
+                            className={`font-bold text-[9px] ${
+                              est.calificacionDesempeno === 'bueno'
+                                ? 'text-emerald-700'
+                                : est.calificacionDesempeno === 'regular'
+                                ? 'text-amber-700'
+                                : 'text-[#9B0F06]'
+                            }`}
+                          >
+                            {est.porcentajeRendimiento.toFixed(1)}% ({est.calificacionDesempeno.toUpperCase()})
+                          </span>
+                        </td>
+
+                        {/* Anticipo Aplicado (Monto + %) */}
+                        <td className="px-2.5 py-1.5 text-right">
+                          <span className="text-amber-800 font-semibold block font-mono text-[9.5px]">
+                            − Q {est.montoAmortizacion.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                          </span>
+                          <span className="text-[7.5px] text-gray-400 font-sans">
+                            ({est.porcentajeAmortizacion.toFixed(0)}% amortizado)
+                          </span>
+                        </td>
+
+                        {/* Valor Bruto */}
+                        <td className="px-2.5 py-1.5 text-right font-semibold text-gray-900 font-mono text-[9.5px]">
+                          Q {est.valorBrutoTrabajado.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                        </td>
+
+                        {/* Monto Líquido a Pagar */}
+                        <td className="px-2.5 py-1.5 text-right font-black text-[#9B0F06] font-mono text-[9.5px]">
+                          Q {est.montoLiquidoAPagar.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                        </td>
+
+                        {/* Saldo Contractual */}
+                        <td className="px-2.5 py-1.5 text-right font-medium text-gray-600 font-mono text-[9px]">
+                          Q {est.saldoContractualRestante.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                        </td>
+
+                        {/* Botón Acción: Hoja Sábana */}
+                        <td className="px-2.5 py-1.5 text-center font-sans">
+                          <button
+                            type="button"
+                            onClick={() => navegarAHojaSabana({ estimacion: est.numero })}
+                            disabled={!tieneAccesoHojaSabana}
+                            className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[8.5px] font-bold transition-all ${
+                              tieneAccesoHojaSabana
+                                ? 'bg-[#9B0F06] text-white hover:bg-[#5E0006] shadow-2xs cursor-pointer'
+                                : 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200'
+                            }`}
+                            title={tieneAccesoHojaSabana ? `Abrir Hoja Sábana para ${est.numero}` : 'Solo el Delegado Residente o Administrador tiene acceso'}
+                          >
+                            {tieneAccesoHojaSabana ? <Eye size={9} /> : <Lock size={9} />}
+                            <span>Sábana</span>
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
-        </div>
-      )}
 
-      {/* ========================================================================= */}
-      {/* 3. SUB-TAB 3: GRÁFICO FINANCIERO (MÁS COMPACTO Y SIN ANIMACIÓN PING)      */}
-      {/* ========================================================================= */}
-      {subTab === 'curva' && (
-        <div className="space-y-2">
-          <div className="rounded-xl border border-gray-200 bg-white p-2.5 shadow-2xs space-y-2">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 pb-1.5">
-              <div>
-                <h3 className="text-[11px] font-bold text-gray-900">
-                  Curva S de Avance Financiero Acumulado (Programado vs Ejecutado Real)
-                </h3>
-                <p className="text-[9px] text-gray-500">
-                  Monitoreo financiero acumulativo mensual durante el plazo contractual.
-                </p>
-              </div>
+          {/* PARTE 2: Gráfico Financiero / Curva S Interactiva */}
+          <div className="space-y-2 pt-2 border-t border-gray-200">
+            <div className="flex items-center justify-between">
+              <h3 className="text-[11px] font-bold text-gray-900 flex items-center gap-1.5">
+                <TrendingUp size={13} className="text-[#9B0F06]" />
+                <span>Parte 2: Gráfico Financiero y Curva S (Programado vs Real)</span>
+              </h3>
 
               {/* Leyenda Compacta */}
               <div className="flex items-center gap-3 text-[9px] font-bold">

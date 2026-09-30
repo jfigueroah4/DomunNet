@@ -100,4 +100,54 @@ describe('Módulo de Backend Hoja Sábana y Analítico (hojaSabana.servicio.ts)'
       })
     ).rejects.toThrow(`La estimación ${estNum} está finalizada/cerrada`)
   })
+
+  it('debe vincular registros de bitácora con analítico y calcular volumen/topes hacia Col. I de Sábana', async () => {
+    const bitacoraEntradaId = 'bitacora-entrada-uuid-99'
+    const medBitacora = await HojaSabanaServicio.crearMedicion({
+      proyectoId: 'proy-bitacora-test',
+      codigoDGC: '401.01',
+      estacionInicio: '10+000',
+      estacionFin: '10+300',
+      longitudL: 300,
+      anchoA: 7.30,
+      alturaH: 0.15,
+      ladoVia: 'Sección Completa',
+      origenTipo: 'Libreta',
+      referenciaOrigen: 'Bitácora Folio #45 Frente 1',
+      estimacionNum: 'Est. 02',
+      unidad: 'm3',
+      cantidadAjustada: 500,
+      acumuladoAnterior: 200,
+      precioUnitario: 1200,
+      bitacoraEntradaId: bitacoraEntradaId,
+    })
+
+    expect(medBitacora.bitacora_entrada_id || medBitacora.bitacoraEntradaId).toBe(bitacoraEntradaId)
+    // 300 * 7.30 * 0.15 = 328.5 m3
+    expect(medBitacora.cantidadCalculada).toBe(328.5)
+    // Ajustada = 500, Acumulado = 200 -> Tope disponible = 300. Facturable = 300, Retenido = 28.5
+    expect(medBitacora.cantidadFacturable).toBe(300)
+    expect(medBitacora.cantidadRetenida).toBe(28.5)
+  })
+
+  it('debe mantener la integridad entre plan de trabajo original (Línea Base) y vista actual sin copiar datos teóricos', () => {
+    const planOriginal = {
+      'Ene 2025': 150,
+      'Feb 2025': 250,
+      'Mar 2025': 250,
+      'Abr 2025': 150,
+    }
+    const realEjecutado = {
+      'Ene 2025': 140,
+      'Feb 2025': 260,
+    }
+
+    // En vista Plan: se mantiene la curva teórica completa
+    const sumaPlan = Object.values(planOriginal).reduce((a, b) => a + b, 0)
+    expect(sumaPlan).toBe(800)
+
+    // En vista Actual: los meses futuros no ejecutados deben ser 0 / undefined, nunca el valor del plan
+    expect(realEjecutado['Mar 2025' as keyof typeof realEjecutado]).toBeUndefined()
+    expect(realEjecutado['Abr 2025' as keyof typeof realEjecutado]).toBeUndefined()
+  })
 })

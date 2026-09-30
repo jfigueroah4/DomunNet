@@ -290,16 +290,23 @@ async function resolverEmpresaContratanteId(val: any): Promise<string | null> {
   const { data: ent } = await clienteSupabase
     .from('entidad_contratante')
     .select('id')
-    .eq('nombre', val.trim())
+    .ilike('nombre', val.trim())
     .maybeSingle()
   if (ent?.id) return ent.id
 
   const { data: entRel } = await clienteSupabase
     .from('empresa_relacionada')
     .select('id')
-    .eq('nombre', val.trim())
+    .ilike('nombre', val.trim())
     .maybeSingle()
   if (entRel?.id) return entRel.id
+
+  const { data: nuevaEnt } = await clienteSupabase
+    .from('entidad_contratante')
+    .insert({ nombre: val.trim() })
+    .select('id')
+    .maybeSingle()
+  if (nuevaEnt?.id) return nuevaEnt.id
 
   return null
 }
@@ -312,16 +319,23 @@ async function resolverEmpresaContratistaId(val: any): Promise<string | null> {
   const { data: emp } = await clienteSupabase
     .from('empresa_contratista')
     .select('id')
-    .or(`nombre.eq.${val.trim()},razon_social.eq.${val.trim()}`)
+    .or(`nombre.ilike.${val.trim()},razon_social.ilike.${val.trim()}`)
     .maybeSingle()
   if (emp?.id) return emp.id
 
   const { data: empRel } = await clienteSupabase
     .from('empresa_relacionada')
     .select('id')
-    .eq('nombre', val.trim())
+    .ilike('nombre', val.trim())
     .maybeSingle()
   if (empRel?.id) return empRel.id
+
+  const { data: nuevaEmp } = await clienteSupabase
+    .from('empresa_contratista')
+    .insert({ nombre: val.trim(), razon_social: val.trim() })
+    .select('id')
+    .maybeSingle()
+  if (nuevaEmp?.id) return nuevaEmp.id
 
   return null
 }
@@ -565,8 +579,8 @@ export async function obtenerProyectoPorId(proyectoId: string) {
     empresaContratanteId: detalle.empresa_contratante_id ?? null,
     entidadContratante: entidadContratanteNombre,
     empresaContratistaId: detalle.empresa_contratista_id ?? null,
-    empresaContratista: empresaContratistaNombre,
-    empresaSupervisora: detalle.empresa_supervisora ?? '',
+    empresaContratista: empresaContratistaNombre || contratoEjecucion?.empresaNombre || '',
+    empresaSupervisora: detalle.empresa_supervisora || contratoSupervision?.empresaNombre || '',
     delegadoResidenteId: detalle.delegado_residente_id ?? null,
     delegadoResidente: delegadoResidenteNombre,
     responsableId: proyecto.responsable_id ?? null,
@@ -801,7 +815,7 @@ export async function crearProyecto(datosFormulario: any) {
       ubicacion: datosFormulario.ubicacionFisica || null,
       fecha_inicio: fechaInicio,
       fecha_fin_estimada: fechaFinEstimada,
-      responsable_id: datosFormulario.responsable || null,
+      responsable_id: esUuidValido(datosFormulario.responsable) || null,
       estado_id: estadoId,
       empresa_id: datosFormulario.empresa_id || (await clienteSupabase.from('empresa').select('id').limit(1).single()).data?.id
     })
@@ -817,8 +831,12 @@ export async function crearProyecto(datosFormulario: any) {
   const depaId = esUuidValido(datosFormulario.departamentoId)
   const muniFinId = esUuidValido(datosFormulario.municipioFinId)
   const depaFinId = esUuidValido(datosFormulario.departamentoFinId)
-  const empContratanteId = await resolverEmpresaContratanteId(datosFormulario.empresaContratanteId || datosFormulario.entidadContratante)
-  const empContratistaId = await resolverEmpresaContratistaId(datosFormulario.empresaContratistaId || datosFormulario.empresaContratista)
+  const empContratanteId = esUuidValido(datosFormulario.empresaContratanteId) 
+    ? datosFormulario.empresaContratanteId 
+    : await resolverEmpresaContratanteId(datosFormulario.entidadContratante || datosFormulario.empresaContratanteId)
+  const empContratistaId = esUuidValido(datosFormulario.empresaContratistaId)
+    ? datosFormulario.empresaContratistaId
+    : await resolverEmpresaContratistaId(datosFormulario.empresaContratista || datosFormulario.empresaContratistaId)
   const delegadoResId = esUuidValido(datosFormulario.delegadoResidenteId)
 
   // 3. Insertar en `proyecto_detalle`
@@ -874,10 +892,11 @@ export async function crearProyecto(datosFormulario: any) {
   
   if (Array.isArray(datosFormulario.equipo)) {
     for (const miembro of datosFormulario.equipo) {
-      if (miembro.id && miembro.id !== datosFormulario.delegadoResidenteId) {
+      const uId = esUuidValido(miembro?.id || miembro?.usuarioId)
+      if (uId && uId !== delegadoResId) {
         usuariosAInsertar.push({
           proyecto_id: proyecto.id,
-          usuario_id: miembro.id,
+          usuario_id: uId,
           rol_proyecto: miembro.rol || 'Miembro'
         });
       }
@@ -1033,12 +1052,12 @@ export async function actualizarProyecto(proyectoId: string, datosFormulario: Re
   if (Array.isArray(datosFormulario.equipo)) {
     await clienteSupabase.from('proyecto_usuario').delete().eq('proyecto_id', proyectoId)
     const usuariosAInsertar = (datosFormulario.equipo as any[])
-      .filter((miembro) => miembro && (miembro.id || miembro.usuarioId))
       .map((miembro) => ({
         proyecto_id: proyectoId,
-        usuario_id: miembro.id || miembro.usuarioId,
-        rol_proyecto: miembro.rol || 'Miembro'
+        usuario_id: esUuidValido(miembro?.id || miembro?.usuarioId),
+        rol_proyecto: miembro?.rol || 'Miembro'
       }))
+      .filter((m) => m.usuario_id)
     if (usuariosAInsertar.length > 0) {
       const { error: errEq } = await clienteSupabase.from('proyecto_usuario').insert(usuariosAInsertar)
       if (errEq) console.error('Error actualizando equipo proyecto_usuario:', errEq)

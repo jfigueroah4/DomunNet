@@ -1,28 +1,31 @@
 import { TablaConfig } from '../mantenimiento.types';
 
 export const empresaExternaConfig: TablaConfig = {
-  "nombreTablaDb": "empresa_externa",
-  "permisoRequerido": "catalogos.write",
-  "columnasVisibles": "id, nombre, nit, direccion, telefono, correo_institucional, activo, created_at, updated_at",
-  "columnasFiltroOrden": [
+  nombreTablaDb: 'empresa_externa',
+  permisoRequerido: 'catalogos.write',
+  columnasVisibles: 'id, nombre, nit, direccion, telefono, correo_institucional, activo, created_at, updated_at',
+  columnasFiltroOrden: [
     "id",
     "nombre",
     "nit",
     "direccion",
     "telefono",
-    "correo_contacto",
+    "correo_institucional",
     "activo",
     "created_at",
     "updated_at"
-  ],
-  "columnasFiltroMenu": [
+],
+  dependenciasDelete: [
     {
-      "columna": "activo",
-      "tipo": "boolean",
-      "opciones": [
-        "true",
-        "false"
-      ]
+        "tablaDependiente": "contacto_empresa_externa",
+        "columnaFk": "empresa_externa_id",
+        "nombreLegible": "contacto empresa externa"
     }
-  ]
+],
+  
+  
+  
+  
+  
+  
 };

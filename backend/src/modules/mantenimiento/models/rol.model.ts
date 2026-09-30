@@ -1,10 +1,10 @@
 import { TablaConfig } from '../mantenimiento.types';
 
 export const rolConfig: TablaConfig = {
-  "nombreTablaDb": "rol",
-  "permisoRequerido": "catalogos.write",
-  "columnasVisibles": "id, nombre_rol, nivel_permisos, permisos, activo, created_at, descripcion",
-  "columnasFiltroOrden": [
+  nombreTablaDb: 'rol',
+  permisoRequerido: 'catalogos.write',
+  columnasVisibles: 'id, nombre_rol, nivel_permisos, permisos, activo, created_at, descripcion',
+  columnasFiltroOrden: [
     "id",
     "nombre_rol",
     "nivel_permisos",
@@ -12,26 +12,28 @@ export const rolConfig: TablaConfig = {
     "activo",
     "created_at",
     "descripcion"
-  ],
-  "columnasFiltroMenu": [
+],
+  dependenciasDelete: [
     {
-      "columna": "activo",
-      "tipo": "boolean",
-      "opciones": [
-        "true",
-        "false"
-      ]
+        "tablaDependiente": "ticket_mensaje",
+        "columnaFk": "rol_id",
+        "nombreLegible": "ticket mensaje"
     },
     {
-      "columna": "nombre_rol",
-      "tipo": "enum",
-      "opciones": [
-        "ADMIN",
-        "GERENTE",
-        "RESIDENTE",
-        "SUPERVISOR",
-        "DIGITADOR"
-      ]
+        "tablaDependiente": "ticket_soporte",
+        "columnaFk": "asignado_a_rol_id",
+        "nombreLegible": "ticket soporte"
+    },
+    {
+        "tablaDependiente": "usuario",
+        "columnaFk": "rol_id",
+        "nombreLegible": "usuario"
     }
-  ]
+],
+  
+  
+  
+  
+  
+  
 };

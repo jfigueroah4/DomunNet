@@ -1,10 +1,10 @@
 import { TablaConfig } from '../mantenimiento.types';
 
 export const especificacionTecnicaConfig: TablaConfig = {
-  "nombreTablaDb": "especificacion_tecnica",
-  "permisoRequerido": "catalogos.write",
-  "columnasVisibles": "id, codigo, descripcion, unidad, parametros_obligatorios, referencia_normativa, edicion, tolerancia_minima, tolerancia_maxima, norma_referencia",
-  "columnasFiltroOrden": [
+  nombreTablaDb: 'especificacion_tecnica',
+  permisoRequerido: 'catalogos.write',
+  columnasVisibles: 'id, codigo, descripcion, unidad, parametros_obligatorios, referencia_normativa, edicion, tolerancia_minima, tolerancia_maxima, norma_referencia',
+  columnasFiltroOrden: [
     "id",
     "codigo",
     "descripcion",
@@ -15,6 +15,23 @@ export const especificacionTecnicaConfig: TablaConfig = {
     "tolerancia_minima",
     "tolerancia_maxima",
     "norma_referencia"
-  ],
-  "columnasFiltroMenu": []
+],
+  dependenciasDelete: [
+    {
+        "tablaDependiente": "ensayo_laboratorio",
+        "columnaFk": "especificacion_id",
+        "nombreLegible": "ensayo laboratorio"
+    },
+    {
+        "tablaDependiente": "renglon_trabajo",
+        "columnaFk": "especificacion_id",
+        "nombreLegible": "renglon trabajo"
+    }
+],
+  
+  
+  
+  
+  
+  
 };

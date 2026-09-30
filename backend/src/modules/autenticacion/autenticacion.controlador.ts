@@ -8,8 +8,17 @@ import { entorno } from '@/configuracion/entorno'
 import { clienteSupabase } from '@/configuracion/cliente-supabase'
 
 const esquemaInicioSesion = z.object({
-  correo: z.string().min(2),
-  contrasena: z.string().min(1),
+  correo: z.string().min(1).optional(),
+  identificador: z.string().min(1).optional(),
+  username: z.string().min(1).optional(),
+  contrasena: z.string().min(1).optional(),
+  password: z.string().min(1).optional(),
+}).refine((data) => Boolean(data.correo || data.identificador || data.username), {
+  message: 'Debe ingresar correo o identificador',
+  path: ['correo'],
+}).refine((data) => Boolean(data.contrasena || data.password), {
+  message: 'Debe ingresar contraseña',
+  path: ['contrasena'],
 })
 
 export async function iniciarSesionControlador(req: Request, res: Response) {
@@ -24,9 +33,12 @@ export async function iniciarSesionControlador(req: Request, res: Response) {
   }
 
   try {
+    const credIdentificador = resultado.data.correo || resultado.data.identificador || resultado.data.username || ''
+    const credPassword = resultado.data.contrasena || resultado.data.password || ''
+
     const acceso = await iniciarSesion(
-      resultado.data.correo,
-      resultado.data.contrasena,
+      credIdentificador,
+      credPassword,
       req.ip,
       req.headers['user-agent'] as string
     )
@@ -41,7 +53,7 @@ export async function iniciarSesionControlador(req: Request, res: Response) {
       maxAge: 8 * 60 * 60 * 1000 // 8 horas
     })
 
-    return sendResponse(res, 200, { usuario: acceso.usuario }, 'Inicio de sesión correcto')
+    return sendResponse(res, 200, { usuario: acceso.usuario, token: acceso.token }, 'Inicio de sesión correcto')
   } catch (error: unknown) {
     if (error instanceof Error && error.message === 'DESACTIVADO') {
       return sendError(res, 403, 'Su cuenta se encuentra desactivada. Contacte al administrador.')

@@ -1,39 +1,37 @@
 import { TablaConfig } from '../mantenimiento.types';
 
 export const proyectoUsuarioConfig: TablaConfig = {
-  "nombreTablaDb": "proyecto_usuario",
-  "permisoRequerido": "catalogos.write",
-  "columnasVisibles": "id, proyecto_id, usuario_id, rol_proyecto, fecha_asignacion, activo",
-  "columnasFiltroOrden": [
+  nombreTablaDb: 'proyecto_usuario',
+  permisoRequerido: 'catalogos.write',
+  columnasVisibles: 'id, proyecto_id, usuario_id, rol_proyecto, fecha_asignacion, activo',
+  columnasFiltroOrden: [
     "id",
     "proyecto_id",
     "usuario_id",
     "rol_proyecto",
     "fecha_asignacion",
     "activo"
-  ],
-  "columnasFiltroMenu": [
+],
+  
+  columnasFiltroMenu: [
     {
-      "columna": "proyecto_id",
-      "tipo": "foreign_key",
-      "tablaReferencia": "proyecto",
-      "columnaLabel": "nombre",
-      "renderizado": "select"
+        "columna": "proyecto_id",
+        "tipo": "foreign_key",
+        "tablaReferencia": "proyecto",
+        "columnaLabel": "nombre",
+        "renderizado": "select"
     },
     {
-      "columna": "usuario_id",
-      "tipo": "foreign_key",
-      "tablaReferencia": "usuario",
-      "columnaLabel": "correo",
-      "renderizado": "combobox"
-    },
-    {
-      "columna": "activo",
-      "tipo": "boolean",
-      "opciones": [
-        "true",
-        "false"
-      ]
+        "columna": "usuario_id",
+        "tipo": "foreign_key",
+        "tablaReferencia": "usuario",
+        "columnaLabel": "email",
+        "renderizado": "combobox"
     }
-  ]
+],
+  
+  
+  
+  
+  
 };

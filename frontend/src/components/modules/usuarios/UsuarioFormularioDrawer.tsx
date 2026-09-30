@@ -18,6 +18,19 @@ interface UsuarioFormularioDrawerProps {
   isPerfilEdit?: boolean
 }
 
+function calcularEdad(d: string, m: string, a: string) {
+  if (!d || !m || !a) return 0
+  const today = new Date()
+  const birthDate = new Date(parseInt(a, 10), parseInt(m, 10) - 1, parseInt(d, 10))
+  if (isNaN(birthDate.getTime())) return 0
+  let age = today.getFullYear() - birthDate.getFullYear()
+  const mDiff = today.getMonth() - birthDate.getMonth()
+  if (mDiff < 0 || (mDiff === 0 && today.getDate() < birthDate.getDate())) {
+    age--
+  }
+  return age
+}
+
 export function UsuarioFormularioDrawer({
   isOpen,
   onClose,
@@ -286,16 +299,7 @@ export function UsuarioFormularioDrawer({
     setErrors((prev: any) => ({ ...prev, [name]: false }))
   }
 
-  const calcularEdad = (d: string, m: string, a: string) => {
-    const today = new Date()
-    const birthDate = new Date(parseInt(a), parseInt(m) - 1, parseInt(d))
-    let age = today.getFullYear() - birthDate.getFullYear()
-    const mDiff = today.getMonth() - birthDate.getMonth()
-    if (mDiff < 0 || (mDiff === 0 && today.getDate() < birthDate.getDate())) {
-      age--
-    }
-    return age
-  }
+
 
   const handleFechaChange = (tipo: 'dia' | 'mes' | 'ano', valor: string) => {
     setFormData((prev) => ({ ...prev, [`${tipo}Nacimiento`]: valor }))

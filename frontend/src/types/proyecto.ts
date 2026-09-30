@@ -47,6 +47,34 @@ export interface RolProyecto {
   permisos: string[]
 }
 
+export interface ProyectoContrato {
+  id?: string
+  proyectoId?: string
+  tipo: 'EJECUCION' | 'SUPERVISION' | 'LABORATORIO' | 'OTRO'
+  empresaNombre?: string
+  propietario?: string
+  registroMercantil?: string
+  direccion?: string
+  telefono?: string
+  correo?: string
+  responsable?: string
+  licitacionNumero?: string
+  actaInicioNumero?: string
+  programa?: string
+  subprograma?: string
+  fuenteFinanciamiento?: string
+  partidaFondos?: string
+  cdp?: string
+  contratoNumero?: string
+  acuerdoMinisterial?: string
+  montoOriginal?: number
+  porcentajeAnticipo?: number
+  montoAnticipo?: number
+  fechaInicio?: string
+  plazoMesesDetalle?: string
+  fechaFin?: string
+}
+
 export interface Proyecto {
   nombreOficial?: string;
   descripcionProyecto?: string;
@@ -66,6 +94,14 @@ export interface Proyecto {
   municipioNombre?: string;
   departamentoId?: string;
   municipioId?: string;
+  departamentoFinId?: string;
+  municipioFinId?: string;
+  direccionFin?: string;
+  kilometroInicio?: number;
+  kilometroFin?: number;
+  contratoEjecucion?: ProyectoContrato;
+  contratoSupervision?: ProyectoContrato;
+  contratos?: ProyectoContrato[];
   id: string
   codigo?: string
   nombre: string

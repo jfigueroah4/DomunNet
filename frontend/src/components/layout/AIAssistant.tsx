@@ -8,6 +8,8 @@ import {
   Minimize2,
   Bot,
   UserCheck,
+  Minus,
+  ChevronUp,
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/useAuthStore';
 
@@ -57,10 +59,59 @@ const getRoleSuggestions = (userRole?: string) => {
   };
 };
 
-function formatCleanMessage(text: string) {
-  if (!text) return '';
-  // Eliminar signos de numeral de encabezados Markdown (##, ###)
-  return text.replace(/^#{1,6}\s+/gm, '');
+function FormattedMessage({ content }: { content: string }) {
+  if (!content) return null;
+
+  const rawLines = content.split('\n');
+
+  return (
+    <div className="space-y-1 text-xs leading-relaxed">
+      {rawLines.map((line, lineIdx) => {
+        let cleanLine = line.trim();
+
+        // Limpiar encabezados Markdown tipo ## o ###
+        cleanLine = cleanLine.replace(/^#{1,6}\s+/, '');
+
+        // Detectar elementos de lista con guión o asterisco
+        const isBullet = cleanLine.startsWith('- ') || cleanLine.startsWith('* ');
+        if (isBullet) {
+          cleanLine = cleanLine.substring(2).trim();
+        }
+
+        // Parsear **negritas** o __negritas__
+        const parts = cleanLine.split(/(\*\*.*?\*\*|__.*?__)/g);
+
+        const parsedElements = parts.map((part, partIdx) => {
+          if (
+            (part.startsWith('**') && part.endsWith('**') && part.length >= 4) ||
+            (part.startsWith('__') && part.endsWith('__') && part.length >= 4)
+          ) {
+            return (
+              <strong key={partIdx} className="font-bold text-slate-900">
+                {part.substring(2, part.length - 2)}
+              </strong>
+            );
+          }
+          return <span key={partIdx}>{part}</span>;
+        });
+
+        if (isBullet) {
+          return (
+            <div key={lineIdx} className="flex items-start gap-2 pl-1.5 my-0.5">
+              <span className="text-[#78350F] font-bold text-[11px] select-none leading-none mt-1">•</span>
+              <div className="flex-1">{parsedElements}</div>
+            </div>
+          );
+        }
+
+        if (!cleanLine) {
+          return <div key={lineIdx} className="h-1.5" />;
+        }
+
+        return <div key={lineIdx}>{parsedElements}</div>;
+      })}
+    </div>
+  );
 }
 
 export default function AIAssistant({ isOpen, onClose }: AIAssistantProps) {
@@ -70,6 +121,7 @@ export default function AIAssistant({ isOpen, onClose }: AIAssistantProps) {
 
   const roleData = useMemo(() => getRoleSuggestions(userRole), [userRole]);
 
+  const [isMinimized, setIsMinimized] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [shouldRender, setShouldRender] = useState(isOpen);
   const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string; timestamp?: string }>>([]);
@@ -181,33 +233,57 @@ export default function AIAssistant({ isOpen, onClose }: AIAssistantProps) {
         />
       )}
 
-      {/* Ventana Emergente de Chat */}
+      {/* Ventana Emergente de Chat acoplada al borde inferior en desktop y flotante sobre nav en mobile */}
       <div
-        className={`fixed z-50 bg-[#FCFBF8] shadow-2xl border border-[#E8DEC8] flex flex-col overflow-hidden transition-all duration-300 ease-out ${
+        className={`fixed z-[1000] md:z-50 bg-white shadow-2xl border border-[#E8DEC8] flex flex-col overflow-hidden transition-all duration-300 ease-out ${
           isExpanded
             ? 'inset-4 sm:inset-8 md:inset-12 rounded-2xl'
-            : 'bottom-4 right-4 sm:right-6 w-[calc(100vw-32px)] sm:w-[410px] h-[540px] max-h-[calc(100vh-100px)] rounded-2xl'
+            : isMinimized
+            ? 'bottom-[62px] md:bottom-0 right-3 sm:right-6 md:right-8 w-auto sm:w-[320px] h-12 rounded-xl md:rounded-t-xl md:rounded-b-none shadow-lg'
+            : 'bottom-[62px] md:bottom-0 right-3 left-3 sm:left-auto sm:right-6 md:right-8 w-auto sm:w-[390px] md:w-[410px] h-[500px] max-h-[calc(100vh-130px)] md:max-h-[calc(100vh-80px)] rounded-2xl md:rounded-t-2xl md:rounded-b-none'
         } ${isOpen ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-6 opacity-0 scale-95 pointer-events-none'}`}
       >
-        {/* Encabezado del Chat (Fondo Beige Claro, Botón Marrón sin fondo, sin badges) */}
-        <div className="flex items-center justify-between border-b border-[#E8DEC8] bg-[#F5EFEB] text-[#2C241E] px-4 py-3 select-none">
+        {/* Encabezado del Chat: Única sección en tono beige */}
+        <div
+          className="flex items-center justify-between border-b border-[#E8DEC8] bg-[#F5EFEB] text-[#2C241E] px-4 py-2.5 select-none cursor-pointer"
+          onClick={() => {
+            if (isMinimized) setIsMinimized(false);
+          }}
+        >
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-full bg-transparent flex items-center justify-center text-[#78350F]">
-              <Bot size={22} className="text-[#78350F]" />
+            <div className="w-7 h-7 rounded-full bg-transparent flex items-center justify-center text-[#78350F]">
+              <Bot size={19} className="text-[#78350F] translate-y-[1px]" />
             </div>
             <div>
-              <h2 className="text-xs font-bold tracking-wide text-[#2C241E]">DomunBot AI</h2>
-              <p className="text-[10px] text-[#7C6E65]">Asistente Virtual • DomunNet</p>
+              <h2 className="text-xs font-bold tracking-wide text-[#78350F]">DomunBot AI</h2>
+              {!isMinimized && (
+                <p className="text-[10px] text-[#8C7A6B]">Asistente Virtual • DomunNet</p>
+              )}
             </div>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+            {/* Botón Minimizar / Restaurar */}
             <button
-              onClick={() => setIsExpanded((value) => !value)}
+              onClick={() => {
+                setIsMinimized((prev) => !prev);
+                if (isExpanded) setIsExpanded(false);
+              }}
               className="p-1.5 text-[#7C6E65] hover:text-[#2C241E] hover:bg-[#EAE0D3] rounded-lg transition-colors"
-              title={isExpanded ? 'Restaurar tamaño' : 'Ampliar ventana'}
+              title={isMinimized ? 'Restaurar chat' : 'Minimizar a la barra'}
             >
-              {isExpanded ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+              {isMinimized ? <ChevronUp size={15} /> : <Minus size={15} />}
             </button>
+            {/* Botón Pantalla Completa */}
+            {!isMinimized && (
+              <button
+                onClick={() => setIsExpanded((value) => !value)}
+                className="p-1.5 text-[#7C6E65] hover:text-[#2C241E] hover:bg-[#EAE0D3] rounded-lg transition-colors"
+                title={isExpanded ? 'Restaurar tamaño' : 'Ampliar ventana'}
+              >
+                {isExpanded ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+              </button>
+            )}
+            {/* Botón Cerrar */}
             <button
               onClick={onClose}
               className="p-1.5 text-[#7C6E65] hover:text-[#2C241E] hover:bg-[#EAE0D3] rounded-lg transition-colors"
@@ -218,88 +294,93 @@ export default function AIAssistant({ isOpen, onClose }: AIAssistantProps) {
           </div>
         </div>
 
-        {/* Opciones de Mensajes / Sugerencias Rápidas para el Chat (Solo al inicio del chat) */}
-        {messages.length <= 1 && (
-          <div className="border-b border-[#E8DEC8] bg-[#FAF7F0] px-3.5 py-2.5">
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[10px] font-semibold text-[#8C7A6B] uppercase tracking-wider">
-                {roleData.title}
-              </span>
-              {roleData.roleTitle && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#EFE8DC] text-[#6B5A4B] text-[9px] font-medium">
-                  <UserCheck size={10} className="text-[#78350F]" />
-                  {roleData.roleTitle}
-                </span>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {roleData.items.map((suggestion) => (
-                <button
-                  key={suggestion.label}
-                  onClick={() => handleSendMessage(suggestion.query)}
-                  className="rounded-full border border-[#DFD3BE] bg-white px-2.5 py-1 text-left text-[10.5px] font-medium text-[#5A4839] transition-all hover:border-[#78350F]/40 hover:bg-[#F2EADB] hover:text-[#78350F] shadow-xs active:scale-95"
-                >
-                  {suggestion.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Área de Mensajes */}
-        <div className="flex-1 space-y-3 overflow-y-auto bg-[#FDFBF7] p-4">
-          {messages.map((msg, idx) => (
-            <div key={idx} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-              <div
-                className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-xs leading-relaxed ${
-                  msg.role === 'user'
-                    ? 'rounded-br-none bg-[#EFE6D8] text-[#3B2D22] border border-[#DFCFA4] shadow-xs font-medium'
-                    : 'rounded-bl-none border border-[#E7DEC8] bg-white text-slate-800 shadow-sm'
-                }`}
-              >
-                {formatCleanMessage(msg.content)}
-              </div>
-              {msg.timestamp && (
-                <span className="mt-1 px-1 text-[9px] text-[#A39486]">{msg.timestamp}</span>
-              )}
-            </div>
-          ))}
-          {isLoading && (
-            <div className="flex justify-start">
-              <div className="rounded-2xl rounded-bl-none border border-[#E7DEC8] bg-white px-4 py-2.5 text-slate-700 shadow-sm">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[11px] font-medium text-[#7C6E65]">Consultando IA</span>
-                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#78350F]"></span>
-                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#78350F]" style={{ animationDelay: '0.15s' }}></span>
-                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#78350F]" style={{ animationDelay: '0.3s' }}></span>
+        {/* Cuerpo del chat: Fondo blanco en el interior */}
+        {!isMinimized && (
+          <>
+            {/* Opciones de Mensajes / Sugerencias Rápidas con fondo blanco */}
+            {messages.length <= 1 && (
+              <div className="border-b border-gray-100 bg-white px-3.5 py-2.5">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-[10px] font-semibold text-[#8C7A6B] uppercase tracking-wider">
+                    {roleData.title}
+                  </span>
+                  {roleData.roleTitle && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#FAF5EE] text-[#6B5A4B] text-[9px] font-medium border border-[#EFE8DC]">
+                      <UserCheck size={10} className="text-[#78350F]" />
+                      {roleData.roleTitle}
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {roleData.items.map((suggestion) => (
+                    <button
+                      key={suggestion.label}
+                      onClick={() => handleSendMessage(suggestion.query)}
+                      className="rounded-full border border-gray-200 bg-gray-50/70 px-2.5 py-1 text-left text-[10.5px] font-medium text-gray-700 transition-all hover:border-[#78350F]/40 hover:bg-[#FAF5EE] hover:text-[#78350F] shadow-2xs active:scale-95 cursor-pointer"
+                    >
+                      {suggestion.label}
+                    </button>
+                  ))}
                 </div>
               </div>
-            </div>
-          )}
-          <div ref={messagesEndRef} />
-        </div>
+            )}
 
-        {/* Barra de Entrada de Texto (Flecha de envío en gris) */}
-        <div className="border-t border-[#E8DEC8] bg-[#FAF7F0] px-3 py-2.5">
-          <div className="flex items-center gap-2 bg-white rounded-full px-3.5 py-1.5 border border-[#DFD3BE] focus-within:border-[#78350F]/60 focus-within:ring-2 focus-within:ring-[#78350F]/10 transition-all shadow-2xs">
-            <input
-              type="text"
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-              placeholder="Escribe tu consulta para la IA..."
-              className="flex-1 bg-transparent text-xs text-[#2C241E] placeholder:text-gray-400 outline-none"
-            />
-            <button
-              onClick={() => handleSendMessage()}
-              disabled={isLoading || !inputValue.trim()}
-              className="w-7 h-7 rounded-full bg-transparent hover:bg-gray-100 flex items-center justify-center text-gray-500 hover:text-gray-700 transition-all active:scale-90 disabled:opacity-30 disabled:pointer-events-none"
-              title="Enviar mensaje"
-            >
-              <Send size={14} className="text-gray-500" />
-            </button>
-          </div>
-        </div>
+            {/* Área de Mensajes con fondo blanco */}
+            <div className="flex-1 space-y-3 overflow-y-auto bg-white p-4">
+              {messages.map((msg, idx) => (
+                <div key={idx} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                  <div
+                    className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-xs leading-relaxed ${
+                      msg.role === 'user'
+                        ? 'rounded-br-none bg-[#9B0F06] text-white shadow-2xs font-medium'
+                        : 'rounded-bl-none border border-gray-200 bg-[#F9FAFB] text-slate-800 shadow-2xs'
+                    }`}
+                  >
+                    <FormattedMessage content={msg.content} />
+                  </div>
+                  {msg.timestamp && (
+                    <span className="mt-1 px-1 text-[9px] text-[#A39486]">{msg.timestamp}</span>
+                  )}
+                </div>
+              ))}
+              {isLoading && (
+                <div className="flex justify-start">
+                  <div className="rounded-2xl rounded-bl-none border border-gray-200 bg-[#F9FAFB] px-4 py-2.5 text-slate-700 shadow-2xs">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[11px] font-medium text-[#7C6E65]">Consultando IA</span>
+                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#78350F]"></span>
+                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#78350F]" style={{ animationDelay: '0.15s' }}></span>
+                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#78350F]" style={{ animationDelay: '0.3s' }}></span>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+
+            {/* Barra de Entrada de Texto con fondo blanco */}
+            <div className="border-t border-gray-100 bg-white px-3 py-2.5">
+              <div className="flex items-center gap-2 bg-gray-50 rounded-full px-3.5 py-1.5 border border-gray-200 focus-within:border-[#78350F]/50 focus-within:bg-white focus-within:ring-2 focus-within:ring-[#78350F]/10 transition-all shadow-2xs">
+                <input
+                  type="text"
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                  placeholder="Escribe tu consulta para la IA..."
+                  className="flex-1 bg-transparent text-xs text-[#2C241E] placeholder:text-gray-400 outline-none"
+                />
+                <button
+                  onClick={() => handleSendMessage()}
+                  disabled={isLoading || !inputValue.trim()}
+                  className="w-7 h-7 rounded-full bg-transparent hover:bg-gray-200/60 flex items-center justify-center text-gray-500 hover:text-[#78350F] transition-all active:scale-90 disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+                  title="Enviar mensaje"
+                >
+                  <Send size={14} />
+                </button>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </>
   );

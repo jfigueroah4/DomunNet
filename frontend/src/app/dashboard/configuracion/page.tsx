@@ -1,148 +1,108 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import {
-  Settings, Database, HardDrive, RotateCcw, Bell, ChevronRight
+  Settings, Database, RefreshCw, HardDrive, RotateCcw, ChevronRight
 } from 'lucide-react'
-
-const POPPINS = "'Poppins', sans-serif"
 
 const CONFIG_MODULES = [
   {
     key: 'general',
     name: 'General',
-    desc: 'Configuración general del sistema',
+    description: 'Configuración general del sistema',
     icon: Settings,
-    gradient: 'linear-gradient(135deg, #059669 0%, #34D399 100%)',
-    path: '/dashboard/configuracion/general',
+    bgColor: 'bg-gradient-to-br from-[#059669] to-[#34D399]',
+    href: '/dashboard/configuracion/general',
   },
   {
     key: 'tablas',
     name: 'Mantenimiento de Tablas',
-    desc: 'Catálogos del sistema',
+    description: 'Catálogos del sistema',
     icon: Database,
-    gradient: 'linear-gradient(135deg, #B45309 0%, #F59E0B 100%)',
-    path: '/dashboard/configuracion/mantenimiento-tablas',
+    bgColor: 'bg-gradient-to-br from-[#B45309] to-[#F59E0B]',
+    href: '/dashboard/configuracion/mantenimiento-tablas',
+  },
+  {
+    key: 'reinicio',
+    name: 'Reinicio de Datos',
+    description: 'Restablecer datos del sistema o por módulos',
+    icon: RefreshCw,
+    bgColor: 'bg-gradient-to-br from-[#9B0F06] to-[#DC2626]',
+    href: '/dashboard/configuracion/reinicio',
   },
   {
     key: 'backup',
     name: 'Backup',
-    desc: 'Generador de copias de seguridad',
+    description: 'Generador de copias de seguridad',
     icon: HardDrive,
-    gradient: 'linear-gradient(135deg, #2563EB 0%, #60A5FA 100%)',
-    path: '/dashboard/configuracion/backup',
+    bgColor: 'bg-gradient-to-br from-[#2563EB] to-[#60A5FA]',
+    href: '/dashboard/configuracion/backup',
   },
   {
     key: 'restauracion',
     name: 'Restauración',
-    desc: 'Restaura una copia de seguridad',
+    description: 'Restaura una copia de seguridad',
     icon: RotateCcw,
-    gradient: 'linear-gradient(135deg, #7C3AED 0%, #A78BFA 100%)',
-    path: '/dashboard/configuracion/restauracion',
-  },
-  {
-    key: 'notificaciones',
-    name: 'Notificaciones',
-    desc: 'Preferencias de alertas',
-    icon: Bell,
-    gradient: 'linear-gradient(135deg, #DC2626 0%, #F87171 100%)',
-    path: '/dashboard/configuracion/notificaciones',
+    bgColor: 'bg-gradient-to-br from-[#7C3AED] to-[#A78BFA]',
+    href: '/dashboard/configuracion/restauracion',
   },
 ]
 
 export default function ConfiguracionPage() {
-  const router = useRouter()
-
   return (
-    <div style={{ fontFamily: POPPINS, padding: '16px 20px', maxWidth: 1400, margin: '0 auto', minHeight: 'calc(100vh - 100px)', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ marginBottom: '24px' }}>
-        <h2 style={{ fontSize: '24px', fontWeight: 700, color: '#111827', margin: 0 }}>Configuración</h2>
-        <p style={{ fontSize: '14px', color: '#6B7280', margin: '4px 0 0' }}>
-          Preferencias y ajustes del sistema
-        </p>
-      </div>
-
+    <div className="space-y-4 p-2 md:p-3 font-[Poppins]">
       <style>{`
-        .module-card-expanded {
-          transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-          cursor: pointer;
-          position: relative;
-          overflow: hidden;
+        .config-module-card {
+          transition: transform 0.28s ease, box-shadow 0.28s ease, filter 0.28s ease;
         }
-        .module-card-expanded:hover {
-          transform: translateY(-4px);
-          box-shadow: 0 12px 24px rgba(0,0,0,0.12) !important;
+        .config-module-card:hover {
+          transform: translateY(-4px) scale(1.01);
+          box-shadow: 0 16px 32px rgba(155, 15, 6, 0.18);
+          filter: saturate(1.02);
         }
-        .module-icon-bg-large {
-          position: absolute;
-          right: -20px;
-          bottom: -20px;
-          opacity: 0.15;
-          transform: rotate(-10deg);
-          transition: transform 0.4s ease;
+        .config-module-card:hover .config-module-icon {
+          transform: scale(1.08) rotate(-4deg);
+          opacity: 0.28;
         }
-        .module-card-expanded:hover .module-icon-bg-large {
-          transform: rotate(0deg) scale(1.1);
+        .config-module-card:hover .config-module-link {
+          transform: translateX(3px);
+          opacity: 1;
         }
       `}</style>
-      
-      <div 
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-          gap: '24px',
-          width: '100%',
-        }}
-      >
+
+      <div className="mb-2">
+        <h1 className="text-[24px] font-bold tracking-tight text-gray-900">Configuración</h1>
+        <p className="mt-1 text-[11px] text-gray-500">Preferencias y ajustes del sistema</p>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
         {CONFIG_MODULES.map((module) => {
-          const Icon = module.icon;
+          const Icon = module.icon
+
           return (
-            <button
+            <Link
               key={module.key}
-              type="button"
-              onClick={() => router.push(module.path)}
-              className="module-card-expanded"
-              style={{
-                background: module.gradient,
-                minHeight: 160,
-                borderRadius: 18,
-                border: 'none',
-                padding: '20px 22px',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                color: 'white',
-                textAlign: 'left',
-                boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
-              }}
+              href={module.href}
+              className={`${module.bgColor} config-module-card relative flex min-h-[164px] flex-col justify-between overflow-hidden rounded-[20px] p-5 text-white`}
             >
-              <div className="module-icon-bg-large">
-                <Icon size={115} color={'white'} />
+              <div className="config-module-icon absolute -bottom-2 -right-2 opacity-20 transition-transform duration-300">
+                <Icon size={104} color="white" />
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', zIndex: 10 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Icon size={24} color="white" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.15))' }} />
-                </div>
-
-                <div className="link-modulo-text" style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, fontFamily: POPPINS, letterSpacing: '0.04em' }}>
-                    Ir a la sección
-                  </span>
-                  <ChevronRight size={14} color="white" />
+              <div className="relative z-10 flex items-center justify-between">
+                <Icon size={24} color="white" className="drop-shadow-[0_2px_4px_rgba(0,0,0,0.15)]" />
+                <div className="config-module-link flex items-center gap-1 text-[11px] font-bold tracking-wide opacity-90 transition-all duration-200">
+                  <span>Ir a la sección</span>
+                  <ChevronRight size={12} className="opacity-80" />
                 </div>
               </div>
 
-              <div style={{ zIndex: 10, marginTop: 16 }}>
-                <h3 style={{ fontSize: 18, fontWeight: 800, margin: 0, color: 'white', fontFamily: POPPINS, lineHeight: 1.2 }}>
-                  {module.name}
-                </h3>
-                <p style={{ fontSize: 12, margin: '4px 0 0', color: 'rgba(255, 255, 255, 0.9)', fontFamily: POPPINS, fontWeight: 400, lineHeight: 1.35 }}>
-                  {module.desc}
-                </p>
+              <div className="relative z-10">
+                <h3 className="text-[20px] font-bold leading-tight">{module.name}</h3>
+                <p className="mt-1 text-[13px] leading-snug text-white/90">{module.description}</p>
               </div>
-            </button>
-          );
+            </Link>
+          )
         })}
       </div>
     </div>

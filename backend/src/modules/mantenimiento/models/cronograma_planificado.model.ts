@@ -1,10 +1,10 @@
 import { TablaConfig } from '../mantenimiento.types';
 
 export const cronogramaPlanificadoConfig: TablaConfig = {
-  "nombreTablaDb": "cronograma_planificado",
-  "permisoRequerido": "catalogos.write",
-  "columnasVisibles": "id, proyecto_id, fase_id, renglon_id, fecha_inicio_plan, fecha_fin_plan, porcentaje_esperado, responsable_id, linea_base",
-  "columnasFiltroOrden": [
+  nombreTablaDb: 'cronograma_planificado',
+  permisoRequerido: 'catalogos.write',
+  columnasVisibles: 'id, proyecto_id, fase_id, renglon_id, fecha_inicio_plan, fecha_fin_plan, porcentaje_esperado, responsable_id, linea_base',
+  columnasFiltroOrden: [
     "id",
     "proyecto_id",
     "fase_id",
@@ -14,29 +14,41 @@ export const cronogramaPlanificadoConfig: TablaConfig = {
     "porcentaje_esperado",
     "responsable_id",
     "linea_base"
-  ],
-  "columnasFiltroMenu": [
+],
+  
+  columnasFiltroMenu: [
     {
-      "columna": "proyecto_id",
-      "tipo": "foreign_key",
-      "tablaReferencia": "proyecto",
-      "columnaLabel": "nombre",
-      "renderizado": "select"
+        "columna": "fase_id",
+        "tipo": "foreign_key",
+        "tablaReferencia": "fase_proyecto",
+        "columnaLabel": "nombre",
+        "renderizado": "select"
     },
     {
-      "columna": "fase_id",
-      "tipo": "foreign_key",
-      "tablaReferencia": "fase_proyecto",
-      "columnaLabel": "nombre",
-      "renderizado": "select"
+        "columna": "proyecto_id",
+        "tipo": "foreign_key",
+        "tablaReferencia": "proyecto",
+        "columnaLabel": "nombre",
+        "renderizado": "select"
     },
     {
-      "columna": "linea_base",
-      "tipo": "boolean",
-      "opciones": [
-        "true",
-        "false"
-      ]
+        "columna": "renglon_id",
+        "tipo": "foreign_key",
+        "tablaReferencia": "renglon_trabajo",
+        "columnaLabel": "codigo",
+        "renderizado": "combobox"
+    },
+    {
+        "columna": "responsable_id",
+        "tipo": "foreign_key",
+        "tablaReferencia": "usuario",
+        "columnaLabel": "email",
+        "renderizado": "combobox"
     }
-  ]
+],
+  
+  
+  
+  
+  
 };

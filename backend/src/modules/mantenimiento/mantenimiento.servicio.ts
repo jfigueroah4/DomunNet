@@ -57,7 +57,18 @@ export async function listarRegistros(config: TablaConfig, pagina: number, limit
     }
   }
   
-  return { data: enrichedData, total: count || 0, columnasVisibles: config.columnasVisibles, columnasFiltroMenu: config.columnasFiltroMenu || [] };
+  return { 
+    data: enrichedData, 
+    total: count || 0, 
+    columnasVisibles: config.columnasVisibles, 
+    columnasFiltroMenu: config.columnasFiltroMenu || [],
+    soloLectura: Boolean(config.soloLectura),
+    bloquearCreacion: Boolean(config.bloquearCreacion || config.soloLectura),
+    bloquearModificacion: Boolean(config.bloquearModificacion || config.soloLectura),
+    bloquearEliminacion: Boolean(config.bloquearEliminacion || config.soloLectura),
+    mensajeBloqueo: config.mensajeBloqueo || null,
+    descripcion: config.descripcion || null
+  };
 }
 
 export async function obtenerRegistro(config: TablaConfig, id: string) {
@@ -88,18 +99,52 @@ export async function obtenerRegistro(config: TablaConfig, id: string) {
 }
 
 export async function crearRegistro(config: TablaConfig, payload: any, usuario_id?: string) {
+  if (config.soloLectura || config.bloquearCreacion) {
+    throw new Error(config.mensajeBloqueo || `No está permitida la creación directa de registros en la tabla '${config.nombreTablaDb}'.`);
+  }
   const { data, error } = await clienteSupabase.from(config.nombreTablaDb).insert([payload]).select().single();
   if (error) throw new Error(error.message);
   return data;
 }
 
 export async function actualizarRegistro(config: TablaConfig, id: string, payload: any) {
+  if (config.soloLectura || config.bloquearModificacion) {
+    throw new Error(config.mensajeBloqueo || `No está permitida la modificación directa de registros en la tabla '${config.nombreTablaDb}'.`);
+  }
   const { data, error } = await clienteSupabase.from(config.nombreTablaDb).update(payload).eq('id', id).select().single();
   if (error) throw new Error(error.message);
   return data;
 }
 
 export async function eliminarRegistro(config: TablaConfig, id: string) {
+  if (config.soloLectura || config.bloquearEliminacion) {
+    throw new Error(config.mensajeBloqueo || `No está permitida la eliminación de registros en la tabla '${config.nombreTablaDb}'.`);
+  }
+
+  // Verificación exhaustiva de dependencias referenciales
+  if (config.dependenciasDelete && config.dependenciasDelete.length > 0) {
+    for (const dep of config.dependenciasDelete) {
+      try {
+        const { count, error } = await clienteSupabase
+          .from(dep.tablaDependiente)
+          .select('id', { count: 'exact', head: true })
+          .eq(dep.columnaFk, id);
+
+        if (!error && count && count > 0) {
+          const tablaNombre = dep.nombreLegible || dep.tablaDependiente.replace(/_/g, ' ');
+          throw new Error(
+            `No se puede eliminar este registro porque tiene ${count} registro(s) dependiente(s) en la tabla '${tablaNombre}'. Debe eliminar o reasignar las referencias asociadas primero.`
+          );
+        }
+      } catch (err: any) {
+        if (err.message && err.message.includes('No se puede eliminar')) {
+          throw err;
+        }
+        console.warn(`Verificación de dependencia en ${dep.tablaDependiente} omitida o advertencia:`, err.message);
+      }
+    }
+  }
+
   const { error } = await clienteSupabase.from(config.nombreTablaDb).delete().eq('id', id);
   if (error) throw new Error(error.message);
   return true;

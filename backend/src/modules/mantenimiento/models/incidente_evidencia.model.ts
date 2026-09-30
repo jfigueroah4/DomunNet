@@ -1,10 +1,10 @@
 import { TablaConfig } from '../mantenimiento.types';
 
 export const incidenteEvidenciaConfig: TablaConfig = {
-  "nombreTablaDb": "incidente_evidencia",
-  "permisoRequerido": "catalogos.write",
-  "columnasVisibles": "id, incidente_id, subido_por, nombre, tipo, url_storage, descripcion, fecha_subida",
-  "columnasFiltroOrden": [
+  nombreTablaDb: 'incidente_evidencia',
+  permisoRequerido: 'catalogos.write',
+  columnasVisibles: 'id, incidente_id, subido_por, nombre, tipo, url_storage, descripcion, fecha_subida',
+  columnasFiltroOrden: [
     "id",
     "incidente_id",
     "subido_por",
@@ -13,14 +13,27 @@ export const incidenteEvidenciaConfig: TablaConfig = {
     "url_storage",
     "descripcion",
     "fecha_subida"
-  ],
-  "columnasFiltroMenu": [
+],
+  
+  columnasFiltroMenu: [
     {
-      "columna": "incidente_id",
-      "tipo": "foreign_key",
-      "tablaReferencia": "incidente_obra",
-      "columnaLabel": "titulo",
-      "renderizado": "combobox"
+        "columna": "incidente_id",
+        "tipo": "foreign_key",
+        "tablaReferencia": "incidente_obra",
+        "columnaLabel": "titulo",
+        "renderizado": "select"
+    },
+    {
+        "columna": "subido_por",
+        "tipo": "foreign_key",
+        "tablaReferencia": "usuario",
+        "columnaLabel": "email",
+        "renderizado": "combobox"
     }
-  ]
+],
+  
+  
+  
+  
+  
 };

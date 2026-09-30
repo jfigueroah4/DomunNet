@@ -197,7 +197,7 @@ function HeaderTooltip({
 
   if (!info) return <>{children}</>
 
-  const isRightCol = ['L', 'M', 'N', 'O', 'P', 'Saldo'].includes(colKey);
+  const isRightCol = ['G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Saldo'].includes(colKey);
   const isLeftCol = ['A', 'B', 'C'].includes(colKey);
   const alignmentClasses = isRightCol
     ? 'right-0 top-full mt-1.5'
@@ -213,14 +213,17 @@ function HeaderTooltip({
     >
       {children}
       {hovered && (
-        <div className={`absolute ${alignmentClasses} z-[9999] whitespace-nowrap min-w-max rounded-lg border border-gray-200 bg-white/95 px-3 py-1.5 text-left font-sans shadow-lg backdrop-blur-md transition-all pointer-events-none flex items-center gap-2 text-[9.5px]`}>
-          <Info size={11} className="text-[#9B0F06] shrink-0" />
-          {info.formula && (
-            <span className="rounded bg-red-50 px-1.5 py-0.5 font-mono text-[9px] font-bold text-[#9B0F06] border border-red-100">
-              {info.formula}
-            </span>
-          )}
-          <span className="font-medium text-gray-700">{info.desc}</span>
+        <div className={`absolute ${alignmentClasses} z-[99999] w-max max-w-[280px] rounded-lg border border-gray-200 bg-white/98 p-2.5 text-left font-sans shadow-2xl backdrop-blur-md transition-all pointer-events-none text-[9.5px] leading-tight space-y-1`}>
+          <div className="flex items-center gap-1.5 font-bold text-[#9B0F06]">
+            <Info size={12} className="shrink-0 text-[#9B0F06]" />
+            <span className="truncate text-[10px]">{info.title}</span>
+            {info.formula && (
+              <span className="ml-auto rounded bg-red-50 px-1.5 py-0.2 font-mono text-[8.5px] font-bold text-[#9B0F06] border border-red-100">
+                {info.formula}
+              </span>
+            )}
+          </div>
+          <p className="font-normal text-gray-700 break-words whitespace-normal text-[9px] leading-normal">{info.desc}</p>
         </div>
       )}
     </div>
@@ -813,12 +816,13 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
 
     const cargarDatosVistaConsolidados = async () => {
       try {
-        const [resProy, resReng, resCap, resUni, resPend] = await Promise.allSettled([
+        const [resProy, resReng, resCap, resUni, resPend, resMed] = await Promise.allSettled([
           apiGetDeduplicado(`/proyectos/${targetId}`),
           apiGetDeduplicado(`/mantenimiento/renglon_trabajo?limite=300`),
           apiGetDeduplicado('/mantenimiento/capitulo_sabana?limite=100'),
           apiGetDeduplicado('/mantenimiento/unidad_medida?limite=100'),
           apiGetDeduplicado(`/proyectos/${targetId}/pendientes`),
+          apiGetDeduplicado(`/hoja-sabana/${targetId}/mediciones`),
         ])
 
         if (!activo) return
@@ -893,6 +897,34 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
             setTrabajosPendientes(lista)
           }
         }
+
+        if (resMed.status === 'fulfilled') {
+          const listaMeds = resMed.value?.data?.data || resMed.value?.data
+          if (Array.isArray(listaMeds) && listaMeds.length > 0) {
+            const mapeadas: MedicionAnaliticaCampo[] = listaMeds.map((m: any) => ({
+              id: m.id || `med-${Math.random().toString(36).slice(2, 9)}`,
+              codigoDGC: m.codigo_dgc || m.codigoDGC || '101.01',
+              descripcionRenglon: m.descripcion || m.descripcionRenglon || '',
+              estacionInicio: m.estacion_inicio || m.estacionInicio || '0+000',
+              estacionFin: m.estacion_fin || m.estacionFin || '0+100',
+              longitudL: Number(m.longitud_l ?? m.longitudL ?? 0),
+              anchoA: Number(m.ancho_a ?? m.anchoA ?? 0),
+              alturaH: Number(m.altura_h ?? m.alturaH ?? 0),
+              ladoVia: m.lado_via || m.ladoVia || 'Sección Completa',
+              multiplicador: Number(m.multiplicador ?? 1),
+              descuento: Number(m.descuento ?? 0),
+              tipoDescuento: m.tipo_descuento || m.tipoDescuento || 'monto',
+              cantidadCalculada: Number(m.cantidad_calculada ?? m.cantidadCalculada ?? 0),
+              unidad: m.unidad || 'm³',
+              origenTipo: m.origen_tipo || m.origenTipo || 'Libreta',
+              referenciaOrigen: m.referencia_origen || m.referenciaOrigen || 'Bitácora de Obra',
+              observaciones: m.observaciones || '',
+              fechaMedicion: m.fecha_medicion || m.fechaMedicion || '',
+              bitacoraEntradaId: m.bitacora_entrada_id || m.bitacoraEntradaId || undefined,
+            }))
+            setMedicionesAnaliticas(mapeadas)
+          }
+        }
       } catch (e) {
         console.warn('Error en carga de datos:', e)
       }
@@ -911,6 +943,28 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
       localStorage.setItem(`sabana_renglones_${targetId}`, JSON.stringify(renglones))
 
       const alertas: any[] = []
+
+      // 1. Alerta de Vencimiento de Estimación (Vence hoy o <= 5 días)
+      if (estimacionEnProgreso && diasRestantesEstimacion !== null && diasRestantesEstimacion <= 5) {
+        alertas.push({
+          id: `alerta-vence-estimacion-${targetId}-${estimacionEnProgreso.id || estimacionEnProgreso.numero}`,
+          title: diasRestantesEstimacion < 0
+            ? `Corte de ${estimacionEnProgreso.numero} VENCIDO (${Math.abs(diasRestantesEstimacion)} días)`
+            : diasRestantesEstimacion === 0
+            ? `Corte de ${estimacionEnProgreso.numero} VENCE HOY`
+            : `Corte de ${estimacionEnProgreso.numero} vence en ${diasRestantesEstimacion} días`,
+          author: proyecto?.nombre || 'Supervisión de Obra',
+          time: diasRestantesEstimacion === 0 ? 'Vence hoy' : `${estimacionEnProgreso.fechaCorte}`,
+          tipo: 'vencimiento_hoy',
+          creadoPor: estimacionEnProgreso.creadoPor,
+          creadoPorId: (estimacionEnProgreso as any).usuarioId || (estimacionEnProgreso as any).creadoPorId || estimacionEnProgreso.creadoPor,
+          proyectoId: targetId,
+          link: `/dashboard/proyectos/${targetId}/hoja-sabana`,
+          diasRestantes: diasRestantesEstimacion,
+        })
+      }
+
+      // 2. Alertas de exceso de renglones (> 100%)
       renglones.forEach((r: any) => {
         const cantTotalFechaK = (r.cantidadEstePeriodo || 0) + (r.cantidadAcumuladaAnterior || 0)
         const pctAvance = r.cantidadAjustada > 0 ? (cantTotalFechaK / r.cantidadAjustada) * 100 : 0
@@ -935,7 +989,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
       window.dispatchEvent(new Event('storage'))
       window.dispatchEvent(new CustomEvent('sabana-alertas-updated'))
     }
-  }, [renglones, proyectoIdSeleccionado, id, proyecto?.nombre])
+  }, [renglones, proyectoIdSeleccionado, id, proyecto?.nombre, estimacionEnProgreso, diasRestantesEstimacion])
 
   const [medicionesAnaliticas, setMedicionesAnaliticas] = useState<MedicionAnaliticaCampo[]>([])
   const [trabajosPendientes, setTrabajosPendientes] = useState<TrabajoPendienteBolsa[]>([])
@@ -1014,18 +1068,30 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
   }, [proyecto])
 
   const fechaFinRealProyecto = useMemo(() => {
+    if (modoVistaLineaBase === 'inicial') {
+      return (
+        proyecto?.fecha_fin_contractual_original ||
+        proyecto?.fechaFinContractualOriginal ||
+        proyecto?.fecha_fin_contractual ||
+        proyecto?.fechaFinContractual ||
+        proyecto?.fecha_fin ||
+        proyecto?.fechaFin ||
+        proyecto?.detalle?.fecha_fin_contractual ||
+        ''
+      )
+    }
     return (
       fechaFinalizacionActualizada ||
-      proyecto?.fecha_fin_contractual ||
-      proyecto?.fechaFinContractual ||
       proyecto?.fechaFinContractualPlan ||
       proyecto?.fecha_fin_contractual_plan ||
+      proyecto?.fecha_fin_contractual ||
+      proyecto?.fechaFinContractual ||
       proyecto?.fecha_fin ||
       proyecto?.fechaFin ||
       proyecto?.detalle?.fecha_fin_contractual ||
       ''
     )
-  }, [proyecto, fechaFinalizacionActualizada])
+  }, [proyecto, fechaFinalizacionActualizada, modoVistaLineaBase])
 
   const fechaInicioProyectoYYYYMMDD = useMemo(() => {
     if (!fechaInicioRealProyecto) return ''
@@ -1056,7 +1122,19 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
   }, [fechaFinRealProyecto])
 
   const plazoRealProyecto = useMemo(() => {
+    if (modoVistaLineaBase === 'inicial') {
+      return (
+        proyecto?.plazo_ejecucion_original ||
+        proyecto?.plazoOriginal ||
+        proyecto?.plazo ||
+        proyecto?.plazoContractual ||
+        proyecto?.plazo_ejecucion_dias ||
+        proyecto?.detalle?.plazo_ejecucion_original ||
+        ''
+      )
+    }
     return (
+      proyecto?.plazoEjecucionRealAmpliado ||
       proyecto?.plazo ||
       proyecto?.plazoContractual ||
       proyecto?.plazo_ejecucion_dias ||
@@ -1064,7 +1142,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
       proyecto?.detalle?.plazo_ejecucion_original ||
       ''
     )
-  }, [proyecto])
+  }, [proyecto, modoVistaLineaBase])
 
   const esBorrador = useMemo(() => {
     if (esPlantillaVacia) return true
@@ -2342,12 +2420,14 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                   {diasRestantesEstimacion !== null && diasRestantesEstimacion <= 5 && (
                     <>
                       <span className="text-gray-300">|</span>
-                      <div className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9.5px] font-bold border ${
+                      <div className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[9.5px] font-extrabold shadow-2xs border ${
                         diasRestantesEstimacion < 0
-                          ? 'bg-red-50 text-red-700 border-red-200'
-                          : 'bg-amber-50 text-amber-800 border-amber-200'
+                          ? 'bg-red-500 text-white border-red-600 animate-pulse'
+                          : diasRestantesEstimacion === 0
+                          ? 'bg-yellow-400 text-yellow-950 border-yellow-500 ring-2 ring-yellow-400/30'
+                          : 'bg-yellow-300 text-yellow-900 border-yellow-400'
                       }`}>
-                        <AlertTriangle size={11} className={diasRestantesEstimacion < 0 ? 'text-red-600' : 'text-amber-600'} />
+                        <AlertTriangle size={11} className={diasRestantesEstimacion < 0 ? 'text-white' : 'text-yellow-950'} />
                         <span>
                           {diasRestantesEstimacion < 0
                             ? `Corte vencido (${Math.abs(diasRestantesEstimacion)} días)`
@@ -2612,28 +2692,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
 
       {/* TAB 1: [SÁBANA] — TABLA CON FUENTE POPPINS, REGULAR SALVO CÓDIGO */}
       {tabSeccion === 'sabana' && (
-        <div className="relative bg-white overflow-hidden rounded-md border-b border-gray-200/80 font-[Poppins] group">
-          {/* Botón Flotante para Desplazarse a Columnas I-R */}
-          <button
-            type="button"
-            onClick={() => scrollTable('right')}
-            className="absolute right-2 top-14 z-30 bg-white/90 hover:bg-white text-[#9B0F06] shadow-md backdrop-blur-xs border border-red-200 rounded-full px-2.5 py-1 transition-all hover:scale-105 flex items-center gap-1 text-[9.5px] font-semibold opacity-75 hover:opacity-100 cursor-pointer"
-            title="Desplazarse a columnas financieras (I a R)"
-          >
-            <span>Ver Col. I-R</span>
-            <ChevronRight size={13} />
-          </button>
-
-          {/* Botón Flotante para Regresar a Columnas A-H */}
-          <button
-            type="button"
-            onClick={() => scrollTable('left')}
-            className="absolute left-2 top-14 z-30 bg-white/90 hover:bg-white text-gray-700 shadow-md backdrop-blur-xs border border-gray-200 rounded-full px-2.5 py-1 transition-all hover:scale-105 flex items-center gap-1 text-[9.5px] font-semibold opacity-75 hover:opacity-100 cursor-pointer"
-            title="Regresar a columnas base (A a H)"
-          >
-            <ChevronLeft size={13} />
-            <span>Ver Col. A-H</span>
-          </button>
+        <div className="relative bg-white overflow-hidden rounded-md border-b border-gray-200/80 font-[Poppins]">
 
           {totalItems === 0 ? (
             <div className="p-8 text-center space-y-2">
@@ -3636,25 +3695,29 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                     <th className="p-2 min-w-[180px]">Descripción</th>
                     <th className="p-2 text-right">Cant. Ajustada (Plan)</th>
                     <th className="p-2 text-right">Cant. Ejecutada (Real)</th>
-                    <th className="p-2 text-right">% Planificado (Mes 6)</th>
+                    <th className="p-2 text-right">% Planificado</th>
                     <th className="p-2 text-right">% Real</th>
                     <th className="p-2 text-center w-28">Variación</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {pvrRenglonesPagina.map((r) => {
+                    const cantPlanTotal = r.cantidadAjustadaPlan || r.cantidadAjustada || 0
                     const ejecReal = r.cantidadEstePeriodo + r.cantidadAcumuladaAnterior
                     
-                    // Cálculo dinámico de % Planificado a la fecha (hasta Mes 6)
-                    const sumaPlanMes6 = r.avancesMensuales
-                      ? Object.entries(r.avancesMensuales).reduce((acc, [mesKey, val]) => {
-                          const numMes = parseInt(mesKey.replace('Mes ', ''), 10)
-                          if (!isNaN(numMes) && numMes <= 6) return acc + (Number(val) || 0)
-                          return acc
-                        }, 0)
-                      : 0
+                    // Cálculo dinámico de % Planificado a la fecha a partir de la curva planificada
+                    const planMap = (r.avancesMensualesPlan && Object.keys(r.avancesMensualesPlan).length > 0)
+                      ? r.avancesMensualesPlan
+                      : r.avancesMensuales
+                    
+                    let sumaPlanAcum = 0
+                    if (planMap && Object.keys(planMap).length > 0) {
+                      sumaPlanAcum = Object.values(planMap).reduce((acc, val) => acc + (Number(val) || 0), 0)
+                    } else {
+                      sumaPlanAcum = cantPlanTotal * 0.5
+                    }
 
-                    const pctPlan = r.cantidadAjustada > 0 ? (sumaPlanMes6 / r.cantidadAjustada) * 100 : 0
+                    const pctPlan = cantPlanTotal > 0 ? (sumaPlanAcum / cantPlanTotal) * 100 : 0
                     const pctReal = r.cantidadAjustada > 0 ? (ejecReal / r.cantidadAjustada) * 100 : 0
                     const variacion = pctReal - pctPlan
 

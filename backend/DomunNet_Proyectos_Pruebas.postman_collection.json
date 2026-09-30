@@ -1,0 +1,298 @@
+{
+  "info": {
+    "_postman_id": "d0a1b2c3-d4e5-4f6a-8b9c-0d1e2f3a4b5c",
+    "name": "DomunNet - Pruebas Módulo de Proyectos",
+    "description": "Colección automatizada de 6 pasos para la prueba de código y API REST del Módulo de Proyectos en DomunNet.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3001/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "proyectoId",
+      "value": "a322bafc-c581-45d1-a137-5bbad6c5661e",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "P-01: Autenticacion (Login y Obtencion de Token)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code es 200 OK\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "var jsonData = pm.response.json();",
+              "var token = (jsonData.data && jsonData.data.token) ? jsonData.data.token : jsonData.token;",
+              "if (token) {",
+              "    pm.collectionVariables.set(\"token\", token);",
+              "    console.log(\"Token guardado exitosamente:\", token);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"correo\": \"daniel.figueroa@domunnet.test\",\n  \"contrasena\": \"mariobros25\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/auth/login",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "auth",
+            "login"
+          ]
+        },
+        "description": "Inicia sesion con credenciales de administrador y extrae automaticamente el token JWT a las variables de coleccion."
+      },
+      "response": []
+    },
+    {
+      "name": "P-02: Consultar Listado General de Proyectos",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code es 200 OK\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "var jsonData = pm.response.json();",
+              "var list = Array.isArray(jsonData.data) ? jsonData.data : (Array.isArray(jsonData) ? jsonData : []);",
+              "if (list.length > 0) {",
+              "    var target = list.find(function(p) { return p.estado === 'activo' || p.codigo === 'PROY-5916'; }) || list[0];",
+              "    pm.collectionVariables.set(\"proyectoId\", target.id);",
+              "    console.log(\"ID de Proyecto seleccionado:\", target.id, target.codigo);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/proyectos",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "proyectos"
+          ]
+        },
+        "description": "Consulta el listado general de proyectos activos y guarda el ID del proyecto para los siguientes pasos."
+      },
+      "response": []
+    },
+    {
+      "name": "P-03: Consultar Detalle de Proyecto por ID",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code es 200 OK\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"La respuesta contiene datos del proyecto\", function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData.success).to.be.true;",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/proyectos/{{proyectoId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "proyectos",
+            "{{proyectoId}}"
+          ]
+        },
+        "description": "Obtiene la informacion detallada del proyecto seleccionado."
+      },
+      "response": []
+    },
+    {
+      "name": "P-04: Validacion Negativa (Estado Vacio - Error 400)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code es 400 Bad Request\", function () {",
+              "    pm.response.to.have.status(400);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"estado_codigo\": \"\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/proyectos/{{proyectoId}}/estado",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "proyectos",
+            "{{proyectoId}}",
+            "estado"
+          ]
+        },
+        "description": "Verifica que el backend rechaza estados invalidos o vacios con codigo HTTP 400."
+      },
+      "response": []
+    },
+    {
+      "name": "P-05: Modificar Informacion de Proyecto y Residente",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code es 200 OK\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"descripcion\": \"Tramo carretero en ejecucion y control tecnico activo\",\n  \"empresaSupervisora\": \"CONSYSTEC S.A.\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/proyectos/{{proyectoId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "proyectos",
+            "{{proyectoId}}"
+          ]
+        },
+        "description": "Actualiza la informacion de supervision tecnica y descripcion del proyecto existente."
+      },
+      "response": []
+    },
+    {
+      "name": "P-06: Modificar Estado del Proyecto a Borrador",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code es 200 OK\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"estado_codigo\": \"borrador\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/proyectos/{{proyectoId}}/estado",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "proyectos",
+            "{{proyectoId}}",
+            "estado"
+          ]
+        },
+        "description": "Actualiza el estado del proyecto a borrador en la base de datos."
+      },
+      "response": []
+    }
+  ]
+}

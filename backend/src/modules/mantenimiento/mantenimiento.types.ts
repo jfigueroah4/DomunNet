@@ -1,4 +1,4 @@
-﻿/**
+/**
  * REGLA DE SEGURIDAD CRÃTICA (NON-NEGOTIABLE):
  * 
  * El parÃ¡metro de ruta `:tabla` y cualquier nombre de columna (para ordenamiento o filtrado) 
@@ -31,6 +31,7 @@ export interface FiltroMenuDef {
 export interface DependenciaDelete {
   tablaDependiente: string;
   columnaFk: string;
+  nombreLegible?: string;
 }
 
 export interface TablaConfig {
@@ -41,6 +42,12 @@ export interface TablaConfig {
   dependenciasDelete?: DependenciaDelete[];
   columnasFiltroMenu?: FiltroMenuDef[];
   limiteMaximo?: number;
+  soloLectura?: boolean;
+  bloquearCreacion?: boolean;
+  bloquearModificacion?: boolean;
+  bloquearEliminacion?: boolean;
+  mensajeBloqueo?: string;
+  descripcion?: string;
 }
 
 export interface AuditoriaTablaConfig {

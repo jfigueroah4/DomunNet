@@ -20,9 +20,42 @@ export default function Providers({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <style dangerouslySetInnerHTML={{ __html: `
-        /* Estilos de animación fade suave para Sonner toast */
+        /* Centrado exacto horizontal y superior para todos los Toasts */
         [data-sonner-toaster] {
+          position: fixed !important;
           top: 24px !important;
+          left: 50% !important;
+          right: auto !important;
+          bottom: auto !important;
+          transform: translateX(-50%) !important;
+          display: flex !important;
+          flex-direction: column !important;
+          align-items: center !important;
+          justify-content: center !important;
+          width: max-content !important;
+          max-width: 94vw !important;
+          margin: 0 auto !important;
+          z-index: 999999 !important;
+          pointer-events: none !important;
+        }
+
+        [data-sonner-toaster] ol {
+          display: flex !important;
+          flex-direction: column !important;
+          align-items: center !important;
+          justify-content: center !important;
+          width: 100% !important;
+          margin: 0 auto !important;
+          padding: 0 !important;
+          list-style: none !important;
+        }
+
+        [data-sonner-toaster] li {
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          margin: 0 auto !important;
+          width: max-content !important;
         }
 
         [data-sonner-toast] {
@@ -30,8 +63,13 @@ export default function Providers({ children }: { children: React.ReactNode }) {
           border: none !important;
           box-shadow: none !important;
           padding: 0 !important;
-          width: auto !important;
-          max-width: none !important;
+          width: max-content !important;
+          max-width: 94vw !important;
+          display: inline-flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          margin: 0 auto !important;
+          pointer-events: auto !important;
           transition: transform 280ms cubic-bezier(0.16, 1, 0.3, 1), opacity 280ms cubic-bezier(0.16, 1, 0.3, 1) !important;
         }
 

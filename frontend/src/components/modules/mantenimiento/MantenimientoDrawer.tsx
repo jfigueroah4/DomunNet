@@ -1,648 +1,3443 @@
-
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
-import { X } from 'lucide-react'
-import { api } from '@/lib/api/cliente'
+import { useState, useEffect, useMemo, useCallback } from 'react'
+import { X, CheckCircle2, AlertCircle, Eye, Edit3, PlusCircle } from 'lucide-react'
+import { apiGetDeduplicado } from '@/lib/api/cliente'
+import { useCustomToast } from '@/hooks/useCustomToast'
 
-interface FieldSchema {
+export interface FieldSchema {
   readOnly?: boolean
   name: string
   label: string
-  type: 'text' | 'number' | 'email' | 'boolean' | 'select' | 'textarea' | 'date' | 'time'
+  type: 'text' | 'integer' | 'decimal' | 'email' | 'boolean' | 'select' | 'textarea' | 'date' | 'time'
   required?: boolean
   endpoint?: string
   labelKey?: string
   valueKey?: string
+  refTable?: string
 }
 
 export const TABLES_SCHEMA: Record<string, FieldSchema[]> = {
-  // 1. ACCESO E IDENTIDAD
-  rol: [
-    { name: 'nombre_rol', label: 'Nombre Rol', type: 'text', required: true },
-    { name: 'descripcion', label: 'Descripción', type: 'text' },
-    { name: 'nivel_permisos', label: 'Nivel Permisos (0-100)', type: 'number' },
-    { name: 'activo', label: 'Activo', type: 'boolean' }
+  "auditoria_operativa": [
+    {
+      "name": "usuario_id",
+      "label": "Usuario Asignado",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/usuario",
+      "labelKey": "email",
+      "valueKey": "id",
+      "refTable": "usuario"
+    },
+    {
+      "name": "proyecto_id",
+      "label": "Proyecto",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/proyecto",
+      "labelKey": "nombre",
+      "valueKey": "id",
+      "refTable": "proyecto"
+    },
+    {
+      "name": "accion",
+      "label": "Accion",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "modulo",
+      "label": "Modulo",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "tabla_afectada",
+      "label": "Tabla Afectada",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "registro_afectado",
+      "label": "Registro Afectado",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "detalles",
+      "label": "Detalles",
+      "type": "textarea",
+      "required": false
+    },
+    {
+      "name": "fecha_hora",
+      "label": "Fecha Hora",
+      "type": "date",
+      "required": false
+    }
   ],
-  usuario: [
-    { name: 'correo', label: 'Correo Electrónico', type: 'email', required: true },
-    { name: 'rol_id', label: 'Rol', type: 'select', required: true, endpoint: '/mantenimiento/rol', labelKey: 'nombre_rol', valueKey: 'id' },
-    { name: 'activo', label: 'Activo', type: 'boolean' }
+  "backup_sistema": [
+    {
+      "name": "generado_por",
+      "label": "Generado Por",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/usuario",
+      "labelKey": "email",
+      "valueKey": "id",
+      "refTable": "usuario"
+    },
+    {
+      "name": "nombre_archivo",
+      "label": "Nombre Archivo",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "url_storage",
+      "label": "Url Storage",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "tamanio",
+      "label": "Tamanio",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "formato",
+      "label": "Formato",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "estado",
+      "label": "Estado",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "fecha_generacion",
+      "label": "Fecha Generacion",
+      "type": "date",
+      "required": false
+    }
   ],
-  dato_usuario: [
-    { name: 'usuario_id', label: 'Usuario', type: 'select', required: true, endpoint: '/mantenimiento/usuario', labelKey: 'correo', valueKey: 'id' },
-    { name: 'primer_nombre', label: 'Primer Nombre', type: 'text', required: true },
-    { name: 'segundo_nombre', label: 'Resto del Nombre', type: 'text' },
-    { name: 'primer_apellido', label: 'Primer Apellido', type: 'text', required: true },
-    { name: 'segundo_apellido', label: 'Resto del Apellido', type: 'text' },
-    { name: 'email', label: 'Email', type: 'email' },
-    { name: 'telefono', label: 'Teléfono', type: 'text' },
-    { name: 'fecha_nacimiento', label: 'Fecha Nacimiento', type: 'date' },
-    { name: 'estado', label: 'Estado', type: 'text' }
+  "bitacora_avance": [
+    {
+      "name": "bitacora_entrada_id",
+      "label": "Entrada de Bitácora",
+      "type": "select",
+      "required": true,
+      "endpoint": "/mantenimiento/bitacora_entrada",
+      "labelKey": "titulo",
+      "valueKey": "id",
+      "refTable": "bitacora_entrada"
+    },
+    {
+      "name": "proyecto_id",
+      "label": "Proyecto",
+      "type": "select",
+      "required": true,
+      "endpoint": "/mantenimiento/proyecto",
+      "labelKey": "nombre",
+      "valueKey": "id",
+      "refTable": "proyecto"
+    },
+    {
+      "name": "fase_id",
+      "label": "Fase de Proyecto",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/fase_proyecto",
+      "labelKey": "nombre",
+      "valueKey": "id",
+      "refTable": "fase_proyecto"
+    },
+    {
+      "name": "renglon_id",
+      "label": "Renglón de Trabajo",
+      "type": "select",
+      "required": true,
+      "endpoint": "/mantenimiento/renglon_trabajo",
+      "labelKey": "codigo",
+      "valueKey": "id",
+      "refTable": "renglon_trabajo"
+    },
+    {
+      "name": "cantidad_periodo",
+      "label": "Cantidad del Período",
+      "type": "decimal",
+      "required": false
+    },
+    {
+      "name": "longitud",
+      "label": "Longitud",
+      "type": "decimal",
+      "required": false
+    },
+    {
+      "name": "ancho",
+      "label": "Ancho",
+      "type": "decimal",
+      "required": false
+    },
+    {
+      "name": "altura_espesor",
+      "label": "Altura Espesor",
+      "type": "decimal",
+      "required": false
+    },
+    {
+      "name": "cantidad_unidades",
+      "label": "Cantidad Unidades",
+      "type": "decimal",
+      "required": false
+    },
+    {
+      "name": "cantidad_calculada",
+      "label": "Cantidad Calculada",
+      "type": "decimal",
+      "required": false
+    },
+    {
+      "name": "estacion_inicio",
+      "label": "Estacion Inicio",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "estacion_fin",
+      "label": "Estacion Fin",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "observaciones",
+      "label": "Observaciones",
+      "type": "textarea",
+      "required": false
+    },
+    {
+      "name": "fecha_corte",
+      "label": "Fecha Corte",
+      "type": "date",
+      "required": false
+    }
   ],
-  estado_usuario: [
-    { name: 'usuario_id', label: 'Usuario', type: 'select', required: true, endpoint: '/mantenimiento/usuario', labelKey: 'correo', valueKey: 'id' },
-    { name: 'estado', label: 'Estado', type: 'text', required: true },
-    { name: 'motivo_bloqueo', label: 'Motivo Bloqueo', type: 'textarea' },
-    { name: 'cambiado_por', label: 'Cambiado Por (UUID)', type: 'text' }
+  "bitacora_entrada": [
+    {
+      "name": "proyecto_id",
+      "label": "Proyecto",
+      "type": "select",
+      "required": true,
+      "endpoint": "/mantenimiento/proyecto",
+      "labelKey": "nombre",
+      "valueKey": "id",
+      "refTable": "proyecto"
+    },
+    {
+      "name": "usuario_id",
+      "label": "Usuario Asignado",
+      "type": "select",
+      "required": true,
+      "endpoint": "/mantenimiento/usuario",
+      "labelKey": "email",
+      "valueKey": "id",
+      "refTable": "usuario"
+    },
+    {
+      "name": "tipo_bitacora_id",
+      "label": "Tipo de Bitácora",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/catalogo_item",
+      "labelKey": "nombre",
+      "valueKey": "id",
+      "refTable": "catalogo_item"
+    },
+    {
+      "name": "categoria_actividad_id",
+      "label": "Categoría de Actividad",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/categoria_actividad",
+      "labelKey": "nombre",
+      "valueKey": "id",
+      "refTable": "categoria_actividad"
+    },
+    {
+      "name": "titulo",
+      "label": "Titulo",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "fecha",
+      "label": "Fecha",
+      "type": "date",
+      "required": true
+    },
+    {
+      "name": "hora",
+      "label": "Hora",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "turno",
+      "label": "Turno",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "ubicacion",
+      "label": "Ubicacion",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "descripcion",
+      "label": "Descripcion",
+      "type": "textarea",
+      "required": true
+    },
+    {
+      "name": "estado_general_id",
+      "label": "Estado General",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/catalogo_item",
+      "labelKey": "nombre",
+      "valueKey": "id",
+      "refTable": "catalogo_item"
+    },
+    {
+      "name": "comentarios",
+      "label": "Comentarios",
+      "type": "textarea",
+      "required": false
+    },
+    {
+      "name": "firma_url",
+      "label": "Firma Url",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "publicada",
+      "label": "Publicada",
+      "type": "boolean",
+      "required": false
+    },
+    {
+      "name": "bloqueada",
+      "label": "Bloqueada",
+      "type": "boolean",
+      "required": false
+    }
   ],
-
-  // 2. INFRAESTRUCTURA Y CONFIGURACIÓN GLOBAL
-  empresa: [
-    { name: 'nombre', label: 'Nombre', type: 'text', required: true },
-    { name: 'nit', label: 'NIT', type: 'text', required: true },
-    { name: 'direccion', label: 'Dirección', type: 'text' },
-    { name: 'telefono', label: 'Teléfono', type: 'text' },
-    { name: 'correo', label: 'Correo', type: 'email' },
-    { name: 'logo_url', label: 'Logo URL', type: 'text' },
-    { name: 'marca_agua_url', label: 'Marca de Agua URL', type: 'text' }
+  "bitacora_pendiente": [
+    {
+      "name": "renglon_id",
+      "label": "Renglón de Trabajo",
+      "type": "select",
+      "required": true,
+      "endpoint": "/mantenimiento/renglon_trabajo",
+      "labelKey": "codigo",
+      "valueKey": "id",
+      "refTable": "renglon_trabajo"
+    },
+    {
+      "name": "proyecto_id",
+      "label": "Proyecto",
+      "type": "select",
+      "required": true,
+      "endpoint": "/mantenimiento/proyecto",
+      "labelKey": "nombre",
+      "valueKey": "id",
+      "refTable": "proyecto"
+    },
+    {
+      "name": "registrado_por",
+      "label": "Registrado Por",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/usuario",
+      "labelKey": "email",
+      "valueKey": "id",
+      "refTable": "usuario"
+    },
+    {
+      "name": "fecha_medicion",
+      "label": "Fecha Medicion",
+      "type": "date",
+      "required": true
+    },
+    {
+      "name": "estimacion_origen",
+      "label": "Estimacion Origen",
+      "type": "integer",
+      "required": false
+    },
+    {
+      "name": "lado_via",
+      "label": "Lado Via",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "ubicacion_especifica",
+      "label": "Ubicacion Especifica",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "estacion_inicial",
+      "label": "Estacion Inicial",
+      "type": "decimal",
+      "required": false
+    },
+    {
+      "name": "estacion_final",
+      "label": "Estacion Final",
+      "type": "decimal",
+      "required": false
+    },
+    {
+      "name": "longitud_medida",
+      "label": "Longitud Medida",
+      "type": "decimal",
+      "required": false
+    },
+    {
+      "name": "ancho",
+      "label": "Ancho",
+      "type": "decimal",
+      "required": false
+    },
+    {
+      "name": "altura_espesor",
+      "label": "Altura Espesor",
+      "type": "decimal",
+      "required": false
+    },
+    {
+      "name": "volumen_area_bruto",
+      "label": "Volumen Area Bruto",
+      "type": "decimal",
+      "required": false
+    },
+    {
+      "name": "descuento_aplicado_id",
+      "label": "Descuento Técnico",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/catalogo_descuento_tecnico",
+      "labelKey": "descripcion",
+      "valueKey": "id",
+      "refTable": "catalogo_descuento_tecnico"
+    },
+    {
+      "name": "cantidad_neta_cobrar",
+      "label": "Cantidad Neta Cobrar",
+      "type": "decimal",
+      "required": false
+    },
+    {
+      "name": "es_derrumbre",
+      "label": "Es Derrumbre",
+      "type": "boolean",
+      "required": true
+    },
+    {
+      "name": "estado_conciliacion",
+      "label": "Estado Conciliacion",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "observaciones",
+      "label": "Observaciones",
+      "type": "textarea",
+      "required": false
+    },
+    {
+      "name": "bitacora_entrada_id",
+      "label": "Entrada de Bitácora",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/bitacora_entrada",
+      "labelKey": "titulo",
+      "valueKey": "id",
+      "refTable": "bitacora_entrada"
+    },
+    {
+      "name": "anulado_en",
+      "label": "Anulado En",
+      "type": "date",
+      "required": false
+    },
+    {
+      "name": "anulado_por",
+      "label": "Anulado Por",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/usuario",
+      "labelKey": "email",
+      "valueKey": "id",
+      "refTable": "usuario"
+    },
+    {
+      "name": "motivo_anulacion",
+      "label": "Motivo Anulacion",
+      "type": "textarea",
+      "required": false
+    }
   ],
-  catalogo: [
-    { name: 'codigo', label: 'Código', type: 'text', required: true },
-    { name: 'nombre', label: 'Nombre', type: 'text', required: true },
-    { name: 'descripcion', label: 'Descripción', type: 'text' },
-    { name: 'activo', label: 'Activo', type: 'boolean' }
+  "bitacora_pendiente_ajuste": [
+    {
+      "name": "bitacora_pendiente_id",
+      "label": "Pendiente Asociado",
+      "type": "select",
+      "required": true,
+      "endpoint": "/mantenimiento/bitacora_pendiente",
+      "labelKey": "renglon_id",
+      "valueKey": "id",
+      "refTable": "bitacora_pendiente"
+    },
+    {
+      "name": "valor_descuento",
+      "label": "Valor Descuento",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "formula_descuento",
+      "label": "Formula Descuento",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "descripcion",
+      "label": "Descripcion",
+      "type": "textarea",
+      "required": false
+    },
+    {
+      "name": "registrado_por",
+      "label": "Registrado Por",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/usuario",
+      "labelKey": "email",
+      "valueKey": "id",
+      "refTable": "usuario"
+    }
   ],
-  catalogo_item: [
-    { name: 'catalogo_id', label: 'Catálogo', type: 'select', required: true, endpoint: '/mantenimiento/catalogo', labelKey: 'nombre', valueKey: 'id' },
-    { name: 'codigo', label: 'Código', type: 'text', required: true },
-    { name: 'nombre', label: 'Nombre', type: 'text', required: true },
-    { name: 'descripcion', label: 'Descripción', type: 'text' },
-    { name: 'color', label: 'Color', type: 'text' },
-    { name: 'orden', label: 'Orden', type: 'number' },
-    { name: 'activo', label: 'Activo', type: 'boolean' }
+  "capitulo_sabana": [
+    {
+      "name": "numero_capitulo",
+      "label": "Numero Capitulo",
+      "type": "integer",
+      "required": true
+    },
+    {
+      "name": "nombre_capitulo",
+      "label": "Nombre Capitulo",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "descripcion",
+      "label": "Descripcion",
+      "type": "textarea",
+      "required": false
+    }
   ],
-  configuracion_general: [
-    { name: 'clave', label: 'Clave', type: 'text', required: true },
-    { name: 'valor', label: 'Valor', type: 'textarea' },
-    { name: 'categoria', label: 'Categoría', type: 'text', required: true },
-    { name: 'cambiado_por', label: 'Cambiado Por (UUID)', type: 'text' }
+  "catalogo": [
+    {
+      "name": "codigo",
+      "label": "Codigo",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "nombre",
+      "label": "Nombre",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "descripcion",
+      "label": "Descripcion",
+      "type": "textarea",
+      "required": false
+    },
+    {
+      "name": "activo",
+      "label": "Activo",
+      "type": "boolean",
+      "required": false
+    }
   ],
-  backup_sistema: [
-    { name: 'generado_por', label: 'Generado Por (UUID)', type: 'text' },
-    { name: 'nombre_archivo', label: 'Nombre Archivo', type: 'text', required: true },
-    { name: 'url_storage', label: 'URL Storage', type: 'text', required: true },
-    { name: 'tamanio', label: 'Tamaño', type: 'text' },
-    { name: 'formato', label: 'Formato', type: 'text', required: true },
-    { name: 'estado', label: 'Estado', type: 'text', required: true }
+  "catalogo_descuento_tecnico": [
+    {
+      "name": "descripcion",
+      "label": "Descripcion",
+      "type": "textarea",
+      "required": true
+    },
+    {
+      "name": "factor_seccion_transversal",
+      "label": "Factor Seccion Transversal",
+      "type": "decimal",
+      "required": true
+    }
   ],
-  restauracion_sistema: [
-    { name: 'restaurado_por', label: 'Restaurado Por (UUID)', type: 'text' },
-    { name: 'archivo_origen', label: 'Archivo Origen', type: 'text', required: true },
-    { name: 'estado', label: 'Estado', type: 'text', required: true },
-    { name: 'observaciones', label: 'Observaciones', type: 'textarea' }
+  "catalogo_item": [
+    {
+      "name": "catalogo_id",
+      "label": "Catalogo",
+      "type": "select",
+      "required": true,
+      "endpoint": "/mantenimiento/catalogo",
+      "labelKey": "nombre",
+      "valueKey": "id",
+      "refTable": "catalogo"
+    },
+    {
+      "name": "codigo",
+      "label": "Codigo",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "nombre",
+      "label": "Nombre",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "descripcion",
+      "label": "Descripcion",
+      "type": "textarea",
+      "required": false
+    },
+    {
+      "name": "color",
+      "label": "Color",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "orden",
+      "label": "Orden",
+      "type": "integer",
+      "required": false
+    },
+    {
+      "name": "activo",
+      "label": "Activo",
+      "type": "boolean",
+      "required": false
+    }
   ],
-
-  // 3. UBICACIÓN Y ENTIDADES EXTERNAS
-  departamento: [
-    { name: 'nombre', label: 'Nombre', type: 'text', required: true }
+  "categoria_actividad": [
+    {
+      "name": "nombre",
+      "label": "Nombre",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "descripcion",
+      "label": "Descripcion",
+      "type": "textarea",
+      "required": false
+    },
+    {
+      "name": "tipo_obra",
+      "label": "Tipo Obra",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "activo",
+      "label": "Activo",
+      "type": "boolean",
+      "required": false
+    }
   ],
-  municipio: [
-    { name: 'departamento_id', label: 'Departamento', type: 'select', required: true, endpoint: '/mantenimiento/departamento', labelKey: 'nombre', valueKey: 'id' },
-    { name: 'nombre', label: 'Nombre', type: 'text', required: true }
+  "condicion_climatica": [
+    {
+      "name": "bitacora_entrada_id",
+      "label": "Entrada de Bitácora",
+      "type": "select",
+      "required": true,
+      "endpoint": "/mantenimiento/bitacora_entrada",
+      "labelKey": "titulo",
+      "valueKey": "id",
+      "refTable": "bitacora_entrada"
+    },
+    {
+      "name": "temperatura",
+      "label": "Temperatura",
+      "type": "decimal",
+      "required": false
+    },
+    {
+      "name": "precipitacion",
+      "label": "Precipitacion",
+      "type": "decimal",
+      "required": false
+    },
+    {
+      "name": "viento",
+      "label": "Viento",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "visibilidad",
+      "label": "Visibilidad",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "estado_general",
+      "label": "Estado General",
+      "type": "text",
+      "required": false
+    }
   ],
-contacto_contratante: [
-
-    { name: 'nombre', label: 'Nombre', type: 'text', required: true },
-    { name: 'cargo', label: 'Cargo', type: 'text' },
-    { name: 'telefono', label: 'Teléfono', type: 'text' },
-    { name: 'correo', label: 'Correo', type: 'email' }
+  "configuracion_general": [
+    {
+      "name": "clave",
+      "label": "Clave",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "valor",
+      "label": "Valor",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "categoria",
+      "label": "Categoria",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "cambiado_por",
+      "label": "Cambiado Por",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/usuario",
+      "labelKey": "email",
+      "valueKey": "id",
+      "refTable": "usuario"
+    }
   ],
-
-  // 4. PROYECTOS Y PLANIFICACIÓN
-  proyecto: [
-    { name: 'empresa_id', label: 'Empresa', type: 'select', required: true, endpoint: '/mantenimiento/empresa', labelKey: 'nombre', valueKey: 'id' },
-    { name: 'codigo', label: 'Código', type: 'text', required: true },
-    { name: 'nombre', label: 'Nombre', type: 'text', required: true },
-    { name: 'descripcion', label: 'Descripción', type: 'textarea' },
-    { name: 'ubicacion', label: 'Ubicación', type: 'text' },
-    { name: 'fecha_inicio', label: 'Fecha Inicio', type: 'date', required: true },
-    { name: 'fecha_fin_estimada', label: 'Fecha Fin Estimada', type: 'date', required: true },
-    { name: 'estado_id', label: 'Estado (Item)', type: 'select', endpoint: '/mantenimiento/catalogo_item', labelKey: 'nombre', valueKey: 'id' },
-    { name: 'responsable_id', label: 'Responsable', type: 'select', endpoint: '/mantenimiento/usuario', labelKey: 'correo', valueKey: 'id' }
+  "contacto_contratista": [
+    {
+      "name": "empresa_contratista_id",
+      "label": "Empresa Contratista",
+      "type": "select",
+      "required": true,
+      "endpoint": "/mantenimiento/empresa_contratista",
+      "labelKey": "nombre",
+      "valueKey": "id",
+      "refTable": "empresa_contratista"
+    },
+    {
+      "name": "cargo",
+      "label": "Cargo",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "usuario_id",
+      "label": "Usuario Asignado",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/usuario",
+      "labelKey": "email",
+      "valueKey": "id",
+      "refTable": "usuario"
+    }
   ],
-  proyecto_usuario: [
-    { name: 'proyecto_id', label: 'Proyecto', type: 'select', required: true, endpoint: '/mantenimiento/proyecto', labelKey: 'nombre', valueKey: 'id' },
-    { name: 'usuario_id', label: 'Usuario', type: 'select', required: true, endpoint: '/mantenimiento/usuario', labelKey: 'correo', valueKey: 'id' },
-    { name: 'rol_proyecto', label: 'Rol en Proyecto', type: 'text', required: true },
-    { name: 'fecha_asignacion', label: 'Fecha Asignación', type: 'date' },
-    { name: 'activo', label: 'Activo', type: 'boolean' }
+  "contacto_empresa_externa": [
+    {
+      "name": "empresa_externa_id",
+      "label": "Empresa Externa",
+      "type": "select",
+      "required": true,
+      "endpoint": "/mantenimiento/empresa_externa",
+      "labelKey": "nombre",
+      "valueKey": "id",
+      "refTable": "empresa_externa"
+    },
+    {
+      "name": "usuario_id",
+      "label": "Usuario Asignado",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/usuario",
+      "labelKey": "email",
+      "valueKey": "id",
+      "refTable": "usuario"
+    },
+    {
+      "name": "nombre",
+      "label": "Nombre",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "cargo",
+      "label": "Cargo",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "telefono",
+      "label": "Telefono",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "correo",
+      "label": "Correo",
+      "type": "email",
+      "required": false
+    }
   ],
-  proyecto_detalle: [
-    { name: 'proyecto_id', label: 'Proyecto', type: 'select', required: true, endpoint: '/mantenimiento/proyecto', labelKey: 'nombre', valueKey: 'id' },
-    { name: 'tipo_obra', label: 'Tipo de Obra', type: 'text' },
-    { name: 'nombre_oficial', label: 'Nombre Oficial', type: 'text' },
-    { name: 'descripcion_proyecto', label: 'Descripción', type: 'textarea' },
-    { name: 'municipio_id', label: 'Municipio', type: 'select', endpoint: '/mantenimiento/municipio', labelKey: 'nombre', valueKey: 'id' },
-    { name: 'tramo', label: 'Tramo', type: 'text' },
-    { name: 'kilometro_inicio', label: 'Km Inicio', type: 'number' },
-    { name: 'kilometro_fin', label: 'Km Fin', type: 'number' },
-    { name: 'numero_contrato_original', label: 'NÂº Contrato Orig.', type: 'text' },
-    { name: 'fecha_firma_contrato_original', label: 'Fecha Firma Orig.', type: 'date' },
-    { name: 'monto_original', label: 'Monto Original', type: 'number' },
-
-
-    { name: 'empresa_contratista_ejecutora', label: 'Contratista Ejecutora', type: 'text' }
+  "contacto_entidad": [
+    {
+      "name": "entidad_contratante_id",
+      "label": "Entidad Contratante",
+      "type": "select",
+      "required": true,
+      "endpoint": "/mantenimiento/entidad_contratante",
+      "labelKey": "nombre",
+      "valueKey": "id",
+      "refTable": "entidad_contratante"
+    },
+    {
+      "name": "cargo",
+      "label": "Cargo",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "usuario_id",
+      "label": "Usuario Asignado",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/usuario",
+      "labelKey": "email",
+      "valueKey": "id",
+      "refTable": "usuario"
+    }
   ],
-  fase_proyecto: [
-    { name: 'proyecto_id', label: 'Proyecto', type: 'select', required: true, endpoint: '/mantenimiento/proyecto', labelKey: 'nombre', valueKey: 'id' },
-    { name: 'nombre', label: 'Nombre', type: 'text', required: true },
-    { name: 'orden', label: 'Orden', type: 'number' },
-    { name: 'fecha_inicio', label: 'Fecha Inicio', type: 'date' },
-    { name: 'fecha_fin', label: 'Fecha Fin', type: 'date' },
-    { name: 'porcentaje_planificado', label: '% Planificado', type: 'number' },
-    { name: 'estado', label: 'Estado', type: 'text' }
+  "control_anticipo": [
+    {
+      "name": "proyecto_id",
+      "label": "Proyecto",
+      "type": "select",
+      "required": true,
+      "endpoint": "/mantenimiento/proyecto",
+      "labelKey": "nombre",
+      "valueKey": "id",
+      "refTable": "proyecto"
+    },
+    {
+      "name": "numero_estimacion",
+      "label": "Numero Estimacion",
+      "type": "integer",
+      "required": true
+    },
+    {
+      "name": "monto_anticipo_total",
+      "label": "Monto Anticipo Total (Q)",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "valor_estimacion_periodo",
+      "label": "Valor Estimación Período (Q)",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "amortizado_periodo",
+      "label": "Amortizado Periodo",
+      "type": "decimal",
+      "required": false
+    },
+    {
+      "name": "saldo_por_amortizar",
+      "label": "Saldo Por Amortizar",
+      "type": "decimal",
+      "required": false
+    },
+    {
+      "name": "fecha_registro",
+      "label": "Fecha Registro",
+      "type": "date",
+      "required": false
+    }
   ],
-  documento_proyecto: [
-    { name: 'proyecto_id', label: 'Proyecto', type: 'select', required: true, endpoint: '/mantenimiento/proyecto', labelKey: 'nombre', valueKey: 'id' },
-    { name: 'subido_por', label: 'Subido Por', type: 'select', endpoint: '/mantenimiento/usuario', labelKey: 'correo', valueKey: 'id' },
-    { name: 'nombre', label: 'Nombre', type: 'text', required: true },
-    { name: 'tipo', label: 'Tipo', type: 'text' },
-    { name: 'url_storage', label: 'URL Storage', type: 'text', required: true },
-    { name: 'version', label: 'Versión', type: 'text' }
+  "control_plazo": [
+    {
+      "name": "proyecto_id",
+      "label": "Proyecto",
+      "type": "select",
+      "required": true,
+      "endpoint": "/mantenimiento/proyecto",
+      "labelKey": "nombre",
+      "valueKey": "id",
+      "refTable": "proyecto"
+    },
+    {
+      "name": "fecha_inicio_referencia",
+      "label": "Fecha Inicio Referencia",
+      "type": "date",
+      "required": true
+    },
+    {
+      "name": "dias_contractuales",
+      "label": "Días Contractuales",
+      "type": "integer",
+      "required": true
+    },
+    {
+      "name": "dias_suspendidos_acumulados",
+      "label": "Dias Suspendidos Acumulados",
+      "type": "integer",
+      "required": true
+    },
+    {
+      "name": "fecha_corte_estimacion",
+      "label": "Fecha Corte Estimacion",
+      "type": "date",
+      "required": false
+    },
+    {
+      "name": "fecha_finalizacion_actualizada",
+      "label": "Fecha Finalizacion Actualizada",
+      "type": "date",
+      "required": false
+    }
   ],
-
-  // 5. CATÃLOGOS TÉCNICOS
-  categoria_actividad: [
-    { name: 'nombre', label: 'Nombre', type: 'text', required: true },
-    { name: 'descripcion', label: 'Descripción', type: 'textarea' },
-    { name: 'tipo_obra', label: 'Tipo de Obra', type: 'text' },
-    { name: 'activo', label: 'Activo', type: 'boolean' }
+  "cronograma_planificado": [
+    {
+      "name": "proyecto_id",
+      "label": "Proyecto",
+      "type": "select",
+      "required": true,
+      "endpoint": "/mantenimiento/proyecto",
+      "labelKey": "nombre",
+      "valueKey": "id",
+      "refTable": "proyecto"
+    },
+    {
+      "name": "fase_id",
+      "label": "Fase de Proyecto",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/fase_proyecto",
+      "labelKey": "nombre",
+      "valueKey": "id",
+      "refTable": "fase_proyecto"
+    },
+    {
+      "name": "renglon_id",
+      "label": "Renglón de Trabajo",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/renglon_trabajo",
+      "labelKey": "codigo",
+      "valueKey": "id",
+      "refTable": "renglon_trabajo"
+    },
+    {
+      "name": "fecha_inicio_plan",
+      "label": "Fecha Inicio Planificada",
+      "type": "date",
+      "required": true
+    },
+    {
+      "name": "fecha_fin_plan",
+      "label": "Fecha Fin Planificada",
+      "type": "date",
+      "required": true
+    },
+    {
+      "name": "porcentaje_esperado",
+      "label": "% Esperado",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "responsable_id",
+      "label": "Responsable",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/usuario",
+      "labelKey": "email",
+      "valueKey": "id",
+      "refTable": "usuario"
+    },
+    {
+      "name": "linea_base",
+      "label": "Linea Base",
+      "type": "boolean",
+      "required": false
+    }
   ],
-  especificacion_tecnica: [
-    { name: 'codigo', label: 'Código', type: 'text', required: true },
-    { name: 'descripcion', label: 'Descripción', type: 'textarea', required: true },
-    { name: 'unidad', label: 'Unidad', type: 'text', required: true },
-    { name: 'parametros_obligatorios', label: 'Parámetros', type: 'textarea' },
-    { name: 'referencia_normativa', label: 'Referencia Normativa', type: 'text' },
-    { name: 'tolerancia_minima', label: 'Tol. Mínima', type: 'number' },
-    { name: 'tolerancia_maxima', label: 'Tol. Máxima', type: 'number' }
+  "dato_usuario": [
+    {
+      "name": "usuario_id",
+      "label": "Usuario Asignado",
+      "type": "select",
+      "required": true,
+      "endpoint": "/mantenimiento/usuario",
+      "labelKey": "email",
+      "valueKey": "id",
+      "refTable": "usuario"
+    },
+    {
+      "name": "email",
+      "label": "Email",
+      "type": "email",
+      "required": false
+    },
+    {
+      "name": "password_hash",
+      "label": "Password Hash",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "username",
+      "label": "Username",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "primer_nombre",
+      "label": "Primer Nombre",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "segundo_nombre",
+      "label": "Segundo Nombre",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "primer_apellido",
+      "label": "Primer Apellido",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "segundo_apellido",
+      "label": "Segundo Apellido",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "telefono",
+      "label": "Telefono",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "direccion",
+      "label": "Direccion",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "fecha_nacimiento",
+      "label": "Fecha Nacimiento",
+      "type": "date",
+      "required": false
+    },
+    {
+      "name": "avatar_url",
+      "label": "Avatar Url",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "estado",
+      "label": "Estado",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "fecha_registro",
+      "label": "Fecha Registro",
+      "type": "date",
+      "required": false
+    },
+    {
+      "name": "ultimo_acceso",
+      "label": "Ultimo Acceso",
+      "type": "date",
+      "required": false
+    }
   ],
-  capitulo_sabana: [
-    { name: 'numero_capitulo', label: 'No. Capítulo', type: 'number', required: true },
-    { name: 'nombre_capitulo', label: 'Nombre', type: 'text', required: true },
-    { name: 'descripcion', label: 'Descripción', type: 'textarea' }
+  "departamento": [
+    {
+      "name": "nombre",
+      "label": "Nombre",
+      "type": "text",
+      "required": true
+    }
   ],
-  unidad_medida: [
-    { name: 'nombre', label: 'Nombre', type: 'text', required: true },
-    { name: 'abreviatura', label: 'Abreviatura', type: 'text', required: true }
+  "documento_proyecto": [
+    {
+      "name": "proyecto_id",
+      "label": "Proyecto",
+      "type": "select",
+      "required": true,
+      "endpoint": "/mantenimiento/proyecto",
+      "labelKey": "nombre",
+      "valueKey": "id",
+      "refTable": "proyecto"
+    },
+    {
+      "name": "subido_por",
+      "label": "Subido Por",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/usuario",
+      "labelKey": "email",
+      "valueKey": "id",
+      "refTable": "usuario"
+    },
+    {
+      "name": "nombre",
+      "label": "Nombre",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "tipo",
+      "label": "Tipo",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "url_storage",
+      "label": "Url Storage",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "version",
+      "label": "Version",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "fecha_subida",
+      "label": "Fecha Subida",
+      "type": "date",
+      "required": false
+    }
   ],
-  renglon_trabajo: [
-    { name: 'proyecto_id', label: 'Proyecto', type: 'select', required: true, endpoint: '/mantenimiento/proyecto', labelKey: 'nombre', valueKey: 'id' },
-    { name: 'categoria_id', label: 'Categoría', type: 'select', endpoint: '/mantenimiento/categoria_actividad', labelKey: 'nombre', valueKey: 'id' },
-    { name: 'especificacion_id', label: 'Especificación', type: 'select', endpoint: '/mantenimiento/especificacion_tecnica', labelKey: 'codigo', valueKey: 'id' },
-    { name: 'capitulo_id', label: 'Capítulo', type: 'select', endpoint: '/mantenimiento/capitulo_sabana', labelKey: 'nombre_capitulo', valueKey: 'id' },
-    { name: 'unidad_id', label: 'Unidad', type: 'select', endpoint: '/mantenimiento/unidad_medida', labelKey: 'abreviatura', valueKey: 'id' },
-    { name: 'tipo_renglon', label: 'Tipo Renglón', type: 'text' },
-    { name: 'aplica_indirectos', label: 'Aplica Indirectos', type: 'boolean' },
-    { name: 'aplica_iva', label: 'Aplica IVA', type: 'boolean' },
-    { name: 'descripcion', label: 'Descripción', type: 'textarea', required: true },
-    { name: 'cantidad_contractual', label: 'Cant. Contractual', type: 'number' },
-    { name: 'precio_unitario_directo', label: 'Precio Unitario', type: 'number' }
+  "empresa": [
+    {
+      "name": "nombre",
+      "label": "Nombre",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "nit",
+      "label": "NIT",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "direccion",
+      "label": "Direccion",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "telefono",
+      "label": "Telefono",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "correo",
+      "label": "Correo",
+      "type": "email",
+      "required": false
+    },
+    {
+      "name": "logo_url",
+      "label": "Logo Url",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "marca_agua_url",
+      "label": "Marca Agua Url",
+      "type": "text",
+      "required": false
+    }
   ],
-  modificativo_renglon: [
-    { name: 'renglon_id', label: 'Renglón', type: 'select', required: true, endpoint: '/mantenimiento/renglon_trabajo', labelKey: 'descripcion', valueKey: 'id' },
-    { name: 'cantidad_delta', label: 'Cantidad Delta', type: 'number', required: true },
-    { name: 'documento_referencia', label: 'Documento Referencia', type: 'text' },
-    { name: 'motivo', label: 'Motivo', type: 'textarea' },
-    { name: 'aprobado_por', label: 'Aprobado Por', type: 'select', endpoint: '/mantenimiento/usuario', labelKey: 'correo', valueKey: 'id' }
+  "empresa_contratista": [
+    {
+      "name": "nombre",
+      "label": "Nombre",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "nit",
+      "label": "NIT",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "direccion",
+      "label": "Direccion",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "telefono",
+      "label": "Telefono",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "correo_institucional",
+      "label": "Correo Institucional",
+      "type": "email",
+      "required": false
+    },
+    {
+      "name": "activo",
+      "label": "Activo",
+      "type": "boolean",
+      "required": false
+    }
   ],
-
-  // 6. BITÃCORAS Y AVANCES
-  bitacora_entrada: [
-    { name: 'proyecto_id', label: 'Proyecto', type: 'select', required: true, endpoint: '/mantenimiento/proyecto', labelKey: 'nombre', valueKey: 'id' },
-    { name: 'usuario_id', label: 'Usuario', type: 'select', required: true, endpoint: '/mantenimiento/usuario', labelKey: 'correo', valueKey: 'id' },
-    { name: 'tipo_bitacora_id', label: 'Tipo Bitácora (Catálogo)', type: 'select', endpoint: '/mantenimiento/catalogo_item', labelKey: 'nombre', valueKey: 'id' },
-    { name: 'categoria_actividad_id', label: 'Categoría', type: 'select', endpoint: '/mantenimiento/categoria_actividad', labelKey: 'nombre', valueKey: 'id' },
-    { name: 'titulo', label: 'Título', type: 'text', required: true },
-    { name: 'fecha', label: 'Fecha', type: 'date', required: true },
-    { name: 'hora', label: 'Hora', type: 'time', required: true },
-    { name: 'turno', label: 'Turno', type: 'text' },
-    { name: 'ubicacion', label: 'Ubicación', type: 'text' },
-    { name: 'descripcion', label: 'Descripción', type: 'textarea', required: true },
-    { name: 'estado_general_id', label: 'Estado (Catálogo)', type: 'select', endpoint: '/mantenimiento/catalogo_item', labelKey: 'nombre', valueKey: 'id' },
-    { name: 'comentarios', label: 'Comentarios', type: 'textarea' },
-    { name: 'firma_url', label: 'Firma URL', type: 'text' },
-    { name: 'publicada', label: 'Publicada', type: 'boolean' },
-    { name: 'bloqueada', label: 'Bloqueada', type: 'boolean' }
+  "empresa_externa": [
+    {
+      "name": "nombre",
+      "label": "Nombre",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "nit",
+      "label": "NIT",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "direccion",
+      "label": "Direccion",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "telefono",
+      "label": "Telefono",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "correo_institucional",
+      "label": "Correo Institucional",
+      "type": "email",
+      "required": false
+    },
+    {
+      "name": "activo",
+      "label": "Activo",
+      "type": "boolean",
+      "required": false
+    }
   ],
-  condicion_climatica: [
-    { name: 'bitacora_entrada_id', label: 'Bitácora Entrada', type: 'select', required: true, endpoint: '/mantenimiento/bitacora_entrada', labelKey: 'titulo', valueKey: 'id' },
-    { name: 'temperatura', label: 'Temperatura', type: 'number' },
-    { name: 'precipitacion', label: 'Precipitación', type: 'number' },
-    { name: 'viento', label: 'Viento', type: 'text' },
-    { name: 'visibilidad', label: 'Visibilidad', type: 'text' },
-    { name: 'estado_general', label: 'Estado General', type: 'text' }
+  "ensayo_laboratorio": [
+    {
+      "name": "bitacora_entrada_id",
+      "label": "Entrada de Bitácora",
+      "type": "select",
+      "required": true,
+      "endpoint": "/mantenimiento/bitacora_entrada",
+      "labelKey": "titulo",
+      "valueKey": "id",
+      "refTable": "bitacora_entrada"
+    },
+    {
+      "name": "tipo_ensayo_id",
+      "label": "Tipo de Ensayo",
+      "type": "select",
+      "required": true,
+      "endpoint": "/mantenimiento/tipo_ensayo",
+      "labelKey": "nombre",
+      "valueKey": "id",
+      "refTable": "tipo_ensayo"
+    },
+    {
+      "name": "tecnico_id",
+      "label": "Técnico Responsable",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/usuario",
+      "labelKey": "email",
+      "valueKey": "id",
+      "refTable": "usuario"
+    },
+    {
+      "name": "especificacion_id",
+      "label": "Especificación Técnica",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/especificacion_tecnica",
+      "labelKey": "codigo",
+      "valueKey": "id",
+      "refTable": "especificacion_tecnica"
+    },
+    {
+      "name": "resultado_obtenido",
+      "label": "Resultado Obtenido",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "valor_minimo",
+      "label": "Valor Minimo",
+      "type": "decimal",
+      "required": false
+    },
+    {
+      "name": "aprobado",
+      "label": "Aprobado",
+      "type": "boolean",
+      "required": true
+    },
+    {
+      "name": "observaciones",
+      "label": "Observaciones",
+      "type": "textarea",
+      "required": false
+    },
+    {
+      "name": "fecha_hora",
+      "label": "Fecha Hora",
+      "type": "date",
+      "required": false
+    }
   ],
-  estacion_kilometrica: [
-    { name: 'bitacora_entrada_id', label: 'Bitácora Entrada', type: 'select', required: true, endpoint: '/mantenimiento/bitacora_entrada', labelKey: 'titulo', valueKey: 'id' },
-    { name: 'renglon_trabajo_id', label: 'Renglón', type: 'select', endpoint: '/mantenimiento/renglon_trabajo', labelKey: 'descripcion', valueKey: 'id' },
-    { name: 'numero_eje', label: 'Número Eje', type: 'text' },
-    { name: 'estacion_inicial', label: 'Estación Inicial', type: 'number', required: true },
-    { name: 'estacion_final', label: 'Estación Final', type: 'number', required: true },
-    { name: 'observacion', label: 'Observación', type: 'textarea' }
+  "entidad_contratante": [
+    {
+      "name": "nombre",
+      "label": "Nombre",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "nit",
+      "label": "NIT",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "direccion",
+      "label": "Direccion",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "telefono",
+      "label": "Telefono",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "correo_institucional",
+      "label": "Correo Institucional",
+      "type": "email",
+      "required": false
+    },
+    {
+      "name": "activo",
+      "label": "Activo",
+      "type": "boolean",
+      "required": false
+    }
   ],
-  bitacora_avance: [
-    { name: 'bitacora_entrada_id', label: 'Bitácora Entrada', type: 'select', required: true, endpoint: '/mantenimiento/bitacora_entrada', labelKey: 'titulo', valueKey: 'id' },
-    { name: 'proyecto_id', label: 'Proyecto', type: 'select', required: true, endpoint: '/mantenimiento/proyecto', labelKey: 'nombre', valueKey: 'id' },
-    { name: 'fase_id', label: 'Fase', type: 'select', endpoint: '/mantenimiento/fase_proyecto', labelKey: 'nombre', valueKey: 'id' },
-    { name: 'renglon_id', label: 'Renglón', type: 'select', required: true, endpoint: '/mantenimiento/renglon_trabajo', labelKey: 'descripcion', valueKey: 'id' },
-    { name: 'cantidad_periodo', label: 'Cant. Período', type: 'number' },
-    { name: 'longitud', label: 'Longitud', type: 'number' },
-    { name: 'ancho', label: 'Ancho', type: 'number' },
-    { name: 'altura_espesor', label: 'Altura/Espesor', type: 'number' },
-    { name: 'cantidad_unidades', label: 'Cant. Unidades', type: 'number' },
-    { name: 'estacion_inicio', label: 'Estación Inicio', type: 'text' },
-    { name: 'estacion_fin', label: 'Estación Fin', type: 'text' },
-    { name: 'observaciones', label: 'Observaciones', type: 'textarea' },
-    { name: 'fecha_corte', label: 'Fecha Corte', type: 'date' }
+  "especificacion_tecnica": [
+    {
+      "name": "codigo",
+      "label": "Codigo",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "descripcion",
+      "label": "Descripcion",
+      "type": "textarea",
+      "required": true
+    },
+    {
+      "name": "unidad",
+      "label": "Unidad",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "parametros_obligatorios",
+      "label": "Parametros Obligatorios",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "referencia_normativa",
+      "label": "Referencia Normativa",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "edicion",
+      "label": "Edicion",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "tolerancia_minima",
+      "label": "Tolerancia Minima",
+      "type": "decimal",
+      "required": false
+    },
+    {
+      "name": "tolerancia_maxima",
+      "label": "Tolerancia Maxima",
+      "type": "decimal",
+      "required": false
+    },
+    {
+      "name": "norma_referencia",
+      "label": "Norma Referencia",
+      "type": "text",
+      "required": false
+    }
   ],
-  cronograma_planificado: [
-    { name: 'proyecto_id', label: 'Proyecto', type: 'select', required: true, endpoint: '/mantenimiento/proyecto', labelKey: 'nombre', valueKey: 'id' },
-    { name: 'fase_id', label: 'Fase', type: 'select', endpoint: '/mantenimiento/fase_proyecto', labelKey: 'nombre', valueKey: 'id' },
-    { name: 'renglon_id', label: 'Renglón', type: 'select', endpoint: '/mantenimiento/renglon_trabajo', labelKey: 'descripcion', valueKey: 'id' },
-    { name: 'fecha_inicio_plan', label: 'Fecha Inicio Plan', type: 'date', required: true },
-    { name: 'fecha_fin_plan', label: 'Fecha Fin Plan', type: 'date', required: true },
-    { name: 'porcentaje_esperado', label: '% Esperado', type: 'number', required: true },
-    { name: 'responsable_id', label: 'Responsable', type: 'select', endpoint: '/mantenimiento/usuario', labelKey: 'correo', valueKey: 'id' },
-    { name: 'linea_base', label: 'Línea Base', type: 'boolean' }
+  "estacion_kilometrica": [
+    {
+      "name": "bitacora_entrada_id",
+      "label": "Entrada de Bitácora",
+      "type": "select",
+      "required": true,
+      "endpoint": "/mantenimiento/bitacora_entrada",
+      "labelKey": "titulo",
+      "valueKey": "id",
+      "refTable": "bitacora_entrada"
+    },
+    {
+      "name": "renglon_trabajo_id",
+      "label": "Renglón de Trabajo",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/renglon_trabajo",
+      "labelKey": "codigo",
+      "valueKey": "id",
+      "refTable": "renglon_trabajo"
+    },
+    {
+      "name": "numero_eje",
+      "label": "Numero Eje",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "estacion_inicial",
+      "label": "Estacion Inicial",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "estacion_final",
+      "label": "Estacion Final",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "observacion",
+      "label": "Observacion",
+      "type": "textarea",
+      "required": false
+    }
   ],
-  catalogo_descuento_tecnico: [
-    { name: 'descripcion', label: 'Descripción', type: 'text', required: true },
-    { name: 'factor_seccion_transversal', label: 'Factor Transversal', type: 'number', required: true }
+  "estado_usuario": [
+    {
+      "name": "usuario_id",
+      "label": "Usuario Asignado",
+      "type": "select",
+      "required": true,
+      "endpoint": "/mantenimiento/usuario",
+      "labelKey": "email",
+      "valueKey": "id",
+      "refTable": "usuario"
+    },
+    {
+      "name": "estado",
+      "label": "Estado",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "motivo_bloqueo",
+      "label": "Motivo Bloqueo",
+      "type": "textarea",
+      "required": false
+    },
+    {
+      "name": "cambiado_por",
+      "label": "Cambiado Por",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/usuario",
+      "labelKey": "email",
+      "valueKey": "id",
+      "refTable": "usuario"
+    },
+    {
+      "name": "fecha_cambio",
+      "label": "Fecha Cambio",
+      "type": "date",
+      "required": false
+    }
   ],
-  bitacora_pendiente: [
-    { name: 'renglon_id', label: 'Renglón', type: 'select', required: true, endpoint: '/mantenimiento/renglon_trabajo', labelKey: 'descripcion', valueKey: 'id' },
-    { name: 'proyecto_id', label: 'Proyecto', type: 'select', required: true, endpoint: '/mantenimiento/proyecto', labelKey: 'nombre', valueKey: 'id' },
-    { name: 'registrado_por', label: 'Registrado Por', type: 'select', endpoint: '/mantenimiento/usuario', labelKey: 'correo', valueKey: 'id' },
-    { name: 'fecha_medicion', label: 'Fecha Medición', type: 'date', required: true },
-    { name: 'estimacion_origen', label: 'Estimación Origen', type: 'number' },
-    { name: 'lado_via', label: 'Lado Vía', type: 'text' },
-    { name: 'ubicacion_especifica', label: 'Ubicación Especifica', type: 'text' },
-    { name: 'estacion_inicial', label: 'Estación Inicial', type: 'number' },
-    { name: 'estacion_final', label: 'Estación Final', type: 'number' },
-    { name: 'longitud_medida', label: 'Longitud', type: 'number' },
-    { name: 'ancho', label: 'Ancho', type: 'number' },
-    { name: 'altura_espesor', label: 'Altura/Espesor', type: 'number' },
-    { name: 'descuento_aplicado_id', label: 'Descuento Técnico', type: 'select', endpoint: '/mantenimiento/catalogo_descuento_tecnico', labelKey: 'descripcion', valueKey: 'id' },
-    { name: 'es_derrumbre', label: 'Es Derrumbre', type: 'boolean' },
-    { name: 'estado_conciliacion', label: 'Estado Conciliación', type: 'text' },
-    { name: 'observaciones', label: 'Observaciones', type: 'textarea' }
+  "evidencia_fotografica": [
+    {
+      "name": "bitacora_entrada_id",
+      "label": "Entrada de Bitácora",
+      "type": "select",
+      "required": true,
+      "endpoint": "/mantenimiento/bitacora_entrada",
+      "labelKey": "titulo",
+      "valueKey": "id",
+      "refTable": "bitacora_entrada"
+    },
+    {
+      "name": "usuario_id",
+      "label": "Usuario Asignado",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/usuario",
+      "labelKey": "email",
+      "valueKey": "id",
+      "refTable": "usuario"
+    },
+    {
+      "name": "gps_lat",
+      "label": "Latitud GPS",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "gps_lng",
+      "label": "Longitud GPS",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "precision_gps",
+      "label": "Precisión GPS (metros)",
+      "type": "decimal",
+      "required": false
+    },
+    {
+      "name": "fecha_hora",
+      "label": "Fecha Hora",
+      "type": "date",
+      "required": true
+    },
+    {
+      "name": "descripcion",
+      "label": "Descripcion",
+      "type": "textarea",
+      "required": false
+    },
+    {
+      "name": "categoria",
+      "label": "Categoria",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "url_storage",
+      "label": "Url Storage",
+      "type": "text",
+      "required": true
+    }
   ],
-  bitacora_pendiente_ajuste: [
-    { name: 'bitacora_pendiente_id', label: 'Bitácora Pendiente (UUID)', type: 'text', required: true },
-    { name: 'valor_descuento', label: 'Valor Descuento', type: 'number', required: true },
-    { name: 'formula_descuento', label: 'Fórmula', type: 'text' },
-    { name: 'descripcion', label: 'Descripción', type: 'textarea' },
-    { name: 'registrado_por', label: 'Registrado Por', type: 'select', endpoint: '/mantenimiento/usuario', labelKey: 'correo', valueKey: 'id' }
+  "fase_proyecto": [
+    {
+      "name": "proyecto_id",
+      "label": "Proyecto",
+      "type": "select",
+      "required": true,
+      "endpoint": "/mantenimiento/proyecto",
+      "labelKey": "nombre",
+      "valueKey": "id",
+      "refTable": "proyecto"
+    },
+    {
+      "name": "nombre",
+      "label": "Nombre",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "orden",
+      "label": "Orden",
+      "type": "integer",
+      "required": false
+    },
+    {
+      "name": "fecha_inicio",
+      "label": "Fecha de Inicio",
+      "type": "date",
+      "required": false
+    },
+    {
+      "name": "fecha_fin",
+      "label": "Fecha de Finalización",
+      "type": "date",
+      "required": false
+    },
+    {
+      "name": "porcentaje_planificado",
+      "label": "% Planificado",
+      "type": "decimal",
+      "required": false
+    },
+    {
+      "name": "porcentaje_real",
+      "label": "Porcentaje Real",
+      "type": "decimal",
+      "required": false
+    },
+    {
+      "name": "porcentaje_avance",
+      "label": "Porcentaje Avance",
+      "type": "decimal",
+      "required": false
+    },
+    {
+      "name": "fecha_corte",
+      "label": "Fecha Corte",
+      "type": "date",
+      "required": false
+    },
+    {
+      "name": "estado",
+      "label": "Estado",
+      "type": "text",
+      "required": false
+    }
   ],
-
-  // 7. CONTROL FINANCIERO Y PLAZOS
-  parametro_proyecto: [
-    { name: 'proyecto_id', label: 'Proyecto', type: 'select', required: true, endpoint: '/mantenimiento/proyecto', labelKey: 'nombre', valueKey: 'id' },
-    { name: 'porcentaje_indirectos', label: '% Indirectos', type: 'number' },
-    { name: 'porcentaje_iva', label: '% IVA', type: 'number' },
-    { name: 'porcentaje_amortizacion_anticipo', label: '% Amortización', type: 'number' },
-    { name: 'monto_etapa_construccion', label: 'Monto Construcción', type: 'number' },
-    { name: 'monto_anticipo_total', label: 'Anticipo Total', type: 'number' },
-    { name: 'anticipo_total_recibido', label: 'Anticipo Recibido', type: 'number' }
+  "incidente_evidencia": [
+    {
+      "name": "incidente_id",
+      "label": "Incidente de Obra",
+      "type": "select",
+      "required": true,
+      "endpoint": "/mantenimiento/incidente_obra",
+      "labelKey": "titulo",
+      "valueKey": "id",
+      "refTable": "incidente_obra"
+    },
+    {
+      "name": "subido_por",
+      "label": "Subido Por",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/usuario",
+      "labelKey": "email",
+      "valueKey": "id",
+      "refTable": "usuario"
+    },
+    {
+      "name": "nombre",
+      "label": "Nombre",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "tipo",
+      "label": "Tipo",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "url_storage",
+      "label": "Url Storage",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "descripcion",
+      "label": "Descripcion",
+      "type": "textarea",
+      "required": false
+    },
+    {
+      "name": "fecha_subida",
+      "label": "Fecha Subida",
+      "type": "date",
+      "required": false
+    }
   ],
-  control_anticipo: [
-    { name: 'proyecto_id', label: 'Proyecto', type: 'select', required: true, endpoint: '/mantenimiento/proyecto', labelKey: 'nombre', valueKey: 'id' },
-    { name: 'numero_estimacion', label: 'No. Estimación', type: 'number', required: true },
-    { name: 'monto_anticipo_total', label: 'Monto Anticipo', type: 'number', required: true },
-    { name: 'valor_estimacion_periodo', label: 'Valor Estimación', type: 'number' }
+  "incidente_obra": [
+    {
+      "name": "proyecto_id",
+      "label": "Proyecto",
+      "type": "select",
+      "required": true,
+      "endpoint": "/mantenimiento/proyecto",
+      "labelKey": "nombre",
+      "valueKey": "id",
+      "refTable": "proyecto"
+    },
+    {
+      "name": "bitacora_entrada_id",
+      "label": "Entrada de Bitácora",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/bitacora_entrada",
+      "labelKey": "titulo",
+      "valueKey": "id",
+      "refTable": "bitacora_entrada"
+    },
+    {
+      "name": "reportado_por",
+      "label": "Reportado Por",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/usuario",
+      "labelKey": "email",
+      "valueKey": "id",
+      "refTable": "usuario"
+    },
+    {
+      "name": "titulo",
+      "label": "Titulo",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "ubicacion",
+      "label": "Ubicacion",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "descripcion",
+      "label": "Descripcion",
+      "type": "textarea",
+      "required": true
+    },
+    {
+      "name": "tipo",
+      "label": "Tipo",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "nivel_gravedad",
+      "label": "Nivel Gravedad",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "acciones_correctivas",
+      "label": "Acciones Correctivas",
+      "type": "textarea",
+      "required": false
+    },
+    {
+      "name": "estado_resolucion",
+      "label": "Estado Resolucion",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "cerrado_por",
+      "label": "Cerrado Por",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/usuario",
+      "labelKey": "email",
+      "valueKey": "id",
+      "refTable": "usuario"
+    },
+    {
+      "name": "fecha",
+      "label": "Fecha",
+      "type": "date",
+      "required": false
+    },
+    {
+      "name": "fecha_cierre",
+      "label": "Fecha Cierre",
+      "type": "date",
+      "required": false
+    }
   ],
-  control_plazo: [
-    { name: 'proyecto_id', label: 'Proyecto', type: 'select', required: true, endpoint: '/mantenimiento/proyecto', labelKey: 'nombre', valueKey: 'id' },
-    { name: 'fecha_inicio_referencia', label: 'Fecha Inicio Ref.', type: 'date', required: true },
-    { name: 'dias_contractuales', label: 'Días Contractuales', type: 'number', required: true },
-    { name: 'fecha_corte_estimacion', label: 'Fecha Corte', type: 'date' }
+  "modificativo_renglon": [
+    {
+      "name": "renglon_id",
+      "label": "Renglón de Trabajo",
+      "type": "select",
+      "required": true,
+      "endpoint": "/mantenimiento/renglon_trabajo",
+      "labelKey": "codigo",
+      "valueKey": "id",
+      "refTable": "renglon_trabajo"
+    },
+    {
+      "name": "cantidad_delta",
+      "label": "Cantidad Delta",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "documento_referencia",
+      "label": "Documento Referencia",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "motivo",
+      "label": "Motivo",
+      "type": "textarea",
+      "required": false
+    },
+    {
+      "name": "aprobado_por",
+      "label": "Aprobado Por",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/usuario",
+      "labelKey": "email",
+      "valueKey": "id",
+      "refTable": "usuario"
+    },
+    {
+      "name": "fecha_registro",
+      "label": "Fecha Registro",
+      "type": "date",
+      "required": false
+    }
   ],
-  suspension_plazo: [
-    { name: 'proyecto_id', label: 'Proyecto', type: 'select', required: true, endpoint: '/mantenimiento/proyecto', labelKey: 'nombre', valueKey: 'id' },
-    { name: 'fecha_inicio', label: 'Fecha Inicio', type: 'date', required: true },
-    { name: 'fecha_fin', label: 'Fecha Fin', type: 'date', required: true },
-    { name: 'motivo', label: 'Motivo', type: 'textarea' },
-    { name: 'tipo_suspension', label: 'Tipo Suspensión', type: 'text' },
-    { name: 'numero_acta_resolucion', label: 'No. Acta', type: 'text', required: true }
+  "municipio": [
+    {
+      "name": "departamento_id",
+      "label": "Departamento",
+      "type": "select",
+      "required": true,
+      "endpoint": "/mantenimiento/departamento",
+      "labelKey": "nombre",
+      "valueKey": "id",
+      "refTable": "departamento"
+    },
+    {
+      "name": "nombre",
+      "label": "Nombre",
+      "type": "text",
+      "required": true
+    }
   ],
-
-  // 8. INCIDENTES Y LABORATORIOS
-  incidente_obra: [
-    { name: 'proyecto_id', label: 'Proyecto', type: 'select', required: true, endpoint: '/mantenimiento/proyecto', labelKey: 'nombre', valueKey: 'id' },
-    { name: 'bitacora_entrada_id', label: 'Bitácora Entrada', type: 'select', endpoint: '/mantenimiento/bitacora_entrada', labelKey: 'titulo', valueKey: 'id' },
-    { name: 'reportado_por', label: 'Reportado Por', type: 'select', endpoint: '/mantenimiento/usuario', labelKey: 'correo', valueKey: 'id' },
-    { name: 'titulo', label: 'Título', type: 'text', required: true },
-    { name: 'ubicacion', label: 'Ubicación', type: 'text' },
-    { name: 'descripcion', label: 'Descripción', type: 'textarea', required: true },
-    { name: 'tipo', label: 'Tipo', type: 'text' },
-    { name: 'nivel_gravedad', label: 'Gravedad', type: 'text' },
-    { name: 'estado_resolucion', label: 'Estado', type: 'text' },
-    { name: 'cerrado_por', label: 'Cerrado Por', type: 'select', endpoint: '/mantenimiento/usuario', labelKey: 'correo', valueKey: 'id' },
-    { name: 'fecha_cierre', label: 'Fecha Cierre', type: 'date' }
+  "parametro_proyecto": [
+    {
+      "name": "proyecto_id",
+      "label": "Proyecto",
+      "type": "select",
+      "required": true,
+      "endpoint": "/mantenimiento/proyecto",
+      "labelKey": "nombre",
+      "valueKey": "id",
+      "refTable": "proyecto"
+    },
+    {
+      "name": "porcentaje_indirectos",
+      "label": "% Indirectos",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "porcentaje_iva",
+      "label": "% IVA",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "porcentaje_amortizacion_anticipo",
+      "label": "% Amortización Anticipo",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "monto_etapa_construccion",
+      "label": "Monto Construcción (Q)",
+      "type": "decimal",
+      "required": false
+    },
+    {
+      "name": "monto_anticipo_total",
+      "label": "Monto Anticipo Total (Q)",
+      "type": "decimal",
+      "required": false
+    },
+    {
+      "name": "anticipo_total_recibido",
+      "label": "Anticipo Total Recibido (Q)",
+      "type": "decimal",
+      "required": false
+    }
   ],
-  incidente_evidencia: [
-    { name: 'incidente_id', label: 'Incidente (UUID)', type: 'text', required: true },
-    { name: 'subido_por', label: 'Subido Por', type: 'select', endpoint: '/mantenimiento/usuario', labelKey: 'correo', valueKey: 'id' },
-    { name: 'nombre', label: 'Nombre', type: 'text', required: true },
-    { name: 'tipo', label: 'Tipo', type: 'text' },
-    { name: 'url_storage', label: 'URL Storage', type: 'text', required: true },
-    { name: 'descripcion', label: 'Descripción', type: 'textarea' }
+  "proyecto": [
+    {
+      "name": "empresa_id",
+      "label": "Empresa",
+      "type": "select",
+      "required": true,
+      "endpoint": "/mantenimiento/empresa",
+      "labelKey": "nombre",
+      "valueKey": "id",
+      "refTable": "empresa"
+    },
+    {
+      "name": "codigo",
+      "label": "Codigo",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "nombre",
+      "label": "Nombre",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "descripcion",
+      "label": "Descripcion",
+      "type": "textarea",
+      "required": false
+    },
+    {
+      "name": "ubicacion",
+      "label": "Ubicacion",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "fecha_inicio",
+      "label": "Fecha de Inicio",
+      "type": "date",
+      "required": true
+    },
+    {
+      "name": "fecha_fin_estimada",
+      "label": "Fecha Fin Estimada",
+      "type": "date",
+      "required": true
+    },
+    {
+      "name": "estado_id",
+      "label": "Estado",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/catalogo_item",
+      "labelKey": "nombre",
+      "valueKey": "id",
+      "refTable": "catalogo_item"
+    },
+    {
+      "name": "responsable_id",
+      "label": "Responsable",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/usuario",
+      "labelKey": "email",
+      "valueKey": "id",
+      "refTable": "usuario"
+    },
+    {
+      "name": "en_replanificacion",
+      "label": "En Replanificacion",
+      "type": "boolean",
+      "required": true
+    }
   ],
-  evidencia_fotografica: [
-    { name: 'bitacora_entrada_id', label: 'Bitácora Entrada', type: 'select', required: true, endpoint: '/mantenimiento/bitacora_entrada', labelKey: 'titulo', valueKey: 'id' },
-    { name: 'usuario_id', label: 'Usuario', type: 'select', endpoint: '/mantenimiento/usuario', labelKey: 'correo', valueKey: 'id' },
-    { name: 'gps_lat', label: 'GPS Latitud', type: 'number', required: true },
-    { name: 'gps_lng', label: 'GPS Longitud', type: 'number', required: true },
-    { name: 'precision_gps', label: 'Precisión GPS', type: 'number' },
-    { name: 'fecha_hora', label: 'Fecha/Hora', type: 'text' },
-    { name: 'descripcion', label: 'Descripción', type: 'textarea' },
-    { name: 'categoria', label: 'Categoría', type: 'text' },
-    { name: 'url_storage', label: 'URL Storage', type: 'text', required: true }
+  "proyecto_detalle": [
+    {
+      "name": "proyecto_id",
+      "label": "Proyecto",
+      "type": "select",
+      "required": true,
+      "endpoint": "/mantenimiento/proyecto",
+      "labelKey": "nombre",
+      "valueKey": "id",
+      "refTable": "proyecto"
+    },
+    {
+      "name": "tipo_obra",
+      "label": "Tipo Obra",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "nombre_oficial",
+      "label": "Nombre Oficial",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "descripcion_proyecto",
+      "label": "Descripcion Proyecto",
+      "type": "textarea",
+      "required": false
+    },
+    {
+      "name": "municipio_id",
+      "label": "Municipio",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/municipio",
+      "labelKey": "nombre",
+      "valueKey": "id",
+      "refTable": "municipio"
+    },
+    {
+      "name": "tramo",
+      "label": "Tramo",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "kilometro_inicio",
+      "label": "Kilometro Inicio",
+      "type": "decimal",
+      "required": false
+    },
+    {
+      "name": "kilometro_fin",
+      "label": "Kilometro Fin",
+      "type": "decimal",
+      "required": false
+    },
+    {
+      "name": "numero_contrato_original",
+      "label": "Numero Contrato Original",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "fecha_firma_contrato_original",
+      "label": "Fecha Firma Contrato Original",
+      "type": "date",
+      "required": false
+    },
+    {
+      "name": "numero_contrato_modificatorio",
+      "label": "Numero Contrato Modificatorio",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "fecha_firma_contrato_modificatorio",
+      "label": "Fecha Firma Contrato Modificatorio",
+      "type": "date",
+      "required": false
+    },
+    {
+      "name": "acuerdo_ministerial_original",
+      "label": "Acuerdo Ministerial Original",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "acuerdo_ministerial_modificatorio",
+      "label": "Acuerdo Ministerial Modificatorio",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "numero_escritura_publica",
+      "label": "Numero Escritura Publica",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "fecha_adjudicacion",
+      "label": "Fecha Adjudicacion",
+      "type": "date",
+      "required": false
+    },
+    {
+      "name": "fecha_inicio_contractual",
+      "label": "Fecha Inicio Contractual",
+      "type": "date",
+      "required": false
+    },
+    {
+      "name": "fecha_finalizacion_real",
+      "label": "Fecha Finalizacion Real",
+      "type": "date",
+      "required": false
+    },
+    {
+      "name": "monto_original",
+      "label": "Monto Original (Q)",
+      "type": "decimal",
+      "required": false
+    },
+    {
+      "name": "monto_ajustado",
+      "label": "Monto Ajustado",
+      "type": "decimal",
+      "required": false
+    },
+    {
+      "name": "empresa_contratante_id",
+      "label": "Entidad Contratante",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/entidad_contratante",
+      "labelKey": "nombre",
+      "valueKey": "id",
+      "refTable": "entidad_contratante"
+    },
+    {
+      "name": "contacto_contratante_id",
+      "label": "Contacto de Entidad",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/contacto_entidad",
+      "labelKey": "nombre",
+      "valueKey": "id",
+      "refTable": "contacto_entidad"
+    },
+    {
+      "name": "empresa_supervisora",
+      "label": "Empresa Supervisora",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "plazo_ejecucion_original",
+      "label": "Plazo Ejecucion Original",
+      "type": "integer",
+      "required": false
+    },
+    {
+      "name": "plazo_ejecucion_ampliado",
+      "label": "Plazo Ejecucion Ampliado",
+      "type": "integer",
+      "required": false
+    },
+    {
+      "name": "empresa_contratista_id",
+      "label": "Empresa Contratista",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/empresa_contratista",
+      "labelKey": "nombre",
+      "valueKey": "id",
+      "refTable": "empresa_contratista"
+    },
+    {
+      "name": "contacto_contratista_id",
+      "label": "Contacto de Contratista",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/contacto_contratista",
+      "labelKey": "nombre",
+      "valueKey": "id",
+      "refTable": "contacto_contratista"
+    },
+    {
+      "name": "departamento_id",
+      "label": "Departamento",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/departamento",
+      "labelKey": "nombre",
+      "valueKey": "id",
+      "refTable": "departamento"
+    },
+    {
+      "name": "latitud",
+      "label": "Latitud",
+      "type": "decimal",
+      "required": false
+    },
+    {
+      "name": "longitud",
+      "label": "Longitud",
+      "type": "decimal",
+      "required": false
+    },
+    {
+      "name": "direccion",
+      "label": "Direccion",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "monto_final",
+      "label": "Monto Final",
+      "type": "decimal",
+      "required": false
+    },
+    {
+      "name": "delegado_residente_id",
+      "label": "Delegado Residente",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/usuario",
+      "labelKey": "email",
+      "valueKey": "id",
+      "refTable": "usuario"
+    },
+    {
+      "name": "departamento_fin_id",
+      "label": "Departamento Fin",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/departamento",
+      "labelKey": "nombre",
+      "valueKey": "id",
+      "refTable": "departamento"
+    },
+    {
+      "name": "municipio_fin_id",
+      "label": "Municipio Fin",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/municipio",
+      "labelKey": "nombre",
+      "valueKey": "id",
+      "refTable": "municipio"
+    },
+    {
+      "name": "direccion_fin",
+      "label": "Direccion Fin",
+      "type": "text",
+      "required": false
+    }
   ],
-  tipo_ensayo: [
-    { name: 'nombre', label: 'Nombre', type: 'text', required: true },
-    { name: 'descripcion', label: 'Descripción', type: 'textarea' },
-    { name: 'unidad_resultado', label: 'Unidad', type: 'text' },
-    { name: 'activo', label: 'Activo', type: 'boolean' }
+  "proyecto_usuario": [
+    {
+      "name": "proyecto_id",
+      "label": "Proyecto",
+      "type": "select",
+      "required": true,
+      "endpoint": "/mantenimiento/proyecto",
+      "labelKey": "nombre",
+      "valueKey": "id",
+      "refTable": "proyecto"
+    },
+    {
+      "name": "usuario_id",
+      "label": "Usuario Asignado",
+      "type": "select",
+      "required": true,
+      "endpoint": "/mantenimiento/usuario",
+      "labelKey": "email",
+      "valueKey": "id",
+      "refTable": "usuario"
+    },
+    {
+      "name": "rol_proyecto",
+      "label": "Rol Proyecto",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "fecha_asignacion",
+      "label": "Fecha Asignacion",
+      "type": "date",
+      "required": false
+    },
+    {
+      "name": "activo",
+      "label": "Activo",
+      "type": "boolean",
+      "required": false
+    }
   ],
-  ensayo_laboratorio: [
-    { name: 'bitacora_entrada_id', label: 'Bitácora Entrada', type: 'select', required: true, endpoint: '/mantenimiento/bitacora_entrada', labelKey: 'titulo', valueKey: 'id' },
-    { name: 'tipo_ensayo_id', label: 'Tipo Ensayo', type: 'select', required: true, endpoint: '/mantenimiento/tipo_ensayo', labelKey: 'nombre', valueKey: 'id' },
-    { name: 'tecnico_id', label: 'Técnico', type: 'select', endpoint: '/mantenimiento/usuario', labelKey: 'correo', valueKey: 'id' },
-    { name: 'especificacion_id', label: 'Especificación', type: 'select', endpoint: '/mantenimiento/especificacion_tecnica', labelKey: 'codigo', valueKey: 'id' },
-    { name: 'resultado_obtenido', label: 'Resultado', type: 'number', required: true },
-    { name: 'valor_minimo', label: 'Valor Mínimo', type: 'number' },
-    { name: 'aprobado', label: 'Aprobado', type: 'boolean' },
-    { name: 'observaciones', label: 'Observaciones', type: 'textarea' }
+  "renglon_trabajo": [
+    {
+      "name": "proyecto_id",
+      "label": "Proyecto",
+      "type": "select",
+      "required": true,
+      "endpoint": "/mantenimiento/proyecto",
+      "labelKey": "nombre",
+      "valueKey": "id",
+      "refTable": "proyecto"
+    },
+    {
+      "name": "categoria_id",
+      "label": "Categoría de Actividad",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/categoria_actividad",
+      "labelKey": "nombre",
+      "valueKey": "id",
+      "refTable": "categoria_actividad"
+    },
+    {
+      "name": "especificacion_id",
+      "label": "Especificación Técnica",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/especificacion_tecnica",
+      "labelKey": "codigo",
+      "valueKey": "id",
+      "refTable": "especificacion_tecnica"
+    },
+    {
+      "name": "capitulo_id",
+      "label": "Capítulo (Sábana)",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/capitulo_sabana",
+      "labelKey": "descripcion",
+      "valueKey": "id",
+      "refTable": "capitulo_sabana"
+    },
+    {
+      "name": "unidad_id",
+      "label": "Unidad de Medida",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/unidad_medida",
+      "labelKey": "nombre",
+      "valueKey": "id",
+      "refTable": "unidad_medida"
+    },
+    {
+      "name": "tipo_renglon",
+      "label": "Tipo Renglon",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "aplica_indirectos",
+      "label": "Aplica Indirectos",
+      "type": "boolean",
+      "required": true
+    },
+    {
+      "name": "aplica_iva",
+      "label": "Aplica Iva",
+      "type": "boolean",
+      "required": true
+    },
+    {
+      "name": "descripcion",
+      "label": "Descripcion",
+      "type": "textarea",
+      "required": true
+    },
+    {
+      "name": "cantidad_contractual",
+      "label": "Cantidad Contractual",
+      "type": "decimal",
+      "required": false
+    },
+    {
+      "name": "cantidad_ejecutada",
+      "label": "Cantidad Ejecutada",
+      "type": "decimal",
+      "required": false
+    },
+    {
+      "name": "cantidad_ajustada",
+      "label": "Cantidad Ajustada",
+      "type": "decimal",
+      "required": false
+    },
+    {
+      "name": "precio_unitario_directo",
+      "label": "Precio Unitario Directo (Q)",
+      "type": "decimal",
+      "required": false
+    },
+    {
+      "name": "costo_total_directo_ajustado",
+      "label": "Costo Total Directo Ajustado",
+      "type": "decimal",
+      "required": false
+    },
+    {
+      "name": "fecha_ultimo_avance",
+      "label": "Fecha Ultimo Avance",
+      "type": "date",
+      "required": false
+    },
+    {
+      "name": "codigo",
+      "label": "Codigo",
+      "type": "text",
+      "required": false
+    }
   ],
-
-  // 9. REPORTES Y AUDITORÍA
-  reporte: [
-    { name: 'proyecto_id', label: 'Proyecto', type: 'select', required: true, endpoint: '/mantenimiento/proyecto', labelKey: 'nombre', valueKey: 'id' },
-    { name: 'generado_por', label: 'Generado Por', type: 'select', endpoint: '/mantenimiento/usuario', labelKey: 'correo', valueKey: 'id' },
-    { name: 'titulo', label: 'Título', type: 'text', required: true },
-    { name: 'tipo', label: 'Tipo', type: 'text', required: true },
-    { name: 'formato', label: 'Formato', type: 'text', required: true },
-    { name: 'estado', label: 'Estado', type: 'text', required: true },
-    { name: 'nombre_archivo', label: 'Nombre Archivo', type: 'text', required: true },
-    { name: 'logo_incluido', label: 'Logo Incluido', type: 'boolean' },
-    { name: 'marca_agua_incluida', label: 'Marca Agua Incluida', type: 'boolean' },
-    { name: 'logo_url', label: 'Logo URL', type: 'text' },
-    { name: 'marca_agua_url', label: 'Marca Agua URL', type: 'text' },
-    { name: 'url_storage', label: 'URL Storage', type: 'text' }
+  "renglon_trabajo_catalogo": [
+    {
+      "name": "capitulo_id",
+      "label": "Capítulo (Sábana)",
+      "type": "select",
+      "required": true,
+      "endpoint": "/mantenimiento/capitulo_sabana",
+      "labelKey": "descripcion",
+      "valueKey": "id",
+      "refTable": "capitulo_sabana"
+    },
+    {
+      "name": "unidad_id",
+      "label": "Unidad de Medida",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/unidad_medida",
+      "labelKey": "nombre",
+      "valueKey": "id",
+      "refTable": "unidad_medida"
+    },
+    {
+      "name": "codigo",
+      "label": "Codigo",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "descripcion",
+      "label": "Descripcion",
+      "type": "textarea",
+      "required": true
+    },
+    {
+      "name": "tipo_renglon",
+      "label": "Tipo Renglon",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "aplica_indirectos",
+      "label": "Aplica Indirectos",
+      "type": "boolean",
+      "required": true
+    },
+    {
+      "name": "aplica_iva",
+      "label": "Aplica Iva",
+      "type": "boolean",
+      "required": true
+    },
+    {
+      "name": "activo",
+      "label": "Activo",
+      "type": "boolean",
+      "required": false
+    }
   ],
-  auditoria_operativa: [
-    { name: 'usuario_id', label: 'Usuario', type: 'select', endpoint: '/mantenimiento/usuario', labelKey: 'correo', valueKey: 'id' },
-    { name: 'proyecto_id', label: 'Proyecto', type: 'select', endpoint: '/mantenimiento/proyecto', labelKey: 'nombre', valueKey: 'id' },
-    { name: 'accion', label: 'Acción', type: 'text', required: true },
-    { name: 'modulo', label: 'Módulo', type: 'text' },
-    { name: 'tabla_afectada', label: 'Tabla Afectada', type: 'text' },
-    { name: 'registro_afectado', label: 'Registro Afectado', type: 'text' }
+  "renglon_trabajo_plantilla": [
+    {
+      "name": "capitulo_id",
+      "label": "Capítulo (Sábana)",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/capitulo_sabana",
+      "labelKey": "descripcion",
+      "valueKey": "id",
+      "refTable": "capitulo_sabana"
+    },
+    {
+      "name": "unidad_id",
+      "label": "Unidad de Medida",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/unidad_medida",
+      "labelKey": "nombre",
+      "valueKey": "id",
+      "refTable": "unidad_medida"
+    },
+    {
+      "name": "codigo",
+      "label": "Codigo",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "descripcion",
+      "label": "Descripcion",
+      "type": "textarea",
+      "required": true
+    },
+    {
+      "name": "tipo_renglon",
+      "label": "Tipo Renglon",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "aplica_indirectos",
+      "label": "Aplica Indirectos",
+      "type": "boolean",
+      "required": true
+    },
+    {
+      "name": "aplica_iva",
+      "label": "Aplica Iva",
+      "type": "boolean",
+      "required": true
+    },
+    {
+      "name": "activo",
+      "label": "Activo",
+      "type": "boolean",
+      "required": true
+    }
   ],
-  seguridad_log: [
-    { name: 'usuario_id', label: 'Usuario', type: 'select', endpoint: '/mantenimiento/usuario', labelKey: 'correo', valueKey: 'id' },
-    { name: 'accion', label: 'Acción', type: 'text', required: true },
-    { name: 'ip', label: 'IP', type: 'text' },
-    { name: 'user_agent', label: 'User Agent', type: 'text' },
-    { name: 'exitoso', label: 'Exitoso', type: 'boolean' }
+  "reporte": [
+    {
+      "name": "proyecto_id",
+      "label": "Proyecto",
+      "type": "select",
+      "required": true,
+      "endpoint": "/mantenimiento/proyecto",
+      "labelKey": "nombre",
+      "valueKey": "id",
+      "refTable": "proyecto"
+    },
+    {
+      "name": "generado_por",
+      "label": "Generado Por",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/usuario",
+      "labelKey": "email",
+      "valueKey": "id",
+      "refTable": "usuario"
+    },
+    {
+      "name": "titulo",
+      "label": "Titulo",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "tipo",
+      "label": "Tipo",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "filtros_aplicados",
+      "label": "Filtros Aplicados",
+      "type": "textarea",
+      "required": false
+    },
+    {
+      "name": "formato",
+      "label": "Formato",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "estado",
+      "label": "Estado",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "nombre_archivo",
+      "label": "Nombre Archivo",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "logo_incluido",
+      "label": "Logo Incluido",
+      "type": "boolean",
+      "required": false
+    },
+    {
+      "name": "marca_agua_incluida",
+      "label": "Marca Agua Incluida",
+      "type": "boolean",
+      "required": false
+    },
+    {
+      "name": "logo_url",
+      "label": "Logo Url",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "marca_agua_url",
+      "label": "Marca Agua Url",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "estructura",
+      "label": "Estructura",
+      "type": "textarea",
+      "required": false
+    },
+    {
+      "name": "campos_incluidos",
+      "label": "Campos Incluidos",
+      "type": "textarea",
+      "required": false
+    },
+    {
+      "name": "url_storage",
+      "label": "Url Storage",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "fecha_generacion",
+      "label": "Fecha Generacion",
+      "type": "date",
+      "required": false
+    }
+  ],
+  "restauracion_sistema": [
+    {
+      "name": "restaurado_por",
+      "label": "Restaurado Por",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/usuario",
+      "labelKey": "email",
+      "valueKey": "id",
+      "refTable": "usuario"
+    },
+    {
+      "name": "archivo_origen",
+      "label": "Archivo Origen",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "estado",
+      "label": "Estado",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "observaciones",
+      "label": "Observaciones",
+      "type": "textarea",
+      "required": false
+    },
+    {
+      "name": "fecha_restauracion",
+      "label": "Fecha Restauracion",
+      "type": "date",
+      "required": false
+    }
+  ],
+  "rol": [
+    {
+      "name": "nombre_rol",
+      "label": "Nombre Rol",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "nivel_permisos",
+      "label": "Nivel Permisos",
+      "type": "integer",
+      "required": false
+    },
+    {
+      "name": "permisos",
+      "label": "Permisos",
+      "type": "textarea",
+      "required": false
+    },
+    {
+      "name": "activo",
+      "label": "Activo",
+      "type": "boolean",
+      "required": false
+    },
+    {
+      "name": "descripcion",
+      "label": "Descripcion",
+      "type": "textarea",
+      "required": false
+    }
+  ],
+  "seguridad_log": [
+    {
+      "name": "usuario_id",
+      "label": "Usuario Asignado",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/usuario",
+      "labelKey": "email",
+      "valueKey": "id",
+      "refTable": "usuario"
+    },
+    {
+      "name": "accion",
+      "label": "Accion",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "ip",
+      "label": "Ip",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "user_agent",
+      "label": "User Agent",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "exitoso",
+      "label": "Exitoso",
+      "type": "boolean",
+      "required": false
+    },
+    {
+      "name": "detalles",
+      "label": "Detalles",
+      "type": "textarea",
+      "required": false
+    },
+    {
+      "name": "fecha_hora",
+      "label": "Fecha Hora",
+      "type": "date",
+      "required": false
+    }
+  ],
+  "suspension_plazo": [
+    {
+      "name": "proyecto_id",
+      "label": "Proyecto",
+      "type": "select",
+      "required": true,
+      "endpoint": "/mantenimiento/proyecto",
+      "labelKey": "nombre",
+      "valueKey": "id",
+      "refTable": "proyecto"
+    },
+    {
+      "name": "fecha_inicio",
+      "label": "Fecha de Inicio",
+      "type": "date",
+      "required": true
+    },
+    {
+      "name": "fecha_fin",
+      "label": "Fecha de Finalización",
+      "type": "date",
+      "required": false
+    },
+    {
+      "name": "duracion_dias",
+      "label": "Duracion Dias",
+      "type": "integer",
+      "required": false
+    },
+    {
+      "name": "motivo",
+      "label": "Motivo",
+      "type": "textarea",
+      "required": false
+    },
+    {
+      "name": "tipo_suspension",
+      "label": "Tipo Suspension",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "numero_acta_resolucion",
+      "label": "Numero Acta Resolucion",
+      "type": "text",
+      "required": true
+    }
+  ],
+  "ticket_mensaje": [
+    {
+      "name": "ticket_id",
+      "label": "Ticket",
+      "type": "select",
+      "required": true,
+      "endpoint": "/mantenimiento/ticket_soporte",
+      "labelKey": "codigo",
+      "valueKey": "id",
+      "refTable": "ticket_soporte"
+    },
+    {
+      "name": "autor_usuario_id",
+      "label": "Autor del Mensaje",
+      "type": "select",
+      "required": true,
+      "endpoint": "/mantenimiento/usuario",
+      "labelKey": "email",
+      "valueKey": "id",
+      "refTable": "usuario"
+    },
+    {
+      "name": "rol_id",
+      "label": "Rol de Sistema",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/rol",
+      "labelKey": "descripcion",
+      "valueKey": "id",
+      "refTable": "rol"
+    },
+    {
+      "name": "mensaje",
+      "label": "Mensaje",
+      "type": "text",
+      "required": true
+    }
+  ],
+  "ticket_soporte": [
+    {
+      "name": "codigo",
+      "label": "Codigo",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "titulo",
+      "label": "Titulo",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "estado",
+      "label": "Estado",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "categoria",
+      "label": "Categoria",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "creado_por_usuario_id",
+      "label": "Creado Por",
+      "type": "select",
+      "required": true,
+      "endpoint": "/mantenimiento/usuario",
+      "labelKey": "email",
+      "valueKey": "id",
+      "refTable": "usuario"
+    },
+    {
+      "name": "asignado_a_rol_id",
+      "label": "Asignado al Rol",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/rol",
+      "labelKey": "descripcion",
+      "valueKey": "id",
+      "refTable": "rol"
+    }
+  ],
+  "tipo_ensayo": [
+    {
+      "name": "nombre",
+      "label": "Nombre",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "descripcion",
+      "label": "Descripcion",
+      "type": "textarea",
+      "required": false
+    },
+    {
+      "name": "unidad_resultado",
+      "label": "Unidad Resultado",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "activo",
+      "label": "Activo",
+      "type": "boolean",
+      "required": false
+    }
+  ],
+  "unidad_medida": [
+    {
+      "name": "nombre",
+      "label": "Nombre",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "abreviatura",
+      "label": "Abreviatura",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "es_discreta",
+      "label": "Es Discreta",
+      "type": "boolean",
+      "required": false
+    }
+  ],
+  "usuario": [
+    {
+      "name": "auth_user_id",
+      "label": "Auth User",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "correo",
+      "label": "Correo",
+      "type": "email",
+      "required": true
+    },
+    {
+      "name": "rol_id",
+      "label": "Rol de Sistema",
+      "type": "select",
+      "required": false,
+      "endpoint": "/mantenimiento/rol",
+      "labelKey": "descripcion",
+      "valueKey": "id",
+      "refTable": "rol"
+    },
+    {
+      "name": "activo",
+      "label": "Activo",
+      "type": "boolean",
+      "required": false
+    },
+    {
+      "name": "ultimo_acceso",
+      "label": "Ultimo Acceso",
+      "type": "date",
+      "required": false
+    },
+    {
+      "name": "fecha_registro",
+      "label": "Fecha Registro",
+      "type": "date",
+      "required": false
+    }
   ]
-}
+};
 
 interface Props {
   isOpen: boolean
   onClose: () => void
   mode: 'create' | 'edit' | 'view'
   table: string
+  tableFriendlyName?: string
   record?: any
   onSave: (data: any) => Promise<void> | void
   dataKeys?: string[]
 }
 
-export default function MantenimientoDrawer({ isOpen, onClose, mode, table, record, onSave, dataKeys = [] }: Props) {
-  const [formData, setFormData] = useState<any>({})
+export default function MantenimientoDrawer({
+  isOpen,
+  onClose,
+  mode,
+  table,
+  tableFriendlyName,
+  record,
+  onSave,
+  dataKeys = []
+}: Props) {
+  const [formData, setFormData] = useState<Record<string, any>>({})
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  const [touchedFields, setTouchedFields] = useState<Record<string, boolean>>({})
   const [optionsMap, setOptionsMap] = useState<Record<string, any[]>>({})
+  const [loadingOptions, setLoadingOptions] = useState<Record<string, boolean>>({})
   const [isSaving, setIsSaving] = useState(false)
+  const { showErrorToast } = useCustomToast()
+
+
 
   const schema = useMemo(() => {
     const baseSchema = TABLES_SCHEMA[table] || []
-    let newSchema = [...baseSchema]
+    const newSchema = [...baseSchema]
     
     dataKeys.forEach(key => {
-      if (!newSchema.find(f => f.name === key)) {
+      if (!newSchema.find(f => f.name === key) && key !== 'id' && key !== 'created_at' && key !== 'updated_at' && key !== 'dependenciasCount') {
         newSchema.push({
           name: key,
-          label: key.replace(/_/g, ' '),
-          type: key.includes('fecha') ? 'date' : typeof record?.[key] === 'boolean' ? 'boolean' : 'text',
+          label: key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+          type: key.includes('fecha') ? 'date' : typeof record?.[key] === 'boolean' ? 'boolean' : typeof record?.[key] === 'number' ? 'decimal' : 'text',
           required: false,
-          readOnly: key.endsWith('_id')
+          readOnly: false
         })
       }
-    })
-    
-    // Always enforce _id fields to be readOnly dynamically
-    newSchema = newSchema.map(f => {
-      if (f.name.endsWith('_id')) {
-        return { ...f, readOnly: true }
-      }
-      return f
     })
     
     return newSchema
   }, [table, dataKeys, record])
 
-  // Cargar opciones dinámicas para selects
+  // Carga de opciones de llaves foráneas con deduplicado y sin bucle infinito
   useEffect(() => {
     if (isOpen) {
+      let isCancelled = false
       const loadOptions = async () => {
-        const newOptionsMap: Record<string, any[]> = {}
-        for (const field of schema) {
-          if (field.type === 'select' && field.endpoint) {
-            try {
-              const res = await api.get(field.endpoint)
-              if (res.data?.success || res.data) {
-                newOptionsMap[field.name] = res.data?.data || res.data
+        const selectsToLoad = schema.filter(f => f.type === 'select' && f.endpoint)
+        for (const field of selectsToLoad) {
+          try {
+            setLoadingOptions(prev => ({ ...prev, [field.name]: true }))
+            const res = await apiGetDeduplicado(`${field.endpoint}?pagina=1&limite=500`)
+            if (!isCancelled) {
+              if (res.data?.success && Array.isArray(res.data.data)) {
+                setOptionsMap(prev => ({ ...prev, [field.name]: res.data.data }))
+              } else if (Array.isArray(res.data?.data)) {
+                setOptionsMap(prev => ({ ...prev, [field.name]: res.data.data }))
+              } else if (Array.isArray(res.data)) {
+                setOptionsMap(prev => ({ ...prev, [field.name]: res.data }))
               }
-            } catch (error) {
-              console.error(`Error loading options for ${field.name}:`, error)
-              newOptionsMap[field.name] = []
+            }
+          } catch (err) {
+            console.warn(`Error al cargar opciones para ${field.name}:`, err)
+          } finally {
+            if (!isCancelled) {
+              setLoadingOptions(prev => ({ ...prev, [field.name]: false }))
             }
           }
         }
-        setOptionsMap(newOptionsMap)
       }
       loadOptions()
+      return () => { isCancelled = true }
     }
   }, [isOpen, table, schema])
 
+  // Inicialización de formData al abrir o cambiar de modo
   useEffect(() => {
     if (isOpen) {
       setIsSaving(false)
+      setFieldErrors({})
+      setTouchedFields({})
+
       if (mode === 'create' || !record) {
-        // Inicializar con valores por defecto
-        const defaultData: any = {}
+        const initialData: Record<string, any> = {}
         schema.forEach(field => {
-          defaultData[field.name] = field.type === 'boolean' ? true : ''
+          if (field.type === 'boolean') {
+            initialData[field.name] = true
+          } else {
+            initialData[field.name] = ''
+          }
         })
-        setFormData(defaultData)
+        setFormData(initialData)
       } else {
-        setFormData({ ...record })
+        const initialData: Record<string, any> = { ...record }
+        schema.forEach(field => {
+          if (field.type === 'boolean') {
+            initialData[field.name] = Boolean(record[field.name])
+          } else if (record[field.name] === null || record[field.name] === undefined) {
+            initialData[field.name] = ''
+          }
+        })
+        setFormData(initialData)
       }
     }
   }, [isOpen, mode, record, table, schema])
 
-  if (!isOpen) return null
+  // Validador individual de campo
+  const validateField = useCallback((name: string, value: any, fieldDef?: FieldSchema): string | null => {
+    const field = fieldDef || schema.find(f => f.name === name)
+    if (!field) return null
 
-  const handleChange = (name: string, value: any) => {
-    setFormData((prev: any) => ({ ...prev, [name]: value }))
+    const valStr = value !== undefined && value !== null ? String(value).trim() : ''
+
+    if (field.required && (valStr === '' || value === null || value === undefined)) {
+      return 'Este campo es obligatorio'
+    }
+
+    if (valStr === '') return null
+
+    if (field.type === 'integer') {
+      if (!/^-?\d+$/.test(valStr)) {
+        return 'Solo se permiten números enteros'
+      }
+    }
+
+    if (field.type === 'decimal') {
+      if (!/^-?\d+(\.\d+)?$/.test(valStr)) {
+        return 'Debe ingresar un número válido (ej. 123.45)'
+      }
+    }
+
+    if (field.type === 'email') {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(valStr)) {
+        return 'Ingrese un formato de correo válido'
+      }
+    }
+
+    if (field.name.includes('nit') && valStr) {
+      if (valStr.length < 4) {
+        return 'NIT demasiado corto'
+      }
+    }
+
+    return null
+  }, [schema])
+
+  const handleInputChange = (field: FieldSchema, rawValue: string) => {
+    let sanitized = rawValue
+
+    // Filtros de teclado en vivo especializados por tipo de dato
+    if (field.type === 'integer') {
+      // Permitir solo números y opcional signo negativo al inicio
+      sanitized = rawValue.replace(/[^0-9-]/g, '')
+      if (sanitized.indexOf('-') > 0) {
+        sanitized = sanitized.replace(/(?!^)-/g, '')
+      }
+    } else if (field.type === 'decimal') {
+      // Permitir solo números, un punto decimal y opcional signo negativo
+      sanitized = rawValue.replace(/[^0-9.-]/g, '')
+      if (sanitized.indexOf('-') > 0) {
+        sanitized = sanitized.replace(/(?!^)-/g, '')
+      }
+      const parts = sanitized.split('.')
+      if (parts.length > 2) {
+        sanitized = parts[0] + '.' + parts.slice(1).join('')
+      }
+    }
+
+    setFormData(prev => ({ ...prev, [field.name]: sanitized }))
+    setTouchedFields(prev => ({ ...prev, [field.name]: true }))
+
+    const error = validateField(field.name, sanitized, field)
+    setFieldErrors(prev => ({ ...prev, [field.name]: error || '' }))
+  }
+
+  const handleBlur = (field: FieldSchema) => {
+    setTouchedFields(prev => ({ ...prev, [field.name]: true }))
+    const error = validateField(field.name, formData[field.name], field)
+    setFieldErrors(prev => ({ ...prev, [field.name]: error || '' }))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (isSaving) return
+    if (isSaving || mode === 'view') return
+
+    // Validar todos los campos del formulario
+    const errors: Record<string, string> = {}
+    let hasErrors = false
+
+    schema.forEach(field => {
+      const error = validateField(field.name, formData[field.name], field)
+      if (error) {
+        errors[field.name] = error
+        hasErrors = true
+      }
+    })
+
+    if (hasErrors) {
+      setFieldErrors(errors)
+      // Marcar todos como tocados para mostrar las alertas
+      const allTouched: Record<string, boolean> = {}
+      schema.forEach(f => { allTouched[f.name] = true })
+      setTouchedFields(allTouched)
+      showErrorToast('Por favor complete los campos requeridos con formato válido.')
+      return
+    }
+
     setIsSaving(true)
     try {
-      const payload = { ...formData }
+      const payload: Record<string, any> = {}
       schema.forEach(f => {
-        if (f.type !== 'boolean' && payload[f.name] === '') {
+        const val = formData[f.name]
+        if (f.type === 'boolean') {
+          payload[f.name] = Boolean(val)
+        } else if (f.type === 'integer') {
+          payload[f.name] = val !== '' && val !== null && val !== undefined ? parseInt(String(val), 10) : null
+        } else if (f.type === 'decimal') {
+          payload[f.name] = val !== '' && val !== null && val !== undefined ? parseFloat(String(val)) : null
+        } else if (val === '' || val === undefined) {
           payload[f.name] = null
+        } else {
+          payload[f.name] = val
         }
       })
+
       await onSave(payload)
     } catch {
-      // Si la promesa falla (error HTTP), el drawer se mantiene abierto
+      // El toast de error lo maneja el parent
     } finally {
       setIsSaving(false)
     }
   }
 
+  if (!isOpen) return null
+
   const isReadOnly = mode === 'view'
-  const title = mode === 'create' ? `Crear en ${table}` : mode === 'edit' ? `Editar en ${table}` : `Ver en ${table}`
+  const tableTitle = tableFriendlyName || table.replace(/_/g, ' ')
+
+  const relatedTables = useMemo(() => {
+    const refs = schema
+      .map(f => f.refTable)
+      .filter((ref): ref is string => Boolean(ref) && ref !== table)
+    return Array.from(new Set(refs))
+  }, [schema, table])
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/40 backdrop-blur-[1px] z-40 transition-opacity animate-in fade-in duration-300 ease-out" onClick={onClose} />
-      <div className="fixed right-0 top-0 h-full w-full max-w-[420px] bg-white shadow-2xl z-50 flex flex-col overflow-hidden animate-in slide-in-from-right duration-300 ease-out">
+      <div 
+        className="fixed inset-0 bg-black/40 backdrop-blur-[1px] z-40 transition-opacity animate-in fade-in duration-200" 
+        onClick={onClose} 
+      />
+      <div className="fixed right-0 top-0 h-full w-full max-w-[480px] bg-white shadow-2xl z-50 flex flex-col overflow-hidden animate-in slide-in-from-right duration-200">
         
-        <div className="flex-shrink-0 flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-white">
-          <div>
-            <h2 className="text-base font-bold text-gray-800">{title}</h2>
-            <p className="text-[10px] text-gray-400 mt-0.5">
-              {mode === 'view' ? 'Visualizando datos del registro' : 'Complete la información solicitada'}
+        {/* Cabecera Estilo Institucional */}
+        <div className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-white">
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <span className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 ${
+                mode === 'create'
+                  ? 'text-[#9B0F06]'
+                  : mode === 'edit'
+                  ? 'text-blue-700'
+                  : 'text-gray-600'
+              }`}>
+                {mode === 'create' && <PlusCircle size={10} />}
+                {mode === 'edit' && <Edit3 size={10} />}
+                {mode === 'view' && <Eye size={10} />}
+                {mode === 'create' ? 'Nuevo Registro' : mode === 'edit' ? 'Editar Registro' : 'Detalle'}
+              </span>
+              <span className="text-[11px] font-mono text-gray-400">({table})</span>
+            </div>
+            <h2 className="text-base font-bold text-gray-900 leading-tight">
+              {tableTitle}
+            </h2>
+            {relatedTables.length > 0 && (
+              <div className="text-[10px] text-gray-500 flex items-center gap-1.5 mt-0.5 flex-wrap">
+                <span className="font-semibold text-gray-700">Relación de tablas con:</span>
+                {relatedTables.map((ref) => (
+                  <span key={ref} className="bg-gray-100 text-gray-700 font-mono text-[9.5px] px-1.5 py-0.5 rounded border border-gray-200">
+                    {ref}
+                  </span>
+                ))}
+              </div>
+            )}
+            <p className="text-[11px] text-gray-500 mt-0.5">
+              {mode === 'create'
+                ? 'Ingresa los datos para registrar un nuevo elemento'
+                : mode === 'edit'
+                ? 'Modifica los valores del registro seleccionado'
+                : 'Consulta la información registrada'}
             </p>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+            className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+            title="Cerrar"
           >
-            <X size={16} className="text-gray-500" />
+            <X size={18} />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-5 py-3">
-          <form id="mantenimiento-form" onSubmit={handleSubmit} className="space-y-0">
-            {schema.length === 0 ? (
-              <p className="text-xs text-gray-500">No hay esquema definido para esta tabla.</p>
-            ) : (
-              <>
-                {!isReadOnly && mode !== 'create' && record?.id && (
-                  <div className="mb-3 space-y-1">
-                    <label className="block text-[10px] font-semibold text-gray-700 uppercase tracking-wide">ID de Registro (No editable - Referencia)</label>
-                    <input type="text" value={record.id} disabled className="w-full h-8 px-2.5 text-[11px] bg-gray-50 text-gray-500 border border-gray-200 rounded-lg focus:outline-none cursor-not-allowed" />
+        {/* Cuerpo del Formulario */}
+        <div className="flex-1 overflow-y-auto px-6 py-4 bg-[#FAFAFA]">
+          <form id="mantenimiento-form" onSubmit={handleSubmit} className="space-y-4">
+            
+            {/* Metadatos de solo lectura si existe registro */}
+            {record?.id && (
+              <div className="bg-white p-3 rounded-xl border border-gray-200/80 shadow-2xs grid grid-cols-2 gap-3 text-[11px]">
+                <div>
+                  <span className="text-[9px] font-semibold text-gray-400 uppercase tracking-wider block">ID Registro (UUID)</span>
+                  <span className="font-mono text-gray-700 font-medium truncate block" title={record.id}>{record.id}</span>
+                </div>
+                {record.created_at && (
+                  <div>
+                    <span className="text-[9px] font-semibold text-gray-400 uppercase tracking-wider block">Fecha Creación</span>
+                    <span className="text-gray-700 font-medium block">{new Date(record.created_at).toLocaleDateString()} {new Date(record.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                   </div>
                 )}
-                {!isReadOnly && mode !== 'create' && record?.created_at && (
-                  <div className="mb-3 space-y-1">
-                    <label className="block text-[10px] font-semibold text-gray-700 uppercase tracking-wide">Fecha de Creación (No editable - Referencia)</label>
-                    <input type="text" value={new Date(record.created_at).toLocaleString()} disabled className="w-full h-8 px-2.5 text-[11px] bg-gray-50 text-gray-500 border border-gray-200 rounded-lg focus:outline-none cursor-not-allowed" />
-                  </div>
-                )}
+              </div>
+            )}
 
-                <div className="grid grid-cols-2 gap-x-3 gap-y-2">
-                  {schema.map(field => {
-                    const isDisabled = isReadOnly || field.readOnly;
-                    const disableClass = isDisabled ? 'bg-gray-50 border-gray-200 text-gray-500 cursor-not-allowed' : 'bg-white border-gray-300 focus:border-[#9B0F06]';
-                    
-                    return (
-                    <div key={field.name} className={`space-y-1 ${field.type === 'textarea' ? 'col-span-2' : 'col-span-1'}`}>
-                      <label className="block text-[10px] font-semibold text-gray-700 uppercase tracking-wide">
-                        {field.label} {field.required && '*'} 
-                        {field.readOnly && <span className="text-[9px] text-gray-400 normal-case ml-1 tracking-normal">(No editable)</span>}
+            <div className="bg-white p-4 rounded-xl border border-gray-200/80 shadow-2xs space-y-3">
+              <div className="grid grid-cols-2 gap-x-3 gap-y-3">
+                {schema.map(field => {
+                  const isFieldDisabled = isReadOnly || field.readOnly
+                  const hasError = touchedFields[field.name] && Boolean(fieldErrors[field.name])
+                  const isValid = touchedFields[field.name] && !fieldErrors[field.name] && formData[field.name] !== '' && formData[field.name] !== null
+
+                  const inputClass = `w-full h-8 px-2.5 text-[11px] rounded-lg transition-colors focus:outline-none ${
+                    isFieldDisabled
+                      ? 'bg-gray-100/70 border-gray-200 text-gray-500 cursor-not-allowed border'
+                      : hasError
+                      ? 'bg-red-50/20 border-red-500 ring-1 ring-red-400 text-red-900 border'
+                      : isValid
+                      ? 'bg-emerald-50/15 border-emerald-500 ring-1 ring-emerald-400/80 text-gray-800 border'
+                      : 'bg-white border border-gray-200 text-gray-800 focus:border-[#9B0F06]'
+                  }`
+
+                  return (
+                    <div 
+                      key={field.name} 
+                      className={`flex flex-col gap-1 ${field.type === 'textarea' ? 'col-span-2' : 'col-span-1'}`}
+                    >
+                      <label className="text-[10px] font-semibold text-gray-700 uppercase tracking-wide flex items-center justify-between">
+                        <span className="flex items-center gap-1">
+                          {field.label}
+                          {field.required && <span className="text-[#9B0F06] font-bold">*</span>}
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                          {field.refTable && (
+                            <span className="text-[9px] text-gray-400 font-normal normal-case">
+                              (Vinculado con: {field.refTable})
+                            </span>
+                          )}
+                          {field.type === 'integer' && <span className="text-[8.5px] text-gray-400 font-mono normal-case">Entero</span>}
+                          {field.type === 'decimal' && <span className="text-[8.5px] text-gray-400 font-mono normal-case">Decimal</span>}
+                          {field.type === 'email' && <span className="text-[8.5px] text-gray-400 font-mono normal-case">Email</span>}
+                        </span>
                       </label>
 
+                      {/* Renderizado según tipo de campo */}
                       {field.type === 'boolean' ? (
-                        <div className="flex flex-col gap-1 mt-1">
-                          <div className="flex items-center gap-2 h-7">
-                            <button
-                              type="button"
-                              onClick={() => !isDisabled && handleChange(field.name, !formData[field.name])}
-                              disabled={isDisabled}
-                              className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors focus:outline-none ${
-                                formData[field.name] ? 'bg-[#9B0F06]' : 'bg-gray-200'
-                              } ${isDisabled ? 'opacity-70 cursor-not-allowed' : ''}`}
-                            >
-                              <span
-                                className={`inline-block h-2.5 w-2.5 transform rounded-full bg-white transition-transform ${
-                                  formData[field.name] ? 'translate-x-3.5' : 'translate-x-1'
-                                }`}
-                              />
-                            </button>
-                            <span className="text-[11px] text-gray-600 font-medium">
-                              {formData[field.name] ? 'Activo' : 'Inactivo'}
-                            </span>
-                          </div>
-                          {(field.name === 'aplica_indirectos' || field.name === 'aplica_iva') && (
-                            <p className="text-[9.5px] text-amber-700 font-sans leading-snug bg-amber-50 p-1.5 rounded border border-amber-200 col-span-2">
-                              ⚠️ Actualmente el cálculo global de Indirectos/IVA no distingue por renglón — desmarcar esto no tiene efecto en los totales todavía
-                            </p>
-                          )}
+                        <div className="flex items-center gap-2.5 h-8 px-1">
+                          <button
+                            type="button"
+                            disabled={isFieldDisabled}
+                            onClick={() => setFormData(prev => ({ ...prev, [field.name]: !prev[field.name] }))}
+                            className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors focus:outline-none ${
+                              formData[field.name] ? 'bg-[#9B0F06]' : 'bg-gray-200'
+                            } ${isFieldDisabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
+                          >
+                            <span
+                              className={`inline-block h-2.5 w-2.5 transform rounded-full bg-white transition-transform ${
+                                formData[field.name] ? 'translate-x-3.5' : 'translate-x-1'
+                              }`}
+                            />
+                          </button>
+                          <span className="text-[11px] font-medium text-gray-700">
+                            {formData[field.name] ? 'Activo / Sí' : 'Inactivo / No'}
+                          </span>
                         </div>
                       ) : field.type === 'select' ? (
-                        <select
-                          value={formData[field.name] || ''}
-                          onChange={(e) => handleChange(field.name, e.target.value)}
-                          disabled={isDisabled}
-                          required={field.required}
-                          className={`w-full h-8 px-2.5 text-[11px] border rounded-lg focus:outline-none transition-colors ${disableClass}`}
-                        >
-                          <option value="">Seleccione una opción</option>
-                          {optionsMap[field.name]?.map((opt: any) => (
-                            <option key={opt[field.valueKey || 'id']} value={opt[field.valueKey || 'id']}>
-                              {opt[field.labelKey || 'nombre']}
-                            </option>
-                          ))}
-                        </select>
+                        <div className="relative">
+                          <select
+                            value={formData[field.name] !== undefined && formData[field.name] !== null ? String(formData[field.name]) : ''}
+                            onChange={e => handleInputChange(field, e.target.value)}
+                            onBlur={() => handleBlur(field)}
+                            disabled={isFieldDisabled}
+                            className={inputClass}
+                          >
+                            <option value="">Seleccione una opción...</option>
+                            {(optionsMap[field.name] || []).map((opt: any) => (
+                              <option key={opt[field.valueKey || 'id']} value={opt[field.valueKey || 'id']}>
+                                {opt[field.labelKey || 'nombre'] || opt.descripcion || opt.codigo || opt.id}
+                              </option>
+                            ))}
+                          </select>
+                          {loadingOptions[field.name] && (
+                            <span className="absolute right-2 top-2 text-[9px] text-gray-400 animate-pulse">Cargando...</span>
+                          )}
+                        </div>
                       ) : field.type === 'textarea' ? (
                         <textarea
-                          value={formData[field.name] || ''}
-                          onChange={(e) => handleChange(field.name, e.target.value)}
-                          disabled={isDisabled}
-                          required={field.required}
                           rows={2}
-                          className={`w-full p-2.5 text-[11px] border rounded-lg focus:outline-none transition-colors resize-none ${disableClass}`}
-                          placeholder={`Ingrese ${field.label.toLowerCase()}`}
+                          value={formData[field.name] !== undefined && formData[field.name] !== null ? formData[field.name] : ''}
+                          onChange={e => handleInputChange(field, e.target.value)}
+                          onBlur={() => handleBlur(field)}
+                          disabled={isFieldDisabled}
+                          className={`w-full p-2 text-[11px] rounded-lg transition-colors focus:outline-none resize-none ${
+                            isFieldDisabled
+                              ? 'bg-gray-100/70 border-gray-200 text-gray-500 cursor-not-allowed border'
+                              : hasError
+                              ? 'bg-red-50/20 border-red-500 ring-1 ring-red-400 text-red-900 border'
+                              : 'bg-white border border-gray-200 text-gray-800 focus:border-[#9B0F06]'
+                          }`}
+                          placeholder={`Ingrese ${field.label.toLowerCase()}...`}
                         />
                       ) : (
-                        <input
-                          type={field.type}
-                          value={formData[field.name] || ''}
-                          onChange={(e) => handleChange(field.name, e.target.value)}
-                          disabled={isDisabled}
-                          required={field.required}
-                          className={`w-full h-8 px-2.5 text-[11px] border rounded-lg focus:outline-none transition-colors ${disableClass}`}
-                          placeholder={`Ingrese ${field.label.toLowerCase()}`}
-                        />
+                        <div className="relative">
+                          <input
+                            type={field.type === 'date' ? 'date' : field.type === 'time' ? 'time' : 'text'}
+                            value={formData[field.name] !== undefined && formData[field.name] !== null ? formData[field.name] : ''}
+                            onChange={e => handleInputChange(field, e.target.value)}
+                            onBlur={() => handleBlur(field)}
+                            disabled={isFieldDisabled}
+                            className={inputClass}
+                            placeholder={
+                              field.type === 'integer'
+                                ? '0'
+                                : field.type === 'decimal'
+                                ? '0.00'
+                                : field.type === 'email'
+                                ? 'correo@ejemplo.com'
+                                : `Ingrese ${field.label.toLowerCase()}`
+                            }
+                          />
+                          {isValid && (
+                            <div className="absolute right-2 top-2 pointer-events-none text-emerald-600">
+                              <CheckCircle2 size={12} />
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Mensaje de error en vivo debajo del campo */}
+                      {hasError && (
+                        <div className="flex items-center gap-1 text-[9.5px] text-red-600 font-medium mt-0.5">
+                          <AlertCircle size={10} className="flex-shrink-0" />
+                          <span>{fieldErrors[field.name]}</span>
+                        </div>
                       )}
                     </div>
-                  )})}
-                </div>
-              </>
-            )}
+                  )
+                })}
+              </div>
+            </div>
           </form>
         </div>
 
-        <div className="flex-shrink-0 px-5 py-3 border-t border-gray-100 bg-gray-50 flex gap-3">
+        {/* Footer con Botones Institucionales */}
+        <div className="flex-shrink-0 px-6 py-3.5 border-t border-gray-100 bg-white flex gap-3">
           <button
             type="button"
             onClick={onClose}
@@ -656,9 +3451,18 @@ export default function MantenimientoDrawer({ isOpen, onClose, mode, table, reco
               type="submit"
               form="mantenimiento-form"
               disabled={isSaving}
-              className="flex-1 bg-[#9B0F06] text-white text-xs font-semibold h-8 rounded-lg hover:bg-[#7a0c05] transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+              className="flex-1 bg-[#9B0F06] hover:bg-[#7a0c05] text-white text-xs font-semibold h-8 rounded-lg transition-colors shadow-sm flex items-center justify-center gap-2 disabled:opacity-50"
             >
-              {isSaving ? 'Guardando...' : mode === 'create' ? 'Crear' : 'Guardar Cambios'}
+              {isSaving ? (
+                <>
+                  <div className="h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <span>Guardando...</span>
+                </>
+              ) : mode === 'create' ? (
+                <span>Crear Registro</span>
+              ) : (
+                <span>Guardar Cambios</span>
+              )}
             </button>
           )}
         </div>
@@ -666,7 +3470,3 @@ export default function MantenimientoDrawer({ isOpen, onClose, mode, table, reco
     </>
   )
 }
-
-
-
-

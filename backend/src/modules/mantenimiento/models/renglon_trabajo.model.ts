@@ -1,16 +1,17 @@
 import { TablaConfig } from '../mantenimiento.types';
 
 export const renglonTrabajoConfig: TablaConfig = {
-  "nombreTablaDb": "renglon_trabajo",
-  "permisoRequerido": "catalogos.write",
-  "columnasVisibles": "id, proyecto_id, categoria_id, especificacion_id, capitulo_id, unidad_id, aplica_indirectos, aplica_iva, descripcion, cantidad_contractual, cantidad_ejecutada, cantidad_ajustada, precio_unitario_directo, costo_total_directo_ajustado, fecha_ultimo_avance",
-  "columnasFiltroOrden": [
+  nombreTablaDb: 'renglon_trabajo',
+  permisoRequerido: 'catalogos.write',
+  columnasVisibles: 'id, proyecto_id, categoria_id, especificacion_id, capitulo_id, unidad_id, tipo_renglon, aplica_indirectos, aplica_iva, descripcion, cantidad_contractual, cantidad_ejecutada, cantidad_ajustada, precio_unitario_directo, costo_total_directo_ajustado, fecha_ultimo_avance, codigo',
+  columnasFiltroOrden: [
     "id",
     "proyecto_id",
     "categoria_id",
     "especificacion_id",
     "capitulo_id",
     "unidad_id",
+    "tipo_renglon",
     "aplica_indirectos",
     "aplica_iva",
     "descripcion",
@@ -19,38 +20,76 @@ export const renglonTrabajoConfig: TablaConfig = {
     "cantidad_ajustada",
     "precio_unitario_directo",
     "costo_total_directo_ajustado",
-    "fecha_ultimo_avance"
-  ],
-  "columnasFiltroMenu": [
+    "fecha_ultimo_avance",
+    "codigo"
+],
+  dependenciasDelete: [
     {
-      "columna": "proyecto_id",
-      "tipo": "foreign_key",
-      "tablaReferencia": "proyecto",
-      "columnaLabel": "nombre",
-      "renderizado": "select"
+        "tablaDependiente": "bitacora_avance",
+        "columnaFk": "renglon_id",
+        "nombreLegible": "bitacora avance"
     },
     {
-      "columna": "categoria_id",
-      "tipo": "foreign_key",
-      "tablaReferencia": "categoria_actividad",
-      "columnaLabel": "nombre",
-      "renderizado": "select"
+        "tablaDependiente": "bitacora_pendiente",
+        "columnaFk": "renglon_id",
+        "nombreLegible": "bitacora pendiente"
     },
     {
-      "columna": "aplica_indirectos",
-      "tipo": "boolean",
-      "opciones": [
-        "true",
-        "false"
-      ]
+        "tablaDependiente": "cronograma_planificado",
+        "columnaFk": "renglon_id",
+        "nombreLegible": "cronograma planificado"
     },
     {
-      "columna": "aplica_iva",
-      "tipo": "boolean",
-      "opciones": [
-        "true",
-        "false"
-      ]
+        "tablaDependiente": "estacion_kilometrica",
+        "columnaFk": "renglon_trabajo_id",
+        "nombreLegible": "estacion kilometrica"
+    },
+    {
+        "tablaDependiente": "modificativo_renglon",
+        "columnaFk": "renglon_id",
+        "nombreLegible": "modificativo renglon"
     }
-  ]
+],
+  columnasFiltroMenu: [
+    {
+        "columna": "capitulo_id",
+        "tipo": "foreign_key",
+        "tablaReferencia": "capitulo_sabana",
+        "columnaLabel": "descripcion",
+        "renderizado": "select"
+    },
+    {
+        "columna": "categoria_id",
+        "tipo": "foreign_key",
+        "tablaReferencia": "categoria_actividad",
+        "columnaLabel": "nombre",
+        "renderizado": "select"
+    },
+    {
+        "columna": "especificacion_id",
+        "tipo": "foreign_key",
+        "tablaReferencia": "especificacion_tecnica",
+        "columnaLabel": "codigo",
+        "renderizado": "select"
+    },
+    {
+        "columna": "proyecto_id",
+        "tipo": "foreign_key",
+        "tablaReferencia": "proyecto",
+        "columnaLabel": "nombre",
+        "renderizado": "select"
+    },
+    {
+        "columna": "unidad_id",
+        "tipo": "foreign_key",
+        "tablaReferencia": "unidad_medida",
+        "columnaLabel": "nombre",
+        "renderizado": "select"
+    }
+],
+  
+  
+  
+  
+  
 };

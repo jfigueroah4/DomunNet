@@ -65,15 +65,17 @@ interface ModalProcesarPendienteProps {
   onProcesarExitoso: (resultado: any) => void
 }
 
-export const ModalProcesarPendiente: React.FC<ModalProcesarPendienteProps> = ({
-  isOpen,
+export const ModalProcesarPendiente: React.FC<ModalProcesarPendienteProps> = (props) => {
+  if (!props.isOpen || !props.item) return null
+  return <ModalProcesarPendienteContenido {...props} item={props.item} />
+}
+
+const ModalProcesarPendienteContenido: React.FC<ModalProcesarPendienteProps & { item: any }> = ({
   onClose,
   item,
   estimacionActiva,
   onProcesarExitoso
 }) => {
-  if (!isOpen || !item) return null
-
   // Estados editables
   const [ancho, setAncho] = useState<number | string>(item.anchoA || '')
   const [alturaEspesor, setAlturaEspesor] = useState<number | string>(item.alturaH || '')
@@ -268,7 +270,7 @@ export const ModalProcesarPendiente: React.FC<ModalProcesarPendienteProps> = ({
               <div className="pt-2 border-t border-gray-200/60 flex items-start justify-between gap-3">
                 {item.bitacoraObservaciones && (
                   <p className="text-[10px] text-gray-600 italic">
-                    "{item.bitacoraObservaciones}"
+                    &ldquo;{item.bitacoraObservaciones}&rdquo;
                   </p>
                 )}
                 {item.fotoEvidenciaUrl && (

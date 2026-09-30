@@ -1,36 +1,33 @@
 import { TablaConfig } from '../mantenimiento.types';
 
 export const categoriaActividadConfig: TablaConfig = {
-  "nombreTablaDb": "categoria_actividad",
-  "permisoRequerido": "catalogos.write",
-  "columnasVisibles": "id, nombre, descripcion, tipo_obra, activo, created_at",
-  "columnasFiltroOrden": [
+  nombreTablaDb: 'categoria_actividad',
+  permisoRequerido: 'catalogos.write',
+  columnasVisibles: 'id, nombre, descripcion, tipo_obra, activo, created_at',
+  columnasFiltroOrden: [
     "id",
     "nombre",
     "descripcion",
     "tipo_obra",
     "activo",
     "created_at"
-  ],
-  "columnasFiltroMenu": [
+],
+  dependenciasDelete: [
     {
-      "columna": "tipo_obra",
-      "tipo": "enum",
-      "opciones": [
-        "Carretera",
-        "Puente",
-        "Edificación",
-        "Supervisión",
-        "Mantenimiento"
-      ]
+        "tablaDependiente": "bitacora_entrada",
+        "columnaFk": "categoria_actividad_id",
+        "nombreLegible": "bitacora entrada"
     },
     {
-      "columna": "activo",
-      "tipo": "boolean",
-      "opciones": [
-        "true",
-        "false"
-      ]
+        "tablaDependiente": "renglon_trabajo",
+        "columnaFk": "categoria_id",
+        "nombreLegible": "renglon trabajo"
     }
-  ]
+],
+  
+  
+  
+  
+  
+  
 };
