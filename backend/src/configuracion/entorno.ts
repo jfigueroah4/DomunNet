@@ -15,7 +15,6 @@ if (!isProd) {
   console.log('🔑 JWT_SECRET dinámico generado para esta sesión de desarrollo (las sesiones anteriores quedarán invalidadas)')
 }
 
-
 export const entorno = {
   puerto: Number(process.env.PORT || 3001),
   modo: process.env.NODE_ENV || 'development',
@@ -46,10 +45,8 @@ export function validarEntorno() {
   if (!entorno.supabaseUrl) faltantes.push('SUPABASE_URL')
   if (!entorno.supabaseServiceRoleKey) faltantes.push('SUPABASE_SERVICE_ROLE_KEY')
   if (isProd && !process.env.JWT_SECRET) {
-    console.warn('âš ï¸  ADVERTENCIA: JWT_SECRET no estÃ¡ definido en el archivo .env de producciÃ³n.')
+    console.warn('⚠️  ADVERTENCIA: JWT_SECRET no está definido en el archivo .env de producción.')
   }
 
   return faltantes
 }
-
-

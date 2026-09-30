@@ -74,7 +74,7 @@ app.use((error: Error, _req: express.Request, res: express.Response) => {
 })
 
 app.listen(PORT, () => {
-  console.log(`Servidor ejecutÃ¡ndose en puerto ${PORT}`)
+  console.log(`Servidor ejecutándose en puerto ${PORT}`)
   console.log(`Environment: ${entorno.modo}`)
 })
 

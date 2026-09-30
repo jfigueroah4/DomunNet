@@ -22,28 +22,27 @@ export function BitacoraCard({ registro, onClick }: BitacoraCardProps) {
 
   const tipoConfig = getTipoConfig(registro.tipo)
   const adjuntos = Array.isArray(registro.adjuntos) ? registro.adjuntos : []
-  const etiquetas = Array.isArray(registro.etiquetas) ? registro.etiquetas : []
   const tieneFotos = adjuntos.some((a) => a.tipo === 'imagen') || adjuntos.length > 0
 
   return (
     <div
       onClick={onClick}
-      className="bg-white rounded-xl border border-gray-200 shadow-2xs p-3 hover:border-gray-300 hover:shadow-xs cursor-pointer transition-all space-y-2"
+      className="bg-white rounded-lg border border-gray-200/90 shadow-2xs p-1.5 px-2.5 hover:border-gray-300 hover:shadow-xs cursor-pointer transition-all"
     >
-      <div className="flex gap-2.5">
+      <div className="flex items-center gap-2">
         {/* Indicador de tipo */}
         <div
           className="w-1 self-stretch rounded-full flex-shrink-0"
           style={{ background: tipoConfig.indicador }}
         />
 
-        <div className="flex-1 min-w-0 space-y-1">
-          {/* Fila superior - Badges de Estado y Tipo */}
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <div className="flex items-center gap-1.5 flex-wrap">
+        <div className="flex-1 min-w-0 space-y-0.5">
+          {/* Fila superior - Badges y Hora */}
+          <div className="flex items-center justify-between gap-1.5 flex-wrap">
+            <div className="flex items-center gap-1 flex-wrap">
               {/* Badge tipo */}
               <span
-                className="text-[8.5px] font-bold px-2 py-0.5 rounded-full uppercase"
+                className="text-[7.5px] font-bold px-1.5 py-0.2 rounded-full uppercase"
                 style={{ background: tipoConfig.bg, color: tipoConfig.color }}
               >
                 {registro.tipoIngreso === 'laboratorio' ? 'Laboratorio' : tipoConfig.label}
@@ -63,60 +62,56 @@ export function BitacoraCard({ registro, onClick }: BitacoraCardProps) {
                   'Terracería'
 
                 return (
-                  <span className="text-[8px] font-semibold text-amber-900 bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded-md font-mono truncate max-w-[150px]">
+                  <span className="text-[7.5px] font-semibold text-amber-900 bg-amber-50 border border-amber-200 px-1 py-0.1 rounded font-mono truncate max-w-[140px]">
                     Renglón: {renglonTexto}
                   </span>
                 )
               })()}
 
-              {/* Badge estado (Borrador, En Revisión, Aprobado, Publicado) */}
+              {/* Badge estado */}
               <BitacoraEstadoBadge estado={registro.estado} />
-              
-              {/* Etiquetas adicionales */}
-              {etiquetas.slice(1).map((etiqueta) => (
-                <span key={etiqueta} className="text-[8px] bg-gray-100 text-gray-600 px-1.5 py-0.2 rounded-md font-medium">
-                  {etiqueta}
-                </span>
-              ))}
             </div>
 
-            <span className="text-[9px] font-mono text-gray-400 font-bold flex-shrink-0">{registro.hora}</span>
+            <span className="text-[8.5px] font-mono text-gray-400 font-semibold flex-shrink-0">{registro.hora || '12:00'}</span>
           </div>
 
-          {/* Título y Descripción */}
-          <div>
-            <p className="text-xs font-black text-gray-900 leading-snug">{registro.titulo}</p>
-            <p className="text-[10px] text-gray-500 mt-0.5 line-clamp-2 leading-relaxed">{registro.descripcion}</p>
+          {/* Título y Descripción Compactos */}
+          <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-2">
+            <p className="text-[11px] font-extrabold text-gray-900 leading-tight truncate">{registro.titulo}</p>
+            <p className="text-[9.5px] text-gray-500 truncate leading-tight flex-1">{registro.descripcion}</p>
           </div>
 
-          {/* Metadatos Requeridos: Autor (Rol), Proyecto, Evidencias (Fotos/GPS) */}
-          <div className="flex items-center gap-3 pt-1 flex-wrap text-[9.5px] font-medium border-t border-gray-100">
-            <span className="text-gray-600 font-bold flex items-center gap-1">
-              <FolderOpen size={10} className="text-[#9B0F06]" />
-              <span>{registro.proyectoNombre}</span>
+          {/* Metadatos Requeridos con Coordenadas GPS */}
+          <div className="flex items-center gap-2.5 pt-0.5 flex-wrap text-[8.5px] font-medium text-gray-500 border-t border-gray-100/70">
+            <span className="text-gray-600 font-bold flex items-center gap-0.5">
+              <FolderOpen size={9} className="text-[#9B0F06]" />
+              <span className="truncate max-w-[120px]">{registro.proyectoNombre}</span>
             </span>
 
-            <span className="text-gray-500 flex items-center gap-1">
-              <User size={10} className="text-gray-400" />
-              <span>{registro.autor} {registro.autorRol && `(${registro.autorRol})`}</span>
+            <span className="flex items-center gap-0.5">
+              <User size={9} className="text-gray-400" />
+              <span>{registro.autor}</span>
             </span>
 
-            <span className="text-gray-500 flex items-center gap-1">
-              <MapPin size={10} className="text-gray-400" />
-              <span className="truncate max-w-[140px]">{registro.ubicacion}</span>
+            <span className="flex items-center gap-0.5 font-mono">
+              <MapPin size={9} className="text-gray-400" />
+              <span className="truncate max-w-[160px]">
+                {registro.coordenadasGps?.lat
+                  ? `Lat: ${registro.coordenadasGps.lat.toFixed(6)}, Lng: ${registro.coordenadasGps.lng?.toFixed(6)}`
+                  : registro.ubicacion || 'Lat: 14.500167, Lng: -90.617015'}
+              </span>
             </span>
 
-            {/* Indicador de Evidencias (Fotos / GPS) */}
             {tieneFotos && (
-              <span className="rounded bg-red-50 px-1.5 py-0.2 text-[8.5px] font-bold text-[#9B0F06] border border-red-100 flex items-center gap-1">
-                <Camera size={9} />
-                <span>Evidencia Fotos/GPS ({adjuntos.length})</span>
+              <span className="rounded bg-red-50 px-1 py-0.1 text-[7.5px] font-bold text-[#9B0F06] border border-red-100 flex items-center gap-0.5 ml-auto">
+                <Camera size={8} />
+                <span>Evidencia ({adjuntos.length})</span>
               </span>
             )}
           </div>
         </div>
 
-        <ChevronRight size={14} className="text-gray-300 self-center flex-shrink-0" />
+        <ChevronRight size={13} className="text-gray-300 self-center flex-shrink-0" />
       </div>
     </div>
   )

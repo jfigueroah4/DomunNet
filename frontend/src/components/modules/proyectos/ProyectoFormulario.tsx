@@ -25,6 +25,7 @@ import {
   Calendar,
   CalendarDays,
   CheckCircle2,
+  ChevronLeft,
   ChevronRight,
   FileCheck,
   FileSignature,
@@ -121,7 +122,22 @@ function EquipoAsignadoSelector({
   onAbrirCrearUsuario?: () => void
 }) {
   const [selectedUsuarioId, setSelectedUsuarioId] = useState('')
+  const [paginaActual, setPaginaActual] = useState(1)
+  const itemsPorPagina = 5
   const { showSuccessToast, showErrorToast } = useCustomToast()
+
+  const totalPaginas = Math.max(1, Math.ceil(equipo.length / itemsPorPagina))
+
+  useEffect(() => {
+    if (paginaActual > totalPaginas) {
+      setPaginaActual(totalPaginas)
+    }
+  }, [equipo.length, totalPaginas, paginaActual])
+
+  const miembrosVisibles = useMemo(() => {
+    const inicio = (paginaActual - 1) * itemsPorPagina
+    return equipo.slice(inicio, inicio + itemsPorPagina)
+  }, [equipo, paginaActual, itemsPorPagina])
 
   const handleAgregar = () => {
     if (!selectedUsuarioId) return
@@ -144,6 +160,8 @@ function EquipoAsignadoSelector({
     setEquipo((prev) => [...prev, nuevoMiembro])
     setSelectedUsuarioId('')
     showSuccessToast(`Se agregó a ${userObj.nombre} (${rolFormateado}) al equipo`)
+    const nuevoTotal = Math.ceil((equipo.length + 1) / itemsPorPagina)
+    setPaginaActual(nuevoTotal)
   }
 
   const handleEliminar = (id: string) => {
@@ -152,9 +170,16 @@ function EquipoAsignadoSelector({
 
   return (
     <div className="space-y-2 rounded-lg border border-gray-100 bg-gray-50/60 p-3">
-      <label className={labelClass}>
-        Equipo Asignado al Proyecto (Seleccionar del Módulo de Usuarios)
-      </label>
+      <div className="flex items-center justify-between">
+        <label className={labelClass}>
+          Equipo Asignado al Proyecto (Seleccionar del Módulo de Usuarios)
+        </label>
+        {equipo.length > 0 && (
+          <span className="text-[9px] font-bold text-gray-500">
+            {equipo.length} {equipo.length === 1 ? 'miembro' : 'miembros'}
+          </span>
+        )}
+      </div>
       <div className="flex flex-wrap gap-1.5">
         <Combobox
           options={usuariosDisponibles
@@ -199,24 +224,59 @@ function EquipoAsignadoSelector({
       </div>
 
       {equipo.length > 0 ? (
-        <div className="flex flex-wrap gap-1.5 pt-1">
-          {equipo.map((m) => (
-            <span
-              key={m.id}
-              className="inline-flex items-center gap-1.5 rounded-md bg-white px-2.5 py-1 text-[10.5px] font-medium text-gray-800 border border-gray-200 shadow-2xs"
-            >
-              <span className="font-bold text-gray-900">{m.nombre}</span>
-              <span className="text-[9px] text-gray-500 font-semibold">({m.rol})</span>
-              <button
-                type="button"
-                onClick={() => handleEliminar(m.id)}
-                className="text-gray-400 hover:text-red-600 transition-colors ml-1 cursor-pointer"
-                title="Quitar del equipo"
+        <div className="space-y-1.5 pt-1">
+          <div className="flex flex-wrap gap-1.5">
+            {miembrosVisibles.map((m) => (
+              <span
+                key={m.id}
+                className="inline-flex items-center gap-1.5 rounded-md bg-white px-2.5 py-1 text-[10.5px] font-medium text-gray-800 border border-gray-200 shadow-2xs"
               >
-                <X size={11} />
-              </button>
-            </span>
-          ))}
+                <span className="font-bold text-gray-900">{m.nombre}</span>
+                <span className="text-[9px] text-gray-500 font-semibold">({m.rol})</span>
+                <button
+                  type="button"
+                  onClick={() => handleEliminar(m.id)}
+                  className="text-gray-400 hover:text-red-600 transition-colors ml-1 cursor-pointer"
+                  title="Quitar del equipo"
+                >
+                  <X size={11} />
+                </button>
+              </span>
+            ))}
+          </div>
+
+          {/* Paginación compacta */}
+          {totalPaginas > 1 && (
+            <div className="flex items-center justify-between border-t border-gray-200/60 pt-1.5 text-[9.5px] text-gray-500">
+              <span>
+                Mostrando {(paginaActual - 1) * itemsPorPagina + 1}-
+                {Math.min(paginaActual * itemsPorPagina, equipo.length)} de {equipo.length}
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setPaginaActual((p) => Math.max(1, p - 1))}
+                  disabled={paginaActual === 1}
+                  className="flex h-5 w-5 items-center justify-center rounded border border-gray-200 bg-white text-gray-700 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                  title="Página anterior"
+                >
+                  <ChevronLeft size={12} />
+                </button>
+                <span className="font-bold text-gray-700 px-1">
+                  {paginaActual} / {totalPaginas}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPaginaActual((p) => Math.min(totalPaginas, p + 1))}
+                  disabled={paginaActual === totalPaginas}
+                  className="flex h-5 w-5 items-center justify-center rounded border border-gray-200 bg-white text-gray-700 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                  title="Página siguiente"
+                >
+                  <ChevronRight size={12} />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <p className="text-[9px] text-gray-400 italic">No hay profesionales asignados al equipo.</p>
@@ -378,9 +438,34 @@ function SelectorMapaInteractivo({
     let activo = true
 
     const inicializarMapa = async () => {
-      if (!mapaRef.current || instanciaMapaRef.current) return
+      if (!mapaRef.current) return
+
+      // Clean up previous instance or leftover leaflet id on container
+      if ((mapaRef.current as any)._leaflet_id) {
+        if (instanciaMapaRef.current) {
+          try {
+            instanciaMapaRef.current.remove()
+          } catch (e) {}
+          instanciaMapaRef.current = null
+        }
+        delete (mapaRef.current as any)._leaflet_id
+      }
+
+      if (instanciaMapaRef.current) return
+
       const L = await import('leaflet')
       if (!activo || !mapaRef.current) return
+
+      // Re-verify in case of race condition during async import
+      if ((mapaRef.current as any)._leaflet_id) {
+        if (instanciaMapaRef.current) {
+          try {
+            instanciaMapaRef.current.remove()
+          } catch (e) {}
+          instanciaMapaRef.current = null
+        }
+        delete (mapaRef.current as any)._leaflet_id
+      }
 
       const guatemalaBounds: [[number, number], [number, number]] = [
         [13.5, -92.6],
@@ -437,6 +522,16 @@ function SelectorMapaInteractivo({
     }
 
     void inicializarMapa()
+
+    return () => {
+      activo = false
+      if (instanciaMapaRef.current) {
+        try {
+          instanciaMapaRef.current.remove()
+        } catch (e) {}
+        instanciaMapaRef.current = null
+      }
+    }
   }, [])
 
   return (
@@ -648,6 +743,8 @@ export function ProyectoFormulario({
   // PASO 6: Resumen Ejecutivo y Estado
   // -------------------------------------------------------------
   const [estado, setEstado] = useState<EstadoProyecto>(proyectoInicial?.estado || 'borrador')
+  const [modalPausarAbierto, setModalPausarAbierto] = useState(false)
+  const [modalCompletadoAbierto, setModalCompletadoAbierto] = useState(false)
   const [fechaFinalizacionReal, setFechaFinalizacionReal] = useState(proyectoInicial?.fechaFinalizacionReal || '')
   const [plazoEjecucionRealAmpliado, setPlazoEjecucionRealAmpliado] = useState(
     proyectoInicial?.plazoEjecucionRealAmpliado || ''
@@ -655,6 +752,34 @@ export function ProyectoFormulario({
   const [montoFinancieroFinalEjecutado, setMontoFinancieroFinalEjecutado] = useState(
     proyectoInicial?.montoFinancieroFinalEjecutado?.toString() || ''
   )
+
+  const ESTILOS_ESTADO: Record<EstadoProyecto, { activo: string; inactivo: string; label: string }> = {
+    borrador: {
+      label: 'Borrador',
+      activo: 'bg-gray-600 text-white shadow-2xs',
+      inactivo: 'bg-gray-100/90 border border-gray-300 text-gray-700 hover:bg-gray-200',
+    },
+    activo: {
+      label: 'Activo',
+      activo: 'bg-emerald-600 text-white shadow-2xs',
+      inactivo: 'bg-emerald-50/70 border border-emerald-300 text-emerald-800 hover:bg-emerald-100',
+    },
+    en_revision: {
+      label: 'En Revisión',
+      activo: 'bg-[#9B0F06] text-white shadow-2xs',
+      inactivo: 'bg-red-50/70 border border-red-300 text-[#9B0F06] hover:bg-red-100',
+    },
+    pausado: {
+      label: 'Pausado',
+      activo: 'bg-amber-600 text-white shadow-2xs',
+      inactivo: 'bg-amber-50/70 border border-amber-300 text-amber-800 hover:bg-amber-100',
+    },
+    completado: {
+      label: 'Completado',
+      activo: 'bg-slate-700 text-white shadow-2xs',
+      inactivo: 'bg-slate-100/80 border border-slate-300 text-slate-800 hover:bg-slate-200',
+    },
+  }
 
   // Cálculos reactivos de anticipos
   const contratistaMontoAnticipoCalculado = useMemo(() => {
@@ -732,6 +857,27 @@ export function ProyectoFormulario({
 
     setErrors(newErrors)
     return { valido: faltantes.length === 0, faltantes, newErrors }
+  }
+
+  // Cambio de estado con validaciones y modales de confirmación
+  const handleSeleccionarEstado = (est: EstadoProyecto) => {
+    if (est === 'pausado' && estado !== 'pausado') {
+      setModalPausarAbierto(true)
+      return
+    }
+    if (est === 'completado' && estado !== 'completado') {
+      setModalCompletadoAbierto(true)
+      return
+    }
+    if (est === 'activo') {
+      const check = validarCamposActivo()
+      if (!check.valido) {
+        showErrorToast(`Para activar el proyecto, complete los campos obligatorios resaltados en rojo: ${check.faltantes.join(', ')}`)
+      }
+      setEstado('activo')
+      return
+    }
+    setEstado(est)
   }
 
   // Guardado principal
@@ -881,7 +1027,7 @@ export function ProyectoFormulario({
     { num: 2, label: '2. Ubicación y Tramo DGC', icon: MapPin },
     { num: 3, label: '3. Marco Legal y Empresas', icon: Briefcase },
     { num: 4, label: '4. Ficha Técnica y Partidas', icon: Landmark },
-    { num: 5, label: '5. Financiero y Plazos', icon: DollarSign },
+    { num: 5, label: '5. Financiero y Plazos', icon: Banknote },
     { num: 6, label: '6. Resumen y Creación', icon: FileCheck },
   ]
 
@@ -1213,7 +1359,7 @@ export function ProyectoFormulario({
                 onClick={() => setSubTabPaso3('supervisora')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold rounded-lg transition-all cursor-pointer ${
                   subTabPaso3 === 'supervisora'
-                    ? 'bg-blue-700 text-white shadow-2xs'
+                    ? 'bg-orange-700 text-white shadow-2xs'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
               >
@@ -1351,10 +1497,10 @@ export function ProyectoFormulario({
               <div className="rounded-lg border border-gray-200 bg-white p-3.5 space-y-3">
                 <div className="flex items-center justify-between border-b border-gray-100 pb-1.5 font-bold text-gray-800 text-[10.5px]">
                   <div className="flex items-center gap-1.5">
-                    <ShieldCheck size={13} className="text-blue-700" />
+                    <ShieldCheck size={13} className="text-orange-700" />
                     <span>ESTATUS CONTRACTUAL DE LA EMPRESA SUPERVISORA</span>
                   </div>
-                  <span className="rounded-full bg-blue-50 text-blue-700 px-2 py-0.5 text-[8.5px] font-bold border border-blue-200">
+                  <span className="rounded-full bg-orange-50 text-orange-700 px-2 py-0.5 text-[8.5px] font-bold border border-orange-200">
                     SUPERVISIÓN
                   </span>
                 </div>
@@ -1501,7 +1647,7 @@ export function ProyectoFormulario({
                 onClick={() => setSubTabPaso4('supervision')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold rounded-lg transition-all cursor-pointer ${
                   subTabPaso4 === 'supervision'
-                    ? 'bg-blue-700 text-white shadow-2xs'
+                    ? 'bg-orange-700 text-white shadow-2xs'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
               >
@@ -1636,10 +1782,10 @@ export function ProyectoFormulario({
               <div className="rounded-lg border border-gray-200 bg-white p-3.5 space-y-3">
                 <div className="flex items-center justify-between border-b border-gray-100 pb-1.5">
                   <div className="flex items-center gap-1.5 font-bold text-gray-800 text-[10.5px]">
-                    <ShieldCheck size={13} className="text-blue-700" />
+                    <ShieldCheck size={13} className="text-orange-700" />
                     <span>PARTIDAS PRESUPUESTARIAS Y CONTRATO DE SUPERVISIÓN</span>
                   </div>
-                  <span className="rounded bg-blue-50 text-blue-700 font-bold px-2 py-0.5 text-[8.5px] border border-blue-200">
+                  <span className="rounded bg-orange-50 text-orange-700 font-bold px-2 py-0.5 text-[8.5px] border border-orange-200">
                     CONTRATO DE SUPERVISIÓN
                   </span>
                 </div>
@@ -1739,7 +1885,7 @@ export function ProyectoFormulario({
             <SectionHeader
               title="Paso 5: Aspectos Financieros, Anticipos y Plazos"
               subtitle="Montos contractuales originales, porcentajes y montos calculados de anticipo, plazos y cronogramas"
-              icon={DollarSign}
+              icon={Banknote}
             />
 
             {/* Sub-tabs para Paso 5 */}
@@ -1753,7 +1899,7 @@ export function ProyectoFormulario({
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
               >
-                <DollarSign size={12} />
+                <Banknote size={12} />
                 <span>5.1 Financiero Obra (Ejecución)</span>
               </button>
               <button
@@ -1761,11 +1907,11 @@ export function ProyectoFormulario({
                 onClick={() => setSubTabPaso5('supervision')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold rounded-lg transition-all cursor-pointer ${
                   subTabPaso5 === 'supervision'
-                    ? 'bg-blue-700 text-white shadow-2xs'
+                    ? 'bg-orange-700 text-white shadow-2xs'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
               >
-                <DollarSign size={12} />
+                <Banknote size={12} />
                 <span>5.2 Financiero Supervisión</span>
               </button>
               <button
@@ -1787,7 +1933,7 @@ export function ProyectoFormulario({
               <div className="rounded-lg border border-gray-200 bg-white p-3.5 space-y-3">
                 <div className="flex items-center justify-between border-b border-gray-100 pb-1.5">
                   <div className="flex items-center gap-1.5 font-bold text-gray-800 text-[10.5px]">
-                    <DollarSign size={13} className="text-[#9B0F06]" />
+                    <Banknote size={13} className="text-[#9B0F06]" />
                     <span>VALORES FINANCIEROS Y PLAZOS DEL CONTRATO DE OBRA</span>
                   </div>
                   <span className="rounded bg-red-50 text-[#9B0F06] font-bold px-2 py-0.5 text-[8.5px] border border-red-200">
@@ -1878,10 +2024,10 @@ export function ProyectoFormulario({
               <div className="rounded-lg border border-gray-200 bg-white p-3.5 space-y-3">
                 <div className="flex items-center justify-between border-b border-gray-100 pb-1.5">
                   <div className="flex items-center gap-1.5 font-bold text-gray-800 text-[10.5px]">
-                    <DollarSign size={13} className="text-blue-700" />
+                    <Banknote size={13} className="text-orange-700" />
                     <span>VALORES FINANCIEROS Y PLAZOS DEL CONTRATO DE SUPERVISIÓN</span>
                   </div>
-                  <span className="rounded bg-blue-50 text-blue-700 font-bold px-2 py-0.5 text-[8.5px] border border-blue-200">
+                  <span className="rounded bg-orange-50 text-orange-700 font-bold px-2 py-0.5 text-[8.5px] border border-orange-200">
                     SUPERVISIÓN
                   </span>
                 </div>
@@ -1912,7 +2058,7 @@ export function ProyectoFormulario({
                         placeholder="10"
                       />
                       <span className="text-[10px] font-bold text-gray-500">%</span>
-                      <div className="flex-1 rounded border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-[10.5px] font-bold font-mono text-blue-700 truncate">
+                      <div className="flex-1 rounded border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-[10.5px] font-bold font-mono text-orange-700 truncate">
                         Q {supervisoraMontoAnticipoCalculado.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
                       </div>
                     </div>
@@ -2066,7 +2212,7 @@ export function ProyectoFormulario({
 
               <div className="rounded-lg border border-gray-200 bg-gray-50/70 p-3 space-y-2">
                 <div className="flex items-center gap-1.5 font-bold text-gray-800 text-[10.5px] border-b border-gray-200 pb-1">
-                  <DollarSign size={13} className="text-[#9B0F06]" />
+                  <Banknote size={13} className="text-[#9B0F06]" />
                   <span>CONTRATOS Y PRESUPUESTO</span>
                 </div>
                 <div className="text-[10px] space-y-1 text-gray-700">
@@ -2086,27 +2232,33 @@ export function ProyectoFormulario({
                 {((esEditar
                   ? ['borrador', 'activo', 'en_revision', 'pausado', 'completado']
                   : ['borrador', 'activo']) as EstadoProyecto[]
-                ).map((est) => (
-                  <button
-                    key={est}
-                    type="button"
-                    onClick={() => setEstado(est)}
-                    className={`rounded-md p-2 text-center text-[10px] font-bold uppercase transition-all cursor-pointer ${
-                      estado === est
-                        ? est === 'activo'
-                          ? 'bg-emerald-600 text-white shadow-2xs'
-                          : 'bg-[#9B0F06] text-white shadow-2xs'
-                        : 'bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100'
-                    }`}
-                  >
-                    {est.replace('_', ' ')}
-                  </button>
-                ))}
+                ).map((est) => {
+                  const cfg = ESTILOS_ESTADO[est]
+                  const esSeleccionado = estado === est
+                  return (
+                    <button
+                      key={est}
+                      type="button"
+                      onClick={() => handleSeleccionarEstado(est)}
+                      className={`rounded-md p-2 text-center text-[10px] font-bold uppercase transition-all cursor-pointer ${
+                        esSeleccionado ? cfg.activo : cfg.inactivo
+                      }`}
+                    >
+                      {cfg.label}
+                    </button>
+                  )
+                })}
               </div>
               <p className="text-[8.5px] text-gray-400">
                 {estado === 'borrador'
                   ? '• En modo Borrador se guarda la información preliminar sin requerir la validación de todos los campos obligatorios.'
-                  : '• En modo Activo el sistema valida que todos los contratos y especificaciones técnicas estén completos.'}
+                  : estado === 'activo'
+                  ? '• En modo Activo el sistema valida que todos los contratos y especificaciones técnicas obligatorias estén completos.'
+                  : estado === 'pausado'
+                  ? '• En modo Pausado se congelan los registros de bitácora y cálculo activo de plazos contractuales.'
+                  : estado === 'completado'
+                  ? '• En modo Completado el proyecto se registra como finalizado al 100% de ejecución.'
+                  : '• En modo En Revisión el proyecto está sujeto a validación técnica y administrativa.'}
               </p>
             </div>
           </div>
@@ -2170,6 +2322,97 @@ export function ProyectoFormulario({
           </div>
         </div>
       </div>
+
+      {/* Modal de Confirmación: Pausar Proyecto */}
+      {modalPausarAbierto && (
+        <Portal>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+            <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-2xl border border-amber-200 space-y-4 font-[Poppins]">
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+                  <AlertCircle size={22} />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-sm font-bold text-gray-900">¿Pausar Estado del Proyecto?</h3>
+                  <p className="text-[11px] text-gray-600 leading-relaxed">
+                    Al cambiar el estado del proyecto a <strong className="text-amber-800 uppercase">Pausado</strong>:
+                  </p>
+                  <ul className="list-disc pl-4 text-[10.5px] text-gray-600 space-y-1 mt-1">
+                    <li>Se suspenden temporalmente los nuevos registros activos en la <strong>Bitácora Digital</strong>.</li>
+                    <li>Se congela el cómputo de plazos y cálculo de avance en los paneles analíticos.</li>
+                    <li>Este estado requiere contar con una orden o acta de suspensión legal correspondiente.</li>
+                  </ul>
+                </div>
+              </div>
+              <div className="flex items-center justify-end gap-2 border-t border-gray-100 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setModalPausarAbierto(false)}
+                  className="rounded-lg border border-gray-300 px-3.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEstado('pausado')
+                    setModalPausarAbierto(false)
+                    showSuccessToast('Estado cambiado a Pausado')
+                  }}
+                  className="rounded-lg bg-amber-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-amber-700 shadow-2xs cursor-pointer"
+                >
+                  Confirmar Pausa
+                </button>
+              </div>
+            </div>
+          </div>
+        </Portal>
+      )}
+
+      {/* Modal de Confirmación: Completar Proyecto */}
+      {modalCompletadoAbierto && (
+        <Portal>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+            <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-2xl border border-slate-200 space-y-4 font-[Poppins]">
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-800">
+                  <CheckCircle2 size={22} />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-sm font-bold text-gray-900">¿Marcar Proyecto como Completado?</h3>
+                  <p className="text-[11px] text-gray-600 leading-relaxed">
+                    Al marcar el proyecto como <strong className="text-slate-800 uppercase">Completado</strong>:
+                  </p>
+                  <ul className="list-disc pl-4 text-[10.5px] text-gray-600 space-y-1 mt-1">
+                    <li>Se asume el cumplimiento y ejecución técnica al 100% de la <strong>Hoja Sábana</strong> y <strong>Plan de Trabajo</strong>.</li>
+                    <li>Se finalizan los ciclos ordinarios de estimación para dar paso a la fase de liquidación y recepción final de obra.</li>
+                  </ul>
+                </div>
+              </div>
+              <div className="flex items-center justify-end gap-2 border-t border-gray-100 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setModalCompletadoAbierto(false)}
+                  className="rounded-lg border border-gray-300 px-3.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEstado('completado')
+                    setModalCompletadoAbierto(false)
+                    showSuccessToast('Estado cambiado a Completado')
+                  }}
+                  className="rounded-lg bg-slate-800 px-4 py-1.5 text-xs font-bold text-white hover:bg-slate-900 shadow-2xs cursor-pointer"
+                >
+                  Confirmar Finalización
+                </button>
+              </div>
+            </div>
+          </div>
+        </Portal>
+      )}
 
       {/* Drawers modales */}
       <UsuarioFormularioDrawer

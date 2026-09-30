@@ -77,8 +77,8 @@ export default function SoportePage() {
             </div>
           </div>
 
-          <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm flex flex-col items-center justify-center min-h-[250px]">
-            <div className="relative w-48 h-48">
+          <div className="flex flex-col items-center justify-center p-6 min-h-[280px]">
+            <div className="relative w-56 h-56 md:w-64 md:h-64 drop-shadow-sm transition-transform hover:scale-105 duration-300">
               <Image
                 src="/logoumg.png"
                 alt="Logo UMG"

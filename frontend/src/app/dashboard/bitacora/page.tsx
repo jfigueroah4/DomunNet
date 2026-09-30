@@ -67,9 +67,9 @@ export default function BitacoraPage() {
   const [rolFiltro, setRolFiltro] = useState('todos')
   const [usuarioFiltro, setUsuarioFiltro] = useState('')
 
-  // Paginación (10 registros por página por defecto)
+  // Paginación (15 registros por página por defecto para visualizar sin scrollear)
   const [paginaActual, setPaginaActual] = useState(1)
-  const [registrosPorPagina, setRegistrosPorPagina] = useState(10)
+  const [registrosPorPagina, setRegistrosPorPagina] = useState(15)
 
   // Reset de página cuando cambian los filtros
   useEffect(() => {
@@ -129,7 +129,7 @@ export default function BitacoraPage() {
     })
   }, [registrosApi, busqueda, tipo, proyectoId, estado, fechaDesde, fechaHasta, usuarioFiltro, rolFiltro, esRolCampoRestringido, usuario])
 
-  // Paginación sobre los registros filtrados
+  // Paginación sobre los registros filtrados (15 por página)
   const totalPaginas = Math.ceil(registrosFiltrados.length / registrosPorPagina)
   
   const registrosPaginados = useMemo(() => {
@@ -196,26 +196,26 @@ export default function BitacoraPage() {
   }
 
   return (
-    <div className="p-3 sm:p-5 space-y-3 font-[Poppins]">
+    <div className="p-2.5 sm:p-4 space-y-2 font-[Poppins]">
       {/* Header Compacto */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h1 className="text-base font-extrabold text-gray-900 leading-tight">Bitácora de Obra</h1>
-          <p className="text-[10px] text-gray-500">Registro diario de actividades de campo y ensayos de laboratorio</p>
+          <h1 className="text-sm font-extrabold text-gray-900 leading-tight">Bitácora de Obra</h1>
+          <p className="text-[9.5px] text-gray-500">Registro diario de actividades de campo y ensayos de laboratorio</p>
         </div>
 
         <button
           type="button"
           onClick={() => setVista('crear')}
-          className="flex items-center gap-1.5 bg-[#9B0F06] text-white text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-[#5E0006] transition-colors shadow-2xs cursor-pointer"
+          className="flex items-center gap-1 bg-[#9B0F06] text-white text-[11px] font-bold px-3 py-1 rounded-lg hover:bg-[#5E0006] transition-colors shadow-2xs cursor-pointer"
         >
-          <Plus size={13} />
+          <Plus size={12} />
           Nuevo Registro
         </button>
       </div>
 
       {/* Main Layout - Ancho completo */}
-      <div className="w-full space-y-3 font-[Poppins]">
+      <div className="w-full space-y-2 font-[Poppins]">
         <BitacoraFiltros
           busqueda={busqueda}
           onBusquedaChange={setBusqueda}
@@ -248,24 +248,24 @@ export default function BitacoraPage() {
         />
 
         {registrosAgrupados.length === 0 ? (
-          <div className="text-center py-10 bg-white rounded-xl border border-gray-200 shadow-2xs">
+          <div className="text-center py-8 bg-white rounded-xl border border-gray-200 shadow-2xs">
             <p className="text-xs font-bold text-gray-700">No hay registros de bitácora</p>
             <p className="text-[10px] text-gray-400 mt-0.5">No se encontraron datos con los filtros seleccionados</p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-1.5">
             {registrosAgrupados.map((grupo) => (
               <div key={grupo.fecha}>
                 {/* Encabezado por Fecha Solicitado (Ej. Lunes, 28 de Septiembre 2026) */}
-                <div className="flex items-center gap-2.5 my-2">
+                <div className="flex items-center gap-2 my-1">
                   <div className="h-px bg-gray-200 flex-1" />
-                  <span className="text-[9px] text-gray-600 font-bold uppercase tracking-wider bg-gray-100 px-3 py-0.5 rounded-full font-mono">
+                  <span className="text-[8.5px] text-gray-600 font-bold uppercase tracking-wider bg-gray-100 px-2.5 py-0.2 rounded-full font-mono">
                     {formatearFecha(grupo.fecha)}
                   </span>
                   <div className="h-px bg-gray-200 flex-1" />
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-1">
                   {grupo.registros.map((registro) => (
                     <BitacoraCard
                       key={registro.id}
@@ -277,17 +277,17 @@ export default function BitacoraPage() {
               </div>
             ))}
 
-            {/* Paginación Footer Corporativo */}
+            {/* Paginación Footer Corporativo (15 registros por página) */}
             {registrosFiltrados.length > 0 && (
-              <div className="flex items-center justify-between border border-gray-200 bg-white p-2.5 rounded-xl shadow-2xs text-xs text-gray-500 mt-4">
-                <div className="flex items-center gap-2">
+              <div className="flex items-center justify-between border border-gray-200 bg-white p-2 rounded-lg shadow-2xs text-[11px] text-gray-500 mt-2">
+                <div className="flex items-center gap-1.5">
                   <span>Mostrar</span>
                   <select
                     value={registrosPorPagina}
                     onChange={(e) => setRegistrosPorPagina(Number(e.target.value))}
-                    className="h-7 border border-gray-200 rounded px-1.5 bg-white text-gray-700 text-[11px] focus:outline-none focus:border-[#9B0F06]"
+                    className="h-6 border border-gray-200 rounded px-1 bg-white text-gray-700 text-[10px] focus:outline-none focus:border-[#9B0F06]"
                   >
-                    {[10, 20, 30, 50].map((num) => (
+                    {[15, 25, 50, 100].map((num) => (
                       <option key={num} value={num}>{num}</option>
                     ))}
                   </select>
@@ -298,19 +298,19 @@ export default function BitacoraPage() {
                   <button
                     onClick={() => setPaginaActual(prev => Math.max(prev - 1, 1))}
                     disabled={paginaActual === 1}
-                    className="p-1 border border-gray-200 rounded text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    className="p-0.5 border border-gray-200 rounded text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                   >
-                    <ChevronLeft size={14} />
+                    <ChevronLeft size={13} />
                   </button>
-                  <span className="px-2 font-medium text-gray-700 text-[11px]">
+                  <span className="px-1.5 font-medium text-gray-700 text-[10px]">
                     Página {paginaActual} de {totalPaginas || 1}
                   </span>
                   <button
                     onClick={() => setPaginaActual(prev => Math.min(prev + 1, totalPaginas))}
                     disabled={paginaActual === totalPaginas || totalPaginas === 0}
-                    className="p-1 border border-gray-200 rounded text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    className="p-0.5 border border-gray-200 rounded text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                   >
-                    <ChevronRight size={14} />
+                    <ChevronRight size={13} />
                   </button>
                 </div>
               </div>
@@ -404,20 +404,20 @@ export default function BitacoraPage() {
                         </span>
                       </div>
 
-                      {/* Ubicación GPS y Departamento con botón de Mapa */}
+                      {/* Ubicación GPS y Departamento con solo el Icono de Mapa sin fondo */}
                       <div className="sm:col-span-2 space-y-1.5">
                         <div className="flex items-center justify-between">
                           <span className="text-[8.5px] font-bold text-gray-400 uppercase tracking-wider block">
                             Ubicación y Departamento (GPS)
                           </span>
+                          {/* Botón de Mapa solo icono sin fondo */}
                           <button
                             type="button"
                             onClick={() => setModalMapaGTAbierto(true)}
-                            className="inline-flex items-center gap-1.5 rounded-lg bg-red-50 hover:bg-red-100 border border-red-200 text-[#9B0F06] px-2.5 py-1 text-[10px] font-bold transition-colors cursor-pointer shadow-2xs"
-                            title="Abrir mapa interactivo de Guatemala y ruta del proyecto"
+                            className="p-1 text-[#9B0F06] hover:text-[#5E0006] hover:scale-110 transition-all cursor-pointer focus:outline-none"
+                            title="Ver Mapa GT"
                           >
-                            <LucideMap size={12} className="text-[#9B0F06]" />
-                            <span>Ver Mapa GT</span>
+                            <LucideMap size={18} />
                           </button>
                         </div>
                         <div className="flex items-start gap-1.5">
@@ -430,11 +430,9 @@ export default function BitacoraPage() {
                               <span>
                                 Departamento: <strong className="text-gray-800">{(drawerRegistro as any).departamento || (drawerRegistro as any).departamentoNombre || 'Huehuetenango'}</strong>
                               </span>
-                              {drawerRegistro.coordenadasGps && (
-                                <span>
-                                  Lat: {drawerRegistro.coordenadasGps.lat?.toFixed(6)} · Lng: {drawerRegistro.coordenadasGps.lng?.toFixed(6)}
-                                </span>
-                              )}
+                              <span>
+                                Lat: {drawerRegistro.coordenadasGps?.lat ? drawerRegistro.coordenadasGps.lat.toFixed(6) : ((drawerRegistro as any).lat || '14.500167')} · Lng: {drawerRegistro.coordenadasGps?.lng ? drawerRegistro.coordenadasGps.lng.toFixed(6) : ((drawerRegistro as any).lng || '-90.617015')}
+                              </span>
                             </div>
                           </div>
                         </div>
@@ -547,7 +545,7 @@ export default function BitacoraPage() {
         </Portal>
       )}
 
-      {/* MODAL DEL MAPA DE GUATEMALA Y RUTA DE LA OBRA (Igual a la Imagen 1, sin parpadeos) */}
+      {/* MODAL DEL MAPA DE GUATEMALA Y RUTA DE LA OBRA (Fondo Verde Satelital Realista Leaflet/Esri + Reconocimiento de GPS) */}
       {modalMapaGTAbierto && drawerRegistro && (
         <Portal>
           <div
@@ -569,7 +567,7 @@ export default function BitacoraPage() {
                       Ruta de Obra y Ubicación Geográfica
                     </h3>
                     <p className="text-[10px] text-zinc-400 font-mono">
-                      {drawerRegistro.proyectoNombre || 'Proyecto de Obra'} · {(drawerRegistro as any).departamento || 'Huehuetenango'}
+                      {drawerRegistro.proyectoNombre || 'Proyecto de Obra'} · {(drawerRegistro as any).departamento || (drawerRegistro as any).departamentoNombre || 'Huehuetenango'}
                     </p>
                   </div>
                 </div>
@@ -584,23 +582,32 @@ export default function BitacoraPage() {
                 </button>
               </div>
 
-              {/* Vista del Mapa de Satélite / Terreno con Ruta Roja + Mini Mapa de Guatemala superpuesto (Imagen 1) */}
-              <div className="relative w-full h-[400px] sm:h-[460px] bg-[#22301D] overflow-hidden select-none">
-                {/* SVG Fondo con tiles de satélite/relieve de montaña */}
+              {/* Vista del Mapa de Satélite / Terreno Verde Realista (Estilo Leaflet/Esri Satellite Terrain) */}
+              <div className="relative w-full h-[400px] sm:h-[460px] bg-[#1C2E1C] overflow-hidden select-none">
+                {/* SVG Fondo con textura de mapa topográfico satelital verde Leaflet */}
                 <svg viewBox="0 0 800 500" className="w-full h-full object-cover">
-                  {/* Fondo Satelital Simulado */}
-                  <rect width="800" height="500" fill="#243320" />
+                  <defs>
+                    <linearGradient id="leafGreenGrad" x1="0" y1="0" x2="1" y2="1">
+                      <stop offset="0%" stopColor="#1B2E1C" />
+                      <stop offset="50%" stopColor="#253D25" />
+                      <stop offset="100%" stopColor="#1A291A" />
+                    </linearGradient>
+                  </defs>
 
-                  {/* Zonas montañosas / textura de mapa de satélite */}
-                  <path d="M 0 0 L 800 0 L 800 500 L 0 500 Z" fill="#1E2B1A" />
-                  <path d="M 120 40 Q 250 180 480 120 T 800 200 L 800 500 L 0 500 Z" fill="#293924" opacity="0.8" />
-                  <path d="M 300 100 Q 550 300 750 450 L 800 500 L 200 500 Z" fill="#32452D" opacity="0.6" />
+                  {/* Capa de fondo satelital */}
+                  <rect width="800" height="500" fill="url(#leafGreenGrad)" />
 
-                  {/* Carreteras secundarias (Líneas beige/gris) */}
+                  {/* Contornos de relieve montañoso verde oscuro/claro */}
+                  <path d="M 0 0 L 800 0 L 800 500 L 0 500 Z" fill="#1C2E1C" />
+                  <path d="M 100 20 Q 300 220 520 100 T 800 180 L 800 500 L 0 500 Z" fill="#263E26" opacity="0.8" />
+                  <path d="M 280 80 Q 580 320 780 440 L 800 500 L 150 500 Z" fill="#304C30" opacity="0.65" />
+                  <path d="M 400 180 Q 600 380 720 480 L 800 500 L 350 500 Z" fill="#213521" opacity="0.7" />
+
+                  {/* Vías secundarias beige / gris */}
                   <path d="M 50 120 L 320 180 L 400 250 M 320 180 L 450 100 L 780 110" stroke="#D4C59E" strokeWidth="2.5" fill="none" opacity="0.6" strokeDasharray="6,4" />
                   <path d="M 220 420 L 480 340 L 750 420" stroke="#D4C59E" strokeWidth="2" fill="none" opacity="0.5" strokeDasharray="4,4" />
 
-                  {/* RUTA PRINCIPAL DEL PROYECTO (Línea Roja Fiel a la Imagen 1) */}
+                  {/* RUTA PRINCIPAL DEL PROYECTO (Línea Roja #EF4444 sin parpadeos) */}
                   <path
                     d="M 530 150 L 535 190 L 525 240 L 530 270 L 545 320 L 580 340 L 615 365 L 610 390 L 580 405 L 610 420 L 640 430"
                     stroke="#EF4444"
@@ -610,18 +617,13 @@ export default function BitacoraPage() {
                     strokeLinejoin="round"
                   />
 
-                  {/* Etiquetas y Puntos de Estación a lo largo de la ruta */}
+                  {/* Puntos de Estación a lo largo de la ruta */}
                   <g className="font-sans text-[11px] font-bold text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">
-                    {/* San Antonio el Cimarrón */}
                     <text x="250" y="85" fill="#E4E4E7">San Antonio el Cimarrón</text>
-
-                    {/* Finca La Trinidad */}
                     <text x="350" y="140" fill="#E4E4E7">Finca La Trinidad</text>
-
-                    {/* Yuxquen */}
                     <text x="470" y="160" fill="#E4E4E7">Yuxquen</text>
 
-                    {/* Yalam bojoch */}
+                    {/* Yalambojoch */}
                     <text x="510" y="140" fill="#FFFFFF" textAnchor="middle">Yalambojoch</text>
                     <circle cx="530" cy="150" r="4" fill="#EF4444" stroke="#FFFFFF" strokeWidth="2" />
 
@@ -633,7 +635,6 @@ export default function BitacoraPage() {
                     <text x="535" y="335" fill="#FFFFFF">Patalcal</text>
                     <circle cx="550" cy="325" r="4.5" fill="#EF4444" stroke="#FFFFFF" strokeWidth="2" />
 
-                    {/* Yolcultac */}
                     <text x="440" y="375" fill="#E4E4E7">Yolcultac</text>
 
                     {/* San Mateo Ixtatán */}
@@ -648,10 +649,10 @@ export default function BitacoraPage() {
                   </g>
                 </svg>
 
-                {/* MINI MAPA DE GUATEMALA SUPERPUESTO EN LA ESQUINA SUPERIOR IZQUIERDA (Imagen 1) */}
+                {/* MINI MAPA DE GUATEMALA SUPERPUESTO EN LA ESQUINA SUPERIOR IZQUIERDA */}
                 <div className="absolute top-3 left-3 bg-white p-2.5 rounded-xl shadow-2xl border border-gray-200 z-20 w-44 sm:w-48">
                   <div className="text-[9px] font-black text-gray-800 uppercase tracking-wider mb-1 text-center font-mono border-b border-gray-100 pb-1">
-                    Guatemala · {(drawerRegistro as any).departamento || 'Huehuetenango'}
+                    Guatemala · {(drawerRegistro as any).departamento || (drawerRegistro as any).departamentoNombre || 'Huehuetenango'}
                   </div>
                   <MapaGuatemalaDepartamentos
                     ubicacion={drawerRegistro.ubicacion || drawerRegistro.proyectoNombre || ''}
@@ -663,10 +664,14 @@ export default function BitacoraPage() {
                   />
                 </div>
 
-                {/* Info Bar inferior */}
+                {/* Coordenadas GPS del registro dinámicas */}
                 <div className="absolute bottom-3 right-3 bg-zinc-900/90 backdrop-blur-xs text-white px-3 py-1.5 rounded-lg border border-zinc-700 text-[10.5px] font-mono flex items-center gap-2 shadow-lg">
                   <span className="w-2 h-2 rounded-full bg-red-500" />
-                  <span>Coordenadas GPS: {drawerRegistro.coordenadasGps ? `${drawerRegistro.coordenadasGps.lat?.toFixed(4)}, ${drawerRegistro.coordenadasGps.lng?.toFixed(4)}` : '15.8340, -91.5670'}</span>
+                  <span>
+                    Coordenadas GPS: {drawerRegistro.coordenadasGps?.lat
+                      ? `${drawerRegistro.coordenadasGps.lat.toFixed(6)}, ${drawerRegistro.coordenadasGps.lng?.toFixed(6)}`
+                      : '14.500167, -90.617015'}
+                  </span>
                 </div>
               </div>
             </div>

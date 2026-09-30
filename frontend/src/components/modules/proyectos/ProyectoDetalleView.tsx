@@ -4,7 +4,6 @@ import { useState, useRef, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ArrowLeft,
-  ArrowRight,
   Building2,
   CalendarDays,
   Check,
@@ -13,7 +12,6 @@ import {
   Clock,
   Edit2,
   FileSignature,
-  FileSpreadsheet,
   FileText,
   Globe,
   Info,
@@ -31,7 +29,7 @@ import { useAuthStore } from '@/stores/useAuthStore'
 import { showSuccessToast, showErrorToast } from '@/hooks/useCustomToast'
 import type { ProyectoType } from '@/validations/proyecto.schema'
 import ProyectoEstadoBadge from '@/components/modules/proyectos/ProyectoEstadoBadge'
-import ProyectoTimeline from '@/components/modules/proyectos/ProyectoTimeline'
+import ProyectoInformacionFinanciera from '@/components/modules/proyectos/ProyectoInformacionFinanciera'
 import { proyectoService } from '@/services/proyectos/proyecto.service'
 
 type MasterTabType = 'general' | 'financiera'
@@ -1863,41 +1861,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
 
       {/* CONTENIDO DE PESTAÑA: INFORMACIÓN FINANCIERA */}
       {tabMaestra === 'financiera' && (
-        <div className="space-y-3">
-          {/* Tarjeta de Presupuesto Global Trasladada */}
-          <div className="rounded-xl border border-gray-200 bg-white p-3.5 shadow-2xs">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-[8px] font-bold uppercase tracking-wider text-gray-400">
-                  Presupuesto / Monto Contractual Global
-                </p>
-                <div className="mt-0.5 flex items-center gap-2">
-                  <p className="text-base font-black text-gray-900">
-                    {formatearMoneda(proyecto.montoContractualOriginal || proyecto.presupuesto)}
-                  </p>
-                  <span className="rounded bg-red-50 border border-red-100 px-2 py-0.5 text-[9px] font-bold text-[#9B0F06]">
-                    Contrato Principal DGC
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => router.push(`/dashboard/proyectos/${proyecto.id}/hoja-sabana`)}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#9B0F06] px-3 py-1.5 text-[11px] font-bold text-white transition-colors hover:bg-[#5E0006] shadow-xs"
-                >
-                  <FileSpreadsheet size={13} />
-                  <span>Abrir Hoja Sábana Analítica</span>
-                  <ArrowRight size={11} />
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Timeline / Cronograma y Fases Financieras */}
-          <ProyectoTimeline proyecto={proyecto} fases={proyecto.fases} avanceGeneral={proyecto.avance} />
-        </div>
+        <ProyectoInformacionFinanciera proyecto={proyecto} />
       )}
 
       {/* Drawer de Equipo Responsable Completo */}

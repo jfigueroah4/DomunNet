@@ -262,13 +262,13 @@ const CATALOGO_BASE_RENGLONES: RenglonItemFinanciero[] = [
   },
 ]
 
-type SubTabFinanciera = 'resumen' | 'estimaciones'
+type SubTabFinanciera = 'resumen' | 'estimaciones' | 'grafico'
 
 export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: ProyectoType | undefined }) {
   const router = useRouter()
   const { profile: user } = useAuthStore()
 
-  // Sub-Pestañas: Resumen Financiero y Control de Estimaciones (dividido en 2 partes: Resumen + Curva S)
+  // Sub-Pestañas: Resumen Financiero, Control de Estimaciones, Gráfico Financiero
   const [subTab, setSubTab] = useState<SubTabFinanciera>('resumen')
 
   // Perspectiva Doble en Control de Estimaciones: Empresa Ejecutora vs Supervisora
@@ -279,9 +279,9 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
   const [filtroRenglon, setFiltroRenglon] = useState<string>('todos')
   const [busquedaTexto, setBusquedaTexto] = useState('')
 
-  // Paginación en Programa de Trabajo
+  // Paginación en Programa de Trabajo (10 renglones por página según requerimiento)
   const [paginaRenglones, setPaginaRenglones] = useState(1)
-  const itemsPorPagina = 6
+  const itemsPorPagina = 10
 
   // Tooltip interactivo para Curva S
   const [tooltipCurva, setTooltipCurva] = useState<any>(null)
@@ -626,42 +626,131 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
           <button
             type="button"
             onClick={() => setSubTab('resumen')}
-            className={`cursor-pointer whitespace-nowrap py-2.5 px-1 border-b-2 text-[11px] font-semibold transition-all duration-200 flex items-center gap-1.5 ${
+            className={`cursor-pointer whitespace-nowrap py-2.5 px-1 border-b-2 text-xs font-semibold transition-all duration-200 flex items-center gap-1.5 ${
               subTab === 'resumen'
                 ? 'border-[#9B0F06] text-[#9B0F06]'
                 : 'border-transparent text-gray-500 hover:text-gray-900 hover:border-gray-300'
             }`}
           >
-            <Layers size={12} className={subTab === 'resumen' ? 'text-[#9B0F06]' : 'text-gray-400'} />
+            <Layers size={13} className={subTab === 'resumen' ? 'text-[#9B0F06]' : 'text-gray-400'} />
             <span>Resumen Financiero</span>
-            <span className="ml-1 rounded-full bg-gray-100 px-1.5 py-0.2 text-[8px] text-gray-600 font-bold border border-gray-200">
-              {CATALOGO_BASE_RENGLONES.length}
-            </span>
           </button>
 
           <button
             type="button"
             onClick={() => setSubTab('estimaciones')}
-            className={`cursor-pointer whitespace-nowrap py-2.5 px-1 border-b-2 text-[11px] font-semibold transition-all duration-200 flex items-center gap-1.5 ${
+            className={`cursor-pointer whitespace-nowrap py-2.5 px-1 border-b-2 text-xs font-semibold transition-all duration-200 flex items-center gap-1.5 ${
               subTab === 'estimaciones'
                 ? 'border-[#9B0F06] text-[#9B0F06]'
                 : 'border-transparent text-gray-500 hover:text-gray-900 hover:border-gray-300'
             }`}
           >
-            <Receipt size={12} className={subTab === 'estimaciones' ? 'text-[#9B0F06]' : 'text-gray-400'} />
+            <Receipt size={13} className={subTab === 'estimaciones' ? 'text-[#9B0F06]' : 'text-gray-400'} />
             <span>Control de Estimaciones</span>
-            <span className="ml-1 rounded-full bg-red-100 px-1.5 py-0.2 text-[8px] text-[#9B0F06] font-bold">
-              {estimacionesGeneradas.length / 2}
-            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSubTab('grafico')}
+            className={`cursor-pointer whitespace-nowrap py-2.5 px-1 border-b-2 text-xs font-semibold transition-all duration-200 flex items-center gap-1.5 ${
+              subTab === 'grafico'
+                ? 'border-[#9B0F06] text-[#9B0F06]'
+                : 'border-transparent text-gray-500 hover:text-gray-900 hover:border-gray-300'
+            }`}
+          >
+            <TrendingUp size={13} className={subTab === 'grafico' ? 'text-[#9B0F06]' : 'text-gray-400'} />
+            <span>Gráfico Financiero</span>
           </button>
         </nav>
       </div>
 
       {/* ========================================================================= */}
-      {/* 1. SUB-TAB 1: RESUMEN FINANCIERO (PROGRAMA DE TRABAJO CON 2 FILTROS)     */}
+      {/* 1. SUB-TAB 1: RESUMEN FINANCIERO (KPIS + PROGRAMA DE TRABAJO COMPACTO)   */}
       {/* ========================================================================= */}
       {subTab === 'resumen' && (
-        <div className="space-y-2">
+        <div className="space-y-2.5">
+          {/* 3 Tarjetas de Resumen Financiero Ejecutivo Compacto */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 font-mono">
+            {/* Tarjeta 1: Resumen Financiero / Líquido */}
+            <div className="rounded-xl border border-gray-200 bg-white p-2.5 shadow-2xs flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <span className="text-[8px] font-extrabold uppercase tracking-wider text-gray-400 font-sans">
+                  Resumen Financiero
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSubTab('estimaciones')}
+                  className="text-[8.5px] font-bold text-[#9B0F06] hover:underline flex items-center gap-0.5 font-sans cursor-pointer"
+                >
+                  <span>Ver detalle</span>
+                  <ChevronRight size={10} />
+                </button>
+              </div>
+              <div className="mt-1">
+                <span className="text-[7.5px] text-gray-400 block uppercase font-sans">Monto Líquido a Pagar</span>
+                <p className="text-[13px] font-black text-gray-900 font-mono">
+                  Q {estimacionesGeneradas.reduce((acc, curr) => curr.perspectiva === 'ejecutora' && curr.estado === 'aprobada' ? acc + curr.montoLiquidoAPagar : acc, 0).toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+            </div>
+
+            {/* Tarjeta 2: Control de Anticipo */}
+            <div className="rounded-xl border border-gray-200 bg-white p-2.5 shadow-2xs flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <span className="text-[8px] font-extrabold uppercase tracking-wider text-gray-400 font-sans">
+                  Control de Anticipo
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSubTab('estimaciones')}
+                  className="text-[8.5px] font-bold text-[#9B0F06] hover:underline flex items-center gap-0.5 font-sans cursor-pointer"
+                >
+                  <span>Ver detalle</span>
+                  <ChevronRight size={10} />
+                </button>
+              </div>
+              <div className="mt-1">
+                <span className="text-[7.5px] text-gray-400 block uppercase font-sans">% Amortizado a la Fecha</span>
+                <div className="flex items-baseline justify-between">
+                  <p className="text-[13px] font-black text-gray-900 font-mono">
+                    {pctAmortizadoAnticipo.toFixed(1)}%
+                  </p>
+                  <span className="text-[8px] text-gray-500 font-sans">
+                    Saldo: Q {saldoAnticipoPendiente.toLocaleString('es-GT', { minimumFractionDigits: 0 })}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Tarjeta 3: Control de Plazo */}
+            <div className="rounded-xl border border-gray-200 bg-white p-2.5 shadow-2xs flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <span className="text-[8px] font-extrabold uppercase tracking-wider text-gray-400 font-sans">
+                  Control de Plazo
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSubTab('estimaciones')}
+                  className="text-[8.5px] font-bold text-[#9B0F06] hover:underline flex items-center gap-0.5 font-sans cursor-pointer"
+                >
+                  <span>Ver detalle</span>
+                  <ChevronRight size={10} />
+                </button>
+              </div>
+              <div className="mt-1">
+                <span className="text-[7.5px] text-gray-400 block uppercase font-sans">Días por Emplearse</span>
+                <div className="flex items-baseline justify-between">
+                  <p className="text-[13px] font-black text-gray-900 font-mono">
+                    92 <span className="text-[9px] font-semibold text-gray-500">días</span>
+                  </p>
+                  <span className="text-[8px] text-gray-500 font-sans">
+                    Plazo: {pAny.plazoMeses ? `${Number(pAny.plazoMeses) * 30}d` : '365d'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Barra con los 2 Filtros Solicitados */}
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-gray-200 bg-white p-2 shadow-2xs">
             <div className="flex flex-wrap items-center gap-2 flex-1">
