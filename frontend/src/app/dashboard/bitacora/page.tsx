@@ -19,7 +19,7 @@ import { BitacoraFiltros } from '@/components/modules/bitacora/BitacoraFiltros'
 import { BitacoraCard } from '@/components/modules/bitacora/BitacoraCard'
 import { BitacoraEstadoBadge } from '@/components/modules/bitacora/BitacoraEstadoBadge'
 import { BitacoraForm } from '@/components/modules/bitacora/BitacoraForm'
-import { BitacoraMapaModal } from '@/components/modules/bitacora/BitacoraMapaModal'
+import { BitacoraMapaInline } from '@/components/modules/bitacora/BitacoraMapaInline'
 
 import { useAuthStore } from '@/stores/useAuthStore'
 import { apiGetDeduplicado } from '@/lib/api/cliente'
@@ -362,8 +362,8 @@ export default function BitacoraPage() {
                 <div className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 text-xs">
                   {/* 1. Información General del Proyecto y Responsable */}
                   <div className="space-y-3 pb-3.5 border-b border-gray-100">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div className="sm:col-span-2">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      <div className="col-span-2 sm:col-span-3">
                         <span className="text-[8.5px] font-bold text-gray-400 uppercase tracking-wider block">
                           Proyecto de Obra
                         </span>
@@ -391,31 +391,69 @@ export default function BitacoraPage() {
                         </span>
                       </div>
 
-                      <div className="sm:col-span-2">
+                      <div>
+                        <span className="text-[8.5px] font-bold text-gray-400 uppercase tracking-wider block">
+                          Lado de la Vía
+                        </span>
+                        <span className="text-[11px] font-bold text-gray-800">
+                          {drawerRegistro.lado || (drawerRegistro as any).lado_via || 'Ambos'}
+                        </span>
+                      </div>
+
+                      <div>
+                        <span className="text-[8.5px] font-bold text-gray-400 uppercase tracking-wider block">
+                          Estación Inicio
+                        </span>
+                        <span className="text-[11px] font-bold text-gray-800 font-mono">
+                          {(() => {
+                            const val =
+                              drawerRegistro.estacionInicio ||
+                              (drawerRegistro as any).estacion_inicial ||
+                              (drawerRegistro as any).estacion_inicio ||
+                              '0+000'
+                            return String(val)
+                          })()}
+                        </span>
+                      </div>
+
+                      <div>
+                        <span className="text-[8.5px] font-bold text-gray-400 uppercase tracking-wider block">
+                          Estación Fin
+                        </span>
+                        <span className="text-[11px] font-bold text-gray-800 font-mono">
+                          {(() => {
+                            const val =
+                              drawerRegistro.estacionFin ||
+                              (drawerRegistro as any).estacion_final ||
+                              (drawerRegistro as any).estacion_fin ||
+                              '0+500'
+                            return String(val)
+                          })()}
+                        </span>
+                      </div>
+
+                      <div>
                         <span className="text-[8.5px] font-bold text-gray-400 uppercase tracking-wider block">
                           Responsable / Autor
                         </span>
                         <span className="text-[11px] font-bold text-gray-800 flex items-center gap-1">
                           <User size={11} className="text-gray-400" />
                           <span>{drawerRegistro.autor}</span>
-                          {drawerRegistro.autorRol && (
-                            <span className="text-[9.5px] text-gray-500 font-normal">({drawerRegistro.autorRol})</span>
-                          )}
                         </span>
                       </div>
 
                       {/* Ubicación GPS y Departamento con solo el Icono de Mapa sin fondo */}
-                      <div className="sm:col-span-2 space-y-1.5">
+                      <div className="col-span-2 sm:col-span-3 space-y-1.5 pt-1">
                         <div className="flex items-center justify-between">
                           <span className="text-[8.5px] font-bold text-gray-400 uppercase tracking-wider block">
                             Ubicación y Departamento (GPS)
                           </span>
-                          {/* Botón de Mapa solo icono sin fondo que abre el modal */}
+                          {/* Botón de Mapa solo icono sin fondo */}
                           <button
                             type="button"
-                            onClick={() => setModalMapaGTAbierto(true)}
+                            onClick={() => setModalMapaGTAbierto((prev) => !prev)}
                             className="p-1 text-[#9B0F06] hover:text-[#5E0006] hover:scale-110 transition-all cursor-pointer focus:outline-none"
-                            title="Ver Mapa OpenStreetMap y Guatemala"
+                            title="Ver / Ocultar Mapa en el Drawer"
                           >
                             <LucideMap size={18} />
                           </button>
@@ -434,20 +472,29 @@ export default function BitacoraPage() {
                                 Lat: {drawerRegistro.coordenadasGps?.lat ? drawerRegistro.coordenadasGps.lat.toFixed(6) : ((drawerRegistro as any).lat || '14.500167')} · Lng: {drawerRegistro.coordenadasGps?.lng ? drawerRegistro.coordenadasGps.lng.toFixed(6) : ((drawerRegistro as any).lng || '-90.617015')}
                               </span>
                             </div>
-                            {/* Información detallada de Est. Inicio, Est. Fin y Lado de la vía */}
-                            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[9.5px] text-gray-600 font-mono pt-0.5 border-t border-gray-100">
+
+                            {/* Abajo de departamento: Est. Inicio, Est. Fin, y Lado */}
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-gray-600 font-mono pt-0.5">
                               <span>
-                                Est. Inicio: <strong className="text-gray-800 font-semibold">{(drawerRegistro as any).estacionInicio || (drawerRegistro as any).estacion_inicio || (drawerRegistro as any).estacion_inicial || '0+000'}</strong>
+                                Est. Inicio: <strong className="text-gray-900">{String(drawerRegistro.estacionInicio || (drawerRegistro as any).estacion_inicial || (drawerRegistro as any).estacion_inicio || '0+000')}</strong>
                               </span>
                               <span>
-                                Est. Fin: <strong className="text-gray-800 font-semibold">{(drawerRegistro as any).estacionFin || (drawerRegistro as any).estacion_fin || (drawerRegistro as any).estacion_final || '0+500'}</strong>
+                                Est. Fin: <strong className="text-gray-900">{String(drawerRegistro.estacionFin || (drawerRegistro as any).estacion_final || (drawerRegistro as any).estacion_fin || '0+500')}</strong>
                               </span>
                               <span>
-                                Lado: <strong className="text-gray-800 font-semibold">{(drawerRegistro as any).lado || (drawerRegistro as any).lado_via || (drawerRegistro as any).ladoRenglon || 'Ambos'}</strong>
+                                Lado: <strong className="text-gray-900">{drawerRegistro.lado || (drawerRegistro as any).lado_via || 'Ambos'}</strong>
                               </span>
                             </div>
                           </div>
                         </div>
+
+                        {/* Mapa Leaflet y Departamental Integrado en el Drawer */}
+                        {modalMapaGTAbierto && (
+                          <BitacoraMapaInline
+                            registro={drawerRegistro}
+                            onClose={() => setModalMapaGTAbierto(false)}
+                          />
+                        )}
                       </div>
                     </div>
                   </div>
@@ -557,12 +604,6 @@ export default function BitacoraPage() {
         </Portal>
       )}
 
-      {/* MODAL ELEGANTE CON MAPA LEAFLET Y MINI MAPA SVG DE GUATEMALA */}
-      <BitacoraMapaModal
-        abierto={modalMapaGTAbierto}
-        onClose={() => setModalMapaGTAbierto(false)}
-        registro={drawerRegistro}
-      />
     </div>
   )
 }

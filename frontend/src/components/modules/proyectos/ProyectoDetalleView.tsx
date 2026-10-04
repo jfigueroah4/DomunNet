@@ -22,6 +22,7 @@ import {
   Route,
   Scale,
   Trash2,
+  UserCheck,
   Users,
   X,
 } from 'lucide-react'
@@ -1339,34 +1340,38 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
           {/* SUB-TAB 4: FICHA TÉCNICA */}
           {subTabGeneral === 'ficha_tecnica' && (
             <div className="space-y-3">
-              {/* Selector de Perspectiva sin fondo gris */}
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
-                  Perspectiva:
-                </span>
-                <div className="inline-flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setFichaPerspectiva('obra')}
-                    className={`px-3 py-1 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                      fichaPerspectiva === 'obra'
-                        ? 'bg-red-50 text-[#9B0F06] border border-red-200 shadow-2xs'
-                        : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
-                    }`}
-                  >
-                    Contrato de Obra (Ejecución)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFichaPerspectiva('supervision')}
-                    className={`px-3 py-1 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                      fichaPerspectiva === 'supervision'
-                        ? 'bg-red-50 text-[#9B0F06] border border-red-200 shadow-2xs'
-                        : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
-                    }`}
-                  >
-                    Contrato de Supervisión
-                  </button>
+              {/* Selector de Perspectiva estilo tarjeta con cápsula y animación (img1 / img3) */}
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-gray-200 bg-white p-2.5 shadow-2xs">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[9px] font-extrabold uppercase tracking-wider text-gray-500">
+                    PERSPECTIVA:
+                  </span>
+                  <div className="inline-flex items-center gap-1 rounded-lg bg-gray-100/80 p-0.5 border border-gray-200/60 shadow-2xs">
+                    <button
+                      type="button"
+                      onClick={() => setFichaPerspectiva('obra')}
+                      className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[10px] font-bold transition-all duration-200 cursor-pointer ${
+                        fichaPerspectiva === 'obra'
+                          ? 'bg-white text-[#9B0F06] border border-gray-200/80 shadow-xs'
+                          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/50 font-medium'
+                      }`}
+                    >
+                      <Building2 size={11} className={fichaPerspectiva === 'obra' ? 'text-[#9B0F06]' : 'text-gray-500'} />
+                      <span>Contrato de Obra (Ejecución)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFichaPerspectiva('supervision')}
+                      className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[10px] font-bold transition-all duration-200 cursor-pointer ${
+                        fichaPerspectiva === 'supervision'
+                          ? 'bg-white text-[#9B0F06] border border-gray-200/80 shadow-xs'
+                          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/50 font-medium'
+                      }`}
+                    >
+                      <UserCheck size={11} className={fichaPerspectiva === 'supervision' ? 'text-[#9B0F06]' : 'text-gray-500'} />
+                      <span>Contrato de Supervisión</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 

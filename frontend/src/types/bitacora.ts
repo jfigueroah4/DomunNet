@@ -43,11 +43,23 @@ export interface RegistroBitacora {
   autorRol?: string
   ubicacion: string
   coordenadasGps?: { lat: number; lng: number }
+  estacionInicio?: string
+  estacionFin?: string
+  lado?: string
+  departamento?: string
+  municipio?: string
   fecha: string // YYYY-MM-DD
   hora: string // HH:MM
   adjuntos: Adjunto[]
   subcontratistas?: SubcontratistaRegistro[]
   historial?: HistorialCambio[]
+  renglonId?: string
+  renglonCodigo?: string
+  renglonNombre?: string
+  justSuspension?: string
+  suspensionActividades?: boolean
+  horaSuspension?: string
+  horaReanudacion?: string
   creadoEn: string
 }
 

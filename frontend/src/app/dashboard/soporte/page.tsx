@@ -47,38 +47,41 @@ export default function SoportePage() {
           <p className="mt-2 text-xs text-gray-500">Informacion de contacto y datos de perfil</p>
         </div>
 
-        <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[1fr_360px]">
-          <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              {contactItems.map((item) => {
-                const Icon = item.icon;
+        <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[1fr_320px]">
+          {/* Grid de datos del personal sin contenedor blanco ni borde exterior */}
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            {contactItems.map((item) => {
+              const Icon = item.icon;
 
-                return (
-                  <div key={item.label} className="flex items-start gap-3 rounded-lg border border-gray-100 bg-gray-50/60 p-3">
-                    <div className={`rounded-lg p-2.5 ${colorClasses[item.color]}`}>
-                      <Icon size={17} />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{item.label}</p>
-                      {item.href ? (
-                        <a
-                          href={item.href}
-                          className="mt-0.5 block truncate text-sm font-semibold text-gray-900 transition-colors hover:text-red-700"
-                        >
-                          {item.value}
-                        </a>
-                      ) : (
-                        <p className="mt-0.5 text-sm font-semibold text-gray-900">{item.value}</p>
-                      )}
-                    </div>
+              return (
+                <div
+                  key={item.label}
+                  className="flex items-start gap-3 rounded-xl border border-gray-200/80 bg-white p-3.5 shadow-2xs transition-colors hover:border-gray-300"
+                >
+                  <div className={`rounded-lg p-2.5 shrink-0 ${colorClasses[item.color]}`}>
+                    <Icon size={17} />
                   </div>
-                );
-              })}
-            </div>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{item.label}</p>
+                    {item.href ? (
+                      <a
+                        href={item.href}
+                        className="mt-0.5 block truncate text-sm font-semibold text-gray-900 transition-colors hover:text-red-700"
+                      >
+                        {item.value}
+                      </a>
+                    ) : (
+                      <p className="mt-0.5 text-sm font-semibold text-gray-900">{item.value}</p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
-          <div className="flex flex-col items-center justify-center p-6 min-h-[280px]">
-            <div className="relative w-56 h-56 md:w-64 md:h-64 drop-shadow-sm transition-transform hover:scale-105 duration-300">
+          {/* Logo UMG sin animación al pasar el cursor y un poco más pequeño */}
+          <div className="flex flex-col items-center justify-center p-4 min-h-[240px]">
+            <div className="relative w-44 h-44 md:w-48 md:h-48 drop-shadow-sm">
               <Image
                 src="/logoumg.png"
                 alt="Logo UMG"

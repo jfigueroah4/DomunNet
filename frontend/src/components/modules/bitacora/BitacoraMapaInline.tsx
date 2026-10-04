@@ -1,14 +1,18 @@
 'use client'
-import { useEffect, useRef } from 'react'
-import { X, Map as LucideMap } from 'lucide-react'
+
+import { useState, useEffect, useRef } from 'react'
+import { X, Map as LucideMap, Globe } from 'lucide-react'
 import { RegistroBitacora } from '@/types/bitacora'
+import { MapaGuatemalaDepartamentos } from '@/components/modules/fotografias/MapaGuatemalaDepartamentos'
 
 interface BitacoraMapaInlineProps {
   registro: RegistroBitacora
   onClose: () => void
+  vistaInicial?: 'leaflet' | 'guatemala'
 }
 
-export function BitacoraMapaInline({ registro, onClose }: BitacoraMapaInlineProps) {
+export function BitacoraMapaInline({ registro, onClose, vistaInicial = 'leaflet' }: BitacoraMapaInlineProps) {
+  const [tab, setTab] = useState<'leaflet' | 'guatemala'>(vistaInicial)
   const mapaRef = useRef<HTMLDivElement>(null)
   const instanciaMapaRef = useRef<any>(null)
 
@@ -17,9 +21,11 @@ export function BitacoraMapaInline({ registro, onClose }: BitacoraMapaInlineProp
   const titulo = registro?.titulo || 'Registro de Bitácora'
   const proyecto = registro?.proyectoNombre || 'Proyecto de Obra'
   const ubicacion = registro?.ubicacion || 'Frente de Obra'
-  const departamento = (registro as any)?.departamento || (registro as any)?.departamentoNombre || 'Guatemala'
+  const departamento = (registro as any)?.departamento || (registro as any)?.departamentoNombre || 'Huehuetenango'
 
   useEffect(() => {
+    if (tab !== 'leaflet') return
+
     let activo = true
 
     const inicializarMapa = async () => {
@@ -41,7 +47,7 @@ export function BitacoraMapaInline({ registro, onClose }: BitacoraMapaInlineProp
         zoomControl: true,
       })
 
-      // Tiles estándar OpenStreetMap (como en la vista de Proyectos)
+      // Tiles estándar OpenStreetMap
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; OpenStreetMap contributors',
         maxZoom: 19,
@@ -70,7 +76,7 @@ export function BitacoraMapaInline({ registro, onClose }: BitacoraMapaInlineProp
         `)
         .openPopup()
 
-      // Tramo / Conexión de Ruta (si hay coordenadas finales o tramo simulado de carretera)
+      // Tramo de conexión
       const pFin: [number, number] = [lat + 0.015, lng + 0.012]
       const pinFin = L.divIcon({
         className: 'custom-domun-pin-fin',
@@ -101,7 +107,6 @@ export function BitacoraMapaInline({ registro, onClose }: BitacoraMapaInlineProp
 
       instanciaMapaRef.current = mapa
 
-      // Invalidate size para asegurar renderizado correcto dentro del drawer
       setTimeout(() => {
         mapa.invalidateSize()
       }, 150)
@@ -116,17 +121,38 @@ export function BitacoraMapaInline({ registro, onClose }: BitacoraMapaInlineProp
         instanciaMapaRef.current = null
       }
     }
-  }, [lat, lng, titulo, ubicacion])
+  }, [tab, lat, lng, titulo, ubicacion, departamento, proyecto])
 
   return (
-    <div className="absolute top-full left-0 right-0 mt-1.5 z-50 w-full bg-white rounded-xl border border-gray-200 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 font-[Poppins]">
-      {/* Encabezado del Mapa Flotante en el Drawer */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 bg-gray-50/80">
-        <div className="flex items-center gap-1.5 min-w-0">
-          <LucideMap size={15} className="text-[#9B0F06] shrink-0" />
-          <span className="text-[11px] font-bold text-gray-800 truncate">
-            Mapa OpenStreetMap (Punto Exacto y Ruta del Tramo)
-          </span>
+    <div className="w-full bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden my-2 animate-in fade-in duration-150 font-[Poppins]">
+      {/* Encabezado con Botones de Selección de Tipo de Mapa y Botón X */}
+      <div className="flex items-center justify-between px-3 py-1.5 border-b border-gray-100 bg-gray-50/90">
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setTab('leaflet')}
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[10.5px] font-bold transition-all cursor-pointer ${
+              tab === 'leaflet'
+                ? 'bg-white text-[#9B0F06] shadow-2xs border border-gray-200'
+                : 'text-gray-500 hover:text-gray-800'
+            }`}
+          >
+            <LucideMap size={13} />
+            <span>OpenStreetMap</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setTab('guatemala')}
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[10.5px] font-bold transition-all cursor-pointer ${
+              tab === 'guatemala'
+                ? 'bg-white text-[#9B0F06] shadow-2xs border border-gray-200'
+                : 'text-gray-500 hover:text-gray-800'
+            }`}
+          >
+            <Globe size={13} />
+            <span>Mapa GT</span>
+          </button>
         </div>
 
         <button
@@ -139,18 +165,43 @@ export function BitacoraMapaInline({ registro, onClose }: BitacoraMapaInlineProp
         </button>
       </div>
 
-      {/* Contenedor del Mapa Leaflet */}
-      <div className="relative w-full h-60 sm:h-64 bg-gray-100">
-        <div ref={mapaRef} className="w-full h-full" />
+      {/* Contenido según el mapa seleccionado */}
+      {tab === 'leaflet' ? (
+        <div className="relative w-full h-56 bg-gray-100">
+          <div ref={mapaRef} className="w-full h-full" />
 
-        {/* Badge inferior con Coordenadas GPS */}
-        <div className="absolute bottom-2 left-2 bg-white/95 backdrop-blur-xs text-gray-800 px-2.5 py-1 rounded-md border border-gray-200 text-[10px] font-mono flex items-center gap-1.5 shadow-sm z-[1000]">
-          <span className="w-2 h-2 rounded-full bg-[#9B0F06]" />
-          <span>
-            {lat.toFixed(6)}, {lng.toFixed(6)} · {departamento}
-          </span>
+          <div className="absolute bottom-2 left-2 bg-white/95 backdrop-blur-xs text-gray-800 px-2.5 py-1 rounded-md border border-gray-200 text-[10px] font-mono flex items-center gap-1.5 shadow-sm z-[1000]">
+            <span className="w-2 h-2 rounded-full bg-[#9B0F06]" />
+            <span>
+              {lat.toFixed(6)}, {lng.toFixed(6)} · {departamento}
+            </span>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="p-3 bg-white flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="w-full sm:w-56 h-48 bg-gray-900 rounded-xl p-2 flex items-center justify-center">
+            <MapaGuatemalaDepartamentos
+              ubicacion={ubicacion}
+              departamentoSeleccionado={departamento}
+              soloMapa={true}
+              compacto={true}
+              fondoTransparente={true}
+              className="w-full h-full"
+            />
+          </div>
+
+          <div className="flex-1 min-w-0 space-y-1 text-xs">
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
+              Ubicación Territorial
+            </span>
+            <p className="text-sm font-extrabold text-gray-900">{departamento}, Guatemala</p>
+            <p className="text-[11px] text-gray-600 font-mono">{ubicacion}</p>
+            <p className="text-[10.5px] text-gray-500 font-mono pt-1">
+              Coordenadas: {lat.toFixed(6)}, {lng.toFixed(6)}
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

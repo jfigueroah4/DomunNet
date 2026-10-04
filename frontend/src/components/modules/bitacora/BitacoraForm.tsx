@@ -10,6 +10,7 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
+  Eraser,
   ImagePlus,
   Loader2,
   MapPin,
@@ -1070,30 +1071,15 @@ export function BitacoraForm({
                   </div>
 
                   <div className="flex items-center gap-1 shrink-0">
-                    {/* Ícono de escoba simple sin fondo para limpiar la info de ubicación */}
-                    {fd.ubicacionGps && (
+                    {/* Ícono de limpiar ubicación (solo visible cuando hay texto ingresado) */}
+                    {Boolean(fd.ubicacionGps && fd.ubicacionGps.trim().length > 0) && (
                       <button
                         type="button"
                         onClick={handleLimpiarUbicacion}
                         className="p-1.5 text-gray-400 hover:text-gray-700 transition-colors cursor-pointer"
                         title="Limpiar ubicación"
                       >
-                        <svg
-                          width="16"
-                          height="16"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="m14 12 7.5-7.5" />
-                          <path d="m9.5 16.5 4.5-4.5" />
-                          <path d="m3 21 6.5-6.5" />
-                          <path d="m3 21 2-5 3 3-5 2Z" />
-                          <path d="M12 21a9 9 0 0 0 9-9" />
-                        </svg>
+                        <Eraser size={16} />
                       </button>
                     )}
 
@@ -1389,17 +1375,12 @@ export function BitacoraForm({
                 )}
               </div>
 
-              {/* 4. Campo de Descripción / Observaciones de la Jornada (Con opciones antes de textarea y sin emoji) */}
+              {/* 4. Campo de Descripción / Observaciones de la Jornada */}
               <div className="relative pt-1 border-b border-gray-100 pb-3 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-bold text-gray-700">
                     Descripción u observaciones de la jornada
                   </span>
-                  {observacionPreset === 'Otra...' && (
-                    <span className="text-[10px] text-gray-400">
-                      {fd.observacionesGenerales.length}/2200
-                    </span>
-                  )}
                 </div>
 
                 {/* Selector de opciones frecuentes */}
@@ -1415,17 +1396,24 @@ export function BitacoraForm({
                   ))}
                 </select>
 
-                {/* Textarea solo cuando se selecciona 'Otra...' */}
+                {/* Textarea limpio con espaciado natural al seleccionar 'Otra...' (sin emoji) */}
                 {observacionPreset === 'Otra...' && (
-                  <textarea
-                    rows={2}
-                    value={fd.observacionesGenerales}
-                    onChange={(e) => set('observacionesGenerales', e.target.value)}
-                    placeholder="Añade una descripción u observaciones detalladas de la jornada..."
-                    maxLength={2200}
-                    className="w-full rounded-lg border border-gray-200 bg-white p-2 text-xs text-gray-800 placeholder-gray-400 outline-none resize-none focus:border-gray-400"
-                    autoFocus
-                  />
+                  <div className="pt-1.5 space-y-1">
+                    <textarea
+                      rows={4}
+                      value={fd.observacionesGenerales}
+                      onChange={(e) => set('observacionesGenerales', e.target.value)}
+                      placeholder="Añade una descripción u observaciones detalladas de la jornada..."
+                      maxLength={2200}
+                      className="w-full text-xs text-gray-800 placeholder-gray-400 outline-none resize-none bg-transparent"
+                      autoFocus
+                    />
+                    <div className="flex items-center justify-end text-gray-400">
+                      <span className="text-[10px] text-gray-400 font-mono">
+                        {fd.observacionesGenerales.length}/2200
+                      </span>
+                    </div>
+                  </div>
                 )}
               </div>
             </div>

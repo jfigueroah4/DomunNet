@@ -24,17 +24,27 @@ export function ProyectoEditorView({
   const { showSuccessToast, showErrorToast } = useCustomToast()
   const esEditar = modo === 'editar'
   const [proyectoReal, setProyectoReal] = useState<any>(proyectoInicial)
+  const [cargando, setCargando] = useState(!proyectoInicial && esEditar)
 
   useEffect(() => {
     if (!esEditar) return
-    const proyectoId = proyectoInicial?.id || new URLSearchParams(window.location.search).get('slug')
-    if (!proyectoId) return
-    proyectoService.getProyectoReal(proyectoId)
-      .then(setProyectoReal)
-      .catch(() => toast.error('No se pudo cargar el proyecto real para editar'))
-  }, [esEditar, proyectoInicial?.id])
+    if (proyectoInicial) {
+      setProyectoReal(proyectoInicial)
+      setCargando(false)
+      return
+    }
+    const slug = new URLSearchParams(window.location.search).get('slug')
+    if (!slug) return
+    setCargando(true)
+    proyectoService.getProyectoBySlug(slug)
+      .then((data) => {
+        setProyectoReal(data)
+      })
+      .catch(() => toast.error('No se pudo cargar el proyecto para editar'))
+      .finally(() => setCargando(false))
+  }, [esEditar, proyectoInicial])
 
-  const proyectoActual = esEditar ? proyectoReal : proyectoInicial
+  const proyectoActual = esEditar ? (proyectoReal || proyectoInicial) : proyectoInicial
 
   const rolStr = (user?.rol || '').toLowerCase().trim()
   const cargoStr = (user?.cargo || '').toLowerCase().trim()
@@ -168,6 +178,7 @@ export function ProyectoEditorView({
       </div>
 
       <ProyectoFormulario
+        key={proyectoActual?.id || 'nuevo'}
         modo={modo}
         proyectoInicial={proyectoActual as any}
         onGuardar={async (proyectoData) => {

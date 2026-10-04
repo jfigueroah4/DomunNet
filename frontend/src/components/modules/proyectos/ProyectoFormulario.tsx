@@ -603,6 +603,34 @@ function SelectorMapaInteractivo({
   )
 }
 
+// Cache en memoria a nivel de módulo para catálogos que no cambian con frecuencia
+let catalogoCacheGlobal: {
+  entidades?: any[]
+  contratistas?: any[]
+  departamentos?: any[]
+  municipios?: any[]
+} | null = null
+
+let catalogoPromiseGlobal: Promise<any> | null = null
+
+function cargarCatalogosGlobal() {
+  if (catalogoCacheGlobal) return Promise.resolve(catalogoCacheGlobal)
+  if (!catalogoPromiseGlobal) {
+    catalogoPromiseGlobal = Promise.all([
+      apiGetDeduplicado('/entidades-contratantes').then((r) => r.data?.data || []).catch(() => []),
+      apiGetDeduplicado('/empresas-contratistas').then((r) => r.data?.data || []).catch(() => []),
+      apiGetDeduplicado('/mantenimiento/departamento?limite=500').then((r) => r.data?.data || []).catch(() => []),
+      apiGetDeduplicado('/mantenimiento/municipio?limite=500').then((r) => r.data?.data || []).catch(() => []),
+    ]).then(([entidades, contratistas, departamentos, municipios]) => {
+      catalogoCacheGlobal = { entidades, contratistas, departamentos, municipios }
+      return catalogoCacheGlobal
+    }).finally(() => {
+      catalogoPromiseGlobal = null
+    })
+  }
+  return catalogoPromiseGlobal
+}
+
 export function ProyectoFormulario({
   proyectoInicial,
   modo = 'crear',
@@ -618,12 +646,12 @@ export function ProyectoFormulario({
   const [pasoActual, setPasoActual] = useState<1 | 2 | 3 | 4 | 5 | 6>(1)
   const [errors, setErrors] = useState<Record<string, boolean>>({})
 
-  // Catálogos
+  // Catálogos con inicialización instantánea desde caché en memoria
   const { usuarios: usuariosDisponibles, cargarUsuarios } = useUsuariosStore()
-  const [entidadesContratantes, setEntidadesContratantes] = useState<any[]>([])
-  const [empresasContratistas, setEmpresasContratistas] = useState<any[]>([])
-  const [departamentos, setDepartamentos] = useState<any[]>([])
-  const [municipios, setMunicipios] = useState<any[]>([])
+  const [entidadesContratantes, setEntidadesContratantes] = useState<any[]>(() => catalogoCacheGlobal?.entidades || [])
+  const [empresasContratistas, setEmpresasContratistas] = useState<any[]>(() => catalogoCacheGlobal?.contratistas || [])
+  const [departamentos, setDepartamentos] = useState<any[]>(() => catalogoCacheGlobal?.departamentos || [])
+  const [municipios, setMunicipios] = useState<any[]>(() => catalogoCacheGlobal?.municipios || [])
 
   // Drawers de creación rápida
   const [openCrearUsuarioDrawer, setOpenCrearUsuarioDrawer] = useState(false)
@@ -641,21 +669,21 @@ export function ProyectoFormulario({
   const [nombreOficial, setNombreOficial] = useState(proyectoInicial?.nombreOficial || proyectoInicial?.nombre || '')
   const [nombre, setNombre] = useState(proyectoInicial?.nombre || '')
   const [descripcion, setDescripcion] = useState(proyectoInicial?.descripcion || '')
-  const [entidadContratante, setEntidadContratante] = useState(proyectoInicial?.entidadContratante || '')
-  const [empresaContratanteId, setEmpresaContratanteId] = useState('')
+  const [entidadContratante, setEntidadContratante] = useState(proyectoInicial?.entidadContratante || (proyectoInicial as any)?.entidad_contratante || '')
+  const [empresaContratanteId, setEmpresaContratanteId] = useState((proyectoInicial as any)?.empresaContratanteId || (proyectoInicial as any)?.empresa_contratante_id || '')
 
   // -------------------------------------------------------------
   // PASO 2: Ubicación Geográfica y Tramo Vial DGC
   // -------------------------------------------------------------
-  const [direccion, setDireccion] = useState(proyectoInicial?.direccion || '')
+  const [direccion, setDireccion] = useState(proyectoInicial?.direccion || proyectoInicial?.ubicacionFisica || '')
   const [ubicacionFisica, setUbicacionFisica] = useState(proyectoInicial?.ubicacionFisica || proyectoInicial?.ubicacion || '')
-  const [departamentoId, setDepartamentoId] = useState((proyectoInicial as any)?.departamentoId || '')
-  const [municipioId, setMunicipioId] = useState((proyectoInicial as any)?.municipioId || '')
-  const [kilometroInicio, setKilometroInicio] = useState(String((proyectoInicial as any)?.kilometroInicio ?? ''))
+  const [departamentoId, setDepartamentoId] = useState((proyectoInicial as any)?.departamentoId || (proyectoInicial as any)?.departamento_id || '')
+  const [municipioId, setMunicipioId] = useState((proyectoInicial as any)?.municipioId || (proyectoInicial as any)?.municipio_id || '')
+  const [kilometroInicio, setKilometroInicio] = useState(String((proyectoInicial as any)?.kilometroInicio ?? (proyectoInicial as any)?.kilometro_inicio ?? ''))
   const [direccionFin, setDireccionFin] = useState(proyectoInicial?.direccionFin || (proyectoInicial as any)?.direccion_fin || '')
   const [departamentoFinId, setDepartamentoFinId] = useState((proyectoInicial as any)?.departamentoFinId || (proyectoInicial as any)?.departamento_fin_id || '')
   const [municipioFinId, setMunicipioFinId] = useState((proyectoInicial as any)?.municipioFinId || (proyectoInicial as any)?.municipio_fin_id || '')
-  const [kilometroFin, setKilometroFin] = useState(String((proyectoInicial as any)?.kilometroFin ?? ''))
+  const [kilometroFin, setKilometroFin] = useState(String((proyectoInicial as any)?.kilometroFin ?? (proyectoInicial as any)?.kilometro_fin ?? ''))
   const [coordenadasMapa, setCoordenadasMapa] = useState<any>(
     proyectoInicial?.coordenadasMapa || { lat: 14.6349, lng: -90.5069, puntoTexto: 'Guatemala' }
   )
@@ -664,8 +692,8 @@ export function ProyectoFormulario({
   // PASO 3: Marco Legal y Empresas Participantes
   // -------------------------------------------------------------
   // 3.1 Contrato de Ejecución (Obra)
-  const [empresaContratista, setEmpresaContratista] = useState(proyectoInicial?.empresaContratista || '')
-  const [empresaContratistaId, setEmpresaContratistaId] = useState('')
+  const [empresaContratista, setEmpresaContratista] = useState(proyectoInicial?.empresaContratista || (proyectoInicial as any)?.empresa_contratista || '')
+  const [empresaContratistaId, setEmpresaContratistaId] = useState((proyectoInicial as any)?.empresaContratistaId || (proyectoInicial as any)?.empresa_contratista_id || '')
   const [contratistaPropietario, setContratistaPropietario] = useState(proyectoInicial?.contratoEjecucion?.propietario || '')
   const [contratistaRegistroMercantil, setContratistaRegistroMercantil] = useState(proyectoInicial?.contratoEjecucion?.registroMercantil || '')
   const [contratistaDireccion, setContratistaDireccion] = useState(proyectoInicial?.contratoEjecucion?.direccion || '')
@@ -676,8 +704,8 @@ export function ProyectoFormulario({
   const [contratistaActaInicio, setContratistaActaInicio] = useState(proyectoInicial?.contratoEjecucion?.actaInicioNumero || '')
 
   // 3.2 Contrato de Supervisión
-  const [empresaSupervisora, setEmpresaSupervisora] = useState(proyectoInicial?.empresaSupervisora || '')
-  const [empresaSupervisoraId, setEmpresaSupervisoraId] = useState('')
+  const [empresaSupervisora, setEmpresaSupervisora] = useState(proyectoInicial?.empresaSupervisora || (proyectoInicial as any)?.empresa_supervisora || '')
+  const [empresaSupervisoraId, setEmpresaSupervisoraId] = useState((proyectoInicial as any)?.empresaSupervisoraId || (proyectoInicial as any)?.empresa_supervisora_id || '')
   const [supervisoraPropietario, setSupervisoraPropietario] = useState(proyectoInicial?.contratoSupervision?.propietario || '')
   const [supervisoraRegistroMercantil, setSupervisoraRegistroMercantil] = useState(proyectoInicial?.contratoSupervision?.registroMercantil || '')
   const [supervisoraDireccion, setSupervisoraDireccion] = useState(proyectoInicial?.contratoSupervision?.direccion || '')
@@ -688,8 +716,8 @@ export function ProyectoFormulario({
   const [supervisoraActaInicio, setSupervisoraActaInicio] = useState(proyectoInicial?.contratoSupervision?.actaInicioNumero || '')
 
   // 3.3 Asignaciones de Personal
-  const [delegadoResidenteId, setDelegadoResidenteId] = useState((proyectoInicial as any)?.delegadoResidenteId || '')
-  const [delegadoResidente, setDelegadoResidente] = useState(proyectoInicial?.delegadoResidente || '')
+  const [delegadoResidenteId, setDelegadoResidenteId] = useState((proyectoInicial as any)?.delegadoResidenteId || (proyectoInicial as any)?.delegado_residente_id || '')
+  const [delegadoResidente, setDelegadoResidente] = useState(proyectoInicial?.delegadoResidente || (proyectoInicial as any)?.delegado_residente || '')
   const [responsable, setResponsable] = useState((proyectoInicial as any)?.responsableId || (proyectoInicial as any)?.responsable_id || '')
   const [equipo, setEquipo] = useState<MiembroEquipo[]>(proyectoInicial?.equipo || [])
 
@@ -705,16 +733,16 @@ export function ProyectoFormulario({
   const [contratistaContratoNumero, setContratistaContratoNumero] = useState(proyectoInicial?.contratoEjecucion?.contratoNumero || '')
   const [contratistaAcuerdoMinisterial, setContratistaAcuerdoMinisterial] = useState(proyectoInicial?.contratoEjecucion?.acuerdoMinisterial || '')
   const [montoContractualOriginal, setMontoContractualOriginal] = useState(
-    proyectoInicial?.montoContractualOriginal?.toString() || proyectoInicial?.presupuesto?.toString() || ''
+    proyectoInicial?.montoContractualOriginal?.toString() || proyectoInicial?.presupuesto?.toString() || (proyectoInicial as any)?.monto_original?.toString() || ''
   )
   const [contratistaPorcentajeAnticipo, setContratistaPorcentajeAnticipo] = useState<string>(
     proyectoInicial?.contratoEjecucion?.porcentajeAnticipo?.toString() || '15'
   )
   const [contratistaMesesPlazo, setContratistaMesesPlazo] = useState(proyectoInicial?.contratoEjecucion?.plazoMesesDetalle || '')
-  const [fechaAdjudicacion, setFechaAdjudicacion] = useState(proyectoInicial?.fechaAdjudicacion || '')
-  const [numeroEscrituraPublica, setNumeroEscrituraPublica] = useState(proyectoInicial?.numeroEscrituraPublica || '')
-  const [fechaInicioContractual, setFechaInicioContractual] = useState(proyectoInicial?.fechaInicioContractual || '')
-  const [fechaFinContractualPlan, setFechaFinContractualPlan] = useState(proyectoInicial?.fechaFin || '')
+  const [fechaAdjudicacion, setFechaAdjudicacion] = useState(proyectoInicial?.fechaAdjudicacion || (proyectoInicial as any)?.fecha_adjudicacion || '')
+  const [numeroEscrituraPublica, setNumeroEscrituraPublica] = useState(proyectoInicial?.numeroEscrituraPublica || (proyectoInicial as any)?.numero_escritura_publica || '')
+  const [fechaInicioContractual, setFechaInicioContractual] = useState(proyectoInicial?.fechaInicioContractual || proyectoInicial?.fechaInicio || (proyectoInicial as any)?.fecha_inicio || '')
+  const [fechaFinContractualPlan, setFechaFinContractualPlan] = useState(proyectoInicial?.fechaFinContractualPlan || proyectoInicial?.fechaFin || (proyectoInicial as any)?.fecha_fin || '')
 
   // 4.2 Ficha Técnica de Supervisión
   const [supervisoraPrograma, setSupervisoraPrograma] = useState(proyectoInicial?.contratoSupervision?.programa || 'TRANSPORTE POR CARRETERA')
@@ -745,12 +773,12 @@ export function ProyectoFormulario({
   const [estado, setEstado] = useState<EstadoProyecto>(proyectoInicial?.estado || 'borrador')
   const [modalPausarAbierto, setModalPausarAbierto] = useState(false)
   const [modalCompletadoAbierto, setModalCompletadoAbierto] = useState(false)
-  const [fechaFinalizacionReal, setFechaFinalizacionReal] = useState(proyectoInicial?.fechaFinalizacionReal || '')
+  const [fechaFinalizacionReal, setFechaFinalizacionReal] = useState(proyectoInicial?.fechaFinalizacionReal || (proyectoInicial as any)?.fecha_finalizacion_real || '')
   const [plazoEjecucionRealAmpliado, setPlazoEjecucionRealAmpliado] = useState(
-    proyectoInicial?.plazoEjecucionRealAmpliado || ''
+    proyectoInicial?.plazoEjecucionRealAmpliado || (proyectoInicial as any)?.plazo_ejecucion_ampliado || ''
   )
   const [montoFinancieroFinalEjecutado, setMontoFinancieroFinalEjecutado] = useState(
-    proyectoInicial?.montoFinancieroFinalEjecutado?.toString() || ''
+    proyectoInicial?.montoFinancieroFinalEjecutado?.toString() || (proyectoInicial as any)?.monto_final?.toString() || ''
   )
 
   const ESTILOS_ESTADO: Record<EstadoProyecto, { activo: string; inactivo: string; label: string }> = {
@@ -794,14 +822,22 @@ export function ProyectoFormulario({
     return (monto * pct) / 100
   }, [supervisoraMontoOriginal, supervisoraPorcentajeAnticipo])
 
-  // Carga inicial de catálogos
+  // Carga ultra-rápida de catálogos con deduplicación y caché en memoria
   useEffect(() => {
-    apiGetDeduplicado('/entidades-contratantes').then((r) => setEntidadesContratantes(r.data?.data || [])).catch(() => {})
-    apiGetDeduplicado('/empresas-contratistas').then((r) => setEmpresasContratistas(r.data?.data || [])).catch(() => {})
-    apiGetDeduplicado('/mantenimiento/departamento?limite=500').then((r) => setDepartamentos(r.data?.data || [])).catch(() => {})
-    apiGetDeduplicado('/mantenimiento/municipio?limite=500').then((r) => setMunicipios(r.data?.data || [])).catch(() => {})
-    cargarUsuarios()
-  }, [])
+    if (!catalogoCacheGlobal) {
+      cargarCatalogosGlobal().then((c) => {
+        if (c) {
+          setEntidadesContratantes(c.entidades || [])
+          setEmpresasContratistas(c.contratistas || [])
+          setDepartamentos(c.departamentos || [])
+          setMunicipios(c.municipios || [])
+        }
+      })
+    }
+    if (!usuariosDisponibles || usuariosDisponibles.length === 0) {
+      cargarUsuarios()
+    }
+  }, [cargarUsuarios, usuariosDisponibles])
 
   // Auto-llenar datos de Contratista al seleccionar del combobox
   const handleSelectContratista = (val: string) => {

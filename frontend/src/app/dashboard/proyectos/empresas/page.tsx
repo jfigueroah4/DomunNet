@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useCallback, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -26,10 +26,10 @@ export default function EmpresasPage() {
           <button
             type="button"
             onClick={() => router.push('/dashboard/proyectos')}
-            className="rounded-md border border-gray-200 bg-white p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-[#9B0F06]"
+            className="p-1 text-gray-500 hover:text-[#9B0F06] transition-colors cursor-pointer"
             title="Volver"
           >
-            <ChevronLeft size={16} />
+            <ChevronLeft size={20} />
           </button>
           <div>
             <h1 className="text-[18px] font-extrabold leading-none text-gray-800">Catálogo de Empresas</h1>

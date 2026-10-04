@@ -287,6 +287,13 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
   const [paginaRenglones, setPaginaRenglones] = useState(1)
   const itemsPorPagina = 10
 
+  // Filtros interactivos para el Gráfico Financiero (Curva S)
+  const [perspectivaCurva, setPerspectivaCurva] = useState<'ejecutora' | 'supervisora'>('ejecutora')
+  const [filtroAnioCurva, setFiltroAnioCurva] = useState<string>('todos')
+  const [tipoMetricaCurva, setTipoMetricaCurva] = useState<'porcentaje' | 'monto'>('porcentaje')
+  const [fechaDesdeCurva, setFechaDesdeCurva] = useState('')
+  const [fechaHastaCurva, setFechaHastaCurva] = useState('')
+
   // Tooltip interactivo para Curva S
   const [tooltipCurva, setTooltipCurva] = useState<any>(null)
 
@@ -344,7 +351,9 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
   const pctAnticipoSup = pctAnticipoSupervisionNum / 100
 
   const montoContractualOriginal = Number(proyecto?.montoContractualOriginal || proyecto?.presupuesto || 48500000)
+  const montoSupervisionOriginal = Number(pAny.contratoSupervision?.montoOriginal || pAny.supervisoraMontoOriginal || pAny.monto_supervision || 13351095.20)
   const montoAjustadoVigente = Number(proyecto?.montoFinancieroFinalEjecutado || montoContractualOriginal)
+  const montoBaseCurva = perspectivaCurva === 'ejecutora' ? montoAjustadoVigente : montoSupervisionOriginal
   const anticipoOtorgado = montoContractualOriginal * pctAnticipoEjec
   const avanceFisico = esBorrador ? 0 : Number(proyecto?.avance || 68.5)
   const pctAmortizadoAnticipo = esBorrador ? 0 : Math.min(100, Math.max(0, avanceFisico * 0.95))
@@ -637,12 +646,14 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
       }
 
       const variacion = real !== null ? Number((real - prog).toFixed(2)) : null
-      const montoProg = montoAjustadoVigente * (prog / 100)
-      const montoReal = real !== null ? montoAjustadoVigente * (real / 100) : null
+      const montoProg = montoBaseCurva * (prog / 100)
+      const montoReal = real !== null ? montoBaseCurva * (real / 100) : null
 
       return {
         mes: m.mes,
         fecha: m.fecha,
+        año: m.año,
+        date: m.date,
         prog,
         real,
         esCorte,
@@ -651,7 +662,30 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
         montoReal,
       }
     })
-  }, [proyecto?.fechaInicioContractual, proyecto?.fechaInicio, proyecto?.fechaFinalizacionReal, (proyecto as any)?.fechaFinContractualPlan, proyecto?.fechaFin, proyecto?.avance, esBorrador, montoAjustadoVigente])
+  }, [proyecto?.fechaInicioContractual, proyecto?.fechaInicio, proyecto?.fechaFinalizacionReal, (proyecto as any)?.fechaFinContractualPlan, proyecto?.fechaFin, proyecto?.avance, esBorrador, montoBaseCurva])
+
+  // Años disponibles en la serie de datos para el filtro
+  const aniosDisponiblesCurva = useMemo(() => {
+    const setAnios = new Set<number>()
+    puntosCurvaS.forEach((p) => setAnios.add(p.año))
+    return Array.from(setAnios).sort((a, b) => a - b)
+  }, [puntosCurvaS])
+
+  // Puntos de la Curva S filtrados por Año y Rango de Fechas
+  const puntosCurvaSFiltrados = useMemo(() => {
+    return puntosCurvaS.filter((p) => {
+      if (filtroAnioCurva !== 'todos' && String(p.año) !== String(filtroAnioCurva)) return false
+      if (fechaDesdeCurva) {
+        const dDesde = new Date(fechaDesdeCurva)
+        if (p.date < dDesde) return false
+      }
+      if (fechaHastaCurva) {
+        const dHasta = new Date(fechaHastaCurva)
+        if (p.date > dHasta) return false
+      }
+      return true
+    })
+  }, [puntosCurvaS, filtroAnioCurva, fechaDesdeCurva, fechaHastaCurva])
 
   return (
     <div className="space-y-2.5 font-[Poppins] text-[10.5px]">
@@ -703,16 +737,16 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
         </div>
       </div>
 
-      {/* Sub-Pestañas Horizontales Estilo Hoja Sábana (Image 2) */}
-      <div className="border-b border-gray-200 bg-white px-2">
-        <nav className="-mb-px flex space-x-4">
+      {/* Sub-Pestañas Horizontales Estilo Hoja Sábana */}
+      <div className="border-b border-gray-200 bg-white px-2 pt-1 rounded-t-md font-[Poppins]">
+        <div className="flex flex-wrap items-center gap-1">
           <button
             type="button"
             onClick={() => setSubTab('resumen')}
-            className={`cursor-pointer whitespace-nowrap py-1.5 px-1.5 border-b-2 text-[10.5px] font-bold transition-all duration-200 flex items-center gap-1.5 ${
+            className={`flex items-center gap-1.5 border-b-2 px-3 py-1.5 text-[10.5px] transition-all cursor-pointer ${
               subTab === 'resumen'
-                ? 'border-[#9B0F06] text-[#9B0F06]'
-                : 'border-transparent text-gray-500 hover:text-gray-900 hover:border-gray-300'
+                ? 'border-[#9B0F06] text-[#9B0F06] font-bold bg-red-50/40 rounded-t-md shadow-2xs'
+                : 'border-transparent text-gray-500 font-medium hover:text-gray-800 hover:bg-gray-50/80 rounded-t-md'
             }`}
           >
             <Layers size={12} className={subTab === 'resumen' ? 'text-[#9B0F06]' : 'text-gray-400'} />
@@ -722,10 +756,10 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
           <button
             type="button"
             onClick={() => setSubTab('estimaciones')}
-            className={`cursor-pointer whitespace-nowrap py-1.5 px-1.5 border-b-2 text-[10.5px] font-bold transition-all duration-200 flex items-center gap-1.5 ${
+            className={`flex items-center gap-1.5 border-b-2 px-3 py-1.5 text-[10.5px] transition-all cursor-pointer ${
               subTab === 'estimaciones'
-                ? 'border-[#9B0F06] text-[#9B0F06]'
-                : 'border-transparent text-gray-500 hover:text-gray-900 hover:border-gray-300'
+                ? 'border-[#9B0F06] text-[#9B0F06] font-bold bg-red-50/40 rounded-t-md shadow-2xs'
+                : 'border-transparent text-gray-500 font-medium hover:text-gray-800 hover:bg-gray-50/80 rounded-t-md'
             }`}
           >
             <Receipt size={12} className={subTab === 'estimaciones' ? 'text-[#9B0F06]' : 'text-gray-400'} />
@@ -735,16 +769,16 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
           <button
             type="button"
             onClick={() => setSubTab('curva')}
-            className={`cursor-pointer whitespace-nowrap py-1.5 px-1.5 border-b-2 text-[10.5px] font-bold transition-all duration-200 flex items-center gap-1.5 ${
+            className={`flex items-center gap-1.5 border-b-2 px-3 py-1.5 text-[10.5px] transition-all cursor-pointer ${
               subTab === 'curva'
-                ? 'border-[#9B0F06] text-[#9B0F06]'
-                : 'border-transparent text-gray-500 hover:text-gray-900 hover:border-gray-300'
+                ? 'border-[#9B0F06] text-[#9B0F06] font-bold bg-red-50/40 rounded-t-md shadow-2xs'
+                : 'border-transparent text-gray-500 font-medium hover:text-gray-800 hover:bg-gray-50/80 rounded-t-md'
             }`}
           >
             <TrendingUp size={12} className={subTab === 'curva' ? 'text-[#9B0F06]' : 'text-gray-400'} />
-            <span>Gráfico</span>
+            <span>Gráfico Financiero</span>
           </button>
-        </nav>
+        </div>
       </div>
 
       {/* ========================================================================= */}
@@ -1014,23 +1048,23 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
           {/* Selector de Perspectiva Doble y Filtros de Fecha */}
           <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-xl border border-gray-200 bg-white p-2.5 shadow-2xs">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[8.5px] font-extrabold uppercase tracking-wider text-gray-500">
+              <span className="text-[9px] font-extrabold uppercase tracking-wider text-gray-500">
                 PERSPECTIVA:
               </span>
-              <div className="inline-flex items-center gap-1.5">
+              <div className="inline-flex items-center gap-1 rounded-lg bg-gray-100/80 p-0.5 border border-gray-200/60 shadow-2xs">
                 <button
                   type="button"
                   onClick={() => {
                     setPerspectivaEstimacion('ejecutora')
                     setPaginaEstimaciones(1)
                   }}
-                  className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[9.5px] font-bold transition-all cursor-pointer ${
+                  className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[10px] font-bold transition-all duration-200 cursor-pointer ${
                     perspectivaEstimacion === 'ejecutora'
-                      ? 'bg-red-50 text-[#9B0F06] border border-red-200 shadow-2xs'
-                      : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 hover:text-gray-900'
+                      ? 'bg-white text-[#9B0F06] border border-gray-200/80 shadow-xs'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/50 font-medium'
                   }`}
                 >
-                  <Building2 size={11} className={perspectivaEstimacion === 'ejecutora' ? 'text-[#9B0F06]' : 'text-gray-400'} />
+                  <Building2 size={11} className={perspectivaEstimacion === 'ejecutora' ? 'text-[#9B0F06]' : 'text-gray-500'} />
                   <span>Empresa Ejecutora ({nombreEmpresaEjecutora})</span>
                 </button>
                 <button
@@ -1039,13 +1073,13 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
                     setPerspectivaEstimacion('supervisora')
                     setPaginaEstimaciones(1)
                   }}
-                  className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[9.5px] font-bold transition-all cursor-pointer ${
+                  className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[10px] font-bold transition-all duration-200 cursor-pointer ${
                     perspectivaEstimacion === 'supervisora'
-                      ? 'bg-blue-50 text-blue-800 border border-blue-200 shadow-2xs'
-                      : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 hover:text-gray-900'
+                      ? 'bg-white text-[#9B0F06] border border-gray-200/80 shadow-xs'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/50 font-medium'
                   }`}
                 >
-                  <UserCheck size={11} className={perspectivaEstimacion === 'supervisora' ? 'text-blue-700' : 'text-gray-400'} />
+                  <UserCheck size={11} className={perspectivaEstimacion === 'supervisora' ? 'text-[#9B0F06]' : 'text-gray-500'} />
                   <span>Empresa Supervisora ({nombreEmpresaSupervisora})</span>
                 </button>
               </div>
@@ -1272,53 +1306,215 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
       {/* 3. SUB-TAB 3: GRÁFICO FINANCIERO (PROGRAMADO / EJECUTADO ACUMULADO)      */}
       {/* ========================================================================= */}
       {subTab === 'curva' && (
-        <div className="space-y-3 font-[Poppins]">
+        <div className="space-y-2.5 font-[Poppins]">
+          {/* Barra de Filtros del Gráfico Financiero (Perspectiva + Año + Métrica + Fechas) */}
+          <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-xl border border-gray-200 bg-white p-2.5 shadow-2xs">
+            {/* Perspectiva Doble con cápsula y animación (img1 / img3) */}
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[9px] font-extrabold uppercase tracking-wider text-gray-500">
+                PERSPECTIVA:
+              </span>
+              <div className="inline-flex items-center gap-1 rounded-lg bg-gray-100/80 p-0.5 border border-gray-200/60 shadow-2xs">
+                <button
+                  type="button"
+                  onClick={() => setPerspectivaCurva('ejecutora')}
+                  className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[10px] font-bold transition-all duration-200 cursor-pointer ${
+                    perspectivaCurva === 'ejecutora'
+                      ? 'bg-white text-[#9B0F06] border border-gray-200/80 shadow-xs'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/50 font-medium'
+                  }`}
+                >
+                  <Building2 size={11} className={perspectivaCurva === 'ejecutora' ? 'text-[#9B0F06]' : 'text-gray-500'} />
+                  <span>Empresa Ejecutora ({nombreEmpresaEjecutora})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPerspectivaCurva('supervisora')}
+                  className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[10px] font-bold transition-all duration-200 cursor-pointer ${
+                    perspectivaCurva === 'supervisora'
+                      ? 'bg-white text-[#9B0F06] border border-gray-200/80 shadow-xs'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/50 font-medium'
+                  }`}
+                >
+                  <UserCheck size={11} className={perspectivaCurva === 'supervisora' ? 'text-[#9B0F06]' : 'text-gray-500'} />
+                  <span>Empresa Supervisora ({nombreEmpresaSupervisora})</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Controles de Filtrado: Año, Métrica y Rango Temporal */}
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Filtro por Año */}
+              <div className="flex items-center gap-1">
+                <span className="text-[9px] text-gray-500 font-medium">Año:</span>
+                <select
+                  value={filtroAnioCurva}
+                  onChange={(e) => setFiltroAnioCurva(e.target.value)}
+                  className="rounded-md border border-gray-200 bg-gray-50/60 px-2 py-0.5 text-[9px] font-semibold text-gray-800 focus:border-[#9B0F06] focus:bg-white focus:outline-none cursor-pointer"
+                >
+                  <option value="todos">Todos los Años</option>
+                  {aniosDisponiblesCurva.map((a) => (
+                    <option key={a} value={String(a)}>{a}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Selector de Métrica (% vs Monto Q) */}
+              <div className="inline-flex items-center gap-0.5 rounded-md bg-gray-100 p-0.5 border border-gray-200 text-[9px]">
+                <button
+                  type="button"
+                  onClick={() => setTipoMetricaCurva('porcentaje')}
+                  className={`px-2 py-0.5 rounded font-bold transition-all cursor-pointer ${
+                    tipoMetricaCurva === 'porcentaje'
+                      ? 'bg-white text-[#9B0F06] shadow-2xs'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  % Acumulado
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTipoMetricaCurva('monto')}
+                  className={`px-2 py-0.5 rounded font-bold transition-all cursor-pointer ${
+                    tipoMetricaCurva === 'monto'
+                      ? 'bg-white text-[#9B0F06] shadow-2xs'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Monto (Q)
+                </button>
+              </div>
+
+              {/* Rango Desde / Hasta */}
+              <div className="flex items-center gap-1 text-[9px] text-gray-500 font-medium">
+                <span>Desde:</span>
+                <input
+                  type="date"
+                  value={fechaDesdeCurva}
+                  onChange={(e) => setFechaDesdeCurva(e.target.value)}
+                  className="rounded-md border border-gray-200 bg-gray-50/60 px-1.5 py-0.5 text-[9px] font-medium text-gray-800 focus:border-[#9B0F06] focus:bg-white focus:outline-none"
+                />
+              </div>
+              <div className="flex items-center gap-1 text-[9px] text-gray-500 font-medium">
+                <span>Hasta:</span>
+                <input
+                  type="date"
+                  value={fechaHastaCurva}
+                  onChange={(e) => setFechaHastaCurva(e.target.value)}
+                  className="rounded-md border border-gray-200 bg-gray-50/60 px-1.5 py-0.5 text-[9px] font-medium text-gray-800 focus:border-[#9B0F06] focus:bg-white focus:outline-none"
+                />
+              </div>
+
+              {(filtroAnioCurva !== 'todos' || fechaDesdeCurva || fechaHastaCurva) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFiltroAnioCurva('todos')
+                    setFechaDesdeCurva('')
+                    setFechaHastaCurva('')
+                  }}
+                  className="text-[8.5px] font-bold text-[#9B0F06] hover:underline cursor-pointer"
+                >
+                  Limpiar
+                </button>
+              )}
+
+              <span className="text-[8.5px] text-gray-400 font-medium pl-1">
+                {puntosCurvaSFiltrados.length} meses
+              </span>
+            </div>
+          </div>
+
           <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-2xs space-y-3">
-            <div className="text-center pb-1">
-              <h2 className="text-sm font-black tracking-wide text-gray-900 uppercase">
-                PROGRAMADO / EJECUTADO ACUMULADO MENSUAL
-              </h2>
+            <div className="flex flex-wrap items-center justify-between border-b border-gray-100 pb-2 gap-2">
+              <div>
+                <h2 className="text-xs font-black tracking-wide text-gray-900 uppercase">
+                  PROGRAMADO / EJECUTADO ACUMULADO MENSUAL ({perspectivaCurva === 'ejecutora' ? 'CONTRATO DE OBRA' : 'CONTRATO DE SUPERVISIÓN'})
+                </h2>
+                <p className="text-[9px] text-gray-400">
+                  {tipoMetricaCurva === 'porcentaje' ? 'Curva de avance porcentual contractual acumulado' : 'Curva de avance monetario acumulado (Q)'}
+                </p>
+              </div>
+              <div className="text-right">
+                <span className="text-[8.5px] font-bold text-gray-400 uppercase block">Base Contractual</span>
+                <span className="font-mono font-bold text-[11px] text-gray-800">
+                  Q {montoBaseCurva.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
             </div>
 
             {/* Contenedor SVG Responsivo de la Curva S */}
             <div className="relative w-full bg-white rounded-lg p-2 select-none overflow-x-auto">
               <div className="w-full min-w-[650px]">
                 {(() => {
-                  const total = puntosCurvaS.length
+                  const total = puntosCurvaSFiltrados.length
+                  if (total === 0) {
+                    return (
+                      <div className="py-12 text-center text-gray-500 text-xs font-sans">
+                        No hay datos financieros para los filtros seleccionados.
+                      </div>
+                    )
+                  }
+
                   const svgWidth = Math.max(760, total * 48)
                   const xStep = (svgWidth - 90) / Math.max(1, total - 1)
+                  const esPorcentaje = tipoMetricaCurva === 'porcentaje'
+                  const maxMonto = Math.max(1, montoBaseCurva * 1.2)
 
-                  const ptsProg = puntosCurvaS.map((p, idx) => ({
-                    x: 55 + idx * xStep,
-                    y: 175 - ((p.prog + 20) / 140) * 145,
-                    data: p,
-                  }))
-
-                  const ptsReal = puntosCurvaS
-                    .filter((p) => p.real !== null)
-                    .map((p, idx) => ({
+                  const ptsProg = puntosCurvaSFiltrados.map((p, idx) => {
+                    const yVal = esPorcentaje
+                      ? 175 - ((p.prog + 20) / 140) * 145
+                      : 175 - ((p.montoProg / maxMonto) * 145)
+                    return {
                       x: 55 + idx * xStep,
-                      y: 175 - (((p.real as number) + 20) / 140) * 145,
+                      y: Math.max(15, Math.min(185, yVal)),
                       data: p,
-                    }))
+                    }
+                  })
+
+                  const ptsReal = puntosCurvaSFiltrados
+                    .filter((p) => p.real !== null)
+                    .map((p) => {
+                      const idx = puntosCurvaSFiltrados.findIndex((it) => it.mes === p.mes && it.fecha === p.fecha)
+                      const yVal = esPorcentaje
+                        ? 175 - (((p.real as number) + 20) / 140) * 145
+                        : 175 - (((p.montoReal as number) / maxMonto) * 145)
+                      return {
+                        x: 55 + (idx >= 0 ? idx : 0) * xStep,
+                        y: Math.max(15, Math.min(185, yVal)),
+                        data: p,
+                      }
+                    })
 
                   const dProg = ptsProg.reduce((acc, curr, idx) => `${acc} ${idx === 0 ? 'M' : 'L'} ${curr.x} ${curr.y}`, '')
                   const dReal = ptsReal.reduce((acc, curr, idx) => `${acc} ${idx === 0 ? 'M' : 'L'} ${curr.x} ${curr.y}`, '')
 
+                  // Configuración de Ticks Eje Y
+                  const ticksY = esPorcentaje
+                    ? [-20, 0, 20, 40, 60, 80, 100, 120].map((pct) => ({
+                        y: 175 - ((pct + 20) / 140) * 145,
+                        label: `${pct.toFixed(2)}%`,
+                      }))
+                    : [0, 0.2, 0.4, 0.6, 0.8, 1.0, 1.2].map((f) => {
+                        const val = f * montoBaseCurva
+                        const y = 175 - (val / maxMonto) * 145
+                        const labelQ = val >= 1_000_000
+                          ? `Q ${(val / 1_000_000).toFixed(1)}M`
+                          : `Q ${(val / 1000).toFixed(0)}k`
+                        return { y, label: labelQ }
+                      })
+
                   return (
                     <svg viewBox={`0 0 ${svgWidth} 250`} className="w-full h-auto max-h-[320px] overflow-visible">
-                      {/* Cuadrícula Horizontal Y de -20% a 120% */}
-                      {[-20, 0, 20, 40, 60, 80, 100, 120].map((pct) => {
-                        const y = 175 - ((pct + 20) / 140) * 145
-                        return (
-                          <g key={pct}>
-                            <line x1="50" y1={y} x2={svgWidth - 20} y2={y} stroke="#e5e7eb" strokeWidth="1" />
-                            <text x="44" y={y + 3} textAnchor="end" fontSize="8" fill="#4b5563" fontFamily="sans-serif" fontWeight="500">
-                              {pct.toFixed(2)}%
-                            </text>
-                          </g>
-                        )
-                      })}
+                      {/* Cuadrícula Horizontal Y */}
+                      {ticksY.map((t, idx) => (
+                        <g key={idx}>
+                          <line x1="50" y1={t.y} x2={svgWidth - 20} y2={t.y} stroke="#e5e7eb" strokeWidth="1" />
+                          <text x="44" y={t.y + 3} textAnchor="end" fontSize="8" fill="#4b5563" fontFamily="sans-serif" fontWeight="500">
+                            {t.label}
+                          </text>
+                        </g>
+                      ))}
 
                       {/* Ejes X y Y */}
                       <line x1="50" y1="30" x2="50" y2="175" stroke="#d1d5db" strokeWidth="1.5" />
@@ -1410,7 +1606,7 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
                     left: '50%',
                     top: '10px',
                     transform: 'translateX(-50%)',
-                    minWidth: '220px',
+                    minWidth: '240px',
                   }}
                 >
                   <div className="flex items-center justify-between border-b border-gray-100 pb-0.5 mb-1">
@@ -1424,15 +1620,19 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
 
                   <div className="space-y-0.5 font-mono text-[9.5px]">
                     <div className="flex justify-between text-blue-700">
-                      <span className="font-sans font-semibold">% Programado Acumulado:</span>
-                      <span className="font-bold">{tooltipCurva.data.prog.toFixed(2)}%</span>
+                      <span className="font-sans font-semibold">Programado:</span>
+                      <span className="font-bold">
+                        {tooltipCurva.data.prog.toFixed(2)}% (Q {tooltipCurva.data.montoProg.toLocaleString('es-GT', { minimumFractionDigits: 2 })})
+                      </span>
                     </div>
 
                     {tooltipCurva.data.real !== null ? (
                       <>
                         <div className="flex justify-between text-[#9B0F06]">
-                          <span className="font-sans font-semibold">% Ejecutado Acumulado:</span>
-                          <span className="font-bold">{tooltipCurva.data.real.toFixed(2)}%</span>
+                          <span className="font-sans font-semibold">Ejecutado:</span>
+                          <span className="font-bold">
+                            {tooltipCurva.data.real.toFixed(2)}% (Q {(tooltipCurva.data.montoReal ?? 0).toLocaleString('es-GT', { minimumFractionDigits: 2 })})
+                          </span>
                         </div>
 
                         <div className="mt-1 pt-0.5 border-t border-gray-100 flex items-center justify-between font-sans">
@@ -1461,17 +1661,17 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
             <div className="flex items-center justify-center gap-6 pt-2 border-t border-gray-100 text-[10px] font-semibold">
               <span className="flex items-center gap-2 text-gray-700">
                 <span className="h-0.5 w-6 bg-[#2563eb] inline-block rounded" />
-                % Prog Acum Mensual
+                {tipoMetricaCurva === 'porcentaje' ? '% Prog Acum Mensual' : 'Monto Prog Acumulado (Q)'}
               </span>
               <span className="flex items-center gap-2 text-gray-700">
                 <span className="h-0.5 w-6 bg-[#9B0F06] inline-block rounded" />
-                % Ejecut Acum Mensual
+                {tipoMetricaCurva === 'porcentaje' ? '% Ejecut Acum Mensual' : 'Monto Ejecut Acumulado (Q)'}
               </span>
             </div>
 
             {/* Resumen Compacto de Desviación y Rendimiento Dinámico */}
             {(() => {
-              const puntoCorte = puntosCurvaS.find((p) => p.esCorte) || puntosCurvaS[0]
+              const puntoCorte = puntosCurvaSFiltrados.find((p) => p.esCorte) || puntosCurvaSFiltrados[0] || puntosCurvaS[0]
               const desviacionVal = puntoCorte?.variacion ?? 0
               const spiVal = (puntoCorte && puntoCorte.prog > 0 && puntoCorte.real !== null)
                 ? (puntoCorte.real / puntoCorte.prog)
@@ -1482,10 +1682,10 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[10px] font-mono pt-2">
                   <div className="rounded-lg border border-gray-200 bg-gray-50/70 p-2">
                     <span className="text-[8px] font-bold uppercase tracking-wider text-gray-500 font-sans block">
-                      Desviación a la Fecha ({mesCorteTexto})
+                      Desviación ({mesCorteTexto})
                     </span>
                     <p className={`text-[12px] font-black mt-0.5 ${desviacionVal >= 0 ? 'text-emerald-700' : 'text-[#9B0F06]'}`}>
-                      {desviacionVal >= 0 ? '+' : ''}{desviacionVal.toFixed(2)}% ({desviacionVal >= 0 ? 'Adelanto respecto al plan' : 'Desfase respecto al plan'})
+                      {desviacionVal >= 0 ? '+' : ''}{desviacionVal.toFixed(2)}% ({desviacionVal >= 0 ? 'Adelanto vs Plan' : 'Desfase vs Plan'})
                     </p>
                     <span className="text-[7.5px] text-gray-400 font-sans">
                       Prog: {puntoCorte?.prog?.toFixed(2) ?? '0.00'}% vs Real: {puntoCorte?.real?.toFixed(2) ?? '0.00'}%
