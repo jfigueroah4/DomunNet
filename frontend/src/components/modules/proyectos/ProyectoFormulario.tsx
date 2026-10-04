@@ -74,13 +74,51 @@ function errorInputClass(errors: Record<string, boolean>, field: string) {
 
 // Helpers de validación y sanitización en tiempo real
 function sanitizeNombrePersona(val: string, maxLen = 150) {
-  // Elimina números para evitar nombres no válidos (solo permite letras, espacios, acentos, puntos y guiones)
-  return val.replace(/[0-9]/g, '').slice(0, maxLen)
+  // Solo permite letras, espacios, acentos, puntos y guiones (igual que UsuarioFormularioDrawer)
+  return val.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s.'-]/g, '').slice(0, maxLen)
 }
 
 function sanitizeTelefono(val: string, maxLen = 30) {
-  // Permite sólo dígitos, espacios, guiones, +, /, ()
-  return val.replace(/[^0-9+\s\-()\/]/g, '').slice(0, maxLen)
+  // Elimina PBX, extensiones y texto alfanumérico
+  const sinTexto = val.replace(/[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ@.]+/g, '')
+  return sinTexto.replace(/[^0-9+\s\-()\/]/g, '').trimStart().slice(0, maxLen)
+}
+
+function parseActaString(actaStr?: string): { numero: string; fecha: string } {
+  if (!actaStr) return { numero: '', fecha: '' }
+  const clean = actaStr.trim()
+  const m = clean.match(/(?:Acta\s*(?:No\.?)?\s*)?([A-Za-z0-9\-_./]+)\s+de\s+fecha\s+([\d\-\/]+)/i)
+  if (m) {
+    const rawNum = m[1].trim()
+    let rawFecha = m[2].trim()
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(rawFecha)) {
+      const [d, mo, y] = rawFecha.split('/')
+      rawFecha = `${y}-${mo.padStart(2, '0')}-${d.padStart(2, '0')}`
+    }
+    return { numero: rawNum, fecha: rawFecha }
+  }
+  const numOnly = clean.replace(/^Acta\s*(?:No\.?)?\s*/i, '').trim()
+  return { numero: numOnly, fecha: '' }
+}
+
+function formatActaString(numero?: string, fecha?: string): string {
+  const num = (numero || '').trim().replace(/^Acta\s*(?:No\.?)?\s*/i, '')
+  const fec = (fecha || '').trim()
+  let displayFec = fec
+  if (/^\d{4}-\d{2}-\d{2}$/.test(fec)) {
+    const [y, mo, d] = fec.split('-')
+    displayFec = `${d}/${mo}/${y}`
+  }
+  if (num && displayFec) {
+    return `Acta No. ${num} de fecha ${displayFec}`
+  }
+  if (num) {
+    return `Acta No. ${num}`
+  }
+  if (displayFec) {
+    return `Fecha: ${displayFec}`
+  }
+  return ''
 }
 
 function sanitizeEmail(val: string, maxLen = 100) {
@@ -750,10 +788,14 @@ export function ProyectoFormulario({
   const [contratistaPropietario, setContratistaPropietario] = useState(proyectoInicial?.contratoEjecucion?.propietario || '')
   const [contratistaRegistroMercantil, setContratistaRegistroMercantil] = useState(proyectoInicial?.contratoEjecucion?.registroMercantil || '')
   const [contratistaDireccion, setContratistaDireccion] = useState(proyectoInicial?.contratoEjecucion?.direccion || '')
-  const [contratistaTelefono, setContratistaTelefono] = useState(proyectoInicial?.contratoEjecucion?.telefono || '')
+  const [contratistaTelefono, setContratistaTelefono] = useState(sanitizeTelefono(proyectoInicial?.contratoEjecucion?.telefono || ''))
   const [contratistaCorreo, setContratistaCorreo] = useState(proyectoInicial?.contratoEjecucion?.correo || '')
   const [contratistaSuperintendente, setContratistaSuperintendente] = useState(proyectoInicial?.contratoEjecucion?.responsable || '')
   const [contratistaLicitacion, setContratistaLicitacion] = useState(proyectoInicial?.contratoEjecucion?.licitacionNumero || '')
+  
+  const parsedActaEjec = parseActaString(proyectoInicial?.contratoEjecucion?.actaInicioNumero || (proyectoInicial as any)?.actaInicioEjecutora || '')
+  const [contratistaActaNumero, setContratistaActaNumero] = useState(parsedActaEjec.numero)
+  const [contratistaActaFecha, setContratistaActaFecha] = useState(parsedActaEjec.fecha)
   const [contratistaActaInicio, setContratistaActaInicio] = useState(proyectoInicial?.contratoEjecucion?.actaInicioNumero || '')
 
   // 3.2 Contrato de Supervisión
@@ -762,10 +804,14 @@ export function ProyectoFormulario({
   const [supervisoraPropietario, setSupervisoraPropietario] = useState(proyectoInicial?.contratoSupervision?.propietario || '')
   const [supervisoraRegistroMercantil, setSupervisoraRegistroMercantil] = useState(proyectoInicial?.contratoSupervision?.registroMercantil || '')
   const [supervisoraDireccion, setSupervisoraDireccion] = useState(proyectoInicial?.contratoSupervision?.direccion || '')
-  const [supervisoraTelefono, setSupervisoraTelefono] = useState(proyectoInicial?.contratoSupervision?.telefono || '')
+  const [supervisoraTelefono, setSupervisoraTelefono] = useState(sanitizeTelefono(proyectoInicial?.contratoSupervision?.telefono || ''))
   const [supervisoraCorreo, setSupervisoraCorreo] = useState(proyectoInicial?.contratoSupervision?.correo || '')
   const [supervisoraResponsable, setSupervisoraResponsable] = useState(proyectoInicial?.contratoSupervision?.responsable || '')
   const [supervisoraLicitacion, setSupervisoraLicitacion] = useState(proyectoInicial?.contratoSupervision?.licitacionNumero || '')
+  
+  const parsedActaSup = parseActaString(proyectoInicial?.contratoSupervision?.actaInicioNumero || (proyectoInicial as any)?.actaInicioSupervisora || '')
+  const [supervisoraActaNumero, setSupervisoraActaNumero] = useState(parsedActaSup.numero)
+  const [supervisoraActaFecha, setSupervisoraActaFecha] = useState(parsedActaSup.fecha)
   const [supervisoraActaInicio, setSupervisoraActaInicio] = useState(proyectoInicial?.contratoSupervision?.actaInicioNumero || '')
 
   // 3.3 Asignaciones de Personal
@@ -997,6 +1043,41 @@ export function ProyectoFormulario({
       }
     }
 
+    // Validaciones de nombres de personas en Paso 3
+    if (contratistaPropietario && (/[0-9]/.test(contratistaPropietario) || contratistaPropietario.trim().length < 2)) {
+      showErrorToast('El nombre del propietario/representante de la ejecutora no es válido. Debe contener solo letras.')
+      setPasoActual(3)
+      return
+    }
+    if (supervisoraPropietario && (/[0-9]/.test(supervisoraPropietario) || supervisoraPropietario.trim().length < 2)) {
+      showErrorToast('El nombre del propietario/representante de la supervisora no es válido. Debe contener solo letras.')
+      setPasoActual(3)
+      return
+    }
+    if (contratistaTelefono && /[a-zA-Z]/.test(contratistaTelefono)) {
+      showErrorToast('El teléfono de la empresa ejecutora no debe incluir texto como PBX ni letras. Ingrese solo números.')
+      setPasoActual(3)
+      return
+    }
+    if (supervisoraTelefono && /[a-zA-Z]/.test(supervisoraTelefono)) {
+      showErrorToast('El teléfono de la empresa supervisora no debe incluir letras. Ingrese solo números.')
+      setPasoActual(3)
+      return
+    }
+    if (contratistaCorreo && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contratistaCorreo.trim())) {
+      showErrorToast('El formato del correo electrónico de la empresa ejecutora es inválido.')
+      setPasoActual(3)
+      return
+    }
+    if (supervisoraCorreo && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(supervisoraCorreo.trim())) {
+      showErrorToast('El formato del correo electrónico de la supervisora es inválido.')
+      setPasoActual(3)
+      return
+    }
+
+    const actaEjecFinal = formatActaString(contratistaActaNumero, contratistaActaFecha) || contratistaActaInicio
+    const actaSupFinal = formatActaString(supervisoraActaNumero, supervisoraActaFecha) || supervisoraActaInicio
+
     const contratoEjecucionData: ProyectoContrato = {
       tipo: 'EJECUCION',
       empresaNombre: empresaContratista,
@@ -1007,7 +1088,7 @@ export function ProyectoFormulario({
       correo: contratistaCorreo,
       responsable: contratistaSuperintendente,
       licitacionNumero: contratistaLicitacion,
-      actaInicioNumero: contratistaActaInicio,
+      actaInicioNumero: actaEjecFinal,
       programa: contratistaPrograma,
       subprograma: contratistaSubprograma,
       fuenteFinanciamiento: contratistaFuenteFinanciamiento,
@@ -1033,7 +1114,7 @@ export function ProyectoFormulario({
       correo: supervisoraCorreo,
       responsable: supervisoraResponsable,
       licitacionNumero: supervisoraLicitacion,
-      actaInicioNumero: supervisoraActaInicio,
+      actaInicioNumero: actaSupFinal,
       programa: supervisoraPrograma,
       subprograma: supervisoraSubprograma,
       fuenteFinanciamiento: supervisoraFuenteFinanciamiento,

@@ -455,7 +455,7 @@ export default function BitacoraFormulario({ modo = 'crear', id }: BitacoraFormu
                 }`}
               >
                 <span
-                  className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
+                  className={`absolute top-0.5 h-5 w-5 rounded-full border border-gray-400 bg-white shadow-xs transition-transform ${
                     suspendieronActividades ? 'translate-x-5' : 'translate-x-0.5'
                   }`}
                 />

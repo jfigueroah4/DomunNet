@@ -760,7 +760,18 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
   const [pvrPaginaActual, setPvrPaginaActual] = useState<number>(1)
 
   const [renglones, setRenglones] = useState<RenglonDetalladoSabana[]>(() => {
-    // Inicializar vacío (0.00 en cantidades y costos) para evitar montos quemados
+    if (typeof window !== 'undefined') {
+      try {
+        const targetId = id || 'p-1'
+        if (targetId && targetId !== 'nuevo' && targetId !== 'crear') {
+          const cached = localStorage.getItem(`sabana_renglones_${targetId}`)
+          if (cached) {
+            const parsed = JSON.parse(cached)
+            if (Array.isArray(parsed) && parsed.length > 0) return parsed
+          }
+        }
+      } catch {}
+    }
     return GENERAR_RENGLONES_VACIOS()
   })
 
@@ -939,56 +950,64 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
 
   useEffect(() => {
     const targetId = proyectoIdSeleccionado || id
-    if (targetId && renglones && renglones.length > 0) {
-      localStorage.setItem(`sabana_renglones_${targetId}`, JSON.stringify(renglones))
+    if (!targetId || !renglones || renglones.length === 0) return
 
-      const alertas: any[] = []
+    const timer = setTimeout(() => {
+      try {
+        localStorage.setItem(`sabana_renglones_${targetId}`, JSON.stringify(renglones))
 
-      // 1. Alerta de Vencimiento de Estimación (Vence hoy o <= 5 días)
-      if (estimacionEnProgreso && diasRestantesEstimacion !== null && diasRestantesEstimacion <= 5) {
-        alertas.push({
-          id: `alerta-vence-estimacion-${targetId}-${estimacionEnProgreso.id || estimacionEnProgreso.numero}`,
-          title: diasRestantesEstimacion < 0
-            ? `Corte de ${estimacionEnProgreso.numero} VENCIDO (${Math.abs(diasRestantesEstimacion)} días)`
-            : diasRestantesEstimacion === 0
-            ? `Corte de ${estimacionEnProgreso.numero} VENCE HOY`
-            : `Corte de ${estimacionEnProgreso.numero} vence en ${diasRestantesEstimacion} días`,
-          author: proyecto?.nombre || 'Supervisión de Obra',
-          time: diasRestantesEstimacion === 0 ? 'Vence hoy' : `${estimacionEnProgreso.fechaCorte}`,
-          tipo: 'vencimiento_hoy',
-          creadoPor: estimacionEnProgreso.creadoPor,
-          creadoPorId: (estimacionEnProgreso as any).usuarioId || (estimacionEnProgreso as any).creadoPorId || estimacionEnProgreso.creadoPor,
-          proyectoId: targetId,
-          link: `/dashboard/proyectos/${targetId}/hoja-sabana`,
-          diasRestantes: diasRestantesEstimacion,
-        })
-      }
+        const alertas: any[] = []
 
-      // 2. Alertas de exceso de renglones (> 100%)
-      renglones.forEach((r: any) => {
-        const cantTotalFechaK = (r.cantidadEstePeriodo || 0) + (r.cantidadAcumuladaAnterior || 0)
-        const pctAvance = r.cantidadAjustada > 0 ? (cantTotalFechaK / r.cantidadAjustada) * 100 : 0
-        if (pctAvance > 100) {
+        // 1. Alerta de Vencimiento de Estimación (Vence hoy o <= 5 días)
+        if (estimacionEnProgreso && diasRestantesEstimacion !== null && diasRestantesEstimacion <= 5) {
           alertas.push({
-            id: `alerta-sabana-${r.id}`,
-            title: `Exceso en Renglón ${r.codigoDGC}: ${pctAvance.toFixed(1)}% ejecutado`,
+            id: `alerta-vence-estimacion-${targetId}-${estimacionEnProgreso.id || estimacionEnProgreso.numero}`,
+            title: diasRestantesEstimacion < 0
+              ? `Corte de ${estimacionEnProgreso.numero} VENCIDO (${Math.abs(diasRestantesEstimacion)} días)`
+              : diasRestantesEstimacion === 0
+              ? `Corte de ${estimacionEnProgreso.numero} VENCE HOY`
+              : `Corte de ${estimacionEnProgreso.numero} vence en ${diasRestantesEstimacion} días`,
             author: proyecto?.nombre || 'Supervisión de Obra',
-            time: 'Hace un momento',
-            tipo: 'hoja_sabana',
+            time: diasRestantesEstimacion === 0 ? 'Vence hoy' : `${estimacionEnProgreso.fechaCorte}`,
+            tipo: 'vencimiento_hoy',
+            creadoPor: estimacionEnProgreso.creadoPor,
+            creadoPorId: (estimacionEnProgreso as any).usuarioId || (estimacionEnProgreso as any).creadoPorId || estimacionEnProgreso.creadoPor,
             proyectoId: targetId,
             link: `/dashboard/proyectos/${targetId}/hoja-sabana`,
+            diasRestantes: diasRestantesEstimacion,
           })
         }
-      })
 
-      if (alertas.length > 0) {
-        localStorage.setItem('domun_alertas_sabana', JSON.stringify(alertas))
-      } else {
-        localStorage.removeItem('domun_alertas_sabana')
+        // 2. Alertas de exceso de renglones (> 100%)
+        renglones.forEach((r: any) => {
+          const cantTotalFechaK = (r.cantidadEstePeriodo || 0) + (r.cantidadAcumuladaAnterior || 0)
+          const pctAvance = r.cantidadAjustada > 0 ? (cantTotalFechaK / r.cantidadAjustada) * 100 : 0
+          if (pctAvance > 100) {
+            alertas.push({
+              id: `alerta-sabana-${r.id}`,
+              title: `Exceso en Renglón ${r.codigoDGC}: ${pctAvance.toFixed(1)}% ejecutado`,
+              author: proyecto?.nombre || 'Supervisión de Obra',
+              time: 'Hace un momento',
+              tipo: 'hoja_sabana',
+              proyectoId: targetId,
+              link: `/dashboard/proyectos/${targetId}/hoja-sabana`,
+            })
+          }
+        })
+
+        if (alertas.length > 0) {
+          localStorage.setItem('domun_alertas_sabana', JSON.stringify(alertas))
+        } else {
+          localStorage.removeItem('domun_alertas_sabana')
+        }
+        window.dispatchEvent(new Event('storage'))
+        window.dispatchEvent(new CustomEvent('sabana-alertas-updated'))
+      } catch (e) {
+        console.warn('Error debouncing sabana localStorage:', e)
       }
-      window.dispatchEvent(new Event('storage'))
-      window.dispatchEvent(new CustomEvent('sabana-alertas-updated'))
-    }
+    }, 300)
+
+    return () => clearTimeout(timer)
   }, [renglones, proyectoIdSeleccionado, id, proyecto?.nombre, estimacionEnProgreso, diasRestantesEstimacion])
 
   const [medicionesAnaliticas, setMedicionesAnaliticas] = useState<MedicionAnaliticaCampo[]>([])
@@ -5466,7 +5485,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
       {modalFinalizarEstimacionOpen && (
         <ModalPortal>
           <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs font-[Poppins]">
-            <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl space-y-4 border border-gray-200 animate-fadeIn">
+            <div className="w-full max-w-lg sm:max-w-xl rounded-2xl bg-white p-5 shadow-2xl space-y-4 border border-gray-200 animate-fadeIn">
               <div className="flex items-center justify-between border-b border-gray-100 pb-3">
                 <div>
                   <h3 className="text-sm font-bold text-gray-900">Finalizar Estimación de Período</h3>
@@ -5497,11 +5516,11 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                 />
               </div>
 
-              <div className="flex flex-wrap items-center justify-end gap-2 pt-3 border-t border-gray-100">
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-gray-100 flex-nowrap">
                 <button
                   type="button"
                   onClick={() => setModalFinalizarEstimacionOpen(false)}
-                  className="rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 cursor-pointer"
+                  className="rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 cursor-pointer shrink-0"
                 >
                   Cancelar
                 </button>
@@ -5511,7 +5530,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                     setModalFinalizarEstimacionOpen(false)
                     setModalExportarEstimacionOpen(true)
                   }}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 cursor-pointer shadow-2xs"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 cursor-pointer shadow-2xs shrink-0 whitespace-nowrap"
                 >
                   <Download size={14} className="text-gray-600" />
                   <span>Exportar Estimación</span>
@@ -5519,7 +5538,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                 <button
                   type="button"
                   onClick={handleFinalizarEstimacionConfirm}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#9B0F06] hover:bg-[#7A0C0D] text-white px-4 py-2 text-xs font-bold shadow-2xs cursor-pointer"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#9B0F06] hover:bg-[#7A0C0D] text-white px-4 py-2 text-xs font-bold shadow-2xs cursor-pointer shrink-0 whitespace-nowrap"
                 >
                   <CheckCircle2 size={14} />
                   <span>Confirmar Estimación</span>

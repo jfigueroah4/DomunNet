@@ -265,15 +265,15 @@ export function BitacoraFiltros({
   }, [hayProyecto, proyectoId, registrosBitacora])
 
   return (
-    <div className="w-full rounded-xl border border-gray-200 bg-white p-2 shadow-2xs mb-2 font-[Poppins] relative z-30">
-      <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
+    <div className="w-full rounded-xl border border-gray-200 bg-white p-1.5 shadow-2xs mb-2 font-[Poppins] relative z-30 overflow-hidden">
+      <div className="flex items-center gap-1.5 text-[10px] flex-nowrap overflow-x-auto no-scrollbar w-full">
         {/* Buscador */}
-        <div className="relative w-[160px] sm:w-[180px] xl:w-[200px] shrink-0">
+        <div className="relative w-[135px] xl:w-[160px] shrink-0">
           <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
             disabled={!hayProyecto}
-            placeholder="Buscar en bitácora..."
+            placeholder="Buscar..."
             value={busqueda}
             onChange={(e) => onBusquedaChange(e.target.value)}
             className={`w-full h-[28px] border rounded-lg pl-7 pr-2 text-[10px] font-medium placeholder:text-gray-400 focus:outline-none focus:border-[#9B0F06] transition-colors ${!hayProyecto ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed' : 'bg-gray-50 border-gray-200 text-gray-800 focus:bg-white'}`}
@@ -281,7 +281,7 @@ export function BitacoraFiltros({
         </div>
 
         {/* 1. Proyecto (Combobox) */}
-        <div className="w-[170px] xl:w-[200px] shrink-0">
+        <div className="w-[155px] xl:w-[180px] shrink-0">
           <Combobox
             options={opcionesProyectos}
             value={proyectoId}
@@ -293,7 +293,7 @@ export function BitacoraFiltros({
 
         {/* 2. Rol (Combobox) */}
         {!esRestringido && onRolChange && (
-          <div className="w-[130px] xl:w-[150px] shrink-0">
+          <div className="w-[115px] xl:w-[130px] shrink-0">
             <Combobox
               disabled={!hayProyecto}
               options={opcionesRoles}
@@ -307,7 +307,7 @@ export function BitacoraFiltros({
 
         {/* 3. Usuario (Combobox) */}
         {!esRestringido && (
-          <div className="w-[135px] xl:w-[155px] shrink-0">
+          <div className="w-[120px] xl:w-[135px] shrink-0">
             <Combobox
               disabled={!hayProyecto}
               options={opcionesUsuarios}
@@ -320,7 +320,7 @@ export function BitacoraFiltros({
         )}
 
         {/* 4. Renglón (Combobox) */}
-        <div className="w-[145px] xl:w-[170px] shrink-0">
+        <div className="w-[125px] xl:w-[150px] shrink-0">
           <Combobox
             disabled={!hayProyecto}
             options={opcionesRenglones}
@@ -332,27 +332,27 @@ export function BitacoraFiltros({
         </div>
 
         {/* Fecha Inicio */}
-        <div className={`flex items-center gap-1 border rounded-lg px-2 h-[28px] shrink-0 ${!hayProyecto ? 'bg-gray-100 border-gray-200 cursor-not-allowed opacity-70' : 'bg-white border-gray-200 focus-within:border-[#9B0F06]'}`}>
-          <span className="text-[8.5px] text-gray-400 font-bold uppercase tracking-wider">Desde:</span>
+        <div className={`flex items-center gap-1 border rounded-lg px-1.5 h-[28px] shrink-0 ${!hayProyecto ? 'bg-gray-100 border-gray-200 cursor-not-allowed opacity-70' : 'bg-white border-gray-200 focus-within:border-[#9B0F06]'}`}>
+          <span className="text-[8px] text-gray-400 font-bold uppercase tracking-wider">Desde:</span>
           <input
             type="date"
             disabled={!hayProyecto}
             value={fechaDesde}
             onChange={(e) => onFechaDesdeChange(e.target.value)}
-            className="border-none bg-transparent text-[10px] font-medium text-gray-700 focus:outline-none disabled:cursor-not-allowed w-[95px]"
+            className="border-none bg-transparent text-[9.5px] font-medium text-gray-700 focus:outline-none disabled:cursor-not-allowed w-[80px]"
           />
         </div>
 
         {/* Fecha Fin */}
-        <div className={`flex items-center gap-1 border rounded-lg px-2 h-[28px] shrink-0 ${!hayProyecto ? 'bg-gray-100 border-gray-200 cursor-not-allowed opacity-70' : 'bg-white border-gray-200 focus-within:border-[#9B0F06]'}`}>
-          <span className="text-[8.5px] text-gray-400 font-bold uppercase tracking-wider">Hasta:</span>
+        <div className={`flex items-center gap-1 border rounded-lg px-1.5 h-[28px] shrink-0 ${!hayProyecto ? 'bg-gray-100 border-gray-200 cursor-not-allowed opacity-70' : 'bg-white border-gray-200 focus-within:border-[#9B0F06]'}`}>
+          <span className="text-[8px] text-gray-400 font-bold uppercase tracking-wider">Hasta:</span>
           <input
             type="date"
             disabled={!hayProyecto}
             value={fechaHasta}
             min={fechaDesde || undefined}
             onChange={(e) => onFechaHastaChange(e.target.value)}
-            className="border-none bg-transparent text-[10px] font-medium text-gray-700 focus:outline-none disabled:cursor-not-allowed w-[95px]"
+            className="border-none bg-transparent text-[9.5px] font-medium text-gray-700 focus:outline-none disabled:cursor-not-allowed w-[80px]"
           />
         </div>
 
@@ -362,7 +362,7 @@ export function BitacoraFiltros({
             disabled={!hayProyecto}
             value={estado}
             onChange={(e) => onEstadoChange(e.target.value as EstadoBitacora | 'todos')}
-            className={`h-[28px] w-[125px] rounded-lg border px-2 text-[10px] font-semibold focus:border-[#9B0F06] focus:outline-none ${!hayProyecto ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed' : 'bg-white border-gray-200 text-gray-800 cursor-pointer shadow-2xs'}`}
+            className={`h-[28px] w-[105px] rounded-lg border px-1.5 text-[9.5px] font-semibold focus:border-[#9B0F06] focus:outline-none ${!hayProyecto ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed' : 'bg-white border-gray-200 text-gray-800 cursor-pointer shadow-2xs'}`}
           >
             <option value="todos">Estado: Todos</option>
             <option value="pendiente">Pendiente</option>
@@ -370,16 +370,15 @@ export function BitacoraFiltros({
           </select>
         </div>
 
-        {/* Limpiar */}
+        {/* Limpiar (Solo Icono) */}
         {hayProyecto && (busqueda || (tipo && tipo !== 'todos') || (estado && estado !== 'todos') || fechaDesde || fechaHasta || usuarioFiltro || (rolFiltro && rolFiltro !== 'todos')) && (
           <button
             type="button"
             onClick={onLimpiar}
-            className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-gray-100 px-2.5 h-[28px] text-[10px] font-bold text-gray-600 transition-colors hover:bg-gray-200 cursor-pointer shadow-2xs"
-            title="Limpiar filtros"
+            className="inline-flex shrink-0 items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-900 w-[28px] h-[28px] transition-colors cursor-pointer shadow-2xs"
+            title="Limpiar todos los filtros"
           >
-            <X size={11} />
-            <span>Limpiar</span>
+            <X size={14} />
           </button>
         )}
       </div>

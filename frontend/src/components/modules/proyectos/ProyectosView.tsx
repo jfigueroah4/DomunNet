@@ -12,7 +12,7 @@ import ProyectoCard from '@/components/modules/proyectos/ProyectoCard'
 
 const estadoColor: Record<EstadoProyecto, string> = {
   borrador: '#9CA3AF',
-  activo: '#D53E0F',
+  activo: '#16a34a',
   en_revision: '#3B82F6',
   completado: '#10B981',
   pausado: '#D97706',
@@ -371,10 +371,10 @@ export function ProyectosView() {
           <button
             type="button"
             onClick={() => router.push('/dashboard')}
-            className="rounded-md border border-gray-200 bg-white p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-[#9B0F06]"
+            className="p-1.5 text-gray-400 transition-colors hover:text-[#9B0F06] cursor-pointer"
             title="Ir al Inicio"
           >
-            <ChevronLeft size={16} />
+            <ChevronLeft size={18} />
           </button>
           <div>
             <h1 className="m-0 text-[18px] font-black text-gray-900 tracking-wide">Proyectos</h1>

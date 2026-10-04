@@ -24,6 +24,7 @@ import {
 import type { ProyectoType } from '@/validations/proyecto.schema'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { showErrorToast } from '@/hooks/useCustomToast'
+import { CATALOGO_COMPLETO_88 } from '@/mocks/proyectoMock'
 
 export interface RenglonItemFinanciero {
   id: string
@@ -77,7 +78,7 @@ export const CAPITULOS_LIBRO_AZUL_DGC = [
 ]
 
 // Catálogo base de renglones DGC para el proyecto
-const CATALOGO_BASE_RENGLONES: RenglonItemFinanciero[] = [
+export const CATALOGO_BASE_RENGLONES: RenglonItemFinanciero[] = [
   {
     id: 'dgc-101',
     capituloId: 1,
@@ -283,9 +284,9 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
   const [filtroRenglon, setFiltroRenglon] = useState<string>('todos')
   const [busquedaTexto, setBusquedaTexto] = useState('')
 
-  // Paginación en Programa de Trabajo (Paginación de 10 solicitada)
+  // Paginación en Programa de Trabajo (Selector de 8, 16, 24, 50, etc.)
   const [paginaRenglones, setPaginaRenglones] = useState(1)
-  const itemsPorPagina = 10
+  const [itemsPorPagina, setItemsPorPagina] = useState(8)
 
   // Filtros interactivos para el Gráfico Financiero (Curva S)
   const [perspectivaCurva, setPerspectivaCurva] = useState<'ejecutora' | 'supervisora'>('ejecutora')
@@ -534,9 +535,42 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
     return estimacionesFiltradas.slice(inicio, inicio + itemsPorPaginaEstimaciones)
   }, [estimacionesFiltradas, paginaEstimaciones, itemsPorPaginaEstimaciones])
 
+  // Fuente de Renglones reales (del proyecto o catálogo integral de 88 renglones DGC)
+  const listaRenglonesFuente = useMemo<RenglonItemFinanciero[]>(() => {
+    const rawRenglones = (proyecto as any)?.renglones || (proyecto as any)?.renglones_sabana
+    if (Array.isArray(rawRenglones) && rawRenglones.length > 0) {
+      return rawRenglones.map((r: any, idx: number) => ({
+        id: r.id || `r-${idx}`,
+        capituloId: Number(r.capituloId || r.capitulo || 1),
+        capituloNombre: r.capituloNombre || `Capítulo ${r.capituloId || 1}`,
+        codigoDGC: r.codigoDGC || r.codigo || `10${idx + 1}.01`,
+        descripcion: r.descripcion || '',
+        unidad: r.unidad || 'm³',
+        cantidadContratada: Number(r.cantidadContratada || r.cantidad || 0),
+        cantidadAjustada: Number(r.cantidadAjustada || r.cantidadContratada || 0),
+        costoUnitarioDirecto: Number(r.costoUnitarioDirecto || r.costoUnitario || r.precioUnitario || 0),
+        cantidadEstePeriodo: Number(r.cantidadEstePeriodo || 0),
+        cantidadAcumuladaAnterior: Number(r.cantidadAcumuladaAnterior || 0),
+      }))
+    }
+    return (CATALOGO_COMPLETO_88 as any[]).map((r: any, idx: number) => ({
+      id: r.id || `r-cat-${idx}`,
+      capituloId: Number(r.capituloId || 1),
+      capituloNombre: r.capituloNombre || `Capítulo ${r.capituloId || 1}`,
+      codigoDGC: r.codigoDGC || `10${idx + 1}.01`,
+      descripcion: r.descripcion || '',
+      unidad: r.unidad || 'm³',
+      cantidadContratada: Number(r.cantidadContratada || 1),
+      cantidadAjustada: Number(r.cantidadAjustada || r.cantidadContratada || 1),
+      costoUnitarioDirecto: Number(r.costoUnitarioDirecto || 100),
+      cantidadEstePeriodo: Number(r.cantidadEstePeriodo || 0),
+      cantidadAcumuladaAnterior: Number(r.cantidadAcumuladaAnterior || 0),
+    }))
+  }, [proyecto])
+
   // Filtrado de Renglones en Programa de Trabajo (Filtro por Capítulo + Filtro por Renglón / Búsqueda)
   const renglonesFiltrados = useMemo(() => {
-    return CATALOGO_BASE_RENGLONES.filter((r) => {
+    return listaRenglonesFuente.filter((r) => {
       const matchCap = filtroCapitulo === 'todos' || r.capituloId === filtroCapitulo
       const matchRenglon = filtroRenglon === 'todos' || r.codigoDGC === filtroRenglon
       const matchTexto = busquedaTexto.trim() === '' ||
@@ -546,22 +580,22 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
 
       return matchCap && matchRenglon && matchTexto
     })
-  }, [filtroCapitulo, filtroRenglon, busquedaTexto])
+  }, [listaRenglonesFuente, filtroCapitulo, filtroRenglon, busquedaTexto])
 
   // Paginación de Renglones
   const totalPaginasRenglones = Math.max(1, Math.ceil(renglonesFiltrados.length / itemsPorPagina))
   const renglonesPaginados = useMemo(() => {
     const inicio = (paginaRenglones - 1) * itemsPorPagina
     return renglonesFiltrados.slice(inicio, inicio + itemsPorPagina)
-  }, [renglonesFiltrados, paginaRenglones])
+  }, [renglonesFiltrados, paginaRenglones, itemsPorPagina])
 
   // Lista de códigos de renglón únicos para el selector
   const listaCodigosRenglon = useMemo(() => {
     const items = filtroCapitulo === 'todos'
-      ? CATALOGO_BASE_RENGLONES
-      : CATALOGO_BASE_RENGLONES.filter((r) => r.capituloId === filtroCapitulo)
+      ? listaRenglonesFuente
+      : listaRenglonesFuente.filter((r) => r.capituloId === filtroCapitulo)
     return items.map((r) => ({ codigo: r.codigoDGC, descripcion: r.descripcion }))
-  }, [filtroCapitulo])
+  }, [listaRenglonesFuente, filtroCapitulo])
 
   // Datos de la Curva S Financiera Dinámica basada en fechas reales y avance del proyecto
   const puntosCurvaS = useMemo(() => {
@@ -1008,11 +1042,32 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
               </table>
             </div>
 
-            {/* Paginación estilo Hoja Sábana */}
+            {/* Paginación estilo Hoja Sábana con Selector de Cantidad (8, 16, 24, 50, etc.) */}
             <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 bg-gray-50/60 px-2.5 py-1 text-[8.5px] text-gray-600">
-              <span className="font-medium">
-                Página <strong className="text-gray-900">{paginaRenglones}</strong> de <strong className="text-gray-900">{totalPaginasRenglones}</strong> ({renglonesFiltrados.length} renglones totales)
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="font-medium">
+                  Página <strong className="text-gray-900">{paginaRenglones}</strong> de <strong className="text-gray-900">{totalPaginasRenglones}</strong> ({renglonesFiltrados.length} renglones)
+                </span>
+                <span className="text-gray-300">|</span>
+                <div className="flex items-center gap-1">
+                  <span>Mostrar:</span>
+                  <select
+                    value={itemsPorPagina}
+                    onChange={(e) => {
+                      setItemsPorPagina(Number(e.target.value))
+                      setPaginaRenglones(1)
+                    }}
+                    className="rounded border border-gray-200 bg-white px-1.5 py-0.5 text-[8.5px] font-semibold text-gray-700 shadow-2xs focus:border-[#9B0F06] focus:outline-none cursor-pointer"
+                  >
+                    <option value={8}>8</option>
+                    <option value={16}>16</option>
+                    <option value={24}>24</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                    <option value={500}>Todos</option>
+                  </select>
+                </div>
+              </div>
 
               <div className="flex items-center gap-1">
                 <button

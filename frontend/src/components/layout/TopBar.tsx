@@ -193,20 +193,34 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
             const currentUserId = profile?.id || ''
             const currentUserEmail = ((profile as any)?.email || profile?.correo || '').toLowerCase().trim()
 
-            sabanaNotifs = parsed.filter((notif: any) => {
-              if (notif.tipo === 'vencimiento_hoy' && (notif.creadoPor || notif.creadoPorId)) {
-                const cPor = String(notif.creadoPor || '').toLowerCase().trim()
-                const cId = String(notif.creadoPorId || '')
+            // Consolidar alertas: mostrar máximo 1 única notificación de estimación vencida / por vencer
+            const vencimientoNotifs: any[] = []
+            const otrasNotifs: any[] = []
 
-                const matchName = currentUserName && (cPor === currentUserName || cPor.includes(currentUserName) || currentUserName.includes(cPor))
-                const matchUser = currentUsername && (cPor === currentUsername || cPor.includes(currentUsername))
-                const matchEmail = currentUserEmail && (cPor === currentUserEmail)
-                const matchId = currentUserId && (cId === currentUserId)
+            parsed.forEach((notif: any) => {
+              if (notif.tipo === 'vencimiento_hoy') {
+                if (notif.creadoPor || notif.creadoPorId) {
+                  const cPor = String(notif.creadoPor || '').toLowerCase().trim()
+                  const cId = String(notif.creadoPorId || '')
 
-                return matchName || matchUser || matchEmail || matchId
+                  const matchName = currentUserName && (cPor === currentUserName || cPor.includes(currentUserName) || currentUserName.includes(cPor))
+                  const matchUser = currentUsername && (cPor === currentUsername || cPor.includes(currentUsername))
+                  const matchEmail = currentUserEmail && (cPor === currentUserEmail)
+                  const matchId = currentUserId && (cId === currentUserId)
+
+                  if (matchName || matchUser || matchEmail || matchId) {
+                    vencimientoNotifs.push(notif)
+                  }
+                } else {
+                  vencimientoNotifs.push(notif)
+                }
+              } else {
+                otrasNotifs.push(notif)
               }
-              return true
             })
+
+            // Asegurar estrictamente 1 sola notificación de vencimiento en el panel
+            sabanaNotifs = vencimientoNotifs.length > 0 ? [vencimientoNotifs[0], ...otrasNotifs] : otrasNotifs
           }
         }
         setNotificacionesSabana(sabanaNotifs)

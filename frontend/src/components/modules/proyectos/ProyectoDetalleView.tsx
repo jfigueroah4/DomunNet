@@ -35,6 +35,65 @@ import { proyectoService } from '@/services/proyectos/proyecto.service'
 
 type MasterTabType = 'general' | 'financiera'
 type SubTabGeneralType = 'resumen' | 'intro' | 'marco_legal' | 'ficha_tecnica' | 'ubicacion'
+export function sanitizeNombrePersona(val: string, maxLen = 150): string {
+  return val.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s.'-]/g, '').slice(0, maxLen)
+}
+
+function sanitizeTelefono(val: string, maxLen = 30): string {
+  const sinTexto = val.replace(/[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ@.]+/g, '')
+  return sinTexto.replace(/[^0-9+\s\-()\/]/g, '').trimStart().slice(0, maxLen)
+}
+
+function limpiarTelefono(tel?: string): string {
+  if (!tel) return ''
+  let t = tel.replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, '')
+  t = t.replace(/(?:pbx|tel|teléfono|telefono|cel|celular|contacto)\s*:?/gi, '')
+  t = t.replace(/^\s*[\/\-]\s*|\s*[\/\-]\s*$/g, '').trim()
+  return t.replace(/[^0-9+\s\-()\/]/g, '').trim()
+}
+
+function extraerCorreoDeTexto(tel?: string): string {
+  if (!tel) return ''
+  const m = tel.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/)
+  return m ? m[1] : ''
+}
+
+function parseActaString(actaStr?: string): { numero: string; fecha: string } {
+  if (!actaStr) return { numero: '', fecha: '' }
+  const clean = actaStr.trim()
+  const m = clean.match(/(?:Acta\s*(?:No\.?)?\s*)?([A-Za-z0-9\-_./]+)\s+de\s+fecha\s+([\d\-\/]+)/i)
+  if (m) {
+    const rawNum = m[1].trim()
+    let rawFecha = m[2].trim()
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(rawFecha)) {
+      const [d, mo, y] = rawFecha.split('/')
+      rawFecha = `${y}-${mo.padStart(2, '0')}-${d.padStart(2, '0')}`
+    }
+    return { numero: rawNum, fecha: rawFecha }
+  }
+  const numOnly = clean.replace(/^Acta\s*(?:No\.?)?\s*/i, '').trim()
+  return { numero: numOnly, fecha: '' }
+}
+
+function formatActaString(numero?: string, fecha?: string): string {
+  const num = (numero || '').trim().replace(/^Acta\s*(?:No\.?)?\s*/i, '')
+  const fec = (fecha || '').trim()
+  let displayFec = fec
+  if (/^\d{4}-\d{2}-\d{2}$/.test(fec)) {
+    const [y, mo, d] = fec.split('-')
+    displayFec = `${d}/${mo}/${y}`
+  }
+  if (num && displayFec) {
+    return `Acta No. ${num} de fecha ${displayFec}`
+  }
+  if (num) {
+    return `Acta No. ${num}`
+  }
+  if (displayFec) {
+    return `Fecha: ${displayFec}`
+  }
+  return ''
+}
 
 function calcularDiasActividad(fechaInicio?: string): number {
   if (!fechaInicio) return 0
@@ -271,7 +330,7 @@ function EditableInfoField({
   value?: string | number | null
   isEditing?: boolean
   onChange?: (val: any) => void
-  type?: 'text' | 'date' | 'number' | 'textarea'
+  type?: 'text' | 'date' | 'number' | 'textarea' | 'email'
   highlight?: boolean
   mono?: boolean
   placeholder?: string
@@ -410,7 +469,7 @@ function obtenerValoresCompletosProyecto(p?: ProyectoType | any): Record<string,
     entidadContratante: p.entidadContratante || 'Dirección General de Caminos (DGC)',
     empresaContratista: p.empresaContratista || cEjec.empresaNombre || 'Constructora y Pavimentos S.A.',
     empresaSupervisora: p.empresaSupervisora || cSup.empresaNombre || 'SERVICIOS DE INGENIERIA - SERINGE',
-    delegadoResidente: p.delegadoResidente || 'Ing. Raúl Alvarado',
+    delegadoResidente: p.delegadoResidente || cSup.responsable || pAny.delegadoResidente || 'Ing. Civil Pablo Osberto Pérez Gómez (Col. 3689)',
 
     // Contrato Resumen
     fechaAdjudicacion: p.fechaAdjudicacion || '2026-09-06',
@@ -431,18 +490,23 @@ function obtenerValoresCompletosProyecto(p?: ProyectoType | any): Record<string,
     registroMercantilContratista: cEjec.registroMercantil || pAny.registroMercantilContratista || '145892B',
     direccionContratista: cEjec.direccion || pAny.direccionContratista || '12 Calle 4-55 Zona 10, Edificio Gran Vía, Nivel 8, Guatemala',
     actaInicioEjecutora: cEjec.actaInicioNumero || pAny.actaInicioEjecutora || 'Acta No. 26-2026 de fecha 09/02/2026',
+    actaInicioNumeroEjecutora: pAny.actaInicioNumeroEjecutora || parseActaString(cEjec.actaInicioNumero || pAny.actaInicioEjecutora || 'Acta No. 26-2026 de fecha 09/02/2026').numero,
+    actaInicioFechaEjecutora: pAny.actaInicioFechaEjecutora || parseActaString(cEjec.actaInicioNumero || pAny.actaInicioEjecutora || 'Acta No. 26-2026 de fecha 09/02/2026').fecha,
     superintendente: cEjec.responsable || pAny.superintendente || 'Ing. Civil Fernando José Reyes Cabrera',
     colegiadoSuperintendente: pAny.colegiadoSuperintendente || 'Colegiado Activo No. 4125',
-    telefonoContratista: cEjec.telefono || pAny.telefonoContratista || 'PBX: 2334-9000 / contacto@constructora.com',
+    telefonoContratista: limpiarTelefono(cEjec.telefono || pAny.telefonoContratista) || '2334-9000',
+    correoContratista: cEjec.correo || pAny.correoContratista || extraerCorreoDeTexto(cEjec.telefono || pAny.telefonoContratista) || 'contacto@constructora.com',
 
     // Marco Legal Supervisora
     licitacionSupervisora: cSup.licitacionNumero || pAny.licitacionSupervisora || 'Licitación Pública No. DGC-SUP-012-2025',
     propietarioSupervisora: cSup.propietario || pAny.propietarioSupervisora || 'William Ramón Godínez Mansilla',
     registroMercantilSupervisora: cSup.registroMercantil || pAny.registroMercantilSupervisora || '177228A',
     direccionSupervisora: cSup.direccion || pAny.direccionSupervisora || 'Avenida Las Américas, 24-70 Zona 13, Guatemala',
-    telefonoSupervisora: cSup.telefono || pAny.telefonoSupervisora || '2212-9675 / 5525-1537',
+    telefonoSupervisora: limpiarTelefono(cSup.telefono || pAny.telefonoSupervisora) || '2212-9675 / 5525-1537',
     correoSupervisora: cSup.correo || pAny.correoSupervisora || 'supervision@seringe.com.gt',
     actaInicioSupervisora: cSup.actaInicioNumero || pAny.actaInicioSupervisora || 'Acta No. 52-2026 de fecha 07/07/2026',
+    actaInicioNumeroSupervisora: pAny.actaInicioNumeroSupervisora || parseActaString(cSup.actaInicioNumero || pAny.actaInicioSupervisora || 'Acta No. 52-2026 de fecha 07/07/2026').numero,
+    actaInicioFechaSupervisora: pAny.actaInicioFechaSupervisora || parseActaString(cSup.actaInicioNumero || pAny.actaInicioSupervisora || 'Acta No. 52-2026 de fecha 07/07/2026').fecha,
 
     // Ficha Técnica Obra
     responsableNombre: cEjec.responsable || pAny.responsableNombre || 'Ing. Civil Fernando Reyes (Col. 4125)',
@@ -544,6 +608,88 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
         showErrorToast('El nombre oficial del proyecto no puede estar vacío')
         setIsSaving(false)
         return
+      }
+
+      if (sectionKey === 'marco_legal_contratista') {
+        const prop = (editFormData.propietarioContratista || '').trim()
+        if (prop && (/[0-9]/.test(prop) || prop.length < 2)) {
+          showErrorToast('El nombre del propietario/representante legal no es válido. Debe contener solo letras y al menos 2 caracteres.')
+          setIsSaving(false)
+          return
+        }
+        const superInt = (editFormData.superintendente || '').trim()
+        if (superInt && (/[0-9]/.test(superInt) || superInt.length < 2)) {
+          showErrorToast('El nombre del superintendente no es válido. Debe contener solo letras.')
+          setIsSaving(false)
+          return
+        }
+        const tel = (editFormData.telefonoContratista || '').trim()
+        if (tel && /[a-zA-Z]/.test(tel)) {
+          showErrorToast('El teléfono no debe incluir letras ni texto como PBX. Ingrese solo dígitos.')
+          setIsSaving(false)
+          return
+        }
+        const correo = (editFormData.correoContratista || '').trim()
+        if (correo && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) {
+          showErrorToast('El formato del correo electrónico del contratista no es válido.')
+          setIsSaving(false)
+          return
+        }
+
+        const actaStr = formatActaString(editFormData.actaInicioNumeroEjecutora, editFormData.actaInicioFechaEjecutora) || editFormData.actaInicioEjecutora
+        editFormData.actaInicioEjecutora = actaStr
+        if (!editFormData.contratoEjecucion) editFormData.contratoEjecucion = {}
+        editFormData.contratoEjecucion = {
+          ...editFormData.contratoEjecucion,
+          empresaNombre: editFormData.empresaContratista,
+          propietario: editFormData.propietarioContratista,
+          direccion: editFormData.direccionContratista,
+          telefono: editFormData.telefonoContratista,
+          correo: editFormData.correoContratista,
+          responsable: editFormData.superintendente,
+          actaInicioNumero: actaStr,
+        }
+      }
+
+      if (sectionKey === 'marco_legal_supervisora') {
+        const propSup = (editFormData.propietarioSupervisora || '').trim()
+        if (propSup && (/[0-9]/.test(propSup) || propSup.length < 2)) {
+          showErrorToast('El nombre del propietario/contacto de supervisión no es válido.')
+          setIsSaving(false)
+          return
+        }
+        const delRes = (editFormData.delegadoResidente || '').trim()
+        if (delRes && (/[0-9]/.test(delRes) || delRes.length < 2)) {
+          showErrorToast('El nombre del delegado residente no es válido. Debe contener solo letras.')
+          setIsSaving(false)
+          return
+        }
+        const telSup = (editFormData.telefonoSupervisora || '').trim()
+        if (telSup && /[a-zA-Z]/.test(telSup)) {
+          showErrorToast('El teléfono de supervisión no debe incluir letras. Ingrese solo dígitos.')
+          setIsSaving(false)
+          return
+        }
+        const correoSup = (editFormData.correoSupervisora || '').trim()
+        if (correoSup && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correoSup)) {
+          showErrorToast('El formato del correo electrónico de la supervisora no es válido.')
+          setIsSaving(false)
+          return
+        }
+
+        const actaStr = formatActaString(editFormData.actaInicioNumeroSupervisora, editFormData.actaInicioFechaSupervisora) || editFormData.actaInicioSupervisora
+        editFormData.actaInicioSupervisora = actaStr
+        if (!editFormData.contratoSupervision) editFormData.contratoSupervision = {}
+        editFormData.contratoSupervision = {
+          ...editFormData.contratoSupervision,
+          empresaNombre: editFormData.empresaSupervisora,
+          propietario: editFormData.propietarioSupervisora,
+          direccion: editFormData.direccionSupervisora,
+          telefono: editFormData.telefonoSupervisora,
+          correo: editFormData.correoSupervisora,
+          responsable: editFormData.delegadoResidente,
+          actaInicioNumero: actaStr,
+        }
       }
 
       await proyectoService.actualizarProyecto(proyecto.id, editFormData)
@@ -1182,7 +1328,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                       label="Nombre de Propietario / Representante Legal"
                       value={editingSection === 'marco_legal_contratista' ? editFormData.propietarioContratista : (pAny.propietarioContratista || 'Ing. Marco Antonio Estrada Morales')}
                       isEditing={editingSection === 'marco_legal_contratista'}
-                      onChange={(v) => handleFieldChange('propietarioContratista', v)}
+                      onChange={(v) => handleFieldChange('propietarioContratista', sanitizeNombrePersona(v))}
                       placeholder="Representante Legal"
                     />
                     <EditableInfoField
@@ -1195,19 +1341,44 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                   </div>
 
                   <div className="space-y-2 rounded-lg border border-gray-100 bg-gray-50/50 p-3">
-                    <EditableInfoField
-                      label="Acta de Inicio y de Plazo"
-                      value={editingSection === 'marco_legal_contratista' ? editFormData.actaInicioEjecutora : (pAny.actaInicioEjecutora || 'Acta No. 26-2026 de fecha 09/02/2026')}
-                      isEditing={editingSection === 'marco_legal_contratista'}
-                      onChange={(v) => handleFieldChange('actaInicioEjecutora', v)}
-                      mono
-                      placeholder="Acta No. 26-2026..."
-                    />
+                    {/* Acta de Inicio: Primero Número y luego Fecha */}
+                    {editingSection === 'marco_legal_contratista' ? (
+                      <div className="grid grid-cols-2 gap-2">
+                        <EditableInfoField
+                          label="Número de Acta"
+                          value={editFormData.actaInicioNumeroEjecutora}
+                          isEditing={true}
+                          onChange={(v) => {
+                            handleFieldChange('actaInicioNumeroEjecutora', v)
+                            handleFieldChange('actaInicioEjecutora', formatActaString(v, editFormData.actaInicioFechaEjecutora))
+                          }}
+                          mono
+                          placeholder="Ej: 26-2026"
+                        />
+                        <EditableInfoField
+                          label="Fecha de Acta"
+                          value={editFormData.actaInicioFechaEjecutora}
+                          isEditing={true}
+                          type="date"
+                          onChange={(v) => {
+                            handleFieldChange('actaInicioFechaEjecutora', v)
+                            handleFieldChange('actaInicioEjecutora', formatActaString(editFormData.actaInicioNumeroEjecutora, v))
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <EditableInfoField
+                        label="Acta de Inicio y de Plazo"
+                        value={formatActaString(editFormData.actaInicioNumeroEjecutora, editFormData.actaInicioFechaEjecutora) || editFormData.actaInicioEjecutora || (pAny.actaInicioEjecutora || 'Acta No. 26-2026 de fecha 09/02/2026')}
+                        mono
+                      />
+                    )}
+
                     <EditableInfoField
                       label="Nombramiento de Superintendente"
                       value={editingSection === 'marco_legal_contratista' ? editFormData.superintendente : (pAny.superintendente || 'Ing. Civil Fernando José Reyes Cabrera')}
                       isEditing={editingSection === 'marco_legal_contratista'}
-                      onChange={(v) => handleFieldChange('superintendente', v)}
+                      onChange={(v) => handleFieldChange('superintendente', sanitizeNombrePersona(v))}
                       placeholder="Superintendente de Obra"
                     />
                     <EditableInfoField
@@ -1218,13 +1389,23 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                       mono
                       placeholder="Col. No. 4125"
                     />
-                    <EditableInfoField
-                      label="Contacto y Teléfono"
-                      value={editingSection === 'marco_legal_contratista' ? editFormData.telefonoContratista : (pAny.telefonoContratista || 'PBX: 2334-9000 / contacto@constructora.com')}
-                      isEditing={editingSection === 'marco_legal_contratista'}
-                      onChange={(v) => handleFieldChange('telefonoContratista', v)}
-                      placeholder="2334-9000 / correo@empresa.com"
-                    />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <EditableInfoField
+                        label="Teléfono de Contacto"
+                        value={editingSection === 'marco_legal_contratista' ? editFormData.telefonoContratista : (editFormData.telefonoContratista || '2334-9000')}
+                        isEditing={editingSection === 'marco_legal_contratista'}
+                        onChange={(v) => handleFieldChange('telefonoContratista', sanitizeTelefono(v))}
+                        placeholder="2334-9000"
+                      />
+                      <EditableInfoField
+                        label="Correo Electrónico"
+                        value={editingSection === 'marco_legal_contratista' ? editFormData.correoContratista : (editFormData.correoContratista || 'contacto@constructora.com')}
+                        isEditing={editingSection === 'marco_legal_contratista'}
+                        type="email"
+                        onChange={(v) => handleFieldChange('correoContratista', v.replace(/\s+/g, ''))}
+                        placeholder="contacto@constructora.com"
+                      />
+                    </div>
                   </div>
                 </div>
               </InfoDetailCard>
@@ -1262,7 +1443,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                       label="Nombre Propietario (Contacto)"
                       value={editingSection === 'marco_legal_supervisora' ? editFormData.propietarioSupervisora : (pAny.propietarioSupervisora || 'William Ramón Godínez Mansilla')}
                       isEditing={editingSection === 'marco_legal_supervisora'}
-                      onChange={(v) => handleFieldChange('propietarioSupervisora', v)}
+                      onChange={(v) => handleFieldChange('propietarioSupervisora', sanitizeNombrePersona(v))}
                       placeholder="Propietario / Contacto"
                     />
                     <EditableInfoField
@@ -1275,33 +1456,62 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                   </div>
 
                   <div className="space-y-2 rounded-lg border border-gray-100 bg-gray-50/50 p-3">
-                    <EditableInfoField
-                      label="Contacto / Teléfonos"
-                      value={editingSection === 'marco_legal_supervisora' ? editFormData.telefonoSupervisora : (pAny.telefonoSupervisora || '2212-9675 / 5525-1537')}
-                      isEditing={editingSection === 'marco_legal_supervisora'}
-                      onChange={(v) => handleFieldChange('telefonoSupervisora', v)}
-                      placeholder="2212-9675 / 5525-1537"
-                    />
-                    <EditableInfoField
-                      label="Correo Electrónico"
-                      value={editingSection === 'marco_legal_supervisora' ? editFormData.correoSupervisora : (pAny.correoSupervisora || 'supervision@seringe.com.gt')}
-                      isEditing={editingSection === 'marco_legal_supervisora'}
-                      onChange={(v) => handleFieldChange('correoSupervisora', v)}
-                      placeholder="supervision@correo.com"
-                    />
-                    <EditableInfoField
-                      label="Acta de Inicio de Supervisión"
-                      value={editingSection === 'marco_legal_supervisora' ? editFormData.actaInicioSupervisora : (pAny.actaInicioSupervisora || 'Acta No. 52-2026 de fecha 07/07/2026')}
-                      isEditing={editingSection === 'marco_legal_supervisora'}
-                      onChange={(v) => handleFieldChange('actaInicioSupervisora', v)}
-                      mono
-                      placeholder="Acta No. 52-2026..."
-                    />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <EditableInfoField
+                        label="Teléfono de Contacto"
+                        value={editingSection === 'marco_legal_supervisora' ? editFormData.telefonoSupervisora : (editFormData.telefonoSupervisora || '2212-9675 / 5525-1537')}
+                        isEditing={editingSection === 'marco_legal_supervisora'}
+                        onChange={(v) => handleFieldChange('telefonoSupervisora', sanitizeTelefono(v))}
+                        placeholder="2212-9675 / 5525-1537"
+                      />
+                      <EditableInfoField
+                        label="Correo Electrónico"
+                        value={editingSection === 'marco_legal_supervisora' ? editFormData.correoSupervisora : (editFormData.correoSupervisora || 'supervision@seringe.com.gt')}
+                        isEditing={editingSection === 'marco_legal_supervisora'}
+                        type="email"
+                        onChange={(v) => handleFieldChange('correoSupervisora', v.replace(/\s+/g, ''))}
+                        placeholder="supervision@seringe.com.gt"
+                      />
+                    </div>
+
+                    {/* Acta de Inicio Supervisión: Primero Número y luego Fecha */}
+                    {editingSection === 'marco_legal_supervisora' ? (
+                      <div className="grid grid-cols-2 gap-2">
+                        <EditableInfoField
+                          label="Número de Acta"
+                          value={editFormData.actaInicioNumeroSupervisora}
+                          isEditing={true}
+                          onChange={(v) => {
+                            handleFieldChange('actaInicioNumeroSupervisora', v)
+                            handleFieldChange('actaInicioSupervisora', formatActaString(v, editFormData.actaInicioFechaSupervisora))
+                          }}
+                          mono
+                          placeholder="Ej: 52-2026"
+                        />
+                        <EditableInfoField
+                          label="Fecha de Acta"
+                          value={editFormData.actaInicioFechaSupervisora}
+                          isEditing={true}
+                          type="date"
+                          onChange={(v) => {
+                            handleFieldChange('actaInicioFechaSupervisora', v)
+                            handleFieldChange('actaInicioSupervisora', formatActaString(editFormData.actaInicioNumeroSupervisora, v))
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <EditableInfoField
+                        label="Acta de Inicio de Supervisión"
+                        value={formatActaString(editFormData.actaInicioNumeroSupervisora, editFormData.actaInicioFechaSupervisora) || editFormData.actaInicioSupervisora || (pAny.actaInicioSupervisora || 'Acta No. 52-2026 de fecha 07/07/2026')}
+                        mono
+                      />
+                    )}
+
                     <EditableInfoField
                       label="Delegado Residente de Proyecto"
                       value={editingSection === 'marco_legal_supervisora' ? editFormData.delegadoResidente : (proyecto.delegadoResidente || 'Ing. Civil Pablo Osberto Pérez Gómez (Col. 3689)')}
                       isEditing={editingSection === 'marco_legal_supervisora'}
-                      onChange={(v) => handleFieldChange('delegadoResidente', v)}
+                      onChange={(v) => handleFieldChange('delegadoResidente', sanitizeNombrePersona(v))}
                       placeholder="Ing. Delegado Residente"
                     />
                   </div>

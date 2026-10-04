@@ -14,8 +14,8 @@ export default function ProyectoEstadoBadge({ estado }: ProyectoEstadoBadgeProps
       label: 'Borrador',
     },
     activo: {
-      bg: 'bg-emerald-50 border border-emerald-200',
-      text: 'text-emerald-700 font-bold',
+      bg: 'bg-emerald-600 border border-emerald-700 shadow-2xs',
+      text: 'text-white font-bold',
       label: 'Activo',
     },
     en_revision: {

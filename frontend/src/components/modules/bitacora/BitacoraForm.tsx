@@ -182,9 +182,9 @@ export function BitacoraForm({
   const [renglonSeleccionadoId, setRenglonSeleccionadoId] = useState<string>('')
   const [comboboxAbierto, setComboboxAbierto] = useState<boolean>(false)
   const [busquedaCombobox, setBusquedaCombobox] = useState<string>('')
-  const [ladoRenglon, setLadoRenglon] = useState<'Ambos' | 'Derecho' | 'Izquierdo'>('Ambos')
-  const [estInicioRenglon, setEstInicioRenglon] = useState<string>('0+000')
-  const [estFinRenglon, setEstFinRenglon] = useState<string>('0+500')
+  const [ladoRenglon, setLadoRenglon] = useState<'Ambos' | 'Derecho' | 'Izquierdo' | ''>('')
+  const [estInicioRenglon, setEstInicioRenglon] = useState<string>('')
+  const [estFinRenglon, setEstFinRenglon] = useState<string>('')
   const comboboxRef = useRef<HTMLDivElement>(null)
 
   // Estado para el motivo de suspensión y campo "Otra..."
@@ -217,8 +217,9 @@ export function BitacoraForm({
     fotografiaPrincipal: null,
   })
 
-  const handleCambiarLado = (lado: 'Ambos' | 'Derecho' | 'Izquierdo') => {
+  const handleCambiarLado = (lado: 'Ambos' | 'Derecho' | 'Izquierdo' | '') => {
     setLadoRenglon(lado)
+    setErrors((p) => ({ ...p, renglones: '' }))
   }
 
   const handleCambiarEstInicio = (val: string) => {
@@ -388,24 +389,22 @@ export function BitacoraForm({
                     }))
                     .sort((a: any, b: any) => a.id.localeCompare(b.id, undefined, { numeric: true }))
                   setProyectoPlanTrabajo(sorted)
-                  if (sorted.length > 0) {
-                    setRenglonSeleccionadoId(sorted[0].id)
-                  }
+                  setRenglonSeleccionadoId('')
                 } else {
                   setProyectoPlanTrabajo(RENGLONES_FALLBACK_DEFAULT)
-                  setRenglonSeleccionadoId(RENGLONES_FALLBACK_DEFAULT[0].id)
+                  setRenglonSeleccionadoId('')
                 }
               })
               .catch(() => {
                 setProyectoPlanTrabajo(RENGLONES_FALLBACK_DEFAULT)
-                setRenglonSeleccionadoId(RENGLONES_FALLBACK_DEFAULT[0].id)
+                setRenglonSeleccionadoId('')
               })
           }
         }
       })
       .catch(() => {
         setProyectoPlanTrabajo(RENGLONES_FALLBACK_DEFAULT)
-        setRenglonSeleccionadoId(RENGLONES_FALLBACK_DEFAULT[0].id)
+        setRenglonSeleccionadoId('')
       })
   }, [fd.proyectoId])
 
@@ -442,15 +441,7 @@ export function BitacoraForm({
     }
   }, [proyectoSeleccionadoObj])
 
-  // Actualizar estaciones por defecto al cambiar el tramo del proyecto
-  useEffect(() => {
-    if (proyMinEstacion) setEstInicioRenglon(proyMinEstacion)
-    if (proyMaxEstacion) {
-      setEstFinRenglon(proyMaxEstacion)
-    } else if (proyMinMeters !== null) {
-      setEstFinRenglon(formatMeters(proyMinMeters + 500))
-    }
-  }, [proyMinEstacion, proyMaxEstacion, proyMinMeters])
+
 
   // Cerrar dropdown del Combobox al hacer clic fuera
   useEffect(() => {
@@ -670,16 +661,22 @@ export function BitacoraForm({
       if (!renglonSeleccionadoId) {
         errs.renglones = 'Selecciona un renglón de obra'
       } else {
-        if (!estInicioRenglon?.trim() || !estFinRenglon?.trim()) {
-          errs.renglones = 'Completa las estaciones de inicio y fin'
+        if (!ladoRenglon) {
+          errs.renglones = 'Selecciona el lado de la vía (Ambos, Derecho o Izquierdo)'
         } else {
-          const mIni = parseMeters(estInicioRenglon)
-          const mFin = parseMeters(estFinRenglon)
+          const finalEstIni = estInicioRenglon?.trim() || proyMinEstacion || '0+000'
+          const finalEstFin =
+            estFinRenglon?.trim() ||
+            proyMaxEstacion ||
+            (proyMinMeters !== null ? formatMeters(proyMinMeters + 500) : '0+500')
+
+          const mIni = parseMeters(finalEstIni)
+          const mFin = parseMeters(finalEstFin)
 
           if (mIni === null || mFin === null) {
             errs.renglones = 'Formato de estación no válido (ej. 0+000)'
           } else if (mFin < mIni) {
-            errs.renglones = `Est. Fin (${estFinRenglon}) debe ser ≥ Est. Inicio (${estInicioRenglon})`
+            errs.renglones = `Est. Fin (${finalEstFin}) debe ser ≥ Est. Inicio (${finalEstIni})`
           } else if (proyMinMeters !== null && mIni < proyMinMeters) {
             errs.renglones = `Est. Inicio no puede ser menor a ${proyMinEstacion}`
           } else if (proyMaxMeters !== null && mFin > proyMaxMeters) {
@@ -717,8 +714,14 @@ export function BitacoraForm({
       motivoSuspensionPreset === 'Otra...' ? motivoSuspensionOtra.trim() : motivoSuspensionPreset.trim()
 
     try {
+      const finalEstIni = estInicioRenglon?.trim() || proyMinEstacion || '0+000'
+      const finalEstFin =
+        estFinRenglon?.trim() ||
+        proyMaxEstacion ||
+        (proyMinMeters !== null ? formatMeters(proyMinMeters + 500) : '0+500')
+
       const ubicacionCalculada =
-        fd.ubicacionGps?.trim() || `Est. ${estInicioRenglon} a ${estFinRenglon} (${ladoRenglon})`
+        fd.ubicacionGps?.trim() || `Est. ${finalEstIni} a ${finalEstFin} (${ladoRenglon})`
 
       const pad = (n: number) => n.toString().padStart(2, '0')
       const now = new Date()
@@ -761,8 +764,8 @@ export function BitacoraForm({
         const renglonUuid = matchPlan?.renglonId || (renglonSeleccionadoId.length === 36 ? renglonSeleccionadoId : undefined)
 
         const ladoMapeado = ladoRenglon === 'Ambos' ? 'Sección Completa' : ladoRenglon
-        const estIni = parseEstacionVal(estInicioRenglon)
-        const estFin = parseEstacionVal(estFinRenglon)
+        const estIni = parseEstacionVal(finalEstIni)
+        const estFin = parseEstacionVal(finalEstFin)
 
         if (renglonUuid) {
           try {
@@ -838,7 +841,7 @@ export function BitacoraForm({
       {/* ========================================================================= */}
       {/* ENCABEZADO LIMPIO: Sin fondo corinto, texto y controles en color corinto */}
       {/* ========================================================================= */}
-      <div className="relative flex items-center justify-between bg-white border-b border-gray-200 px-6 py-3.5 z-20">
+      <div className="relative flex items-center justify-between bg-white border-b border-gray-200 px-4 sm:px-6 py-1.5 sm:py-2 z-20">
         {/* Izquierda: X para cerrar o Flecha si está en paso 2 o 3 */}
         <div className="flex items-center gap-2 z-10">
           {paso > 1 ? (
@@ -970,10 +973,11 @@ export function BitacoraForm({
               <button
                 type="button"
                 onClick={() => fileInputFotoRef.current?.click()}
-                className="absolute top-3.5 right-3.5 p-2 rounded-full bg-black/60 hover:bg-black/80 text-white backdrop-blur-md transition-all shadow-md cursor-pointer border border-white/20"
+                className="absolute top-3.5 right-3.5 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-gray-50 text-[#9B0F06] font-bold text-xs shadow-md transition-all cursor-pointer border border-gray-200"
                 title="Cambiar foto"
               >
-                <ArrowLeftRight size={17} />
+                <ArrowLeftRight size={14} className="text-[#9B0F06]" />
+                <span>Cambiar foto</span>
               </button>
 
               <div className="absolute bottom-3.5 left-3.5 bg-black/60 backdrop-blur-xs px-3.5 py-1.5 rounded-full text-[10.5px] text-white font-mono">
@@ -1002,7 +1006,7 @@ export function BitacoraForm({
       {paso === 3 && (
         <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 min-h-[calc(100vh-140px)]">
           {/* LADO IZQUIERDO: Fotografía en Grande sobre FONDO BLANCO */}
-          <div className="lg:col-span-7 bg-white flex flex-col p-6 border-b lg:border-b-0 lg:border-r border-gray-100">
+          <div className="lg:col-span-7 bg-white flex flex-col p-4 sm:p-5 pt-2 sm:pt-3 border-b lg:border-b-0 lg:border-r border-gray-100">
             {/* Barra superior elevada sobre la foto con botón Cambiar */}
             <div className="w-full flex items-center justify-between pb-2 mb-2">
               <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">
@@ -1012,7 +1016,7 @@ export function BitacoraForm({
                 <button
                   type="button"
                   onClick={() => fileInputFotoRef.current?.click()}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1 text-xs font-bold transition-all cursor-pointer shadow-2xs border border-gray-200"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-white hover:bg-gray-50 text-[#9B0F06] px-3 py-1 text-xs font-bold transition-all cursor-pointer shadow-2xs border border-gray-200"
                   title="Cambiar fotografía"
                 >
                   <ArrowLeftRight size={13} className="text-[#9B0F06]" />
@@ -1048,7 +1052,7 @@ export function BitacoraForm({
           </div>
 
           {/* LADO DERECHO: Panel con líneas divisorias limpias estilo Instagram */}
-          <div className="lg:col-span-5 p-6 bg-white flex flex-col justify-between">
+          <div className="lg:col-span-5 p-4 sm:p-5 pt-2 sm:pt-3 bg-white flex flex-col justify-between">
             <div className="space-y-4">
               {/* 1. Fila de Ubicación GPS (con geocodificación automática bi-direccional) */}
               <div className="border-b border-gray-100 pb-3 space-y-1">
@@ -1119,8 +1123,8 @@ export function BitacoraForm({
               {/* 2. Renglón de Trabajo (Combobox limpio sin fondos rojos ni números duplicados) */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-gray-800">
-                    Renglón de trabajo
+                  <span className="text-[11px] font-bold text-gray-700">
+                    Selección de Renglón
                   </span>
                   <span className="text-[10px] text-gray-400 font-mono">
                     {proyMinEstacion} ➔ {proyMaxEstacion || 'Fin'}
@@ -1243,6 +1247,7 @@ export function BitacoraForm({
                       onChange={(e) => handleCambiarLado(e.target.value as any)}
                       className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs text-gray-800 font-medium focus:outline-none focus:border-gray-400"
                     >
+                      <option value="">-- Seleccionar --</option>
                       <option value="Ambos">Ambos</option>
                       <option value="Derecho">Derecho</option>
                       <option value="Izquierdo">Izquierdo</option>
@@ -1252,20 +1257,24 @@ export function BitacoraForm({
                     <span className="text-[10px] font-bold text-gray-500 uppercase block mb-1">EST. INICIO</span>
                     <input
                       type="text"
+                      inputMode="tel"
                       value={estInicioRenglon}
                       onChange={(e) => handleCambiarEstInicio(e.target.value)}
-                      placeholder="0+000"
-                      className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 font-mono text-xs text-gray-800 focus:outline-none focus:border-gray-400"
+                      placeholder={proyMinEstacion || '0+000'}
+                      autoComplete="off"
+                      className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 font-mono text-xs text-gray-800 placeholder-gray-400 focus:outline-none focus:border-gray-400"
                     />
                   </div>
                   <div>
                     <span className="text-[10px] font-bold text-gray-500 uppercase block mb-1">EST. FIN</span>
                     <input
                       type="text"
+                      inputMode="tel"
                       value={estFinRenglon}
                       onChange={(e) => handleCambiarEstFin(e.target.value)}
-                      placeholder="0+500"
-                      className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 font-mono text-xs text-gray-800 focus:outline-none focus:border-gray-400"
+                      placeholder={proyMaxEstacion || (proyMinMeters !== null ? formatMeters(proyMinMeters + 500) : '0+500')}
+                      autoComplete="off"
+                      className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 font-mono text-xs text-gray-800 placeholder-gray-400 focus:outline-none focus:border-gray-400"
                     />
                   </div>
                 </div>
@@ -1298,7 +1307,7 @@ export function BitacoraForm({
                     }`}
                   >
                     <span
-                      className={`pointer-events-none inline-block h-3.5 w-3.5 transform rounded-full border border-black/30 bg-white shadow-xs transition duration-200 ease-in-out ${
+                      className={`pointer-events-none inline-block h-3.5 w-3.5 transform rounded-full border border-gray-400 bg-white shadow-xs transition duration-200 ease-in-out ${
                         fd.suspensionActividades ? 'translate-x-5' : 'translate-x-0'
                       }`}
                     />
