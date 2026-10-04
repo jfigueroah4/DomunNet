@@ -635,10 +635,10 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
           <button
             type="button"
             onClick={() => router.push('/dashboard/proyectos')}
-            className="mt-0.5 rounded-lg border border-gray-200 bg-white p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-[#9B0F06] shrink-0"
+            className="mt-0.5 p-1 text-gray-500 transition-colors hover:text-[#9B0F06] shrink-0 cursor-pointer"
             title="Volver a proyectos"
           >
-            <ArrowLeft size={14} />
+            <ArrowLeft size={16} />
           </button>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5">
