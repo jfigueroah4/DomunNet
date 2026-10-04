@@ -273,6 +273,10 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
 
   // Perspectiva Doble en Control de Estimaciones: Empresa Ejecutora vs Supervisora
   const [perspectivaEstimacion, setPerspectivaEstimacion] = useState<'ejecutora' | 'supervisora'>('ejecutora')
+  const [fechaDesdeEstimacion, setFechaDesdeEstimacion] = useState('')
+  const [fechaHastaEstimacion, setFechaHastaEstimacion] = useState('')
+  const [paginaEstimaciones, setPaginaEstimaciones] = useState(1)
+  const itemsPorPaginaEstimaciones = 5
 
   // 2 Filtros en Programa de Trabajo: Por Capítulo y Por Renglón
   const [filtroCapitulo, setFiltroCapitulo] = useState<number | 'todos'>('todos')
@@ -507,8 +511,19 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
   }, [montoAjustadoVigente, pctAnticipoEjec, pctAnticipoSup, pctAnticipoEjecucionNum, pctAnticipoSupervisionNum, nombreDelegadoProyecto, nombreEmpresaEjecutora, nombreEmpresaSupervisora])
 
   const estimacionesFiltradas = useMemo(() => {
-    return estimacionesGeneradas.filter((e) => e.perspectiva === perspectivaEstimacion)
-  }, [estimacionesGeneradas, perspectivaEstimacion])
+    return estimacionesGeneradas.filter((e) => {
+      if (e.perspectiva !== perspectivaEstimacion) return false
+      if (fechaDesdeEstimacion && e.fechaInicio < fechaDesdeEstimacion) return false
+      if (fechaHastaEstimacion && e.fechaFin > fechaHastaEstimacion) return false
+      return true
+    })
+  }, [estimacionesGeneradas, perspectivaEstimacion, fechaDesdeEstimacion, fechaHastaEstimacion])
+
+  const totalPaginasEstimaciones = Math.max(1, Math.ceil(estimacionesFiltradas.length / itemsPorPaginaEstimaciones))
+  const estimacionesPaginadas = useMemo(() => {
+    const inicio = (paginaEstimaciones - 1) * itemsPorPaginaEstimaciones
+    return estimacionesFiltradas.slice(inicio, inicio + itemsPorPaginaEstimaciones)
+  }, [estimacionesFiltradas, paginaEstimaciones, itemsPorPaginaEstimaciones])
 
   // Filtrado de Renglones en Programa de Trabajo (Filtro por Capítulo + Filtro por Renglón / Búsqueda)
   const renglonesFiltrados = useMemo(() => {
@@ -539,62 +554,104 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
     return items.map((r) => ({ codigo: r.codigoDGC, descripcion: r.descripcion }))
   }, [filtroCapitulo])
 
-  // Datos de la Curva S Financiera Completa (PROGRAMADO / EJECUTADO ACUMULADO MENSUAL según Registro DGC)
+  // Datos de la Curva S Financiera Dinámica basada en fechas reales y avance del proyecto
   const puntosCurvaS = useMemo(() => {
-    const meses = [
-      { mes: '22-nov-23', fecha: '22-nov-23', prog: 0.0, real: 0.0 },
-      { mes: 'Dic 2023', fecha: 'Dic 2023', prog: 0.45, real: 0.45 },
-      { mes: 'Ene 2024', fecha: 'Ene 2024', prog: 0.52, real: 0.52 },
-      { mes: 'Feb 2024', fecha: 'Feb 2024', prog: 0.99, real: 0.99 },
-      { mes: 'Marzo 2024', fecha: 'Mar 2024', prog: 2.19, real: 2.19 },
-      { mes: 'Abril 2024', fecha: 'Abr 2024', prog: 3.62, real: 3.62 },
-      { mes: 'Mayo 2024', fecha: 'May 2024', prog: 7.03, real: 7.03 },
-      { mes: 'Junio 2024', fecha: 'Jun 2024', prog: 7.82, real: 7.82 },
-      { mes: 'Julio 2024', fecha: 'Jul 2024', prog: 8.27, real: 8.27 },
-      { mes: 'Agosto 2024', fecha: 'Ago 2024', prog: 8.27, real: 8.27 },
-      { mes: 'Septiembre 2024', fecha: 'Sep 2024', prog: 8.27, real: 8.27 },
-      { mes: 'Octubre 2024', fecha: 'Oct 2024', prog: 10.41, real: 10.41 },
-      { mes: 'Noviembre 2024', fecha: 'Nov 2024', prog: 10.62, real: 10.62 },
-      { mes: 'Diciembre 2024', fecha: 'Dic 2024', prog: 11.30, real: 11.30 },
-      { mes: 'Enero 2025', fecha: 'Ene 2025', prog: 11.97, real: 11.97 },
-      { mes: 'Febrero 2025', fecha: 'Feb 2025', prog: 11.97, real: 11.97 },
-      { mes: 'Marzo 2025', fecha: 'Mar 2025', prog: 14.54, real: 14.54 },
-      { mes: 'Abril 2025', fecha: 'Abr 2025', prog: 14.54, real: 14.54 },
-      { mes: 'Mayo 2025', fecha: 'May 2025', prog: 14.54, real: 14.54 },
-      { mes: 'Junio 2025', fecha: 'Jun 2025', prog: 14.54, real: 14.54 },
-      { mes: 'Julio 2025', fecha: 'Jul 2025', prog: 14.54, real: 14.54 },
-      { mes: 'Agosto 2025', fecha: 'Ago 2025', prog: 14.54, real: 21.63 },
-      { mes: 'Septiembre 2025', fecha: 'Sep 2025', prog: 14.62, real: 26.74 },
-      { mes: 'Octubre 2025', fecha: 'Oct 2025', prog: 14.71, real: 28.49 },
-      { mes: 'Noviembre 2025', fecha: 'Nov 2025', prog: 14.79, real: 29.81 },
-      { mes: 'Diciembre 2025', fecha: 'Dic 2025', prog: 14.96, real: 29.81 },
-      { mes: 'Enero 2026', fecha: 'Ene 2026', prog: 15.12, real: 31.07 },
-      { mes: 'Febrero 2026', fecha: 'Feb 2026', prog: 15.60, real: 31.07 },
-      { mes: 'Marzo 2026', fecha: 'Mar 2026', prog: 16.23, real: 31.85 },
-      { mes: 'Abril 2026', fecha: 'Abr 2026', prog: 16.99, real: 31.85 },
-      { mes: 'Mayo 2026', fecha: 'May 2026', prog: 17.94, real: 37.42 },
-      { mes: 'Junio 2026', fecha: 'Jun 2026', prog: 18.89, real: 37.42 },
-      { mes: 'Julio 2026', fecha: 'Jul 2026', prog: 20.06, real: 39.03, esCorte: true },
-      { mes: 'Agosto 2026', fecha: 'Ago 2026', prog: 21.04, real: null },
-      { mes: 'Septiembre 2026', fecha: 'Sep 2026', prog: 23.01, real: null },
-      { mes: 'Octubre 2026', fecha: 'Oct 2026', prog: 56.74, real: null },
-      { mes: 'Noviembre 2026', fecha: 'Nov 2026', prog: 97.08, real: null },
-      { mes: '3-nov-26', fecha: '3-nov-26', prog: 100.00, real: null },
-    ]
+    const fIniRaw = proyecto?.fechaInicioContractual || proyecto?.fechaInicio || '2026-01-01'
+    const fFinRaw = proyecto?.fechaFinalizacionReal || (proyecto as any)?.fechaFinContractualPlan || proyecto?.fechaFin || '2026-12-31'
 
-    return meses.map((m) => {
-      const variacion = m.real !== null ? m.real - m.prog : null
-      const montoProg = montoAjustadoVigente * (m.prog / 100)
-      const montoReal = m.real !== null ? montoAjustadoVigente * (m.real / 100) : null
+    const partesIni = String(fIniRaw).split('-').map(Number)
+    const partesFin = String(fFinRaw).split('-').map(Number)
+
+    const dIni = new Date(partesIni[0] || 2026, partesIni[1] ? partesIni[1] - 1 : 0, partesIni[2] || 1)
+    const dFin = new Date(partesFin[0] || 2026, partesFin[1] ? partesFin[1] - 1 : 11, partesFin[2] || 28)
+
+    const mesesAbrev = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+    const mesesCompletos = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+
+    const listaMeses: Array<{ mes: string; fecha: string; año: number; mesIdx: number; date: Date }> = []
+    const cursor = new Date(dIni.getFullYear(), dIni.getMonth(), 1)
+    const limite = new Date(dFin.getFullYear(), dFin.getMonth(), 1)
+
+    // Límite de seguridad de 60 meses
+    let count = 0
+    while (cursor <= limite && count < 60) {
+      const mIdx = cursor.getMonth()
+      const y = cursor.getFullYear()
+      listaMeses.push({
+        mes: `${mesesCompletos[mIdx]} ${y}`,
+        fecha: `${mesesAbrev[mIdx]} ${y}`,
+        año: y,
+        mesIdx: mIdx,
+        date: new Date(cursor),
+      })
+      cursor.setMonth(cursor.getMonth() + 1)
+      count++
+    }
+
+    if (listaMeses.length < 2) {
+      listaMeses.push({
+        mes: `${mesesCompletos[(dIni.getMonth() + 1) % 12]} ${dIni.getFullYear()}`,
+        fecha: `${mesesAbrev[(dIni.getMonth() + 1) % 12]} ${dIni.getFullYear()}`,
+        año: dIni.getFullYear(),
+        mesIdx: (dIni.getMonth() + 1) % 12,
+        date: new Date(dIni.getFullYear(), dIni.getMonth() + 1, 1),
+      })
+    }
+
+    const total = listaMeses.length
+    const currentAvance = esBorrador ? 0 : Number(proyecto?.avance ?? 0)
+    const hoy = new Date()
+
+    let idxCorte = 0
+    if (currentAvance <= 0) {
+      idxCorte = 0
+    } else {
+      const idxHoy = listaMeses.findIndex((m) => m.date.getFullYear() === hoy.getFullYear() && m.date.getMonth() === hoy.getMonth())
+      if (idxHoy !== -1) {
+        idxCorte = idxHoy
+      } else {
+        idxCorte = Math.min(total - 1, Math.max(1, Math.round((currentAvance / 100) * (total - 1))))
+      }
+    }
+
+    return listaMeses.map((m, idx) => {
+      // Función S-curve estándar
+      const t = idx / (total - 1)
+      const prog = Math.round((3 * t * t - 2 * t * t * t) * 10000) / 100
+
+      let real: number | null = null
+      let esCorte = false
+
+      if (idx <= idxCorte) {
+        if (currentAvance === 0) {
+          real = 0
+          if (idx === idxCorte) esCorte = true
+        } else {
+          const factor = idx / Math.max(1, idxCorte)
+          real = Math.round((currentAvance * (factor * factor * (3 - 2 * factor))) * 100) / 100
+          if (idx === idxCorte) {
+            real = currentAvance
+            esCorte = true
+          }
+        }
+      }
+
+      const variacion = real !== null ? Number((real - prog).toFixed(2)) : null
+      const montoProg = montoAjustadoVigente * (prog / 100)
+      const montoReal = real !== null ? montoAjustadoVigente * (real / 100) : null
 
       return {
-        ...m,
+        mes: m.mes,
+        fecha: m.fecha,
+        prog,
+        real,
+        esCorte,
         variacion,
         montoProg,
         montoReal,
       }
     })
-  }, [montoAjustadoVigente])
+  }, [proyecto?.fechaInicioContractual, proyecto?.fechaInicio, proyecto?.fechaFinalizacionReal, (proyecto as any)?.fechaFinContractualPlan, proyecto?.fechaFin, proyecto?.avance, esBorrador, montoAjustadoVigente])
 
   return (
     <div className="space-y-2.5 font-[Poppins] text-[10.5px]">
@@ -950,50 +1007,99 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
       )}
 
       {/* ========================================================================= */}
-      {/* 2. SUB-TAB 2: ESTIMACIONES (PERSPECTIVA SIN FONDO GRIS + TABLA DETALLADA) */}
+      {/* 2. SUB-TAB 2: ESTIMACIONES (PERSPECTIVA + FILTRO DE FECHAS + PAGINACIÓN) */}
       {/* ========================================================================= */}
       {subTab === 'estimaciones' && (
         <div className="space-y-2.5">
-          {/* Selector de Perspectiva Doble SIN FONDO GRIS */}
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-gray-200 bg-white p-2.5 shadow-2xs">
-            <div className="flex items-center gap-2.5">
-              <span className="text-[9px] font-extrabold uppercase tracking-wider text-gray-500">
+          {/* Selector de Perspectiva Doble y Filtros de Fecha */}
+          <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-xl border border-gray-200 bg-white p-2.5 shadow-2xs">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[8.5px] font-extrabold uppercase tracking-wider text-gray-500">
                 PERSPECTIVA:
               </span>
-              <div className="inline-flex items-center gap-2">
+              <div className="inline-flex items-center gap-1.5">
                 <button
                   type="button"
-                  onClick={() => setPerspectivaEstimacion('ejecutora')}
-                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[10px] font-bold transition-all cursor-pointer ${
+                  onClick={() => {
+                    setPerspectivaEstimacion('ejecutora')
+                    setPaginaEstimaciones(1)
+                  }}
+                  className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[9.5px] font-bold transition-all cursor-pointer ${
                     perspectivaEstimacion === 'ejecutora'
                       ? 'bg-red-50 text-[#9B0F06] border border-red-200 shadow-2xs'
                       : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 hover:text-gray-900'
                   }`}
                 >
-                  <Building2 size={12} className={perspectivaEstimacion === 'ejecutora' ? 'text-[#9B0F06]' : 'text-gray-400'} />
+                  <Building2 size={11} className={perspectivaEstimacion === 'ejecutora' ? 'text-[#9B0F06]' : 'text-gray-400'} />
                   <span>Empresa Ejecutora ({nombreEmpresaEjecutora})</span>
                 </button>
                 <button
                   type="button"
-                  onClick={() => setPerspectivaEstimacion('supervisora')}
-                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[10px] font-bold transition-all cursor-pointer ${
+                  onClick={() => {
+                    setPerspectivaEstimacion('supervisora')
+                    setPaginaEstimaciones(1)
+                  }}
+                  className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[9.5px] font-bold transition-all cursor-pointer ${
                     perspectivaEstimacion === 'supervisora'
                       ? 'bg-blue-50 text-blue-800 border border-blue-200 shadow-2xs'
                       : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 hover:text-gray-900'
                   }`}
                 >
-                  <UserCheck size={12} className={perspectivaEstimacion === 'supervisora' ? 'text-blue-700' : 'text-gray-400'} />
+                  <UserCheck size={11} className={perspectivaEstimacion === 'supervisora' ? 'text-blue-700' : 'text-gray-400'} />
                   <span>Empresa Supervisora ({nombreEmpresaSupervisora})</span>
                 </button>
               </div>
             </div>
 
-            <div className="text-[9px] text-gray-400 font-medium">
-              Viendo {estimacionesFiltradas.length} estimaciones
+            {/* Filtros de Rango de Fecha para Estimaciones */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-1 text-[9px] text-gray-500 font-medium">
+                <span>Desde:</span>
+                <input
+                  type="date"
+                  value={fechaDesdeEstimacion}
+                  onChange={(e) => {
+                    setFechaDesdeEstimacion(e.target.value)
+                    setPaginaEstimaciones(1)
+                  }}
+                  className="rounded-md border border-gray-200 bg-gray-50/60 px-2 py-0.5 text-[9px] font-medium text-gray-800 focus:border-[#9B0F06] focus:bg-white focus:outline-none"
+                />
+              </div>
+
+              <div className="flex items-center gap-1 text-[9px] text-gray-500 font-medium">
+                <span>Hasta:</span>
+                <input
+                  type="date"
+                  value={fechaHastaEstimacion}
+                  onChange={(e) => {
+                    setFechaHastaEstimacion(e.target.value)
+                    setPaginaEstimaciones(1)
+                  }}
+                  className="rounded-md border border-gray-200 bg-gray-50/60 px-2 py-0.5 text-[9px] font-medium text-gray-800 focus:border-[#9B0F06] focus:bg-white focus:outline-none"
+                />
+              </div>
+
+              {(fechaDesdeEstimacion || fechaHastaEstimacion) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFechaDesdeEstimacion('')
+                    setFechaHastaEstimacion('')
+                    setPaginaEstimaciones(1)
+                  }}
+                  className="text-[8.5px] font-bold text-[#9B0F06] hover:underline cursor-pointer"
+                >
+                  Limpiar
+                </button>
+              )}
+
+              <div className="text-[8.5px] text-gray-400 font-medium pl-1">
+                {estimacionesFiltradas.length} estimaciones
+              </div>
             </div>
           </div>
 
-          {/* Tabla de Estimaciones */}
+          {/* Tabla de Estimaciones con Acción (Solo Ojo) y Paginación */}
           <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xs">
             <div className="overflow-x-auto">
               <table className="w-full text-left font-sans text-[10px]">
@@ -1008,119 +1114,155 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
                     <th className="px-2.5 py-1.5 text-right min-w-[110px]">Valor Bruto (Q)</th>
                     <th className="px-2.5 py-1.5 text-right min-w-[110px]">Líquido a Pagar (Q)</th>
                     <th className="px-2.5 py-1.5 text-right min-w-[110px]">Saldo Restante</th>
-                    <th className="px-2.5 py-1.5 text-center w-20">Acción</th>
+                    <th className="px-2.5 py-1.5 text-center w-14">Acción</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 font-mono text-[10px]">
-                  {estimacionesFiltradas.map((est) => (
-                    <tr key={est.id} className="hover:bg-red-50/30 transition-colors">
-                      {/* No. Estimación & Nombre */}
-                      <td className="px-2.5 py-1.5 font-sans">
-                        <div className="flex items-center gap-1">
-                          <span className="font-bold text-gray-900">{est.numero}</span>
-                          <span className="text-[8px] text-gray-400 font-mono">({est.estado.toUpperCase()})</span>
-                        </div>
-                        <p className="text-[9px] text-gray-500 font-medium truncate max-w-[180px]" title={est.nombreEstimacion}>
-                          {est.nombreEstimacion}
-                        </p>
-                      </td>
-
-                      {/* Delegado Residente */}
-                      <td className="px-2.5 py-1.5 font-sans">
-                        <div className="flex items-center gap-1 text-gray-800 font-semibold text-[9.5px]">
-                          <User size={9} className="text-[#9B0F06] shrink-0" />
-                          <span className="truncate max-w-[120px]">{est.delegadoResidente}</span>
-                        </div>
-                        <p className="text-[8px] text-gray-400 font-normal truncate max-w-[120px]">{est.supervisadoPor}</p>
-                      </td>
-
-                      {/* Período */}
-                      <td className="px-2.5 py-1.5 font-mono text-[9px] text-gray-600">
-                        <div className="flex items-center gap-1">
-                          <Calendar size={9} className="text-gray-400 shrink-0" />
-                          <span>{est.fechaInicio} al {est.fechaFin}</span>
-                        </div>
-                        <span className="text-[8px] text-gray-400 block font-sans">{est.mes}</span>
-                      </td>
-
-                      {/* Retraso */}
-                      <td className="px-2.5 py-1.5 text-center font-sans">
-                        {est.diasRetraso === 0 ? (
-                          <span className="text-emerald-700 font-semibold text-[9px] inline-flex items-center gap-0.5">
-                            <CheckCircle2 size={9} />
-                            En tiempo (0d)
-                          </span>
-                        ) : (
-                          <span className={`font-semibold text-[9px] inline-flex items-center gap-0.5 ${
-                            est.diasRetraso <= 5 ? 'text-amber-700' : 'text-[#9B0F06]'
-                          }`}>
-                            <AlertTriangle size={9} />
-                            +{est.diasRetraso}d retraso
-                          </span>
-                        )}
-                      </td>
-
-                      {/* Rendimiento / Calificación */}
-                      <td className="px-2.5 py-1.5 text-center font-sans">
-                        <span
-                          className={`font-bold text-[9px] ${
-                            est.calificacionDesempeno === 'bueno'
-                              ? 'text-emerald-700'
-                              : est.calificacionDesempeno === 'regular'
-                              ? 'text-amber-700'
-                              : 'text-[#9B0F06]'
-                          }`}
-                        >
-                          {est.porcentajeRendimiento.toFixed(1)}% ({est.calificacionDesempeno.toUpperCase()})
-                        </span>
-                      </td>
-
-                      {/* Anticipo Aplicado (Monto + %) */}
-                      <td className="px-2.5 py-1.5 text-right">
-                        <span className="text-amber-800 font-semibold block font-mono text-[9.5px]">
-                          − Q {est.montoAmortizacion.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
-                        </span>
-                        <span className="text-[7.5px] text-gray-400 font-sans">
-                          ({est.porcentajeAmortizacion.toFixed(0)}% amortizado)
-                        </span>
-                      </td>
-
-                      {/* Valor Bruto */}
-                      <td className="px-2.5 py-1.5 text-right font-semibold text-gray-900 font-mono text-[9.5px]">
-                        Q {est.valorBrutoTrabajado.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
-                      </td>
-
-                      {/* Monto Líquido a Pagar */}
-                      <td className="px-2.5 py-1.5 text-right font-black text-[#9B0F06] font-mono text-[9.5px]">
-                        Q {est.montoLiquidoAPagar.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
-                      </td>
-
-                      {/* Saldo Contractual */}
-                      <td className="px-2.5 py-1.5 text-right font-medium text-gray-600 font-mono text-[9px]">
-                        Q {est.saldoContractualRestante.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
-                      </td>
-
-                      {/* Botón Acción: Hoja Sábana */}
-                      <td className="px-2.5 py-1.5 text-center font-sans">
-                        <button
-                          type="button"
-                          onClick={() => navegarAHojaSabana({ estimacion: est.numero })}
-                          disabled={!tieneAccesoHojaSabana}
-                          className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[8.5px] font-bold transition-all ${
-                            tieneAccesoHojaSabana
-                              ? 'bg-[#9B0F06] text-white hover:bg-[#5E0006] shadow-2xs cursor-pointer'
-                              : 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200'
-                          }`}
-                          title={tieneAccesoHojaSabana ? `Abrir Hoja Sábana para ${est.numero}` : 'Solo el Delegado Residente o Administrador tiene acceso'}
-                        >
-                          {tieneAccesoHojaSabana ? <Eye size={9} /> : <Lock size={9} />}
-                          <span>Sábana</span>
-                        </button>
+                  {estimacionesPaginadas.length === 0 ? (
+                    <tr>
+                      <td colSpan={10} className="p-4 text-center text-[10px] text-gray-500 font-sans">
+                        No se encontraron estimaciones con los filtros de fecha seleccionados.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    estimacionesPaginadas.map((est) => (
+                      <tr key={est.id} className="hover:bg-red-50/30 transition-colors">
+                        {/* No. Estimación & Nombre */}
+                        <td className="px-2.5 py-1.5 font-sans">
+                          <div className="flex items-center gap-1">
+                            <span className="font-bold text-gray-900">{est.numero}</span>
+                            <span className="text-[8px] text-gray-400 font-mono">({est.estado.toUpperCase()})</span>
+                          </div>
+                          <p className="text-[9px] text-gray-500 font-medium truncate max-w-[180px]" title={est.nombreEstimacion}>
+                            {est.nombreEstimacion}
+                          </p>
+                        </td>
+
+                        {/* Delegado Residente */}
+                        <td className="px-2.5 py-1.5 font-sans">
+                          <div className="flex items-center gap-1 text-gray-800 font-semibold text-[9.5px]">
+                            <User size={9} className="text-[#9B0F06] shrink-0" />
+                            <span className="truncate max-w-[120px]">{est.delegadoResidente}</span>
+                          </div>
+                          <p className="text-[8px] text-gray-400 font-normal truncate max-w-[120px]">{est.supervisadoPor}</p>
+                        </td>
+
+                        {/* Período */}
+                        <td className="px-2.5 py-1.5 font-mono text-[9px] text-gray-600">
+                          <div className="flex items-center gap-1">
+                            <Calendar size={9} className="text-gray-400 shrink-0" />
+                            <span>{est.fechaInicio} al {est.fechaFin}</span>
+                          </div>
+                          <span className="text-[8px] text-gray-400 block font-sans">{est.mes}</span>
+                        </td>
+
+                        {/* Retraso */}
+                        <td className="px-2.5 py-1.5 text-center font-sans">
+                          {est.diasRetraso === 0 ? (
+                            <span className="text-emerald-700 font-semibold text-[9px] inline-flex items-center gap-0.5">
+                              <CheckCircle2 size={9} />
+                              En tiempo (0d)
+                            </span>
+                          ) : (
+                            <span className={`font-semibold text-[9px] inline-flex items-center gap-0.5 ${
+                              est.diasRetraso <= 5 ? 'text-amber-700' : 'text-[#9B0F06]'
+                            }`}>
+                              <AlertTriangle size={9} />
+                              +{est.diasRetraso}d retraso
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Rendimiento / Calificación */}
+                        <td className="px-2.5 py-1.5 text-center font-sans">
+                          <span
+                            className={`font-bold text-[9px] ${
+                              est.calificacionDesempeno === 'bueno'
+                                ? 'text-emerald-700'
+                                : est.calificacionDesempeno === 'regular'
+                                ? 'text-amber-700'
+                                : 'text-[#9B0F06]'
+                            }`}
+                          >
+                            {est.porcentajeRendimiento.toFixed(1)}% ({est.calificacionDesempeno.toUpperCase()})
+                          </span>
+                        </td>
+
+                        {/* Anticipo Aplicado (Monto + %) */}
+                        <td className="px-2.5 py-1.5 text-right">
+                          <span className="text-amber-800 font-semibold block font-mono text-[9.5px]">
+                            − Q {est.montoAmortizacion.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                          </span>
+                          <span className="text-[7.5px] text-gray-400 font-sans">
+                            ({est.porcentajeAmortizacion.toFixed(0)}% amortizado)
+                          </span>
+                        </td>
+
+                        {/* Valor Bruto */}
+                        <td className="px-2.5 py-1.5 text-right font-semibold text-gray-900 font-mono text-[9.5px]">
+                          Q {est.valorBrutoTrabajado.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                        </td>
+
+                        {/* Monto Líquido a Pagar */}
+                        <td className="px-2.5 py-1.5 text-right font-black text-[#9B0F06] font-mono text-[9.5px]">
+                          Q {est.montoLiquidoAPagar.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                        </td>
+
+                        {/* Saldo Contractual */}
+                        <td className="px-2.5 py-1.5 text-right font-medium text-gray-600 font-mono text-[9px]">
+                          Q {est.saldoContractualRestante.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                        </td>
+
+                        {/* Botón Acción: Solo Icono de Ojo */}
+                        <td className="px-2.5 py-1.5 text-center font-sans">
+                          <button
+                            type="button"
+                            onClick={() => navegarAHojaSabana({ estimacion: est.numero })}
+                            disabled={!tieneAccesoHojaSabana}
+                            className={`inline-flex h-6 w-6 items-center justify-center rounded transition-colors ${
+                              tieneAccesoHojaSabana
+                                ? 'text-gray-600 hover:text-[#9B0F06] hover:bg-red-50 cursor-pointer shadow-2xs'
+                                : 'text-gray-300 cursor-not-allowed'
+                            }`}
+                            title={tieneAccesoHojaSabana ? `Ver Hoja Sábana para ${est.numero}` : 'Solo el Delegado Residente o Administrador tiene acceso'}
+                          >
+                            {tieneAccesoHojaSabana ? <Eye size={13} /> : <Lock size={12} />}
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
+            </div>
+
+            {/* Paginación de Estimaciones */}
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 bg-gray-50/60 px-2.5 py-1 text-[8.5px] text-gray-600">
+              <span className="font-medium">
+                Página <strong className="text-gray-900">{paginaEstimaciones}</strong> de <strong className="text-gray-900">{totalPaginasEstimaciones}</strong> ({estimacionesFiltradas.length} estimaciones totales)
+              </span>
+
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setPaginaEstimaciones((p) => Math.max(1, p - 1))}
+                  disabled={paginaEstimaciones <= 1}
+                  className="inline-flex h-5 w-5 items-center justify-center rounded border border-gray-200 bg-white text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                  title="Página anterior"
+                >
+                  <ChevronLeft size={10} />
+                </button>
+                <span className="px-1 font-bold font-mono text-[9px]">{paginaEstimaciones}</span>
+                <button
+                  type="button"
+                  onClick={() => setPaginaEstimaciones((p) => Math.min(totalPaginasEstimaciones, p + 1))}
+                  disabled={paginaEstimaciones >= totalPaginasEstimaciones}
+                  className="inline-flex h-5 w-5 items-center justify-center rounded border border-gray-200 bg-white text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                  title="Página siguiente"
+                >
+                  <ChevronRight size={10} />
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1138,66 +1280,92 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
               </h2>
             </div>
 
-            {/* Contenedor SVG de la Curva S */}
+            {/* Contenedor SVG Responsivo de la Curva S */}
             <div className="relative w-full bg-white rounded-lg p-2 select-none overflow-x-auto">
-              <div className="min-w-[700px]">
-                <svg viewBox="0 0 820 250" className="w-full h-auto max-h-[320px] overflow-visible">
-                  {/* Cuadrícula Horizontal Y de -20% a 120% */}
-                  {[-20, 0, 20, 40, 60, 80, 100, 120].map((pct) => {
-                    const y = 175 - ((pct + 20) / 140) * 145
-                    return (
-                      <g key={pct}>
-                        <line x1="55" y1={y} x2="795" y2={y} stroke="#e5e7eb" strokeWidth="1" />
-                        <text x="48" y={y + 3} textAnchor="end" fontSize="8.5" fill="#4b5563" fontFamily="sans-serif" fontWeight="500">
-                          {pct.toFixed(2)}%
-                        </text>
-                      </g>
-                    )
-                  })}
+              <div className="w-full min-w-[650px]">
+                {(() => {
+                  const total = puntosCurvaS.length
+                  const svgWidth = Math.max(760, total * 48)
+                  const xStep = (svgWidth - 90) / Math.max(1, total - 1)
 
-                  {/* Ejes X y Y */}
-                  <line x1="55" y1="30" x2="55" y2="175" stroke="#d1d5db" strokeWidth="1.5" />
-                  <line x1="55" y1="175" x2="795" y2="175" stroke="#d1d5db" strokeWidth="1.5" />
+                  const ptsProg = puntosCurvaS.map((p, idx) => ({
+                    x: 55 + idx * xStep,
+                    y: 175 - ((p.prog + 20) / 140) * 145,
+                    data: p,
+                  }))
 
-                  {(() => {
-                    const total = puntosCurvaS.length
-                    const xStep = 730 / (total - 1)
-
-                    const ptsProg = puntosCurvaS.map((p, idx) => ({
-                      x: 60 + idx * xStep,
-                      y: 175 - ((p.prog + 20) / 140) * 145,
+                  const ptsReal = puntosCurvaS
+                    .filter((p) => p.real !== null)
+                    .map((p, idx) => ({
+                      x: 55 + idx * xStep,
+                      y: 175 - (((p.real as number) + 20) / 140) * 145,
                       data: p,
                     }))
 
-                    const ptsReal = puntosCurvaS
-                      .filter((p) => p.real !== null)
-                      .map((p, idx) => ({
-                        x: 60 + idx * xStep,
-                        y: 175 - (((p.real as number) + 20) / 140) * 145,
-                        data: p,
-                      }))
+                  const dProg = ptsProg.reduce((acc, curr, idx) => `${acc} ${idx === 0 ? 'M' : 'L'} ${curr.x} ${curr.y}`, '')
+                  const dReal = ptsReal.reduce((acc, curr, idx) => `${acc} ${idx === 0 ? 'M' : 'L'} ${curr.x} ${curr.y}`, '')
 
-                    const dProg = ptsProg.reduce((acc, curr, idx) => `${acc} ${idx === 0 ? 'M' : 'L'} ${curr.x} ${curr.y}`, '')
-                    const dReal = ptsReal.reduce((acc, curr, idx) => `${acc} ${idx === 0 ? 'M' : 'L'} ${curr.x} ${curr.y}`, '')
+                  return (
+                    <svg viewBox={`0 0 ${svgWidth} 250`} className="w-full h-auto max-h-[320px] overflow-visible">
+                      {/* Cuadrícula Horizontal Y de -20% a 120% */}
+                      {[-20, 0, 20, 40, 60, 80, 100, 120].map((pct) => {
+                        const y = 175 - ((pct + 20) / 140) * 145
+                        return (
+                          <g key={pct}>
+                            <line x1="50" y1={y} x2={svgWidth - 20} y2={y} stroke="#e5e7eb" strokeWidth="1" />
+                            <text x="44" y={y + 3} textAnchor="end" fontSize="8" fill="#4b5563" fontFamily="sans-serif" fontWeight="500">
+                              {pct.toFixed(2)}%
+                            </text>
+                          </g>
+                        )
+                      })}
 
-                    return (
-                      <>
-                        {/* Línea Azul: % Prog Acum Mensual */}
-                        <path d={dProg} fill="none" stroke="#2563eb" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                      {/* Ejes X y Y */}
+                      <line x1="50" y1="30" x2="50" y2="175" stroke="#d1d5db" strokeWidth="1.5" />
+                      <line x1="50" y1="175" x2={svgWidth - 20} y2="175" stroke="#d1d5db" strokeWidth="1.5" />
 
-                        {/* Línea Roja / Granate: % Ejecut Acum Mensual */}
-                        <path d={dReal} fill="none" stroke="#9B0F06" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                      {/* Línea Azul: % Prog Acum Mensual */}
+                      <path d={dProg} fill="none" stroke="#2563eb" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
 
-                        {/* Puntos Interactivos Programados */}
-                        {ptsProg.map((pt, idx) => (
+                      {/* Línea Roja / Granate: % Ejecut Acum Mensual */}
+                      <path d={dReal} fill="none" stroke="#9B0F06" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+
+                      {/* Puntos Interactivos Programados */}
+                      {ptsProg.map((pt, idx) => (
+                        <circle
+                          key={`prog-${idx}`}
+                          cx={pt.x}
+                          cy={pt.y}
+                          r="2.5"
+                          fill="#ffffff"
+                          stroke="#2563eb"
+                          strokeWidth="1.5"
+                          className="transition-all hover:r-4 cursor-pointer"
+                          onMouseEnter={(e) => {
+                            const rect = e.currentTarget.getBoundingClientRect()
+                            setTooltipCurva({
+                              x: rect.left,
+                              y: rect.top,
+                              visible: true,
+                              data: pt.data,
+                            })
+                          }}
+                          onMouseLeave={() => setTooltipCurva(null)}
+                        />
+                      ))}
+
+                      {/* Puntos Interactivos Reales */}
+                      {ptsReal.map((pt, idx) => {
+                        const esCorte = pt.data.esCorte
+                        return (
                           <circle
-                            key={`prog-${idx}`}
+                            key={`real-${idx}`}
                             cx={pt.x}
                             cy={pt.y}
-                            r="2.5"
-                            fill="#ffffff"
-                            stroke="#2563eb"
-                            strokeWidth="1.5"
+                            r={esCorte ? '4' : '2.5'}
+                            fill={esCorte ? '#9B0F06' : '#ffffff'}
+                            stroke="#9B0F06"
+                            strokeWidth="2"
                             className="transition-all hover:r-4 cursor-pointer"
                             onMouseEnter={(e) => {
                               const rect = e.currentTarget.getBoundingClientRect()
@@ -1210,55 +1378,28 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
                             }}
                             onMouseLeave={() => setTooltipCurva(null)}
                           />
-                        ))}
+                        )
+                      })}
 
-                        {/* Puntos Interactivos Reales */}
-                        {ptsReal.map((pt, idx) => {
-                          const esCorte = pt.data.esCorte
-                          return (
-                            <circle
-                              key={`real-${idx}`}
-                              cx={pt.x}
-                              cy={pt.y}
-                              r={esCorte ? '4' : '2.5'}
-                              fill={esCorte ? '#9B0F06' : '#ffffff'}
-                              stroke="#9B0F06"
-                              strokeWidth="2"
-                              className="transition-all hover:r-4 cursor-pointer"
-                              onMouseEnter={(e) => {
-                                const rect = e.currentTarget.getBoundingClientRect()
-                                setTooltipCurva({
-                                  x: rect.left,
-                                  y: rect.top,
-                                  visible: true,
-                                  data: pt.data,
-                                })
-                              }}
-                              onMouseLeave={() => setTooltipCurva(null)}
-                            />
-                          )
-                        })}
-
-                        {/* Etiquetas Eje X Verticales / Rotadas */}
-                        {ptsProg.map((pt, idx) => (
-                          <g key={`lbl-${idx}`} transform={`translate(${pt.x}, 185) rotate(-90)`}>
-                            <text
-                              x="0"
-                              y="3"
-                              textAnchor="end"
-                              fontSize="7.5"
-                              fill={pt.data.esCorte ? '#9B0F06' : '#4b5563'}
-                              fontWeight={pt.data.esCorte ? 'bold' : 'normal'}
-                              fontFamily="sans-serif"
-                            >
-                              {pt.data.fecha}
-                            </text>
-                          </g>
-                        ))}
-                      </>
-                    )
-                  })()}
-                </svg>
+                      {/* Etiquetas Eje X Verticales / Rotadas */}
+                      {ptsProg.map((pt, idx) => (
+                        <g key={`lbl-${idx}`} transform={`translate(${pt.x}, 185) rotate(-90)`}>
+                          <text
+                            x="0"
+                            y="3"
+                            textAnchor="end"
+                            fontSize="7.5"
+                            fill={pt.data.esCorte ? '#9B0F06' : '#4b5563'}
+                            fontWeight={pt.data.esCorte ? 'bold' : 'normal'}
+                            fontFamily="sans-serif"
+                          >
+                            {pt.data.fecha}
+                          </text>
+                        </g>
+                      ))}
+                    </svg>
+                  )
+                })()}
               </div>
 
               {/* Tooltip Flotante */}
@@ -1273,7 +1414,7 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
                   }}
                 >
                   <div className="flex items-center justify-between border-b border-gray-100 pb-0.5 mb-1">
-                    <span className="font-extrabold text-gray-900">{tooltipCurva.data.mes} ({tooltipCurva.data.fecha})</span>
+                    <span className="font-extrabold text-gray-900">{tooltipCurva.data.mes}</span>
                     {tooltipCurva.data.esCorte && (
                       <span className="rounded bg-red-100 text-[#9B0F06] font-black px-1 text-[7.5px] uppercase">
                         Corte Actual
@@ -1316,7 +1457,7 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
               )}
             </div>
 
-            {/* Leyenda en la parte inferior centrada (como en img2) */}
+            {/* Leyenda en la parte inferior centrada */}
             <div className="flex items-center justify-center gap-6 pt-2 border-t border-gray-100 text-[10px] font-semibold">
               <span className="flex items-center gap-2 text-gray-700">
                 <span className="h-0.5 w-6 bg-[#2563eb] inline-block rounded" />
@@ -1328,40 +1469,55 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
               </span>
             </div>
 
-            {/* Resumen Compacto de Desviación y Rendimiento */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[10px] font-mono pt-2">
-              <div className="rounded-lg border border-gray-200 bg-gray-50/70 p-2">
-                <span className="text-[8px] font-bold uppercase tracking-wider text-gray-500 font-sans block">
-                  Desviación a la Fecha (Julio 2026)
-                </span>
-                <p className="text-[12px] font-black text-[#9B0F06] mt-0.5">
-                  +18.97% (Avance Ejecutado Real vs Programado)
-                </p>
-                <span className="text-[7.5px] text-gray-400 font-sans">Prog: 20.06% vs Real: 39.03%</span>
-              </div>
+            {/* Resumen Compacto de Desviación y Rendimiento Dinámico */}
+            {(() => {
+              const puntoCorte = puntosCurvaS.find((p) => p.esCorte) || puntosCurvaS[0]
+              const desviacionVal = puntoCorte?.variacion ?? 0
+              const spiVal = (puntoCorte && puntoCorte.prog > 0 && puntoCorte.real !== null)
+                ? (puntoCorte.real / puntoCorte.prog)
+                : (Number(proyecto?.avance || 0) > 0 ? 1.0 : 0)
+              const mesCorteTexto = puntoCorte?.mes || 'A la fecha'
 
-              <div className="rounded-lg border border-gray-200 bg-gray-50/70 p-2">
-                <span className="text-[8px] font-bold uppercase tracking-wider text-gray-500 font-sans block">
-                  Índice de Rendimiento (SPI)
-                </span>
-                <p className="text-[12px] font-black text-emerald-700 mt-0.5">
-                  1.94 (Rendimiento Favorable)
-                </p>
-                <span className="text-[7.5px] text-gray-400 font-sans">Ritmo superior al plan base</span>
-              </div>
+              return (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[10px] font-mono pt-2">
+                  <div className="rounded-lg border border-gray-200 bg-gray-50/70 p-2">
+                    <span className="text-[8px] font-bold uppercase tracking-wider text-gray-500 font-sans block">
+                      Desviación a la Fecha ({mesCorteTexto})
+                    </span>
+                    <p className={`text-[12px] font-black mt-0.5 ${desviacionVal >= 0 ? 'text-emerald-700' : 'text-[#9B0F06]'}`}>
+                      {desviacionVal >= 0 ? '+' : ''}{desviacionVal.toFixed(2)}% ({desviacionVal >= 0 ? 'Adelanto respecto al plan' : 'Desfase respecto al plan'})
+                    </p>
+                    <span className="text-[7.5px] text-gray-400 font-sans">
+                      Prog: {puntoCorte?.prog?.toFixed(2) ?? '0.00'}% vs Real: {puntoCorte?.real?.toFixed(2) ?? '0.00'}%
+                    </span>
+                  </div>
 
-              <div className="rounded-lg border border-gray-200 bg-gray-50/70 p-2">
-                <span className="text-[8px] font-bold uppercase tracking-wider text-gray-500 font-sans block">
-                  Anticipo Pendiente de Amortizar
-                </span>
-                <p className="text-[12px] font-black text-gray-900 mt-0.5">
-                  Q {saldoAnticipoPendiente.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
-                </p>
-                <span className="text-[7.5px] text-gray-400 font-sans">
-                  Amortizado: Q {anticipoAmortizado.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
-                </span>
-              </div>
-            </div>
+                  <div className="rounded-lg border border-gray-200 bg-gray-50/70 p-2">
+                    <span className="text-[8px] font-bold uppercase tracking-wider text-gray-500 font-sans block">
+                      Índice de Rendimiento (SPI)
+                    </span>
+                    <p className={`text-[12px] font-black mt-0.5 ${spiVal >= 1 ? 'text-emerald-700' : 'text-[#9B0F06]'}`}>
+                      {spiVal.toFixed(2)} ({spiVal >= 1 ? 'Rendimiento Favorable' : 'Rendimiento con Desfase'})
+                    </p>
+                    <span className="text-[7.5px] text-gray-400 font-sans">
+                      {spiVal >= 1 ? 'Ritmo superior o conforme al plan base' : 'Requiere ajuste de ritmo'}
+                    </span>
+                  </div>
+
+                  <div className="rounded-lg border border-gray-200 bg-gray-50/70 p-2">
+                    <span className="text-[8px] font-bold uppercase tracking-wider text-gray-500 font-sans block">
+                      Anticipo Pendiente de Amortizar
+                    </span>
+                    <p className="text-[12px] font-black text-gray-900 mt-0.5">
+                      Q {saldoAnticipoPendiente.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                    </p>
+                    <span className="text-[7.5px] text-gray-400 font-sans">
+                      Amortizado: Q {anticipoAmortizado.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                </div>
+              )
+            })()}
           </div>
         </div>
       )}

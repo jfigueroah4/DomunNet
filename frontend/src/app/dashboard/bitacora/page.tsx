@@ -19,7 +19,7 @@ import { BitacoraFiltros } from '@/components/modules/bitacora/BitacoraFiltros'
 import { BitacoraCard } from '@/components/modules/bitacora/BitacoraCard'
 import { BitacoraEstadoBadge } from '@/components/modules/bitacora/BitacoraEstadoBadge'
 import { BitacoraForm } from '@/components/modules/bitacora/BitacoraForm'
-import { BitacoraMapaInline } from '@/components/modules/bitacora/BitacoraMapaInline'
+import { BitacoraMapaModal } from '@/components/modules/bitacora/BitacoraMapaModal'
 
 import { useAuthStore } from '@/stores/useAuthStore'
 import { apiGetDeduplicado } from '@/lib/api/cliente'
@@ -405,17 +405,17 @@ export default function BitacoraPage() {
                       </div>
 
                       {/* Ubicación GPS y Departamento con solo el Icono de Mapa sin fondo */}
-                      <div className="sm:col-span-2 space-y-1.5 relative">
+                      <div className="sm:col-span-2 space-y-1.5">
                         <div className="flex items-center justify-between">
                           <span className="text-[8.5px] font-bold text-gray-400 uppercase tracking-wider block">
                             Ubicación y Departamento (GPS)
                           </span>
-                          {/* Botón de Mapa solo icono sin fondo */}
+                          {/* Botón de Mapa solo icono sin fondo que abre el modal */}
                           <button
                             type="button"
-                            onClick={() => setModalMapaGTAbierto((prev) => !prev)}
+                            onClick={() => setModalMapaGTAbierto(true)}
                             className="p-1 text-[#9B0F06] hover:text-[#5E0006] hover:scale-110 transition-all cursor-pointer focus:outline-none"
-                            title="Ver / Ocultar Mapa en el Drawer"
+                            title="Ver Mapa OpenStreetMap y Guatemala"
                           >
                             <LucideMap size={18} />
                           </button>
@@ -434,16 +434,20 @@ export default function BitacoraPage() {
                                 Lat: {drawerRegistro.coordenadasGps?.lat ? drawerRegistro.coordenadasGps.lat.toFixed(6) : ((drawerRegistro as any).lat || '14.500167')} · Lng: {drawerRegistro.coordenadasGps?.lng ? drawerRegistro.coordenadasGps.lng.toFixed(6) : ((drawerRegistro as any).lng || '-90.617015')}
                               </span>
                             </div>
+                            {/* Información detallada de Est. Inicio, Est. Fin y Lado de la vía */}
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[9.5px] text-gray-600 font-mono pt-0.5 border-t border-gray-100">
+                              <span>
+                                Est. Inicio: <strong className="text-gray-800 font-semibold">{(drawerRegistro as any).estacionInicio || (drawerRegistro as any).estacion_inicio || (drawerRegistro as any).estacion_inicial || '0+000'}</strong>
+                              </span>
+                              <span>
+                                Est. Fin: <strong className="text-gray-800 font-semibold">{(drawerRegistro as any).estacionFin || (drawerRegistro as any).estacion_fin || (drawerRegistro as any).estacion_final || '0+500'}</strong>
+                              </span>
+                              <span>
+                                Lado: <strong className="text-gray-800 font-semibold">{(drawerRegistro as any).lado || (drawerRegistro as any).lado_via || (drawerRegistro as any).ladoRenglon || 'Ambos'}</strong>
+                              </span>
+                            </div>
                           </div>
                         </div>
-
-                        {/* Mapa Leaflet Integrado en el Drawer sin fondo ni modal flotante */}
-                        {modalMapaGTAbierto && (
-                          <BitacoraMapaInline
-                            registro={drawerRegistro}
-                            onClose={() => setModalMapaGTAbierto(false)}
-                          />
-                        )}
                       </div>
                     </div>
                   </div>
@@ -553,6 +557,12 @@ export default function BitacoraPage() {
         </Portal>
       )}
 
+      {/* MODAL ELEGANTE CON MAPA LEAFLET Y MINI MAPA SVG DE GUATEMALA */}
+      <BitacoraMapaModal
+        abierto={modalMapaGTAbierto}
+        onClose={() => setModalMapaGTAbierto(false)}
+        registro={drawerRegistro}
+      />
     </div>
   )
 }

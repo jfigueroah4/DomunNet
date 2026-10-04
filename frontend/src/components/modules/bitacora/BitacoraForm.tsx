@@ -15,6 +15,7 @@ import {
   MapPin,
   Save,
   Search,
+  RotateCcw,
   X,
 } from 'lucide-react'
 import { RegistroBitacora } from '@/types/bitacora'
@@ -200,7 +201,7 @@ export function BitacoraForm({
     fecha: today,
     turno: 'Diurno',
     ingeniero: responsableActual,
-    ubicacionGps: 'Est. 0+000 a 0+500 (Ambos)',
+    ubicacionGps: '',
     latitud: null,
     longitud: null,
     precisionGps: null,
@@ -215,27 +216,18 @@ export function BitacoraForm({
     fotografiaPrincipal: null,
   })
 
-  // Sincronizar ubicación automática cuando cambian Lado, Est. Inicio o Est. Fin (img2)
-  const sincronizarUbicacionTramo = (ini: string, fin: string, lado: string) => {
-    const texto = `Est. ${ini || '0+000'} a ${fin || '0+500'} (${lado || 'Ambos'})`
-    setFd((p) => ({ ...p, ubicacionGps: texto }))
-  }
-
   const handleCambiarLado = (lado: 'Ambos' | 'Derecho' | 'Izquierdo') => {
     setLadoRenglon(lado)
-    sincronizarUbicacionTramo(estInicioRenglon, estFinRenglon, lado)
   }
 
   const handleCambiarEstInicio = (val: string) => {
     setEstInicioRenglon(val)
     setErrors((p) => ({ ...p, renglones: '' }))
-    sincronizarUbicacionTramo(val, estFinRenglon, ladoRenglon)
   }
 
   const handleCambiarEstFin = (val: string) => {
     setEstFinRenglon(val)
     setErrors((p) => ({ ...p, renglones: '' }))
-    sincronizarUbicacionTramo(estInicioRenglon, val, ladoRenglon)
   }
 
   // Auto-detectar usuario y rol en segundo plano
@@ -724,25 +716,34 @@ export function BitacoraForm({
       motivoSuspensionPreset === 'Otra...' ? motivoSuspensionOtra.trim() : motivoSuspensionPreset.trim()
 
     try {
-      // 1. Guardar entrada de bitácora
+      const ubicacionCalculada =
+        fd.ubicacionGps?.trim() || `Est. ${estInicioRenglon} a ${estFinRenglon} (${ladoRenglon})`
+
+      const pad = (n: number) => n.toString().padStart(2, '0')
+      const now = new Date()
+      const horaClean = `${pad(now.getHours())}:${pad(now.getMinutes())}`
+
+      // 1. Guardar entrada de bitácora (con columnas existentes en la tabla)
       const payloadEntrada = {
         proyecto_id: fd.proyectoId,
         usuario_id:
           user?.id ||
           (await apiGetDeduplicado('/auth/perfil')
             .then((r) => r.data?.data?.id)
-            .catch(() => undefined)),
+            .catch(() => null)) ||
+          null,
         titulo: `Registro de ${fd.tipoIngreso} - ${fd.fecha}`,
         fecha: fd.fecha,
-        hora: new Date().toLocaleTimeString('es-GT', { hour12: false }).slice(0, 5),
+        hora: horaClean,
         turno: fd.turno || 'Diurno',
-        ubicacion: fd.ubicacionGps || 'Frente de obra',
+        ubicacion: ubicacionCalculada,
         descripcion:
           fd.observacionesGenerales ||
           `Registro de bitácora ${fd.tipoIngreso} en fecha ${fd.fecha}${
             fd.suspensionActividades ? ` (Suspensión: ${finalMotivo})` : ''
           }`,
         publicada: true,
+        bloqueada: false,
       }
 
       let entradaId: string | null = null
@@ -789,9 +790,12 @@ export function BitacoraForm({
       if (fd.fotografiaPrincipal?.url && fd.proyectoId) {
         try {
           await api.post('/bitacora/gcs/subir', {
+            bitacoraEntradaId: entradaId || undefined,
             proyectoId: fd.proyectoId,
             imagenBase64: fd.fotografiaPrincipal.url,
             descripcion: `Evidencia Bitácora ${fd.fecha}`,
+            gpsLat: fd.latitud || undefined,
+            gpsLng: fd.longitud || undefined,
           })
         } catch (_) {}
       }
@@ -799,6 +803,10 @@ export function BitacoraForm({
       showSuccessToast('¡Registro de Bitácora guardado exitosamente!')
       onSubmit({
         ...fd,
+        ubicacion: ubicacionCalculada,
+        estacionInicio: estInicioRenglon,
+        estacionFin: estFinRenglon,
+        lado: ladoRenglon,
         justSuspension: finalMotivo,
       } as any)
     } catch (err) {
@@ -1240,47 +1248,41 @@ export function BitacoraForm({
                   )}
                 </div>
 
-                {/* Campos de Lado, Est. Inicio, Est. Fin ampliado sin estilo tarjeta y con línea de división */}
-                {renglonSeleccionadoId && (
-                  <div className="grid grid-cols-3 gap-3 pt-2 pb-3.5 border-b border-gray-100">
-                    <div>
-                      <span className="text-[10px] font-bold text-gray-500 uppercase block mb-1">LADO</span>
-                      <select
-                        value={ladoRenglon}
-                        onChange={(e) => setLadoRenglon(e.target.value as any)}
-                        className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs text-gray-800 font-medium focus:outline-none focus:border-gray-400"
-                      >
-                        <option value="Ambos">Ambos</option>
-                        <option value="Derecho">Derecho</option>
-                        <option value="Izquierdo">Izquierdo</option>
-                      </select>
-                    </div>
-                    <div>
-                      <span className="text-[10px] font-bold text-gray-500 uppercase block mb-1">EST. INICIO</span>
-                      <input
-                        type="text"
-                        value={estInicioRenglon}
-                        onChange={(e) => {
-                          setEstInicioRenglon(e.target.value)
-                          setErrors((p) => ({ ...p, renglones: '' }))
-                        }}
-                        className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 font-mono text-xs text-gray-800 focus:outline-none focus:border-gray-400"
-                      />
-                    </div>
-                    <div>
-                      <span className="text-[10px] font-bold text-gray-500 uppercase block mb-1">EST. FIN</span>
-                      <input
-                        type="text"
-                        value={estFinRenglon}
-                        onChange={(e) => {
-                          setEstFinRenglon(e.target.value)
-                          setErrors((p) => ({ ...p, renglones: '' }))
-                        }}
-                        className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 font-mono text-xs text-gray-800 focus:outline-none focus:border-gray-400"
-                      />
-                    </div>
+                {/* Campos de Lado, Est. Inicio, Est. Fin ampliado siempre visible y con línea de división (img2) */}
+                <div className="grid grid-cols-3 gap-3 pt-2 pb-3.5 border-b border-gray-100">
+                  <div>
+                    <span className="text-[10px] font-bold text-gray-500 uppercase block mb-1">LADO</span>
+                    <select
+                      value={ladoRenglon}
+                      onChange={(e) => handleCambiarLado(e.target.value as any)}
+                      className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs text-gray-800 font-medium focus:outline-none focus:border-gray-400"
+                    >
+                      <option value="Ambos">Ambos</option>
+                      <option value="Derecho">Derecho</option>
+                      <option value="Izquierdo">Izquierdo</option>
+                    </select>
                   </div>
-                )}
+                  <div>
+                    <span className="text-[10px] font-bold text-gray-500 uppercase block mb-1">EST. INICIO</span>
+                    <input
+                      type="text"
+                      value={estInicioRenglon}
+                      onChange={(e) => handleCambiarEstInicio(e.target.value)}
+                      placeholder="0+000"
+                      className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 font-mono text-xs text-gray-800 focus:outline-none focus:border-gray-400"
+                    />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold text-gray-500 uppercase block mb-1">EST. FIN</span>
+                    <input
+                      type="text"
+                      value={estFinRenglon}
+                      onChange={(e) => handleCambiarEstFin(e.target.value)}
+                      placeholder="0+500"
+                      className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 font-mono text-xs text-gray-800 focus:outline-none focus:border-gray-400"
+                    />
+                  </div>
+                </div>
                 {errors.renglones && (
                   <p className="text-[10px] text-red-600 font-medium">{errors.renglones}</p>
                 )}

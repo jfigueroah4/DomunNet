@@ -67,6 +67,7 @@ export async function subirArchivoB2(
     Bucket: entorno.b2.bucketName,
     Key: key,
     Body: bodyBuffer,
+    ContentLength: bodyBuffer.length,
     ContentType: contentType,
   })
 

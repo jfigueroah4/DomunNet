@@ -58,6 +58,7 @@ function MapaDetalleVista({
   direccionFin,
   kilometroInicio,
   kilometroFin,
+  className,
 }: {
   lat: number
   lng: number
@@ -65,6 +66,7 @@ function MapaDetalleVista({
   direccionFin?: string
   kilometroInicio?: string | number
   kilometroFin?: string | number
+  className?: string
 }) {
   const mapaRef = useRef<HTMLDivElement>(null)
   const instanciaMapaRef = useRef<any>(null)
@@ -153,7 +155,7 @@ function MapaDetalleVista({
     }
   }, [lat, lng, direccion, direccionFin, distanciaTramo, kilometroFin])
 
-  return <div ref={mapaRef} className="h-64 w-full overflow-hidden rounded-xl border border-gray-200 shadow-xs" />
+  return <div ref={mapaRef} className={className || "h-64 w-full overflow-hidden rounded-xl border border-gray-200 shadow-xs"} />
 }
 
 function getInitials(nombre: string): string {
@@ -944,18 +946,70 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                     </div>
                   )}
                 </InfoDetailCard>
+              </div>
 
-                {/* Card 4: Ubicación Geográfica y Mapa en Resumen General */}
-                <div className="rounded-xl border border-gray-200 bg-white p-3.5 shadow-2xs space-y-2">
-                  <div className="flex items-center justify-between border-b border-gray-100 pb-2">
-                    <div className="flex items-center gap-2">
-                      <Globe size={13} className="text-[#9B0F06]" />
-                      <h3 className="text-xs font-bold text-gray-900">
-                        Ubicación Geográfica y Tramo Vial del Proyecto
+              {/* Panel Lateral de Resumen */}
+              <div className="space-y-2.5">
+                {/* Avance y Días de Actividad en la misma fila (2 tarjetas pegadas) */}
+                <div className="grid grid-cols-2 gap-2">
+                  <section className="relative rounded-xl border border-gray-200 bg-white p-2.5 shadow-2xs flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <span className="text-[7.5px] font-bold uppercase tracking-wider text-gray-400">
+                            Avance Físico Actual
+                          </span>
+                          <p className="mt-0.5 text-xl font-black text-[#9B0F06]">{Math.round(proyecto.avance || 0)}%</p>
+                        </div>
+                        <div className="flex h-5 w-5 items-center justify-center rounded-full bg-red-50 text-[#9B0F06]">
+                          <CheckCircle2 size={12} />
+                        </div>
+                      </div>
+
+                      <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-gray-100">
+                        <div className="h-full bg-[#9B0F06]" style={{ width: `${Math.min(100, Math.max(0, proyecto.avance || 0))}%` }} />
+                      </div>
+                    </div>
+
+                    <div className="mt-2 grid grid-cols-2 gap-0.5 border-t border-gray-100 pt-1 text-[7.5px]">
+                      <div>
+                        <span className="block font-bold text-gray-400">Inicio:</span>
+                        <span className="font-bold text-gray-700 truncate block">{proyecto.fechaInicioContractual || proyecto.fechaInicio || '-'}</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="block font-bold text-gray-400">Fin:</span>
+                        <span className="font-bold text-gray-700 truncate block">{proyecto.fechaFinalizacionReal || proyecto.fechaFin || '-'}</span>
+                      </div>
+                    </div>
+                  </section>
+
+                  <section className="flex flex-col justify-between rounded-xl border border-gray-200 bg-white p-2.5 shadow-2xs">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[7.5px] font-bold uppercase tracking-wider text-gray-400">
+                        Días de Actividad
+                      </span>
+                      <div className="flex h-5 w-5 items-center justify-center rounded-full bg-red-50 text-[#9B0F06]">
+                        <Clock size={11} />
+                      </div>
+                    </div>
+                    <div className="my-auto pt-1">
+                      <p className="text-xl font-black text-gray-900">{diasActividad} días</p>
+                      <p className="text-[7.5px] text-gray-400">Desde inicio contractual</p>
+                    </div>
+                  </section>
+                </div>
+
+                {/* Mapa Interactivo debajo de las 2 tarjetas en el panel lateral */}
+                <section className="rounded-xl border border-gray-200 bg-white p-2.5 shadow-2xs space-y-1.5">
+                  <div className="flex items-center justify-between border-b border-gray-100 pb-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <Globe size={11} className="text-[#9B0F06]" />
+                      <h3 className="text-[10px] font-bold text-gray-900">
+                        Ubicación Geográfica
                       </h3>
                     </div>
-                    <span className="text-[9px] font-medium text-gray-500">
-                      Marcador Rojo: Origen | Marcador Marrón: Límite Fin
+                    <span className="text-[7.5px] font-medium text-gray-400">
+                      Rojo: Inicio | Marrón: Fin
                     </span>
                   </div>
 
@@ -966,58 +1020,9 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                     direccionFin={pAny.direccionFin || 'Plan Grande, Palencia'}
                     kilometroInicio={pAny.kilometroInicio ?? 5}
                     kilometroFin={pAny.kilometroFin ?? 10}
+                    className="h-44 w-full overflow-hidden rounded-lg border border-gray-200 shadow-2xs"
                   />
-                </div>
-              </div>
-
-              {/* Panel Lateral de Resumen */}
-              <div className="space-y-2">
-                {/* Avance y Días de Actividad */}
-                <div className="flex flex-col gap-1.5">
-                  <section className="relative rounded-xl border border-gray-200 bg-white p-2.5 shadow-2xs">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <span className="text-[8px] font-bold uppercase tracking-wider text-gray-400">
-                          Avance Físico Actual
-                        </span>
-                        <p className="mt-0.5 text-xl font-black text-[#9B0F06]">{Math.round(proyecto.avance || 0)}%</p>
-                      </div>
-                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-red-50 text-[#9B0F06]">
-                        <CheckCircle2 size={14} />
-                      </div>
-                    </div>
-
-                    <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-gray-100">
-                      <div className="h-full bg-[#9B0F06]" style={{ width: `${Math.min(100, Math.max(0, proyecto.avance || 0))}%` }} />
-                    </div>
-
-                    <div className="mt-2 grid grid-cols-2 gap-1 border-t border-gray-100 pt-1.5 text-[8.5px]">
-                      <div>
-                        <span className="block font-bold text-gray-400">Inicio:</span>
-                        <span className="font-bold text-gray-700">{proyecto.fechaInicioContractual || proyecto.fechaInicio || '-'}</span>
-                      </div>
-                      <div className="text-right">
-                        <span className="block font-bold text-gray-400">Fin:</span>
-                        <span className="font-bold text-gray-700">{proyecto.fechaFinalizacionReal || proyecto.fechaFin || '-'}</span>
-                      </div>
-                    </div>
-                  </section>
-
-                  <section className="flex flex-col justify-between rounded-xl border border-gray-200 bg-white p-2.5 shadow-2xs">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[8px] font-bold uppercase tracking-wider text-gray-400">
-                        Días de Actividad
-                      </span>
-                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-red-50 text-[#9B0F06]">
-                        <Clock size={13} />
-                      </div>
-                    </div>
-                    <div className="mt-1.5">
-                      <p className="text-xl font-black text-gray-900">{diasActividad} días</p>
-                      <p className="text-[8px] text-gray-400">Transcurridos desde el inicio contractual</p>
-                    </div>
-                  </section>
-                </div>
+                </section>
 
                 {/* Equipo Responsable */}
                 <section className="rounded-xl border border-gray-200 bg-white p-3 shadow-2xs">
