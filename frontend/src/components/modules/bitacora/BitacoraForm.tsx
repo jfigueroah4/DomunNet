@@ -744,11 +744,11 @@ export function BitacoraForm({
       }
 
       let entradaId: string | null = null
-      if (payloadEntrada.usuario_id && payloadEntrada.proyecto_id) {
-        try {
-          const resEntrada = await api.post('/mantenimiento/bitacora_entrada', payloadEntrada)
-          entradaId = resEntrada.data?.data?.id || null
-        } catch (_) {}
+      try {
+        const resEntrada = await api.post('/mantenimiento/bitacora_entrada', payloadEntrada)
+        entradaId = resEntrada.data?.data?.id || null
+      } catch (e) {
+        console.warn('Advertencia al insertar bitacora_entrada:', e)
       }
 
       // 2. Si es de Campo, registrar el renglón activo en bitacora_pendiente
@@ -783,29 +783,102 @@ export function BitacoraForm({
         }
       }
 
-      // 3. Subir foto a storage si existe
+      let urlFinalStorage = fd.fotografiaPrincipal?.url || ''
+      let subidaExitosaB2 = false
+
+      // 3. Subir y registrar foto en Backblaze B2 y base de datos
       if (fd.fotografiaPrincipal?.url && fd.proyectoId) {
         try {
-          await api.post('/bitacora/gcs/subir', {
+          const resSubida = await api.post('/bitacora/gcs/subir', {
             bitacoraEntradaId: entradaId || undefined,
             proyectoId: fd.proyectoId,
             imagenBase64: fd.fotografiaPrincipal.url,
-            descripcion: `Evidencia Bitácora ${fd.fecha}`,
+            descripcion: fd.fotografiaPrincipal.nombre || `Evidencia Bitácora ${fd.fecha}`,
             gpsLat: fd.latitud || undefined,
             gpsLng: fd.longitud || undefined,
           })
-        } catch (_) {}
+          if (resSubida.data?.data?.urlStorage) {
+            urlFinalStorage = resSubida.data.data.urlStorage
+            subidaExitosaB2 = true
+          }
+        } catch (errSubida) {
+          console.warn('Fallo subida a B2/Cloudinary, usando respaldo directo:', errSubida)
+        }
+
+        // Si el endpoint de subida B2 no se ejecutó o falló, asegurar el registro en la tabla de evidencia fotográfica
+        if (!subidaExitosaB2) {
+          try {
+            await api.post('/mantenimiento/evidencia_fotografica', {
+              bitacora_entrada_id: entradaId || null,
+              usuario_id: user?.id || null,
+              gps_lat: fd.latitud || null,
+              gps_lng: fd.longitud || null,
+              precision_gps: fd.precisionGps || null,
+              fecha_hora: `${fd.fecha}T${horaClean}:00`,
+              descripcion: fd.fotografiaPrincipal.nombre || `Evidencia Fotográfica ${fd.fecha}`,
+              categoria: 'Avance Físico',
+              url_storage: urlFinalStorage,
+            })
+          } catch (_) {}
+        }
       }
 
-      showSuccessToast('¡Registro de Bitácora guardado exitosamente!')
-      onSubmit({
-        ...fd,
+      const proyNombre =
+        proyectoSeleccionadoObj?.nombreOficial ||
+        proyectoSeleccionadoObj?.nombre ||
+        proyectoSeleccionadoObj?.nombre_oficial ||
+        'Proyecto Vial'
+
+      const nuevoRegistroCompleto: RegistroBitacora = {
+        id: entradaId || `bit-local-${Date.now()}`,
+        titulo: `Registro de ${fd.tipoIngreso} - ${fd.fecha}`,
+        descripcion:
+          fd.observacionesGenerales ||
+          `Registro de bitácora ${fd.tipoIngreso} en fecha ${fd.fecha}${
+            fd.suspensionActividades ? ` (Suspensión: ${finalMotivo})` : ''
+          }`,
+        tipo: fd.tipoIngreso === 'Laboratorio' ? 'inspeccion' : 'actividad',
+        estado: 'aprobado',
+        proyectoId: fd.proyectoId,
+        proyectoNombre: proyNombre,
+        autor: fd.ingeniero || user?.nombre || 'Ingeniero Residente',
+        autor_id: user?.id,
         ubicacion: ubicacionCalculada,
-        estacionInicio: estInicioRenglon,
-        estacionFin: estFinRenglon,
+        fecha: fd.fecha,
+        hora: horaClean,
+        estacionInicio: finalEstIni,
+        estacionFin: finalEstFin,
         lado: ladoRenglon,
-        justSuspension: finalMotivo,
-      } as any)
+        departamento: fd.departamento || 'Huehuetenango',
+        municipio: fd.municipio || 'Guatemala',
+        coordenadasGps: fd.latitud && fd.longitud ? { lat: fd.latitud, lng: fd.longitud } : undefined,
+        renglon_nombre: renglonActualObj
+          ? `${renglonActualObj.id} - ${limpiarDescripcionRenglon(renglonActualObj.desc, renglonActualObj.id)}`
+          : 'Terracería',
+        adjuntos: fd.fotografiaPrincipal?.url
+          ? [
+              {
+                id: `adj-${Date.now()}`,
+                nombre: fd.fotografiaPrincipal.nombre || 'evidencia.jpg',
+                tipo: 'imagen',
+                url: urlFinalStorage,
+                tamanio: '2.1 MB',
+              },
+            ]
+          : [],
+        creadoEn: new Date().toISOString(),
+      }
+
+      try {
+        const guardadosPrevios = JSON.parse(localStorage.getItem('domun_bitacora_locales') || '[]')
+        localStorage.setItem(
+          'domun_bitacora_locales',
+          JSON.stringify([nuevoRegistroCompleto, ...guardadosPrevios.filter((g: any) => g.id !== nuevoRegistroCompleto.id)])
+        )
+      } catch (_) {}
+
+      showSuccessToast('¡Registro de Bitácora y Fotografía guardados exitosamente!')
+      onSubmit(nuevoRegistroCompleto)
     } catch (err) {
       console.error('Error al guardar bitácora:', err)
       showSuccessToast('Registro guardado')

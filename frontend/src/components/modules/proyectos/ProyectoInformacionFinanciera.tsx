@@ -1,29 +1,34 @@
 'use client'
 
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   AlertTriangle,
   ArrowRight,
   Banknote,
   Building2,
+  Calculator,
   Calendar,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  Edit2,
   Eye,
   FileSpreadsheet,
   Layers,
   Lock,
+  Plus,
   Receipt,
   Search,
+  Trash2,
   TrendingUp,
   User,
   UserCheck,
+  X,
 } from 'lucide-react'
 import type { ProyectoType } from '@/validations/proyecto.schema'
 import { useAuthStore } from '@/stores/useAuthStore'
-import { showErrorToast } from '@/hooks/useCustomToast'
+import { showErrorToast, showSuccessToast } from '@/hooks/useCustomToast'
 import { CATALOGO_COMPLETO_88 } from '@/mocks/proyectoMock'
 
 export interface RenglonItemFinanciero {
@@ -361,8 +366,89 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
   const anticipoAmortizado = anticipoOtorgado * (pctAmortizadoAnticipo / 100)
   const saldoAnticipoPendiente = Math.max(0, anticipoOtorgado - anticipoAmortizado)
 
-  // Estimaciones Generadas
-  const estimacionesGeneradas: EstimacionFinancieraItem[] = useMemo(() => {
+  // Soporte de Modalidad Manual de Presupuesto y Estimaciones
+  const modoManual =
+    pAny.modoGestionFinanciera === 'manual' || pAny.usarModoSabana === false
+  const [estimacionesManuales, setEstimacionesManuales] = useState<EstimacionFinancieraItem[]>([])
+  const [modalEstimacionManualOpen, setModalEstimacionManualOpen] = useState(false)
+  const [estimacionEnEdicion, setEstimacionEnEdicion] = useState<EstimacionFinancieraItem | null>(null)
+
+  // Formulario modal de estimación manual
+  const [formEstNumero, setFormEstNumero] = useState('')
+  const [formEstNombre, setFormEstNombre] = useState('')
+  const [formEstPerspectiva, setFormEstPerspectiva] = useState<'ejecutora' | 'supervisora'>('ejecutora')
+  const [formEstFechaInicio, setFormEstFechaInicio] = useState('')
+  const [formEstFechaFin, setFormEstFechaFin] = useState('')
+  const [formEstMes, setFormEstMes] = useState('')
+  const [formEstValorBruto, setFormEstValorBruto] = useState('')
+  const [formEstPctAmortizacion, setFormEstPctAmortizacion] = useState('20')
+  const [formEstMontoLiquido, setFormEstMontoLiquido] = useState('')
+  const [formEstSaldoRestante, setFormEstSaldoRestante] = useState('')
+  const [formEstEstado, setFormEstEstado] = useState<'aprobada' | 'en_revision' | 'pagada' | 'borrador'>('aprobada')
+  const [formEstObservaciones, setFormEstObservaciones] = useState('')
+  const [formEstDiasRetraso, setFormEstDiasRetraso] = useState('0')
+  const [formEstRendimiento, setFormEstRendimiento] = useState('100')
+
+  useEffect(() => {
+    if (!proyecto?.id) return
+    try {
+      const stored = localStorage.getItem(`domun_estimaciones_manuales_${proyecto.id}`)
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setEstimacionesManuales(parsed)
+          return
+        }
+      }
+      if (Array.isArray(pAny.estimacionesManuales) && pAny.estimacionesManuales.length > 0) {
+        setEstimacionesManuales(pAny.estimacionesManuales)
+      }
+    } catch (e) {
+      console.warn('Error cargando estimaciones manuales:', e)
+    }
+  }, [proyecto?.id, pAny.estimacionesManuales])
+
+  const handleAbrirCrearEstimacionManual = () => {
+    setEstimacionEnEdicion(null)
+    const proxNum = (estimacionesManuales.length > 0 ? estimacionesManuales.length + 1 : 8)
+    setFormEstNumero(`Est. 0${proxNum}`)
+    setFormEstNombre(`Estimación No. 0${proxNum} - Ingreso Manual`)
+    setFormEstPerspectiva(perspectivaEstimacion)
+    setFormEstFechaInicio('2026-08-01')
+    setFormEstFechaFin('2026-08-31')
+    setFormEstMes('Agosto 2026')
+    setFormEstValorBruto('1500000')
+    setFormEstPctAmortizacion(perspectivaEstimacion === 'ejecutora' ? pctAnticipoEjecucionNum.toString() : pctAnticipoSupervisionNum.toString())
+    setFormEstMontoLiquido('1200000')
+    setFormEstSaldoRestante('25000000')
+    setFormEstEstado('aprobada')
+    setFormEstObservaciones('Monto registrado manualmente por el usuario.')
+    setFormEstDiasRetraso('0')
+    setFormEstRendimiento('100')
+    setModalEstimacionManualOpen(true)
+  }
+
+  const handleAbrirEditarEstimacionManual = (est: EstimacionFinancieraItem) => {
+    setEstimacionEnEdicion(est)
+    setFormEstNumero(est.numero)
+    setFormEstNombre(est.nombreEstimacion)
+    setFormEstPerspectiva(est.perspectiva)
+    setFormEstFechaInicio(est.fechaInicio)
+    setFormEstFechaFin(est.fechaFin)
+    setFormEstMes(est.mes)
+    setFormEstValorBruto(est.valorBrutoTrabajado.toString())
+    setFormEstPctAmortizacion(est.porcentajeAmortizacion.toString())
+    setFormEstMontoLiquido(est.montoLiquidoAPagar.toString())
+    setFormEstSaldoRestante(est.saldoContractualRestante.toString())
+    setFormEstEstado(est.estado)
+    setFormEstObservaciones(est.observaciones || '')
+    setFormEstDiasRetraso(est.diasRetraso.toString())
+    setFormEstRendimiento(est.porcentajeRendimiento.toString())
+    setModalEstimacionManualOpen(true)
+  }
+
+  // Estimaciones Base Calculadas
+  const estimacionesGeneradasBase: EstimacionFinancieraItem[] = useMemo(() => {
     const periodos = [
       {
         num: 'Est. 01',
@@ -519,6 +605,75 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
       return [estEjecutora, estSupervisora]
     })
   }, [montoAjustadoVigente, pctAnticipoEjec, pctAnticipoSup, pctAnticipoEjecucionNum, pctAnticipoSupervisionNum, nombreDelegadoProyecto, nombreEmpresaEjecutora, nombreEmpresaSupervisora])
+
+  // Estimaciones Finales (Manuales si existen o Calculadas)
+  const estimacionesGeneradas = useMemo<EstimacionFinancieraItem[]>(() => {
+    if (modoManual && estimacionesManuales.length > 0) {
+      return estimacionesManuales
+    }
+    return estimacionesGeneradasBase
+  }, [modoManual, estimacionesManuales, estimacionesGeneradasBase])
+
+  const handleGuardarEstimacionManual = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!formEstNumero.trim()) {
+      showErrorToast('El número de estimación es obligatorio (ej. Est. 08)')
+      return
+    }
+    const bruto = parseFloat(formEstValorBruto) || 0
+    const pctAmort = parseFloat(formEstPctAmortizacion) || 0
+    const amort = (bruto * pctAmort) / 100
+    const liq = parseFloat(formEstMontoLiquido) || (bruto - amort)
+    const saldo = parseFloat(formEstSaldoRestante) || Math.max(0, montoAjustadoVigente - bruto)
+
+    const nueva: EstimacionFinancieraItem = {
+      id: estimacionEnEdicion?.id || `est-man-${Date.now()}`,
+      numero: formEstNumero.trim(),
+      nombreEstimacion: formEstNombre.trim() || `Estimación ${formEstNumero}`,
+      delegadoResidente: nombreDelegadoProyecto,
+      perspectiva: formEstPerspectiva,
+      fechaInicio: formEstFechaInicio || '2026-08-01',
+      fechaFin: formEstFechaFin || '2026-08-31',
+      mes: formEstMes || 'Agosto 2026',
+      diasRetraso: parseInt(formEstDiasRetraso) || 0,
+      porcentajeRendimiento: parseFloat(formEstRendimiento) || 100,
+      calificacionDesempeno: (parseFloat(formEstRendimiento) || 100) >= 90 ? 'bueno' : (parseFloat(formEstRendimiento) || 100) >= 70 ? 'regular' : 'malo',
+      valorBrutoTrabajado: bruto,
+      porcentajeAmortizacion: pctAmort,
+      montoAmortizacion: amort,
+      montoLiquidoAPagar: liq,
+      saldoContractualRestante: saldo,
+      estado: formEstEstado,
+      supervisadoPor: formEstPerspectiva === 'ejecutora' ? nombreEmpresaEjecutora : nombreEmpresaSupervisora,
+      observaciones: formEstObservaciones || 'Monto registrado manualmente por el usuario.',
+    }
+
+    const baseLista = estimacionesManuales.length > 0 ? estimacionesManuales : estimacionesGeneradasBase
+    let actualizadas: EstimacionFinancieraItem[] = []
+    if (estimacionEnEdicion) {
+      actualizadas = baseLista.map((item) => (item.id === estimacionEnEdicion.id ? nueva : item))
+    } else {
+      actualizadas = [...baseLista, nueva]
+    }
+
+    setEstimacionesManuales(actualizadas)
+    if (proyecto?.id) {
+      localStorage.setItem(`domun_estimaciones_manuales_${proyecto.id}`, JSON.stringify(actualizadas))
+    }
+    showSuccessToast(`Estimación ${nueva.numero} guardada exitosamente`)
+    setModalEstimacionManualOpen(false)
+    setEstimacionEnEdicion(null)
+  }
+
+  const handleEliminarEstimacionManual = (id: string) => {
+    const baseLista = estimacionesManuales.length > 0 ? estimacionesManuales : estimacionesGeneradasBase
+    const filtradas = baseLista.filter((item) => item.id !== id)
+    setEstimacionesManuales(filtradas)
+    if (proyecto?.id) {
+      localStorage.setItem(`domun_estimaciones_manuales_${proyecto.id}`, JSON.stringify(filtradas))
+    }
+    showSuccessToast('Estimación eliminada exitosamente')
+  }
 
   const estimacionesFiltradas = useMemo(() => {
     return estimacionesGeneradas.filter((e) => {
@@ -738,6 +893,14 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
                 </span>
                 <span className="text-[10px] text-gray-500 font-medium">
                   · Anticipo: {(pctAnticipoEjec * 100).toFixed(0)}% (Q {anticipoOtorgado.toLocaleString('es-GT', { minimumFractionDigits: 2 })})
+                </span>
+                <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[8.5px] font-bold border ${
+                  modoManual
+                    ? 'bg-amber-50 text-amber-800 border-amber-300'
+                    : 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                }`}>
+                  {modoManual ? <Calculator size={10} /> : <FileSpreadsheet size={10} />}
+                  <span>{modoManual ? 'Modo Manual' : 'Modo Hoja Sábana'}</span>
                 </span>
               </div>
             </div>
@@ -1182,13 +1345,24 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
                 </button>
               )}
 
+              {/* Botón para crear o agregar estimación manual */}
+              <button
+                type="button"
+                onClick={handleAbrirCrearEstimacionManual}
+                className="inline-flex items-center gap-1 rounded-md bg-[#9B0F06] px-2.5 py-1 text-[9px] font-bold text-white hover:bg-[#7a0c05] transition-colors cursor-pointer shadow-2xs"
+                title="Crear o registrar estimación manual"
+              >
+                <Plus size={11} />
+                <span>+ Nueva Estimación</span>
+              </button>
+
               <div className="text-[8.5px] text-gray-400 font-medium pl-1">
                 {estimacionesFiltradas.length} estimaciones
               </div>
             </div>
           </div>
 
-          {/* Tabla de Estimaciones con Acción (Solo Ojo) y Paginación */}
+          {/* Tabla de Estimaciones con Acción (Solo Ojo / Editar) y Paginación */}
           <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xs">
             <div className="overflow-x-auto">
               <table className="w-full text-left font-sans text-[10px]">
@@ -1203,7 +1377,7 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
                     <th className="px-2.5 py-1.5 text-right min-w-[110px]">Valor Bruto (Q)</th>
                     <th className="px-2.5 py-1.5 text-right min-w-[110px]">Líquido a Pagar (Q)</th>
                     <th className="px-2.5 py-1.5 text-right min-w-[110px]">Saldo Restante</th>
-                    <th className="px-2.5 py-1.5 text-center w-14">Acción</th>
+                    <th className="px-2.5 py-1.5 text-center w-20">Acción</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 font-mono text-[10px]">
@@ -1302,21 +1476,31 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
                           Q {est.saldoContractualRestante.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
                         </td>
 
-                        {/* Botón Acción: Solo Icono de Ojo */}
+                        {/* Botón Acción: Ojo y Editar Manual */}
                         <td className="px-2.5 py-1.5 text-center font-sans">
-                          <button
-                            type="button"
-                            onClick={() => navegarAHojaSabana({ estimacion: est.numero })}
-                            disabled={!tieneAccesoHojaSabana}
-                            className={`inline-flex h-6 w-6 items-center justify-center rounded transition-colors ${
-                              tieneAccesoHojaSabana
-                                ? 'text-gray-600 hover:text-[#9B0F06] hover:bg-red-50 cursor-pointer shadow-2xs'
-                                : 'text-gray-300 cursor-not-allowed'
-                            }`}
-                            title={tieneAccesoHojaSabana ? `Ver Hoja Sábana para ${est.numero}` : 'Solo el Delegado Residente o Administrador tiene acceso'}
-                          >
-                            {tieneAccesoHojaSabana ? <Eye size={13} /> : <Lock size={12} />}
-                          </button>
+                          <div className="flex items-center justify-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => navegarAHojaSabana({ estimacion: est.numero })}
+                              disabled={!tieneAccesoHojaSabana}
+                              className={`inline-flex h-6 w-6 items-center justify-center rounded transition-colors ${
+                                tieneAccesoHojaSabana
+                                  ? 'text-gray-600 hover:text-[#9B0F06] hover:bg-red-50 cursor-pointer shadow-2xs'
+                                  : 'text-gray-300 cursor-not-allowed'
+                              }`}
+                              title={tieneAccesoHojaSabana ? `Ver Hoja Sábana para ${est.numero}` : 'Solo el Delegado Residente o Administrador tiene acceso'}
+                            >
+                              {tieneAccesoHojaSabana ? <Eye size={13} /> : <Lock size={12} />}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleAbrirEditarEstimacionManual(est)}
+                              className="inline-flex h-6 w-6 items-center justify-center rounded text-amber-700 hover:bg-amber-50 cursor-pointer transition-colors shadow-2xs"
+                              title="Editar montos manualmente"
+                            >
+                              <Edit2 size={11} />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))
@@ -1773,6 +1957,277 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
                 </div>
               )
             })()}
+          </div>
+        </div>
+      )}
+
+      {/* MODAL REGISTRO / EDICIÓN DE ESTIMACIÓN MANUAL */}
+      {modalEstimacionManualOpen && (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs font-[Poppins]">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl space-y-4 border border-gray-200 animate-fadeIn max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-lg bg-amber-50 text-amber-800 border border-amber-200">
+                  <Calculator size={16} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-gray-900">
+                    {estimacionEnEdicion ? `Editar ${estimacionEnEdicion.numero}` : 'Nueva Estimación Manual'}
+                  </h3>
+                  <p className="text-[10px] text-gray-500 font-medium">
+                    Registro directo de montos contractuales y liquidación
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalEstimacionManualOpen(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors p-1 cursor-pointer"
+                title="Cerrar"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleGuardarEstimacionManual} className="space-y-3 text-[10.5px]">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-700 mb-0.5">
+                    No. de Estimación <span className="text-[#9B0F06]">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formEstNumero}
+                    onChange={(e) => setFormEstNumero(e.target.value)}
+                    placeholder="Ej: Est. 08"
+                    className="w-full rounded-lg border border-gray-200 bg-gray-50/50 px-2.5 py-1.5 font-bold text-gray-900 focus:bg-white focus:border-[#9B0F06] focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-700 mb-0.5">
+                    Perspectiva Contractual
+                  </label>
+                  <select
+                    value={formEstPerspectiva}
+                    onChange={(e) => setFormEstPerspectiva(e.target.value as any)}
+                    className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 font-semibold text-gray-800 focus:border-[#9B0F06] focus:outline-none"
+                  >
+                    <option value="ejecutora">Empresa Ejecutora (Contratista)</option>
+                    <option value="supervisora">Empresa Supervisora (DGC)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-gray-700 mb-0.5">
+                  Concepto / Título de la Estimación
+                </label>
+                <input
+                  type="text"
+                  value={formEstNombre}
+                  onChange={(e) => setFormEstNombre(e.target.value)}
+                  placeholder="Ej: Estimación No. 08 - Pavimentación y Señalización"
+                  className="w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-gray-800 focus:border-[#9B0F06] focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-700 mb-0.5">Fecha Inicio</label>
+                  <input
+                    type="date"
+                    value={formEstFechaInicio}
+                    onChange={(e) => setFormEstFechaInicio(e.target.value)}
+                    className="w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-gray-800 focus:border-[#9B0F06] focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-700 mb-0.5">Fecha Fin</label>
+                  <input
+                    type="date"
+                    value={formEstFechaFin}
+                    onChange={(e) => setFormEstFechaFin(e.target.value)}
+                    className="w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-gray-800 focus:border-[#9B0F06] focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-700 mb-0.5">Mes / Período</label>
+                  <input
+                    type="text"
+                    value={formEstMes}
+                    onChange={(e) => setFormEstMes(e.target.value)}
+                    placeholder="Ej: Agosto 2026"
+                    className="w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-gray-800 focus:border-[#9B0F06] focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Montos Financieros Directos */}
+              <div className="rounded-xl border border-gray-200 bg-gray-50/60 p-3 space-y-2.5">
+                <span className="text-[9px] font-extrabold uppercase tracking-wider text-gray-600 block">
+                  Liquidación Financiera Directa
+                </span>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-700 mb-0.5">
+                      Valor Bruto Trabajado (Q) <span className="text-[#9B0F06]">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      required
+                      value={formEstValorBruto}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        setFormEstValorBruto(val)
+                        const bruto = parseFloat(val) || 0
+                        const pct = parseFloat(formEstPctAmortizacion) || 0
+                        const amort = (bruto * pct) / 100
+                        setFormEstMontoLiquido((bruto - amort).toFixed(2))
+                      }}
+                      placeholder="0.00"
+                      className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 font-mono font-bold text-gray-900 focus:border-[#9B0F06] focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-700 mb-0.5">
+                      % Amortización Anticipo (%)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={formEstPctAmortizacion}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        setFormEstPctAmortizacion(val)
+                        const bruto = parseFloat(formEstValorBruto) || 0
+                        const pct = parseFloat(val) || 0
+                        const amort = (bruto * pct) / 100
+                        setFormEstMontoLiquido((bruto - amort).toFixed(2))
+                      }}
+                      placeholder="20"
+                      className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 font-mono text-gray-800 focus:border-[#9B0F06] focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-700 mb-0.5">
+                      Monto Líquido a Pagar (Q)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={formEstMontoLiquido}
+                      onChange={(e) => setFormEstMontoLiquido(e.target.value)}
+                      placeholder="0.00"
+                      className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 font-mono font-black text-[#9B0F06] focus:border-[#9B0F06] focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-700 mb-0.5">
+                      Saldo Contractual Restante (Q)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={formEstSaldoRestante}
+                      onChange={(e) => setFormEstSaldoRestante(e.target.value)}
+                      placeholder="0.00"
+                      className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 font-mono text-gray-800 focus:border-[#9B0F06] focus:outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-700 mb-0.5">Estado</label>
+                  <select
+                    value={formEstEstado}
+                    onChange={(e) => setFormEstEstado(e.target.value as any)}
+                    className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 font-semibold text-gray-800 focus:border-[#9B0F06] focus:outline-none"
+                  >
+                    <option value="aprobada">Aprobada</option>
+                    <option value="en_revision">En Revisión</option>
+                    <option value="pagada">Pagada</option>
+                    <option value="borrador">Borrador</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-700 mb-0.5">Rendimiento (%)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={formEstRendimiento}
+                    onChange={(e) => setFormEstRendimiento(e.target.value)}
+                    placeholder="100"
+                    className="w-full rounded-lg border border-gray-200 px-2.5 py-1.5 font-mono text-gray-800 focus:border-[#9B0F06] focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-700 mb-0.5">Días Retraso</label>
+                  <input
+                    type="number"
+                    value={formEstDiasRetraso}
+                    onChange={(e) => setFormEstDiasRetraso(e.target.value)}
+                    placeholder="0"
+                    className="w-full rounded-lg border border-gray-200 px-2.5 py-1.5 font-mono text-gray-800 focus:border-[#9B0F06] focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-gray-700 mb-0.5">Observaciones</label>
+                <textarea
+                  rows={2}
+                  value={formEstObservaciones}
+                  onChange={(e) => setFormEstObservaciones(e.target.value)}
+                  placeholder="Notas u observaciones de la estimación..."
+                  className="w-full rounded-lg border border-gray-200 p-2 text-xs text-gray-800 focus:border-[#9B0F06] focus:outline-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                {estimacionEnEdicion && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleEliminarEstimacionManual(estimacionEnEdicion.id)
+                      setModalEstimacionManualOpen(false)
+                    }}
+                    className="inline-flex items-center gap-1 text-red-600 hover:text-red-800 text-[10px] font-bold cursor-pointer"
+                  >
+                    <Trash2 size={12} />
+                    <span>Eliminar</span>
+                  </button>
+                )}
+                <div className="flex items-center gap-2 ml-auto">
+                  <button
+                    type="button"
+                    onClick={() => setModalEstimacionManualOpen(false)}
+                    className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-[#9B0F06] hover:bg-[#7a0c05] text-white px-4 py-1.5 text-xs font-bold shadow-2xs cursor-pointer"
+                  >
+                    <CheckCircle2 size={13} />
+                    <span>Guardar Estimación</span>
+                  </button>
+                </div>
+              </div>
+            </form>
           </div>
         </div>
       )}

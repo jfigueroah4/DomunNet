@@ -316,12 +316,102 @@ function InfoDetailCard({
   )
 }
 
+function getFieldValidation(
+  rawVal: any,
+  label: string,
+  kind?: 'nombre' | 'porcentaje' | 'monto' | 'telefono' | 'email' | 'texto' | 'codigo',
+  required?: boolean
+): { cleanVal: string; error: string | null } {
+  const strVal = rawVal !== undefined && rawVal !== null ? String(rawVal) : ''
+  const lbl = label.toLowerCase()
+
+  const detectedKind = kind || (
+    /propietario|superintendente|responsable|delegado/i.test(lbl) ? 'nombre' :
+    /porcentaje|anticipo/i.test(lbl) ? 'porcentaje' :
+    /monto|presupuesto/i.test(lbl) ? 'monto' :
+    /teléfono|telefono/i.test(lbl) ? 'telefono' :
+    /correo|email/i.test(lbl) ? 'email' :
+    /código|codigo/i.test(lbl) ? 'codigo' : 'texto'
+  )
+
+  let clean = strVal
+  let error: string | null = null
+
+  if (detectedKind === 'nombre') {
+    const hasDigits = /[0-9]/.test(strVal)
+    clean = sanitizeNombrePersona(strVal)
+    if (required && !clean.trim()) {
+      error = 'El nombre es obligatorio y no puede quedar vacío.'
+    } else if (hasDigits) {
+      error = 'No se permiten números en nombres de personas.'
+    } else if (clean.trim().length > 0 && clean.trim().length < 2) {
+      error = 'El nombre debe contener al menos 2 letras.'
+    }
+  } else if (detectedKind === 'porcentaje') {
+    const hasLetters = /[a-zA-Z]/.test(strVal)
+    clean = strVal.replace(/[^0-9.]/g, '')
+    const parts = clean.split('.')
+    if (parts.length > 2) clean = parts[0] + '.' + parts.slice(1).join('')
+    if (required && clean === '') {
+      error = 'El porcentaje es obligatorio y no puede quedar vacío.'
+    } else if (hasLetters) {
+      error = 'No se permiten letras en porcentajes (0 a 100).'
+    } else if (clean !== '') {
+      const num = Number(clean)
+      if (isNaN(num) || num < 0 || num > 100) {
+        error = 'El porcentaje debe estar entre 0% y 100%.'
+      }
+    }
+  } else if (detectedKind === 'monto') {
+    const hasLetters = /[a-zA-Z]/.test(strVal)
+    clean = strVal.replace(/[^0-9.]/g, '')
+    const parts = clean.split('.')
+    if (parts.length > 2) clean = parts[0] + '.' + parts.slice(1).join('')
+    if (required && clean === '') {
+      error = 'El monto es obligatorio y no puede quedar vacío.'
+    } else if (hasLetters) {
+      error = 'No se permiten letras en montos monetarios.'
+    } else if (clean !== '') {
+      const num = Number(clean)
+      if (isNaN(num) || num <= 0) {
+        error = 'El monto debe ser un valor numérico mayor a 0.'
+      }
+    }
+  } else if (detectedKind === 'telefono') {
+    const hasLetters = /[a-zA-Z]/.test(strVal)
+    clean = sanitizeTelefono(strVal)
+    const digitsOnly = clean.replace(/\D/g, '')
+    if (required && !clean.trim()) {
+      error = 'El teléfono es obligatorio y no puede quedar vacío.'
+    } else if (hasLetters) {
+      error = 'No se permiten letras ni texto como PBX. Ingrese solo dígitos.'
+    } else if (clean.trim().length > 0 && digitsOnly.length < 8) {
+      error = 'Debe ingresar al menos 8 dígitos telefónicos.'
+    }
+  } else if (detectedKind === 'email') {
+    clean = strVal.replace(/\s+/g, '')
+    if (required && !clean.trim()) {
+      error = 'El correo electrónico es obligatorio y no puede quedar vacío.'
+    } else if (clean.trim().length > 0 && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean.trim())) {
+      error = 'Formato de correo electrónico inválido (ej: contacto@empresa.com).'
+    }
+  } else {
+    if (required && !clean.trim()) {
+      error = 'Este campo es obligatorio y no puede quedar vacío.'
+    }
+  }
+
+  return { cleanVal: clean, error }
+}
+
 function EditableInfoField({
   label,
   value,
   isEditing = false,
   onChange,
   type = 'text',
+  kind,
+  required = false,
   highlight,
   mono,
   placeholder,
@@ -331,34 +421,85 @@ function EditableInfoField({
   isEditing?: boolean
   onChange?: (val: any) => void
   type?: 'text' | 'date' | 'number' | 'textarea' | 'email'
+  kind?: 'nombre' | 'porcentaje' | 'monto' | 'telefono' | 'email' | 'texto' | 'codigo'
+  required?: boolean
   highlight?: boolean
   mono?: boolean
   placeholder?: string
 }) {
+  const [localInput, setLocalInput] = useState<string | null>(null)
+  const [localError, setLocalError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!isEditing) {
+      setLocalInput(null)
+      setLocalError(null)
+    }
+  }, [isEditing])
+
+  const valParaCheck = localInput !== null ? localInput : value
+  const currentCheck = useMemo(
+    () => getFieldValidation(valParaCheck, label, kind, required),
+    [valParaCheck, label, kind, required]
+  )
+
+  const activeError = localError || currentCheck.error
+
+  const handleInputChange = (raw: string) => {
+    setLocalInput(raw)
+    const check = getFieldValidation(raw, label, kind, required)
+    setLocalError(check.error)
+    onChange?.(type === 'number' ? (check.cleanVal === '' ? '' : Number(check.cleanVal)) : check.cleanVal)
+  }
+
+  const handleBlur = () => {
+    if (localInput !== null) {
+      const check = getFieldValidation(localInput, label, kind, required)
+      setLocalInput(null)
+      setLocalError(check.error)
+    }
+  }
+
   if (isEditing) {
+    const hasError = Boolean(activeError)
+    const displayVal = localInput !== null ? localInput : (value ?? '')
     return (
       <div className="space-y-1">
-        <label className="text-[8.5px] font-bold uppercase tracking-wider text-gray-500 block">{label}</label>
+        <label className="text-[8.5px] font-bold uppercase tracking-wider text-gray-500 block">
+          {label} {required && <span className="text-[#9B0F06] font-bold">*</span>}
+        </label>
         {type === 'textarea' ? (
           <textarea
-            value={value ?? ''}
-            onChange={(e) => onChange?.(e.target.value)}
+            value={displayVal}
+            onChange={(e) => handleInputChange(e.target.value)}
+            onBlur={handleBlur}
             rows={3}
             placeholder={placeholder || `Ingresa ${label.toLowerCase()}`}
-            className="w-full rounded-lg border border-gray-300 bg-gray-50/40 p-2 text-[11px] font-medium text-gray-900 focus:border-[#9B0F06] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#9B0F06] transition-all resize-y"
+            className={`w-full rounded-lg border p-2 text-[11px] font-medium transition-all resize-y focus:outline-none ${
+              hasError
+                ? 'border-red-500 ring-1 ring-red-400 bg-red-50/20 text-red-900'
+                : 'border-gray-300 bg-gray-50/40 text-gray-900 focus:border-[#9B0F06] focus:bg-white focus:ring-1 focus:ring-[#9B0F06]'
+            }`}
           />
         ) : (
           <input
-            type={type}
-            value={value ?? ''}
-            onChange={(e) =>
-              onChange?.(type === 'number' ? (e.target.value === '' ? '' : Number(e.target.value)) : e.target.value)
-            }
+            type={type === 'number' ? 'text' : type}
+            inputMode={kind === 'porcentaje' || kind === 'monto' || /porcentaje|anticipo|monto|presupuesto/i.test(label) ? 'decimal' : undefined}
+            value={displayVal}
+            onChange={(e) => handleInputChange(e.target.value)}
+            onBlur={handleBlur}
             placeholder={placeholder || `Ingresa ${label.toLowerCase()}`}
-            className={`w-full rounded-lg border border-gray-300 bg-gray-50/40 px-2.5 py-1 text-[11px] font-semibold text-gray-900 focus:border-[#9B0F06] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#9B0F06] transition-all ${
-              mono ? 'font-mono' : ''
-            }`}
+            className={`w-full rounded-lg border px-2.5 py-1 text-[11px] font-semibold transition-all focus:outline-none ${
+              hasError
+                ? 'border-red-500 ring-1 ring-red-400 bg-red-50/20 text-red-900'
+                : 'border-gray-300 bg-gray-50/40 text-gray-900 focus:border-[#9B0F06] focus:bg-white focus:ring-1 focus:ring-[#9B0F06]'
+            } ${mono ? 'font-mono' : ''}`}
           />
+        )}
+        {hasError && (
+          <p className="text-[8.5px] font-bold text-red-600 mt-0.5 flex items-center gap-1">
+            <span>⚠</span> {activeError}
+          </p>
         )}
       </div>
     )
@@ -385,6 +526,8 @@ function EditableItemFichaTecnica({
   isEditing = false,
   onChange,
   type = 'text',
+  kind,
+  required = false,
   highlight,
   mono,
   placeholder,
@@ -395,29 +538,74 @@ function EditableItemFichaTecnica({
   isEditing?: boolean
   onChange?: (val: any) => void
   type?: 'text' | 'date' | 'number'
+  kind?: 'nombre' | 'porcentaje' | 'monto' | 'telefono' | 'email' | 'texto' | 'codigo'
+  required?: boolean
   highlight?: boolean
   mono?: boolean
   placeholder?: string
 }) {
+  const [localInput, setLocalInput] = useState<string | null>(null)
+  const [localError, setLocalError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!isEditing) {
+      setLocalInput(null)
+      setLocalError(null)
+    }
+  }, [isEditing])
+
+  const valParaCheck = localInput !== null ? localInput : value
+  const currentCheck = useMemo(
+    () => getFieldValidation(valParaCheck, label, kind, required),
+    [valParaCheck, label, kind, required]
+  )
+
+  const activeError = localError || currentCheck.error
+
+  const handleInputChange = (raw: string) => {
+    setLocalInput(raw)
+    const check = getFieldValidation(raw, label, kind, required)
+    setLocalError(check.error)
+    onChange?.(type === 'number' ? (check.cleanVal === '' ? '' : Number(check.cleanVal)) : check.cleanVal)
+  }
+
+  const handleBlur = () => {
+    if (localInput !== null) {
+      const check = getFieldValidation(localInput, label, kind, required)
+      setLocalInput(null)
+      setLocalError(check.error)
+    }
+  }
+
   if (isEditing) {
+    const hasError = Boolean(activeError)
+    const displayVal = localInput !== null ? localInput : (value ?? '')
     return (
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 py-1 px-2 border-b border-gray-100 last:border-0 rounded">
-        <div className="flex items-center gap-1.5 min-w-0 sm:w-1/2">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-1.5 py-1 px-2 border-b border-gray-100 last:border-0 rounded">
+        <div className="flex items-center gap-1.5 min-w-0 sm:w-1/2 pt-1">
           {codigo && <span className="font-mono text-[9px] font-bold text-gray-400 shrink-0">{codigo}</span>}
           <span className="text-[10px] font-semibold text-gray-700 truncate">{label}:</span>
+          {required && <span className="text-[#9B0F06] font-bold">*</span>}
         </div>
         <div className="sm:w-1/2">
           <input
-            type={type}
-            value={value ?? ''}
-            onChange={(e) =>
-              onChange?.(type === 'number' ? (e.target.value === '' ? '' : Number(e.target.value)) : e.target.value)
-            }
+            type={type === 'number' ? 'text' : type}
+            inputMode={kind === 'porcentaje' || kind === 'monto' || /porcentaje|anticipo|monto|presupuesto/i.test(label) ? 'decimal' : undefined}
+            value={displayVal}
+            onChange={(e) => handleInputChange(e.target.value)}
+            onBlur={handleBlur}
             placeholder={placeholder || label}
-            className={`w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-[10.5px] font-semibold text-gray-900 focus:border-[#9B0F06] focus:outline-none focus:ring-1 focus:ring-[#9B0F06] transition-all ${
-              mono ? 'font-mono' : ''
-            }`}
+            className={`w-full rounded-md border px-2 py-1 text-[10.5px] font-semibold transition-all focus:outline-none ${
+              hasError
+                ? 'border-red-500 ring-1 ring-red-400 bg-red-50/20 text-red-900'
+                : 'border-gray-300 bg-white text-gray-900 focus:border-[#9B0F06] focus:ring-1 focus:ring-[#9B0F06]'
+            } ${mono ? 'font-mono' : ''}`}
           />
+          {hasError && (
+            <p className="text-[8.5px] font-bold text-red-600 mt-0.5 flex items-center gap-1">
+              <span>⚠</span> {activeError}
+            </p>
+          )}
         </div>
       </div>
     )
@@ -598,34 +786,115 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
     setEditingSection(null)
   }
 
-  // Guardar cambios en línea
+  // Guardar cambios en línea con validación exhaustiva
   const handleSaveSection = async (sectionKey: string) => {
     if (!proyecto) return
     setIsSaving(true)
     try {
-      // Validaciones básicas según la sección
-      if (sectionKey === 'resumen_identificacion' && !editFormData.nombreOficial && !editFormData.nombre) {
-        showErrorToast('El nombre oficial del proyecto no puede estar vacío')
-        setIsSaving(false)
-        return
+      // 1. Resumen: Identificación
+      if (sectionKey === 'resumen_identificacion') {
+        const nom = (editFormData.nombreOficial || editFormData.nombre || '').trim()
+        if (!nom) {
+          showErrorToast('El nombre oficial del proyecto no puede estar vacío.')
+          setIsSaving(false)
+          return
+        }
+        if (!(editFormData.codigo || '').trim()) {
+          showErrorToast('El código del proyecto no puede estar vacío.')
+          setIsSaving(false)
+          return
+        }
+        if (!(editFormData.direccion || '').trim()) {
+          showErrorToast('La dirección del proyecto no puede estar vacía.')
+          setIsSaving(false)
+          return
+        }
+        if (!(editFormData.descripcion || '').trim()) {
+          showErrorToast('La descripción del alcance no puede estar vacía.')
+          setIsSaving(false)
+          return
+        }
       }
 
+      // 2. Resumen: Entidades
+      if (sectionKey === 'resumen_entidades') {
+        if (!(editFormData.entidadContratante || '').trim()) {
+          showErrorToast('La entidad contratante no puede estar vacía.')
+          setIsSaving(false)
+          return
+        }
+        if (!(editFormData.empresaContratista || '').trim()) {
+          showErrorToast('La empresa contratista no puede estar vacía.')
+          setIsSaving(false)
+          return
+        }
+        if (!(editFormData.empresaSupervisora || '').trim()) {
+          showErrorToast('La empresa supervisora no puede estar vacía.')
+          setIsSaving(false)
+          return
+        }
+        const delRes = (editFormData.delegadoResidente || '').trim()
+        if (delRes && (/[0-9]/.test(delRes) || delRes.length < 2)) {
+          showErrorToast('El nombre del delegado residente no es válido. Debe contener solo letras.')
+          setIsSaving(false)
+          return
+        }
+      }
+
+      // 3. Resumen: Contrato
+      if (sectionKey === 'resumen_contrato') {
+        const fIni = editFormData.fechaInicioContractual || editFormData.fechaInicio
+        if (!fIni) {
+          showErrorToast('La fecha de inicio contractual no puede estar vacía.')
+          setIsSaving(false)
+          return
+        }
+        const mFinal = editFormData.montoFinancieroFinalEjecutado ?? editFormData.montoFinal
+        if (mFinal !== null && mFinal !== undefined && mFinal !== '') {
+          if (isNaN(Number(mFinal)) || Number(mFinal) < 0) {
+            showErrorToast('El monto final ejecutado debe ser un número válido mayor o igual a 0.')
+            setIsSaving(false)
+            return
+          }
+        }
+      }
+
+      // 4. Introducción
+      if (sectionKey === 'intro') {
+        if (!(editFormData.descripcion || '').trim()) {
+          showErrorToast('La descripción y alcance del proyecto no puede estar vacía.')
+          setIsSaving(false)
+          return
+        }
+      }
+
+      // 5. Marco Legal Contratista
       if (sectionKey === 'marco_legal_contratista') {
+        if (!(editFormData.empresaContratista || '').trim()) {
+          showErrorToast('El nombre de la empresa contratista es obligatorio.')
+          setIsSaving(false)
+          return
+        }
         const prop = (editFormData.propietarioContratista || '').trim()
-        if (prop && (/[0-9]/.test(prop) || prop.length < 2)) {
-          showErrorToast('El nombre del propietario/representante legal no es válido. Debe contener solo letras y al menos 2 caracteres.')
+        if (!prop) {
+          showErrorToast('El nombre del propietario/representante legal es obligatorio.')
+          setIsSaving(false)
+          return
+        }
+        if (/[0-9]/.test(prop) || prop.length < 2) {
+          showErrorToast('El nombre del propietario/representante legal no es válido. No se permiten números.')
           setIsSaving(false)
           return
         }
         const superInt = (editFormData.superintendente || '').trim()
         if (superInt && (/[0-9]/.test(superInt) || superInt.length < 2)) {
-          showErrorToast('El nombre del superintendente no es válido. Debe contener solo letras.')
+          showErrorToast('El nombre del superintendente no es válido. No se permiten números.')
           setIsSaving(false)
           return
         }
         const tel = (editFormData.telefonoContratista || '').trim()
-        if (tel && /[a-zA-Z]/.test(tel)) {
-          showErrorToast('El teléfono no debe incluir letras ni texto como PBX. Ingrese solo dígitos.')
+        if (tel && (/[a-zA-Z]/.test(tel) || tel.replace(/\D/g, '').length < 8)) {
+          showErrorToast('El teléfono debe contener al menos 8 dígitos y no debe incluir letras ni texto como PBX.')
           setIsSaving(false)
           return
         }
@@ -651,22 +920,33 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
         }
       }
 
+      // 6. Marco Legal Supervisora
       if (sectionKey === 'marco_legal_supervisora') {
+        if (!(editFormData.empresaSupervisora || '').trim()) {
+          showErrorToast('El nombre de la empresa supervisora es obligatorio.')
+          setIsSaving(false)
+          return
+        }
         const propSup = (editFormData.propietarioSupervisora || '').trim()
-        if (propSup && (/[0-9]/.test(propSup) || propSup.length < 2)) {
-          showErrorToast('El nombre del propietario/contacto de supervisión no es válido.')
+        if (!propSup) {
+          showErrorToast('El nombre del propietario/contacto de supervisión es obligatorio.')
+          setIsSaving(false)
+          return
+        }
+        if (/[0-9]/.test(propSup) || propSup.length < 2) {
+          showErrorToast('El nombre del propietario/contacto de supervisión no es válido. No se permiten números.')
           setIsSaving(false)
           return
         }
         const delRes = (editFormData.delegadoResidente || '').trim()
         if (delRes && (/[0-9]/.test(delRes) || delRes.length < 2)) {
-          showErrorToast('El nombre del delegado residente no es válido. Debe contener solo letras.')
+          showErrorToast('El nombre del delegado residente no es válido. No se permiten números.')
           setIsSaving(false)
           return
         }
         const telSup = (editFormData.telefonoSupervisora || '').trim()
-        if (telSup && /[a-zA-Z]/.test(telSup)) {
-          showErrorToast('El teléfono de supervisión no debe incluir letras. Ingrese solo dígitos.')
+        if (telSup && (/[a-zA-Z]/.test(telSup) || telSup.replace(/\D/g, '').length < 8)) {
+          showErrorToast('El teléfono de supervisión debe contener al menos 8 dígitos y no debe incluir letras ni PBX.')
           setIsSaving(false)
           return
         }
@@ -689,6 +969,139 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
           correo: editFormData.correoSupervisora,
           responsable: editFormData.delegadoResidente,
           actaInicioNumero: actaStr,
+        }
+      }
+
+      // 7. Ficha Técnica Obra
+      if (sectionKey === 'ficha_obra') {
+        if (!(editFormData.empresaContratista || '').trim()) {
+          showErrorToast('La empresa contratista no puede estar vacía.')
+          setIsSaving(false)
+          return
+        }
+        const prop = (editFormData.propietarioContratista || '').trim()
+        if (!prop) {
+          showErrorToast('El propietario/representante legal es obligatorio.')
+          setIsSaving(false)
+          return
+        }
+        if (/[0-9]/.test(prop) || prop.length < 2) {
+          showErrorToast('El nombre del propietario/representante legal no es válido. No se permiten números.')
+          setIsSaving(false)
+          return
+        }
+        const resp = (editFormData.responsableNombre || '').trim()
+        if (resp && (/[0-9]/.test(resp) || resp.length < 2)) {
+          showErrorToast('El responsable del proyecto no es válido. No se permiten números.')
+          setIsSaving(false)
+          return
+        }
+        const monto = editFormData.montoContractualOriginal ?? editFormData.presupuesto
+        if (monto === '' || monto === null || monto === undefined || isNaN(Number(monto)) || Number(monto) <= 0) {
+          showErrorToast('El monto original de obra debe ser un valor numérico mayor a 0.')
+          setIsSaving(false)
+          return
+        }
+        const pct = editFormData.porcentajeAnticipoObra
+        if (pct === '' || pct === null || pct === undefined || isNaN(Number(pct)) || Number(pct) < 0 || Number(pct) > 100) {
+          showErrorToast('El porcentaje de anticipo de obra debe estar entre 0% y 100%.')
+          setIsSaving(false)
+          return
+        }
+        const tel = (editFormData.telefonoContratista || '').trim()
+        if (tel && /[a-zA-Z]/.test(tel)) {
+          showErrorToast('El teléfono no debe incluir letras. Ingrese solo dígitos.')
+          setIsSaving(false)
+          return
+        }
+
+        if (!editFormData.contratoEjecucion) editFormData.contratoEjecucion = {}
+        editFormData.contratoEjecucion = {
+          ...editFormData.contratoEjecucion,
+          empresaNombre: editFormData.empresaContratista,
+          propietario: editFormData.propietarioContratista,
+          registroMercantil: editFormData.registroMercantilContratista,
+          direccion: editFormData.direccionContratista,
+          telefono: editFormData.telefonoContratista,
+          responsable: editFormData.responsableNombre,
+          programa: editFormData.programaObra,
+          subprograma: editFormData.subprogramaObra,
+          fuenteFinanciamiento: editFormData.fuenteFinanciamientoObra,
+          partidaFondos: editFormData.partidaFondosObra,
+          cdp: editFormData.cdpObra,
+          contratoNumero: editFormData.numeroContratoOriginal,
+          acuerdoMinisterial: editFormData.acuerdoMinisterialOriginal,
+          montoOriginal: Number(monto),
+          porcentajeAnticipo: Number(pct),
+          plazoMesesDetalle: editFormData.mesesContratadosObra,
+          fechaFin: editFormData.fechaTerminacionOriginalObra,
+        }
+      }
+
+      // 8. Ficha Técnica Supervisión
+      if (sectionKey === 'ficha_supervision') {
+        if (!(editFormData.empresaSupervisora || '').trim()) {
+          showErrorToast('La empresa supervisora no puede estar vacía.')
+          setIsSaving(false)
+          return
+        }
+        const prop = (editFormData.propietarioSupervisora || '').trim()
+        if (!prop) {
+          showErrorToast('El propietario de supervisión es obligatorio.')
+          setIsSaving(false)
+          return
+        }
+        if (/[0-9]/.test(prop) || prop.length < 2) {
+          showErrorToast('El nombre del propietario de supervisión no es válido. No se permiten números.')
+          setIsSaving(false)
+          return
+        }
+        const resp = (editFormData.responsableSupervisora || '').trim()
+        if (resp && (/[0-9]/.test(resp) || resp.length < 2)) {
+          showErrorToast('El responsable de supervisión no es válido. No se permiten números.')
+          setIsSaving(false)
+          return
+        }
+        const montoSup = editFormData.supervisoraMontoOriginal
+        if (montoSup === '' || montoSup === null || montoSup === undefined || isNaN(Number(montoSup)) || Number(montoSup) <= 0) {
+          showErrorToast('El monto original de supervisión debe ser un valor numérico mayor a 0.')
+          setIsSaving(false)
+          return
+        }
+        const pctSup = editFormData.porcentajeAnticipoSupervision
+        if (pctSup === '' || pctSup === null || pctSup === undefined || isNaN(Number(pctSup)) || Number(pctSup) < 0 || Number(pctSup) > 100) {
+          showErrorToast('El porcentaje de anticipo de supervisión debe estar entre 0% y 100%.')
+          setIsSaving(false)
+          return
+        }
+        const telSup = (editFormData.telefonoSupervisora || '').trim()
+        if (telSup && /[a-zA-Z]/.test(telSup)) {
+          showErrorToast('El teléfono no debe incluir letras. Ingrese solo dígitos.')
+          setIsSaving(false)
+          return
+        }
+
+        if (!editFormData.contratoSupervision) editFormData.contratoSupervision = {}
+        editFormData.contratoSupervision = {
+          ...editFormData.contratoSupervision,
+          empresaNombre: editFormData.empresaSupervisora,
+          propietario: editFormData.propietarioSupervisora,
+          registroMercantil: editFormData.registroMercantilSupervisora,
+          direccion: editFormData.direccionSupervisora,
+          telefono: editFormData.telefonoSupervisora,
+          responsable: editFormData.responsableSupervisora,
+          programa: editFormData.programaSupervisora,
+          subprograma: editFormData.subprogramaSupervisora,
+          fuenteFinanciamiento: editFormData.fuenteFinanciamientoSupervisora,
+          partidaFondos: editFormData.partidaFondosSupervisora,
+          cdp: editFormData.cdpSupervisora,
+          contratoNumero: editFormData.contratoSupervisora,
+          acuerdoMinisterial: editFormData.acuerdoSupervisora,
+          montoOriginal: Number(montoSup),
+          porcentajeAnticipo: Number(pctSup),
+          fechaInicio: editFormData.fechaInicioSupervisora,
+          plazoMesesDetalle: editFormData.mesesContratadosSupervisora,
+          fechaFin: editFormData.fechaFinSupervisora,
         }
       }
 
@@ -911,6 +1324,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                         handleFieldChange('nombre', v)
                       }}
                       placeholder="Nombre oficial del proyecto"
+                      required
                     />
                     <EditableInfoField
                       label="Código del Proyecto"
@@ -918,7 +1332,9 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                       isEditing={editingSection === 'resumen_identificacion'}
                       onChange={(v) => handleFieldChange('codigo', v)}
                       mono
+                      kind="codigo"
                       placeholder="DOM-VIAL-001"
+                      required
                     />
                     <EditableInfoField
                       label="Dirección (Texto Corto)"
@@ -926,6 +1342,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                       isEditing={editingSection === 'resumen_identificacion'}
                       onChange={(v) => handleFieldChange('direccion', v)}
                       placeholder="Dirección o tramo corto"
+                      required
                     />
                     <EditableInfoField
                       label="Ubicación Física"
@@ -936,6 +1353,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                         handleFieldChange('ubicacion', v)
                       }}
                       placeholder="Ubicación física del proyecto"
+                      required
                     />
                   </div>
                   <div className="mt-2.5 border-t border-gray-100 pt-2">
@@ -946,6 +1364,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                       onChange={(v) => handleFieldChange('descripcion', v)}
                       type="textarea"
                       placeholder="Descripción del alcance del proyecto..."
+                      required
                     />
                   </div>
                 </InfoDetailCard>
@@ -968,6 +1387,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                       isEditing={editingSection === 'resumen_entidades'}
                       onChange={(v) => handleFieldChange('entidadContratante', v)}
                       placeholder="Ej: Dirección General de Caminos (DGC)"
+                      required
                     />
                     <EditableInfoField
                       label="Empresa Contratista Ejecutora"
@@ -975,6 +1395,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                       isEditing={editingSection === 'resumen_entidades'}
                       onChange={(v) => handleFieldChange('empresaContratista', v)}
                       placeholder="Ej: Constructora y Pavimentos S.A."
+                      required
                     />
                     <EditableInfoField
                       label="Empresa Supervisora de Obra"
@@ -982,6 +1403,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                       isEditing={editingSection === 'resumen_entidades'}
                       onChange={(v) => handleFieldChange('empresaSupervisora', v)}
                       placeholder="Ej: SERVICIOS DE INGENIERIA - SERINGE"
+                      required
                     />
                     <EditableInfoField
                       label="Delegado Residente de Proyecto"
@@ -989,6 +1411,8 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                       isEditing={editingSection === 'resumen_entidades'}
                       onChange={(v) => handleFieldChange('delegadoResidente', v)}
                       placeholder="Ej: Ing. Raúl Alvarado"
+                      kind="nombre"
+                      required
                     />
                   </div>
                 </InfoDetailCard>
@@ -1323,13 +1747,16 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                       isEditing={editingSection === 'marco_legal_contratista'}
                       onChange={(v) => handleFieldChange('empresaContratista', v)}
                       placeholder="Constructora y Pavimentos S.A."
+                      required
                     />
                     <EditableInfoField
                       label="Nombre de Propietario / Representante Legal"
                       value={editingSection === 'marco_legal_contratista' ? editFormData.propietarioContratista : (pAny.propietarioContratista || 'Ing. Marco Antonio Estrada Morales')}
                       isEditing={editingSection === 'marco_legal_contratista'}
-                      onChange={(v) => handleFieldChange('propietarioContratista', sanitizeNombrePersona(v))}
+                      onChange={(v) => handleFieldChange('propietarioContratista', v)}
                       placeholder="Representante Legal"
+                      kind="nombre"
+                      required
                     />
                     <EditableInfoField
                       label="Dirección de la Empresa"
@@ -1337,6 +1764,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                       isEditing={editingSection === 'marco_legal_contratista'}
                       onChange={(v) => handleFieldChange('direccionContratista', v)}
                       placeholder="Dirección fiscal"
+                      required
                     />
                   </div>
 
@@ -1378,8 +1806,10 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                       label="Nombramiento de Superintendente"
                       value={editingSection === 'marco_legal_contratista' ? editFormData.superintendente : (pAny.superintendente || 'Ing. Civil Fernando José Reyes Cabrera')}
                       isEditing={editingSection === 'marco_legal_contratista'}
-                      onChange={(v) => handleFieldChange('superintendente', sanitizeNombrePersona(v))}
+                      onChange={(v) => handleFieldChange('superintendente', v)}
                       placeholder="Superintendente de Obra"
+                      kind="nombre"
+                      required
                     />
                     <EditableInfoField
                       label="Colegiado Activo de Superintendente"
@@ -1394,15 +1824,19 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                         label="Teléfono de Contacto"
                         value={editingSection === 'marco_legal_contratista' ? editFormData.telefonoContratista : (editFormData.telefonoContratista || '2334-9000')}
                         isEditing={editingSection === 'marco_legal_contratista'}
-                        onChange={(v) => handleFieldChange('telefonoContratista', sanitizeTelefono(v))}
+                        onChange={(v) => handleFieldChange('telefonoContratista', v)}
                         placeholder="2334-9000"
+                        kind="telefono"
+                        required
                       />
                       <EditableInfoField
                         label="Correo Electrónico"
                         value={editingSection === 'marco_legal_contratista' ? editFormData.correoContratista : (editFormData.correoContratista || 'contacto@constructora.com')}
                         isEditing={editingSection === 'marco_legal_contratista'}
                         type="email"
-                        onChange={(v) => handleFieldChange('correoContratista', v.replace(/\s+/g, ''))}
+                        kind="email"
+                        required
+                        onChange={(v) => handleFieldChange('correoContratista', v)}
                         placeholder="contacto@constructora.com"
                       />
                     </div>
@@ -1438,13 +1872,16 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                       isEditing={editingSection === 'marco_legal_supervisora'}
                       onChange={(v) => handleFieldChange('empresaSupervisora', v)}
                       placeholder="SERVICIOS DE INGENIERIA"
+                      required
                     />
                     <EditableInfoField
                       label="Nombre Propietario (Contacto)"
                       value={editingSection === 'marco_legal_supervisora' ? editFormData.propietarioSupervisora : (pAny.propietarioSupervisora || 'William Ramón Godínez Mansilla')}
                       isEditing={editingSection === 'marco_legal_supervisora'}
-                      onChange={(v) => handleFieldChange('propietarioSupervisora', sanitizeNombrePersona(v))}
+                      onChange={(v) => handleFieldChange('propietarioSupervisora', v)}
                       placeholder="Propietario / Contacto"
+                      kind="nombre"
+                      required
                     />
                     <EditableInfoField
                       label="Dirección"
@@ -1452,6 +1889,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                       isEditing={editingSection === 'marco_legal_supervisora'}
                       onChange={(v) => handleFieldChange('direccionSupervisora', v)}
                       placeholder="Dirección fiscal"
+                      required
                     />
                   </div>
 
@@ -1461,15 +1899,19 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                         label="Teléfono de Contacto"
                         value={editingSection === 'marco_legal_supervisora' ? editFormData.telefonoSupervisora : (editFormData.telefonoSupervisora || '2212-9675 / 5525-1537')}
                         isEditing={editingSection === 'marco_legal_supervisora'}
-                        onChange={(v) => handleFieldChange('telefonoSupervisora', sanitizeTelefono(v))}
+                        onChange={(v) => handleFieldChange('telefonoSupervisora', v)}
                         placeholder="2212-9675 / 5525-1537"
+                        kind="telefono"
+                        required
                       />
                       <EditableInfoField
                         label="Correo Electrónico"
                         value={editingSection === 'marco_legal_supervisora' ? editFormData.correoSupervisora : (editFormData.correoSupervisora || 'supervision@seringe.com.gt')}
                         isEditing={editingSection === 'marco_legal_supervisora'}
                         type="email"
-                        onChange={(v) => handleFieldChange('correoSupervisora', v.replace(/\s+/g, ''))}
+                        kind="email"
+                        required
+                        onChange={(v) => handleFieldChange('correoSupervisora', v)}
                         placeholder="supervision@seringe.com.gt"
                       />
                     </div>
@@ -1511,8 +1953,10 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                       label="Delegado Residente de Proyecto"
                       value={editingSection === 'marco_legal_supervisora' ? editFormData.delegadoResidente : (proyecto.delegadoResidente || 'Ing. Civil Pablo Osberto Pérez Gómez (Col. 3689)')}
                       isEditing={editingSection === 'marco_legal_supervisora'}
-                      onChange={(v) => handleFieldChange('delegadoResidente', sanitizeNombrePersona(v))}
+                      onChange={(v) => handleFieldChange('delegadoResidente', v)}
                       placeholder="Ing. Delegado Residente"
+                      kind="nombre"
+                      required
                     />
                   </div>
                 </div>
@@ -1671,18 +2115,22 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                             value={editingSection === 'ficha_obra' ? editFormData.empresaContratista : (proyecto.empresaContratista || 'Constructora Principal')}
                             isEditing={editingSection === 'ficha_obra'}
                             onChange={(v) => handleFieldChange('empresaContratista', v)}
+                            required
                           />
                           <EditableItemFichaTecnica
                             label="Propietario / Rep. Legal"
                             value={editingSection === 'ficha_obra' ? editFormData.propietarioContratista : (pAny.propietarioContratista || 'Ing. Marco Antonio Estrada Morales')}
                             isEditing={editingSection === 'ficha_obra'}
                             onChange={(v) => handleFieldChange('propietarioContratista', v)}
+                            kind="nombre"
+                            required
                           />
                           <EditableItemFichaTecnica
                             label="Registro Mercantil"
                             value={editingSection === 'ficha_obra' ? editFormData.registroMercantilContratista : (pAny.registroMercantilContratista || '145892B')}
                             isEditing={editingSection === 'ficha_obra'}
                             onChange={(v) => handleFieldChange('registroMercantilContratista', v)}
+                            kind="codigo"
                             mono
                           />
                           <EditableItemFichaTecnica
@@ -1690,18 +2138,22 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                             value={editingSection === 'ficha_obra' ? editFormData.direccionContratista : (pAny.direccionContratista || '12 Calle 4-55 Zona 10, Guatemala')}
                             isEditing={editingSection === 'ficha_obra'}
                             onChange={(v) => handleFieldChange('direccionContratista', v)}
+                            required
                           />
                           <EditableItemFichaTecnica
                             label="Teléfono"
                             value={editingSection === 'ficha_obra' ? editFormData.telefonoContratista : (pAny.telefonoContratista || '2334-9000 / 5544-1234')}
                             isEditing={editingSection === 'ficha_obra'}
                             onChange={(v) => handleFieldChange('telefonoContratista', v)}
+                            kind="telefono"
                           />
                           <EditableItemFichaTecnica
                             label="Responsable del Proyecto"
                             value={editingSection === 'ficha_obra' ? editFormData.responsableNombre : (pAny.responsableNombre || 'Ing. Civil Fernando Reyes (Col. 4125)')}
                             isEditing={editingSection === 'ficha_obra'}
                             onChange={(v) => handleFieldChange('responsableNombre', v)}
+                            kind="nombre"
+                            required
                           />
                           <EditableItemFichaTecnica
                             label="Programa"
@@ -1765,6 +2217,8 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                               handleFieldChange('presupuesto', v)
                             }}
                             type={editingSection === 'ficha_obra' ? 'number' : 'text'}
+                            kind="monto"
+                            required
                             highlight
                           />
                           <EditableItemFichaTecnica
@@ -1773,6 +2227,8 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                             isEditing={editingSection === 'ficha_obra'}
                             onChange={(v) => handleFieldChange('porcentajeAnticipoObra', v)}
                             type={editingSection === 'ficha_obra' ? 'number' : 'text'}
+                            kind="porcentaje"
+                            required
                           />
                           <EditableItemFichaTecnica
                             label="Número de Meses Contratados"
@@ -1880,6 +2336,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                             value={editingSection === 'ficha_supervision' ? editFormData.empresaSupervisora : (proyecto.empresaSupervisora || 'SERVICIOS DE INGENIERIA - SERINGE')}
                             isEditing={editingSection === 'ficha_supervision'}
                             onChange={(v) => handleFieldChange('empresaSupervisora', v)}
+                            required
                           />
                           <EditableItemFichaTecnica
                             codigo="3.1.2.2"
@@ -1887,6 +2344,8 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                             value={editingSection === 'ficha_supervision' ? editFormData.propietarioSupervisora : (pAny.propietarioSupervisora || 'William Ramón Godínez Mansilla')}
                             isEditing={editingSection === 'ficha_supervision'}
                             onChange={(v) => handleFieldChange('propietarioSupervisora', v)}
+                            kind="nombre"
+                            required
                           />
                           <EditableItemFichaTecnica
                             codigo="3.1.2.3"
@@ -1894,6 +2353,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                             value={editingSection === 'ficha_supervision' ? editFormData.registroMercantilSupervisora : (pAny.registroMercantilSupervisora || '177228A')}
                             isEditing={editingSection === 'ficha_supervision'}
                             onChange={(v) => handleFieldChange('registroMercantilSupervisora', v)}
+                            kind="codigo"
                             mono
                           />
                           <EditableItemFichaTecnica
@@ -1902,6 +2362,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                             value={editingSection === 'ficha_supervision' ? editFormData.direccionSupervisora : (pAny.direccionSupervisora || 'Avenida Las Américas, 24-70 Zona 13, Guatemala')}
                             isEditing={editingSection === 'ficha_supervision'}
                             onChange={(v) => handleFieldChange('direccionSupervisora', v)}
+                            required
                           />
                           <EditableItemFichaTecnica
                             codigo="3.1.2.5"
@@ -1909,6 +2370,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                             value={editingSection === 'ficha_supervision' ? editFormData.telefonoSupervisora : (pAny.telefonoSupervisora || '2212-9675 / 5525-1537')}
                             isEditing={editingSection === 'ficha_supervision'}
                             onChange={(v) => handleFieldChange('telefonoSupervisora', v)}
+                            kind="telefono"
                           />
                           <EditableItemFichaTecnica
                             codigo="3.1.2.6"
@@ -1916,6 +2378,8 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                             value={editingSection === 'ficha_supervision' ? editFormData.responsableSupervisora : (pAny.responsableSupervisora || 'Ing. Civil Pablo Osberto Pérez Gómez (Col. 3689)')}
                             isEditing={editingSection === 'ficha_supervision'}
                             onChange={(v) => handleFieldChange('responsableSupervisora', v)}
+                            kind="nombre"
+                            required
                           />
                           <EditableItemFichaTecnica
                             codigo="3.1.2.7"
@@ -1984,6 +2448,8 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                             isEditing={editingSection === 'ficha_supervision'}
                             onChange={(v) => handleFieldChange('supervisoraMontoOriginal', v)}
                             type={editingSection === 'ficha_supervision' ? 'number' : 'text'}
+                            kind="monto"
+                            required
                             highlight
                           />
                           <EditableItemFichaTecnica
@@ -1993,6 +2459,8 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                             isEditing={editingSection === 'ficha_supervision'}
                             onChange={(v) => handleFieldChange('porcentajeAnticipoSupervision', v)}
                             type={editingSection === 'ficha_supervision' ? 'number' : 'text'}
+                            kind="porcentaje"
+                            required
                           />
                           <EditableItemFichaTecnica
                             codigo="3.1.2.16"

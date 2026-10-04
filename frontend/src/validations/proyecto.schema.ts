@@ -72,6 +72,9 @@ export const ProyectoSchema = z.object({
   documentos: z.array(DocumentoProyectoSchema).optional().default([]),
   fotografias: z.array(z.any()).optional().default([]),
   fases: z.array(FaseTimelineSchema).optional().default([]),
+  modoGestionFinanciera: z.enum(['sabana', 'manual']).optional().default('sabana'),
+  usarModoSabana: z.boolean().optional().default(true),
+  estimacionesManuales: z.array(z.any()).optional().default([]),
 })
 
 export const RenglonDetalladoSabanaSchema = z.object({

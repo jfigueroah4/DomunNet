@@ -24,6 +24,7 @@ import { BitacoraMapaInline } from '@/components/modules/bitacora/BitacoraMapaIn
 import { useAuthStore } from '@/stores/useAuthStore'
 import { apiGetDeduplicado } from '@/lib/api/cliente'
 import { Portal } from '@/components/ui/Portal'
+import { BITACORA_MOCK } from '@/data/bitacora.mock'
 
 export default function BitacoraPage() {
   const searchParams = useSearchParams()
@@ -36,6 +37,126 @@ export default function BitacoraPage() {
   const [vista, setVista] = useState<'lista' | 'crear'>('lista')
   const [registrosApi, setRegistrosApi] = useState<any[]>([])
 
+  const cargarRegistros = async () => {
+    try {
+      const [resEntradas, resFotos, resProyectos, resUsuarios] = await Promise.allSettled([
+        apiGetDeduplicado('/mantenimiento/bitacora_entrada?limite=200'),
+        apiGetDeduplicado('/mantenimiento/evidencia_fotografica?limite=200'),
+        apiGetDeduplicado('/proyectos?limite=100'),
+        apiGetDeduplicado('/usuarios?limite=100'),
+      ])
+
+      const entradasBD =
+        resEntradas.status === 'fulfilled' && Array.isArray(resEntradas.value?.data?.data)
+          ? resEntradas.value.data.data
+          : []
+
+      const fotosBD =
+        resFotos.status === 'fulfilled' && Array.isArray(resFotos.value?.data?.data)
+          ? resFotos.value.data.data
+          : []
+
+      const proysBD =
+        resProyectos.status === 'fulfilled' && Array.isArray(resProyectos.value?.data?.data)
+          ? resProyectos.value.data.data
+          : []
+
+      const usuariosBD =
+        resUsuarios.status === 'fulfilled' && Array.isArray(resUsuarios.value?.data?.data)
+          ? resUsuarios.value.data.data
+          : []
+
+      // Mapa de proyectos y usuarios
+      const proyMap = new Map<string, string>()
+      proysBD.forEach((p: any) => {
+        if (p.id) proyMap.set(String(p.id), p.nombreOficial || p.nombre || p.codigo || 'Proyecto Vial')
+      })
+
+      const userMap = new Map<string, string>()
+      usuariosBD.forEach((u: any) => {
+        if (u.id) userMap.set(String(u.id), u.nombre || `${u.primer_nombre || ''} ${u.primer_apellido || ''}`.trim() || u.email)
+      })
+
+      // Mapa de fotos por bitacora_entrada_id
+      const fotosMap = new Map<string, any[]>()
+      fotosBD.forEach((f: any) => {
+        if (f.bitacora_entrada_id) {
+          const list = fotosMap.get(String(f.bitacora_entrada_id)) || []
+          list.push({
+            id: f.id,
+            nombre: f.descripcion || 'evidencia.jpg',
+            tipo: 'imagen',
+            url: f.url_storage,
+            tamanio: '2.1 MB',
+          })
+          fotosMap.set(String(f.bitacora_entrada_id), list)
+        }
+      })
+
+      // Cargar también registros locales offline guardados en localStorage
+      let locales: any[] = []
+      try {
+        locales = JSON.parse(localStorage.getItem('domun_bitacora_locales') || '[]')
+      } catch (_) {}
+
+      const mapeadosBD = entradasBD.map((e: any) => {
+        const pNombre = proyMap.get(String(e.proyecto_id)) || 'Proyecto Vial'
+        const uNombre = userMap.get(String(e.usuario_id)) || 'Ingeniero Residente'
+        const fotosAdj =
+          fotosMap.get(String(e.id)) ||
+          (e.firma_url ? [{ id: `f-${e.id}`, url: e.firma_url, tipo: 'imagen', nombre: 'evidencia.jpg' }] : [])
+
+        return {
+          id: e.id,
+          titulo: e.titulo || `Registro de Bitácora`,
+          descripcion: e.descripcion || '',
+          tipo: (e.titulo || '').toLowerCase().includes('laboratorio') ? 'inspeccion' : 'actividad',
+          estado: 'aprobado',
+          proyectoId: String(e.proyecto_id || ''),
+          proyectoNombre: pNombre,
+          autor: uNombre,
+          autor_id: e.usuario_id,
+          ubicacion: e.ubicacion || 'Frente de Obra',
+          fecha: e.fecha || new Date().toISOString().slice(0, 10),
+          hora: e.hora || '12:00',
+          adjuntos: fotosAdj,
+          renglon_nombre: e.descripcion?.includes('Renglón')
+            ? e.descripcion.split('Renglón')[1]?.split('·')[0]?.trim()
+            : 'Terracería',
+        }
+      })
+
+      // Combinar locales + mapeados BD + BITACORA_MOCK
+      const idsExistentes = new Set<string>()
+      const consolidado: any[] = []
+
+      locales.forEach((item: any) => {
+        if (item.id && !idsExistentes.has(String(item.id))) {
+          idsExistentes.add(String(item.id))
+          consolidado.push(item)
+        }
+      })
+
+      mapeadosBD.forEach((item: any) => {
+        if (item.id && !idsExistentes.has(String(item.id))) {
+          idsExistentes.add(String(item.id))
+          consolidado.push(item)
+        }
+      })
+
+      BITACORA_MOCK.forEach((item: any) => {
+        if (item.id && !idsExistentes.has(String(item.id))) {
+          idsExistentes.add(String(item.id))
+          consolidado.push(item)
+        }
+      })
+
+      setRegistrosApi(consolidado)
+    } catch (err) {
+      console.warn('Error al sincronizar bitácora:', err)
+    }
+  }
+
   useEffect(() => {
     if (searchParams?.get('nuevo') === 'true' || searchParams?.get('formulario') === 'true') {
       setVista('crear')
@@ -43,13 +164,7 @@ export default function BitacoraPage() {
   }, [searchParams])
 
   useEffect(() => {
-    apiGetDeduplicado('/mantenimiento/bitacora_entrada')
-      .then((res) => {
-        if (res.data?.success && Array.isArray(res.data.data)) {
-          setRegistrosApi(res.data.data)
-        }
-      })
-      .catch(() => {})
+    void cargarRegistros()
   }, [])
 
   // Drawer lateral deslizable de detalle de registro y modales
@@ -187,8 +302,12 @@ export default function BitacoraPage() {
       <div className="-mx-4 -mt-4 -mb-20 md:-mb-4 xl:-mx-5 min-h-[calc(100vh-65px)] bg-white">
         <BitacoraForm
           onBack={() => setVista('lista')}
-          onSubmit={() => {
+          onSubmit={(nuevoReg: any) => {
+            if (nuevoReg) {
+              setRegistrosApi((prev) => [nuevoReg, ...prev.filter((p: any) => p.id !== nuevoReg.id)])
+            }
             setVista('lista')
+            void cargarRegistros()
           }}
         />
       </div>

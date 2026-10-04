@@ -68,8 +68,9 @@ const inputClass =
 
 const labelClass = 'mb-1 block text-[9px] font-extrabold uppercase tracking-wider text-gray-600'
 
-function errorInputClass(errors: Record<string, boolean>, field: string) {
-  return `w-full rounded border ${errors[field] ? 'border-red-500 ring-1 ring-red-400 bg-red-50/20' : 'border-gray-200'} bg-white px-2.5 py-1.5 text-[11px] text-gray-800 placeholder-gray-400 focus:border-[#9B0F06] focus:outline-none focus:ring-1 focus:ring-[#9B0F06] transition-colors font-medium`
+function errorInputClass(errors: Record<string, boolean>, field: string, errorMessages?: Record<string, string>) {
+  const hasError = Boolean(errors[field] || (errorMessages && errorMessages[field]))
+  return `w-full rounded border ${hasError ? 'border-red-500 ring-1 ring-red-400 bg-red-50/20 text-red-900' : 'border-gray-200'} bg-white px-2.5 py-1.5 text-[11px] text-gray-800 placeholder-gray-400 focus:border-[#9B0F06] focus:outline-none focus:ring-1 focus:ring-[#9B0F06] transition-colors font-medium`
 }
 
 // Helpers de validación y sanitización en tiempo real
@@ -736,6 +737,30 @@ export function ProyectoFormulario({
   // Estado del Asistente (6 Pasos Especializados)
   const [pasoActual, setPasoActual] = useState<1 | 2 | 3 | 4 | 5 | 6>(1)
   const [errors, setErrors] = useState<Record<string, boolean>>({})
+  const [errorMessages, setErrorMessages] = useState<Record<string, string>>({})
+
+  const setFieldError = (field: string, message: string | null) => {
+    setErrors((prev) => ({ ...prev, [field]: Boolean(message) }))
+    setErrorMessages((prev) => {
+      const updated = { ...prev }
+      if (message) {
+        updated[field] = message
+      } else {
+        delete updated[field]
+      }
+      return updated
+    })
+  }
+
+  const renderFieldError = (field: string) => {
+    const msg = errorMessages[field]
+    if (!msg) return null
+    return (
+      <p className="text-[8.5px] font-bold text-red-600 mt-1 flex items-center gap-1">
+        <span>⚠</span> {msg}
+      </p>
+    )
+  }
 
   // Catálogos con inicialización instantánea desde caché en memoria
   const { usuarios: usuariosDisponibles, cargarUsuarios } = useUsuariosStore()
@@ -861,6 +886,13 @@ export function ProyectoFormulario({
   const [supervisoraMesesPlazo, setSupervisoraMesesPlazo] = useState(proyectoInicial?.contratoSupervision?.plazoMesesDetalle || '')
   const [supervisoraFechaFin, setSupervisoraFechaFin] = useState(proyectoInicial?.contratoSupervision?.fechaFin || '')
 
+  // Modalidad de Gestión Financiera: Modo Hoja Sábana vs Modo Manual
+  const [modoGestionFinanciera, setModoGestionFinanciera] = useState<'sabana' | 'manual'>(
+    (proyectoInicial as any)?.modoGestionFinanciera ||
+    (proyectoInicial as any)?.modo_gestion_financiera ||
+    ((proyectoInicial as any)?.usarModoSabana === false ? 'manual' : 'sabana')
+  )
+
   // Sub-tabs internas para organización óptima en pasos complejos
   const [subTabPaso3, setSubTabPaso3] = useState<'ejecutora' | 'supervisora'>('ejecutora')
   const [subTabPaso4, setSubTabPaso4] = useState<'ejecucion' | 'supervision'>('ejecucion')
@@ -971,27 +1003,71 @@ export function ProyectoFormulario({
   const validarCamposActivo = () => {
     const faltantes: string[] = []
     const newErrors: Record<string, boolean> = {}
+    const newErrorMessages: Record<string, string> = {}
 
-    const nom = nombreOficial || nombre
-    if (!nom.trim()) { faltantes.push('Nombre Oficial del Proyecto'); newErrors.nombreOficial = true }
-    if (!descripcion.trim()) { faltantes.push('Descripción y Alcance'); newErrors.descripcion = true }
-    if (!entidadContratante.trim()) { faltantes.push('Entidad Contratante'); newErrors.entidadContratante = true }
-
-    if (!direccion.trim()) { faltantes.push('Dirección Inicial / Origen'); newErrors.direccion = true }
-    if (!departamentoId) { faltantes.push('Departamento Inicial'); newErrors.departamentoId = true }
-    if (!municipioId) { faltantes.push('Municipio Inicial'); newErrors.municipioId = true }
-
-    if (!empresaContratista.trim()) { faltantes.push('Empresa Contratista Ejecutora'); newErrors.empresaContratista = true }
-    if (!empresaSupervisora.trim()) { faltantes.push('Empresa Supervisora'); newErrors.empresaSupervisora = true }
-    if (!delegadoResidenteId) { faltantes.push('Delegado Residente'); newErrors.delegadoResidenteId = true }
-
-    if (!montoContractualOriginal || parseFloat(montoContractualOriginal) <= 0) {
-      faltantes.push('Monto Contractual Original de Obra'); newErrors.montoContractualOriginal = true
+    const nom = (nombreOficial || nombre || '').trim()
+    if (!nom) {
+      faltantes.push('Nombre Oficial del Proyecto')
+      newErrors.nombreOficial = true
+      newErrorMessages.nombreOficial = 'El nombre oficial es obligatorio y no puede quedar vacío.'
     }
-    if (!fechaInicioContractual) { faltantes.push('Fecha de Inicio Contractual'); newErrors.fechaInicioContractual = true }
+    if (!(descripcion || '').trim()) {
+      faltantes.push('Descripción y Alcance')
+      newErrors.descripcion = true
+      newErrorMessages.descripcion = 'La descripción y alcance del proyecto es obligatoria.'
+    }
+    if (!(entidadContratante || '').trim()) {
+      faltantes.push('Entidad Contratante')
+      newErrors.entidadContratante = true
+      newErrorMessages.entidadContratante = 'La entidad contratante es obligatoria.'
+    }
+
+    if (!(direccion || '').trim()) {
+      faltantes.push('Dirección Inicial / Origen')
+      newErrors.direccion = true
+      newErrorMessages.direccion = 'La dirección inicial es obligatoria.'
+    }
+    if (!departamentoId) {
+      faltantes.push('Departamento Inicial')
+      newErrors.departamentoId = true
+      newErrorMessages.departamentoId = 'Seleccione el departamento inicial.'
+    }
+    if (!municipioId) {
+      faltantes.push('Municipio Inicial')
+      newErrors.municipioId = true
+      newErrorMessages.municipioId = 'Seleccione el municipio inicial.'
+    }
+
+    if (!(empresaContratista || '').trim()) {
+      faltantes.push('Empresa Contratista Ejecutora')
+      newErrors.empresaContratista = true
+      newErrorMessages.empresaContratista = 'La empresa contratista es obligatoria.'
+    }
+    if (!(empresaSupervisora || '').trim()) {
+      faltantes.push('Empresa Supervisora')
+      newErrors.empresaSupervisora = true
+      newErrorMessages.empresaSupervisora = 'La empresa supervisora es obligatoria.'
+    }
+    if (!delegadoResidenteId) {
+      faltantes.push('Delegado Residente')
+      newErrors.delegadoResidenteId = true
+      newErrorMessages.delegadoResidenteId = 'Debe asignar un delegado residente.'
+    }
+
+    if (!montoContractualOriginal || isNaN(Number(montoContractualOriginal)) || parseFloat(montoContractualOriginal) <= 0) {
+      faltantes.push('Monto Contractual Original de Obra')
+      newErrors.montoContractualOriginal = true
+      newErrorMessages.montoContractualOriginal = 'El monto de obra debe ser un valor numérico mayor a 0.'
+    }
+    if (!fechaInicioContractual) {
+      faltantes.push('Fecha de Inicio Contractual')
+      newErrors.fechaInicioContractual = true
+      newErrorMessages.fechaInicioContractual = 'La fecha de inicio contractual es obligatoria.'
+    }
 
     setErrors(newErrors)
-    return { valido: faltantes.length === 0, faltantes, newErrors }
+    setErrorMessages(newErrorMessages)
+    return { valido: faltantes.length === 0, faltantes, newErrors, newErrorMessages }
   }
 
   // Cambio de estado con validaciones y modales de confirmación
@@ -1020,9 +1096,10 @@ export function ProyectoFormulario({
     const estadoFinal = forzarEstado || estado
 
     // 1. REGLA PARA BORRADOR: Solo requiere Nombre Oficial
-    const nom = nombreOficial || nombre
-    if (!nom.trim()) {
+    const nom = (nombreOficial || nombre || '').trim()
+    if (!nom) {
       setErrors({ nombreOficial: true })
+      setErrorMessages({ nombreOficial: 'El nombre oficial es obligatorio y no puede quedar vacío.' })
       setPasoActual(1)
       showErrorToast('Para guardar el proyecto se requiere como mínimo el Nombre Oficial.')
       return
@@ -1045,33 +1122,57 @@ export function ProyectoFormulario({
 
     // Validaciones de nombres de personas en Paso 3
     if (contratistaPropietario && (/[0-9]/.test(contratistaPropietario) || contratistaPropietario.trim().length < 2)) {
-      showErrorToast('El nombre del propietario/representante de la ejecutora no es válido. Debe contener solo letras.')
+      setFieldError('contratistaPropietario', 'El nombre del propietario/representante no es válido. No se permiten números.')
+      showErrorToast('El nombre del propietario/representante de la ejecutora no es válido. No se permiten números.')
       setPasoActual(3)
       return
     }
     if (supervisoraPropietario && (/[0-9]/.test(supervisoraPropietario) || supervisoraPropietario.trim().length < 2)) {
-      showErrorToast('El nombre del propietario/representante de la supervisora no es válido. Debe contener solo letras.')
+      setFieldError('supervisoraPropietario', 'El nombre del propietario/representante no es válido. No se permiten números.')
+      showErrorToast('El nombre del propietario/representante de la supervisora no es válido. No se permiten números.')
       setPasoActual(3)
       return
     }
-    if (contratistaTelefono && /[a-zA-Z]/.test(contratistaTelefono)) {
+    if (contratistaTelefono && (/[a-zA-Z]/.test(contratistaTelefono) || contratistaTelefono.replace(/\D/g, '').length < 8)) {
+      setFieldError('contratistaTelefono', 'El teléfono debe contener al menos 8 dígitos y no debe incluir letras ni texto como PBX.')
       showErrorToast('El teléfono de la empresa ejecutora no debe incluir texto como PBX ni letras. Ingrese solo números.')
       setPasoActual(3)
       return
     }
-    if (supervisoraTelefono && /[a-zA-Z]/.test(supervisoraTelefono)) {
-      showErrorToast('El teléfono de la empresa supervisora no debe incluir letras. Ingrese solo números.')
+    if (supervisoraTelefono && (/[a-zA-Z]/.test(supervisoraTelefono) || supervisoraTelefono.replace(/\D/g, '').length < 8)) {
+      setFieldError('supervisoraTelefono', 'El teléfono debe contener al menos 8 dígitos y no debe incluir letras ni PBX.')
+      showErrorToast('El teléfono de la empresa supervisora no debe incluir letras ni PBX. Ingrese solo números.')
       setPasoActual(3)
       return
     }
     if (contratistaCorreo && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contratistaCorreo.trim())) {
+      setFieldError('contratistaCorreo', 'El formato del correo electrónico de la empresa ejecutora es inválido.')
       showErrorToast('El formato del correo electrónico de la empresa ejecutora es inválido.')
       setPasoActual(3)
       return
     }
     if (supervisoraCorreo && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(supervisoraCorreo.trim())) {
+      setFieldError('supervisoraCorreo', 'El formato del correo electrónico de la supervisora es inválido.')
       showErrorToast('El formato del correo electrónico de la supervisora es inválido.')
       setPasoActual(3)
+      return
+    }
+    if (montoContractualOriginal && (isNaN(Number(montoContractualOriginal)) || Number(montoContractualOriginal) <= 0)) {
+      setFieldError('montoContractualOriginal', 'El monto debe ser un valor numérico mayor a 0.')
+      showErrorToast('El monto contractual de obra debe ser un valor numérico mayor a 0.')
+      setPasoActual(5)
+      return
+    }
+    if (contratistaPorcentajeAnticipo && (isNaN(Number(contratistaPorcentajeAnticipo)) || Number(contratistaPorcentajeAnticipo) < 0 || Number(contratistaPorcentajeAnticipo) > 100)) {
+      setFieldError('contratistaPorcentajeAnticipo', 'El porcentaje debe estar entre 0% y 100%.')
+      showErrorToast('El porcentaje de anticipo de obra debe estar entre 0% y 100%.')
+      setPasoActual(5)
+      return
+    }
+    if (supervisoraPorcentajeAnticipo && (isNaN(Number(supervisoraPorcentajeAnticipo)) || Number(supervisoraPorcentajeAnticipo) < 0 || Number(supervisoraPorcentajeAnticipo) > 100)) {
+      setFieldError('supervisoraPorcentajeAnticipo', 'El porcentaje debe estar entre 0% y 100%.')
+      showErrorToast('El porcentaje de anticipo de supervisión debe estar entre 0% y 100%.')
+      setPasoActual(5)
       return
     }
 
@@ -1161,6 +1262,8 @@ export function ProyectoFormulario({
       fechaFin: fechaFinContractualPlan || null,
       montoContractualOriginal: parseFloat(montoContractualOriginal) || 0,
       presupuesto: parseFloat(montoContractualOriginal) || 0,
+      modoGestionFinanciera,
+      usarModoSabana: modoGestionFinanciera === 'sabana',
       estado: estadoFinal,
       contratoEjecucion: contratoEjecucionData,
       contratoSupervision: contratoSupervisionData,
@@ -1282,11 +1385,16 @@ export function ProyectoFormulario({
                     const val = e.target.value.slice(0, 300)
                     setNombreOficial(val)
                     setNombre(val)
-                    setErrors((prev) => ({ ...prev, nombreOficial: false }))
+                    if (!val.trim()) {
+                      setFieldError('nombreOficial', 'El nombre oficial es obligatorio y no puede quedar vacío')
+                    } else {
+                      setFieldError('nombreOficial', null)
+                    }
                   }}
-                  className={errorInputClass(errors, 'nombreOficial')}
+                  className={errorInputClass(errors, 'nombreOficial', errorMessages)}
                   placeholder="Ej: Construcción del Paso a Desnivel e Intersección Vial CA-9 Sur Km 22.5"
                 />
+                {renderFieldError('nombreOficial')}
               </div>
             </div>
 
@@ -1297,12 +1405,16 @@ export function ProyectoFormulario({
               <Combobox
                 options={entidadesContratantes.map((e: any) => ({ value: e.nombre, label: e.nombre }))}
                 value={entidadContratante}
-                hasError={errors.entidadContratante}
+                hasError={errors.entidadContratante || !!errorMessages.entidadContratante}
                 onChange={(val) => {
                   setEntidadContratante(val)
                   const found = entidadesContratantes.find((e: any) => e.nombre === val || e.id === val)
                   if (found?.id) setEmpresaContratanteId(found.id)
-                  setErrors((prev) => ({ ...prev, entidadContratante: false }))
+                  if (!val || !val.trim()) {
+                    setFieldError('entidadContratante', 'La entidad contratante es obligatoria')
+                  } else {
+                    setFieldError('entidadContratante', null)
+                  }
                 }}
                 placeholder="Buscar o seleccionar Entidad Contratante (ej. DGC, MICIVI)..."
                 className="mt-0.5"
@@ -1311,6 +1423,7 @@ export function ProyectoFormulario({
                   onClick: () => setOpenCrearEntidadDrawer(true),
                 }}
               />
+              {renderFieldError('entidadContratante')}
             </div>
 
             <div>
@@ -1323,12 +1436,17 @@ export function ProyectoFormulario({
                 onChange={(e) => {
                   const val = e.target.value.slice(0, 2000)
                   setDescripcion(val)
-                  setErrors((prev) => ({ ...prev, descripcion: false }))
+                  if (!val.trim()) {
+                    setFieldError('descripcion', 'La descripción del proyecto es obligatoria y no puede quedar vacía')
+                  } else {
+                    setFieldError('descripcion', null)
+                  }
                 }}
                 rows={5}
-                className={errorInputClass(errors, 'descripcion')}
+                className={errorInputClass(errors, 'descripcion', errorMessages)}
                 placeholder="Describe a detalle el alcance físico: longitud en kilómetros, número de carriles, estructura de pavimento, puentes, drenajes..."
               />
+              {renderFieldError('descripcion')}
             </div>
           </div>
         )}
@@ -1559,14 +1677,22 @@ export function ProyectoFormulario({
                     <Combobox
                       options={empresasContratistas.map((e: any) => ({ value: e.nombre || e.razon_social, label: e.nombre || e.razon_social }))}
                       value={empresaContratista}
-                      hasError={errors.empresaContratista}
-                      onChange={handleSelectContratista}
+                      hasError={errors.empresaContratista || !!errorMessages.empresaContratista}
+                      onChange={(val) => {
+                        handleSelectContratista(val)
+                        if (!val || !val.trim()) {
+                          setFieldError('empresaContratista', 'La empresa contratista es obligatoria')
+                        } else {
+                          setFieldError('empresaContratista', null)
+                        }
+                      }}
                       placeholder="Buscar Empresa Ejecutora..."
                       emptyAction={{
                         label: 'Crear Nueva Empresa',
                         onClick: () => setOpenCrearContratistaDrawer(true),
                       }}
                     />
+                    {renderFieldError('empresaContratista')}
                   </div>
 
                   <div>
@@ -1575,10 +1701,19 @@ export function ProyectoFormulario({
                       type="text"
                       maxLength={150}
                       value={contratistaPropietario}
-                      onChange={(e) => setContratistaPropietario(sanitizeNombrePersona(e.target.value))}
-                      className={inputClass}
+                      onChange={(e) => {
+                        const raw = e.target.value
+                        if (/[0-9]/.test(raw)) {
+                          setFieldError('contratistaPropietario', 'No se permiten números en nombres de personas')
+                        } else {
+                          setFieldError('contratistaPropietario', null)
+                        }
+                        setContratistaPropietario(sanitizeNombrePersona(raw))
+                      }}
+                      className={errorInputClass(errors, 'contratistaPropietario', errorMessages)}
                       placeholder="Ej: Ing. William Ramón Godínez"
                     />
+                    {renderFieldError('contratistaPropietario')}
                   </div>
 
                   <div>
@@ -1613,10 +1748,19 @@ export function ProyectoFormulario({
                       type="text"
                       maxLength={30}
                       value={contratistaTelefono}
-                      onChange={(e) => setContratistaTelefono(sanitizeTelefono(e.target.value))}
-                      className={inputClass}
+                      onChange={(e) => {
+                        const raw = e.target.value
+                        if (/[a-zA-Z]/.test(raw)) {
+                          setFieldError('contratistaTelefono', 'Solo se permiten números, guiones y signos +')
+                        } else {
+                          setFieldError('contratistaTelefono', null)
+                        }
+                        setContratistaTelefono(sanitizeTelefono(raw))
+                      }}
+                      className={errorInputClass(errors, 'contratistaTelefono', errorMessages)}
                       placeholder="2212-9675 / 5525-1537"
                     />
+                    {renderFieldError('contratistaTelefono')}
                   </div>
 
                   <div>
@@ -1625,10 +1769,19 @@ export function ProyectoFormulario({
                       type="email"
                       maxLength={100}
                       value={contratistaCorreo}
-                      onChange={(e) => setContratistaCorreo(sanitizeEmail(e.target.value))}
-                      className={inputClass}
+                      onChange={(e) => {
+                        const raw = e.target.value
+                        if (raw.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(raw.trim())) {
+                          setFieldError('contratistaCorreo', 'Formato de correo inválido (ej. usuario@dominio.com)')
+                        } else {
+                          setFieldError('contratistaCorreo', null)
+                        }
+                        setContratistaCorreo(sanitizeEmail(raw))
+                      }}
+                      className={errorInputClass(errors, 'contratistaCorreo', errorMessages)}
                       placeholder="contacto@empresa.com"
                     />
+                    {renderFieldError('contratistaCorreo')}
                   </div>
                 </div>
 
@@ -1733,12 +1886,18 @@ export function ProyectoFormulario({
                       maxLength={200}
                       value={empresaSupervisora}
                       onChange={(e) => {
-                        setEmpresaSupervisora(e.target.value.slice(0, 200))
-                        setErrors((prev) => ({ ...prev, empresaSupervisora: false }))
+                        const val = e.target.value.slice(0, 200)
+                        setEmpresaSupervisora(val)
+                        if (!val.trim()) {
+                          setFieldError('empresaSupervisora', 'La empresa supervisora es obligatoria')
+                        } else {
+                          setFieldError('empresaSupervisora', null)
+                        }
                       }}
-                      className={errorInputClass(errors, 'empresaSupervisora')}
+                      className={errorInputClass(errors, 'empresaSupervisora', errorMessages)}
                       placeholder="Ej: SERVICIOS DE INGENIERIA - SERINGE"
                     />
+                    {renderFieldError('empresaSupervisora')}
                   </div>
 
                   <div>
@@ -1747,10 +1906,19 @@ export function ProyectoFormulario({
                       type="text"
                       maxLength={150}
                       value={supervisoraPropietario}
-                      onChange={(e) => setSupervisoraPropietario(sanitizeNombrePersona(e.target.value))}
-                      className={inputClass}
+                      onChange={(e) => {
+                        const raw = e.target.value
+                        if (/[0-9]/.test(raw)) {
+                          setFieldError('supervisoraPropietario', 'No se permiten números en nombres de personas')
+                        } else {
+                          setFieldError('supervisoraPropietario', null)
+                        }
+                        setSupervisoraPropietario(sanitizeNombrePersona(raw))
+                      }}
+                      className={errorInputClass(errors, 'supervisoraPropietario', errorMessages)}
                       placeholder="Ej: William Ramón Godínez Mansilla"
                     />
+                    {renderFieldError('supervisoraPropietario')}
                   </div>
 
                   <div>
@@ -1785,10 +1953,19 @@ export function ProyectoFormulario({
                       type="text"
                       maxLength={30}
                       value={supervisoraTelefono}
-                      onChange={(e) => setSupervisoraTelefono(sanitizeTelefono(e.target.value))}
-                      className={inputClass}
+                      onChange={(e) => {
+                        const raw = e.target.value
+                        if (/[a-zA-Z]/.test(raw)) {
+                          setFieldError('supervisoraTelefono', 'Solo se permiten números, guiones y signos +')
+                        } else {
+                          setFieldError('supervisoraTelefono', null)
+                        }
+                        setSupervisoraTelefono(sanitizeTelefono(raw))
+                      }}
+                      className={errorInputClass(errors, 'supervisoraTelefono', errorMessages)}
                       placeholder="2212-9675"
                     />
+                    {renderFieldError('supervisoraTelefono')}
                   </div>
 
                   <div>
@@ -1797,10 +1974,19 @@ export function ProyectoFormulario({
                       type="email"
                       maxLength={100}
                       value={supervisoraCorreo}
-                      onChange={(e) => setSupervisoraCorreo(sanitizeEmail(e.target.value))}
-                      className={inputClass}
+                      onChange={(e) => {
+                        const raw = e.target.value
+                        if (raw.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(raw.trim())) {
+                          setFieldError('supervisoraCorreo', 'Formato de correo inválido (ej. usuario@dominio.com)')
+                        } else {
+                          setFieldError('supervisoraCorreo', null)
+                        }
+                        setSupervisoraCorreo(sanitizeEmail(raw))
+                      }}
+                      className={errorInputClass(errors, 'supervisoraCorreo', errorMessages)}
                       placeholder="supervision@seringe.com"
                     />
+                    {renderFieldError('supervisoraCorreo')}
                   </div>
                 </div>
 
@@ -2172,6 +2358,85 @@ export function ProyectoFormulario({
               icon={Banknote}
             />
 
+            {/* Selector de Modalidad de Presupuesto / Estimaciones: Modo Hoja Sábana vs Modo Manual */}
+            <div className="rounded-xl border border-gray-200 bg-gray-50/70 p-3.5 space-y-2.5">
+              <div className="flex flex-wrap items-center justify-between gap-1.5">
+                <div>
+                  <h4 className="text-[11px] font-bold text-gray-800">
+                    Modalidad de Gestión de Presupuesto y Estimaciones
+                  </h4>
+                  <p className="text-[9.5px] text-gray-500">
+                    Define cómo se calcularán y registrarán los montos de estimaciones y avances en este proyecto.
+                  </p>
+                </div>
+                <span className={`rounded-full px-2 py-0.5 text-[8.5px] font-extrabold uppercase border ${
+                  modoGestionFinanciera === 'sabana'
+                    ? 'bg-red-50 text-[#9B0F06] border-red-200'
+                    : 'bg-amber-50 text-amber-800 border-amber-300'
+                }`}>
+                  {modoGestionFinanciera === 'sabana' ? 'Modo Sábana Activo' : 'Modo Manual Activo'}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {/* Opción 1: Modo Hoja Sábana */}
+                <button
+                  type="button"
+                  onClick={() => setModoGestionFinanciera('sabana')}
+                  className={`flex items-start gap-3 p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                    modoGestionFinanciera === 'sabana'
+                      ? 'border-[#9B0F06] bg-white shadow-xs ring-1 ring-[#9B0F06]/30'
+                      : 'border-gray-200 bg-white/60 hover:bg-white hover:border-gray-300'
+                  }`}
+                >
+                  <div className={`p-2 rounded-lg shrink-0 ${
+                    modoGestionFinanciera === 'sabana' ? 'bg-[#9B0F06] text-white' : 'bg-gray-100 text-gray-500'
+                  }`}>
+                    <FileSpreadsheet size={16} />
+                  </div>
+                  <div className="space-y-0.5 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[11px] font-bold text-gray-900">Modo Hoja Sábana</span>
+                      <span className="text-[7.5px] font-extrabold px-1.5 py-0.2 rounded bg-red-100 text-[#9B0F06]">
+                        RECOMENDADO
+                      </span>
+                    </div>
+                    <p className="text-[9.5px] text-gray-500 leading-snug">
+                      Cálculo automatizado desde los 88 renglones DGC, mediciones analíticas en campo, amortización y liquidación por período.
+                    </p>
+                  </div>
+                </button>
+
+                {/* Opción 2: Modo Manual */}
+                <button
+                  type="button"
+                  onClick={() => setModoGestionFinanciera('manual')}
+                  className={`flex items-start gap-3 p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                    modoGestionFinanciera === 'manual'
+                      ? 'border-amber-600 bg-white shadow-xs ring-1 ring-amber-600/30'
+                      : 'border-gray-200 bg-white/60 hover:bg-white hover:border-gray-300'
+                  }`}
+                >
+                  <div className={`p-2 rounded-lg shrink-0 ${
+                    modoGestionFinanciera === 'manual' ? 'bg-amber-600 text-white' : 'bg-gray-100 text-gray-500'
+                  }`}>
+                    <Banknote size={16} />
+                  </div>
+                  <div className="space-y-0.5 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[11px] font-bold text-gray-900">Modo Manual</span>
+                      <span className="text-[7.5px] font-extrabold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800">
+                        DIRECTO
+                      </span>
+                    </div>
+                    <p className="text-[9.5px] text-gray-500 leading-snug">
+                      Ingreso manual y libre de montos finales, anticipos y saldos en las estimaciones de ejecutora y supervisora sin obligar a usar la sábana.
+                    </p>
+                  </div>
+                </button>
+              </div>
+            </div>
+
             {/* Sub-tabs para Paso 5 con diseño moderno estilo underline (img3) */}
             <div className="flex items-center gap-1 border-b border-gray-200">
               <button
@@ -2237,13 +2502,21 @@ export function ProyectoFormulario({
                         maxLength={15}
                         value={montoContractualOriginal}
                         onChange={(e) => {
-                          setMontoContractualOriginal(sanitizeNumeroPositivo(e.target.value, 15))
-                          setErrors((prev) => ({ ...prev, montoContractualOriginal: false }))
+                          const raw = e.target.value
+                          if (/[a-zA-Z]/.test(raw)) {
+                            setFieldError('montoContractualOriginal', 'No se permiten letras en montos monetarios')
+                          } else if (!raw.trim()) {
+                            setFieldError('montoContractualOriginal', 'El monto original de obra es obligatorio')
+                          } else {
+                            setFieldError('montoContractualOriginal', null)
+                          }
+                          setMontoContractualOriginal(sanitizeNumeroPositivo(raw, 15))
                         }}
-                        className={`${errorInputClass(errors, 'montoContractualOriginal')} pl-7 font-mono font-bold text-gray-900`}
+                        className={`${errorInputClass(errors, 'montoContractualOriginal', errorMessages)} pl-7 font-mono font-bold text-gray-900`}
                         placeholder="369834297.14"
                       />
                     </div>
+                    {renderFieldError('montoContractualOriginal')}
                   </div>
 
                   <div>
@@ -2253,8 +2526,20 @@ export function ProyectoFormulario({
                         type="text"
                         maxLength={5}
                         value={contratistaPorcentajeAnticipo}
-                        onChange={(e) => setContratistaPorcentajeAnticipo(sanitizePorcentaje(e.target.value))}
-                        className="w-20 rounded border border-gray-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-gray-800"
+                        onChange={(e) => {
+                          const raw = e.target.value
+                          if (/[a-zA-Z]/.test(raw)) {
+                            setFieldError('contratistaPorcentajeAnticipo', 'No se permiten letras en porcentajes')
+                          } else if (Number(raw) > 100) {
+                            setFieldError('contratistaPorcentajeAnticipo', 'El porcentaje no puede ser mayor a 100%')
+                          } else {
+                            setFieldError('contratistaPorcentajeAnticipo', null)
+                          }
+                          setContratistaPorcentajeAnticipo(sanitizePorcentaje(raw))
+                        }}
+                        className={`w-20 rounded border px-2.5 py-1.5 text-[11px] font-bold text-gray-800 ${
+                          errorMessages.contratistaPorcentajeAnticipo ? 'border-red-500 ring-1 ring-red-400 bg-red-50/20 text-red-900' : 'border-gray-200 bg-white'
+                        }`}
                         placeholder="15"
                       />
                       <span className="text-[10px] font-bold text-gray-500">%</span>
@@ -2262,6 +2547,7 @@ export function ProyectoFormulario({
                         Q {contratistaMontoAnticipoCalculado.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
                       </div>
                     </div>
+                    {renderFieldError('contratistaPorcentajeAnticipo')}
                   </div>
 
                   <div>
@@ -2286,11 +2572,17 @@ export function ProyectoFormulario({
                       type="date"
                       value={fechaInicioContractual}
                       onChange={(e) => {
-                        setFechaInicioContractual(e.target.value)
-                        setErrors((prev) => ({ ...prev, fechaInicioContractual: false }))
+                        const val = e.target.value
+                        setFechaInicioContractual(val)
+                        if (!val) {
+                          setFieldError('fechaInicioContractual', 'La fecha de inicio contractual es obligatoria')
+                        } else {
+                          setFieldError('fechaInicioContractual', null)
+                        }
                       }}
-                      className={errorInputClass(errors, 'fechaInicioContractual')}
+                      className={errorInputClass(errors, 'fechaInicioContractual', errorMessages)}
                     />
+                    {renderFieldError('fechaInicioContractual')}
                   </div>
 
                   <div>
@@ -2328,11 +2620,20 @@ export function ProyectoFormulario({
                         type="text"
                         maxLength={15}
                         value={supervisoraMontoOriginal}
-                        onChange={(e) => setSupervisoraMontoOriginal(sanitizeNumeroPositivo(e.target.value, 15))}
-                        className={`${inputClass} pl-7 font-mono font-bold text-gray-900`}
+                        onChange={(e) => {
+                          const raw = e.target.value
+                          if (/[a-zA-Z]/.test(raw)) {
+                            setFieldError('supervisoraMontoOriginal', 'No se permiten letras en montos monetarios')
+                          } else {
+                            setFieldError('supervisoraMontoOriginal', null)
+                          }
+                          setSupervisoraMontoOriginal(sanitizeNumeroPositivo(raw, 15))
+                        }}
+                        className={`${errorInputClass(errors, 'supervisoraMontoOriginal', errorMessages)} pl-7 font-mono font-bold text-gray-900`}
                         placeholder="13351095.20"
                       />
                     </div>
+                    {renderFieldError('supervisoraMontoOriginal')}
                   </div>
 
                   <div>
@@ -2342,8 +2643,20 @@ export function ProyectoFormulario({
                         type="text"
                         maxLength={5}
                         value={supervisoraPorcentajeAnticipo}
-                        onChange={(e) => setSupervisoraPorcentajeAnticipo(sanitizePorcentaje(e.target.value))}
-                        className="w-20 rounded border border-gray-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-gray-800"
+                        onChange={(e) => {
+                          const raw = e.target.value
+                          if (/[a-zA-Z]/.test(raw)) {
+                            setFieldError('supervisoraPorcentajeAnticipo', 'No se permiten letras en porcentajes')
+                          } else if (Number(raw) > 100) {
+                            setFieldError('supervisoraPorcentajeAnticipo', 'El porcentaje no puede ser mayor a 100%')
+                          } else {
+                            setFieldError('supervisoraPorcentajeAnticipo', null)
+                          }
+                          setSupervisoraPorcentajeAnticipo(sanitizePorcentaje(raw))
+                        }}
+                        className={`w-20 rounded border px-2.5 py-1.5 text-[11px] font-bold text-gray-800 ${
+                          errorMessages.supervisoraPorcentajeAnticipo ? 'border-red-500 ring-1 ring-red-400 bg-red-50/20 text-red-900' : 'border-gray-200 bg-white'
+                        }`}
                         placeholder="10"
                       />
                       <span className="text-[10px] font-bold text-gray-500">%</span>
@@ -2351,6 +2664,7 @@ export function ProyectoFormulario({
                         Q {supervisoraMontoAnticipoCalculado.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
                       </div>
                     </div>
+                    {renderFieldError('supervisoraPorcentajeAnticipo')}
                   </div>
 
                   <div>
