@@ -23,6 +23,7 @@ import { RegistroBitacora } from '@/types/bitacora'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { api, apiGetDeduplicado } from '@/lib/api/cliente'
 import { showSuccessToast, showErrorToast } from '@/components/ui/Toast'
+import { CATALOGO_COMPLETO_88 } from '@/mocks/proyectoMock'
 
 const geocodeReverse = async (lat: number, lng: number) => {
   try {
@@ -96,24 +97,15 @@ const OBSERVACIONES_PRESETS = [
   'Otra...',
 ]
 
-const RENGLONES_FALLBACK_DEFAULT = [
-  { id: '101.01', desc: 'Mantenimiento del tránsito y construcción de desvíos provisionales', unidad: 'Glb' },
-  { id: '102.03', desc: 'Clechado, chapeo, destronque y limpieza del derecho de vía', unidad: 'Ha' },
-  { id: '103.01', desc: 'Demolición de estructuras existentes de concreto y mampostería', unidad: 'm³' },
-  { id: '105.06', desc: 'Replanteo topográfico, nivelación y trazado de precisión DGC', unidad: 'km' },
-  { id: '201.01', desc: 'Excavación no clasificada para corte en vía', unidad: 'm³' },
-  { id: '201.03(b)', desc: 'Excavación en roca mediante perforación y voladura controlada', unidad: 'm³' },
-  { id: '202.01', desc: 'Excavación no clasificada para estructuras y cimentaciones', unidad: 'm³' },
-  { id: '301.01', desc: 'Compactación de terraplenes con material propio de corte', unidad: 'm³' },
-  { id: '302.02', desc: 'Terraplén con material de préstamo seleccionado (95% AASHTO T-180)', unidad: 'm³' },
-  { id: '401.01', desc: 'Subbase granular graduada e=20cm compactada al 100% AASHTO T-180', unidad: 'm³' },
-  { id: '402.02', desc: 'Base granular graduada clase A e=25cm 100% de trituración', unidad: 'm³' },
-  { id: '501.01', desc: 'Mezcla asfáltica en caliente graduación densa e=7.5cm', unidad: 'm²' },
-  { id: '504.01', desc: 'Pavimento rígido de concreto hidráulico MR=45 e=20cm', unidad: 'm²' },
-  { id: '551.03', desc: 'Pavimento de concreto hidráulico MR=48 e=25cm', unidad: 'm²' },
-  { id: '601.01', desc: 'Tubería de concreto reforzado Ø24" clase III para alcantarillado', unidad: 'ml' },
-  { id: '801.01', desc: 'Señalización horizontal termoplástica retrorreflectiva', unidad: 'ml' },
-]
+const CATALOGO_COMPLETO_88_ITEMS: { id: string; desc: string; unidad: string; renglonId?: string }[] =
+  CATALOGO_COMPLETO_88.map((r: any) => ({
+    id: r.codigoDGC || r.id,
+    desc: r.descripcion || '',
+    unidad: r.unidad || 'm³',
+    renglonId: r.id,
+  }))
+
+const RENGLONES_FALLBACK_DEFAULT = CATALOGO_COMPLETO_88_ITEMS
 
 export type EvidenciaFoto = {
   id: string
@@ -222,14 +214,32 @@ export function BitacoraForm({
     setErrors((p) => ({ ...p, renglones: '' }))
   }
 
+  const sanitizeEstacion = (val: string) => {
+    // Solo permitir números (0-9) y el signo '+'
+    return val.replace(/[^0-9+]/g, '')
+  }
+
   const handleCambiarEstInicio = (val: string) => {
-    setEstInicioRenglon(val)
+    setEstInicioRenglon(sanitizeEstacion(val))
     setErrors((p) => ({ ...p, renglones: '' }))
   }
 
   const handleCambiarEstFin = (val: string) => {
-    setEstFinRenglon(val)
+    setEstFinRenglon(sanitizeEstacion(val))
     setErrors((p) => ({ ...p, renglones: '' }))
+  }
+
+  const handleKeyDownEstacion = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (
+      ['Backspace', 'Delete', 'Tab', 'Escape', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key) ||
+      e.ctrlKey ||
+      e.metaKey
+    ) {
+      return
+    }
+    if (!/[0-9+]/.test(e.key)) {
+      e.preventDefault()
+    }
   }
 
   // Auto-detectar usuario y rol en segundo plano
@@ -338,10 +348,10 @@ export function BitacoraForm({
     return `${km}+${m.toString().padStart(3, '0')}`
   }
 
-  // Cargar Plan de Trabajo del proyecto
+  // Cargar Plan de Trabajo del proyecto (+80 renglones DGC garantizados)
   useEffect(() => {
     if (!fd.proyectoId) {
-      setProyectoPlanTrabajo([])
+      setProyectoPlanTrabajo(CATALOGO_COMPLETO_88_ITEMS)
       setProyectoDetalle(null)
       return
     }
@@ -356,55 +366,38 @@ export function BitacoraForm({
             proy.renglones_sabana ||
             proy.parametro_proyecto?.planTrabajo ||
             []
+
+          let mappedCustom: any[] = []
           if (Array.isArray(list) && list.length > 0) {
-            const sorted = list
-              .map((item: any) => ({
-                id: String(item.codigoDGC || item.codigo || item.id || 'R'),
-                renglonId:
-                  item.renglonId ||
-                  (item.id && typeof item.id === 'string' && item.id.length === 36 ? item.id : undefined),
-                desc: item.descripcion || item.desc || item.nombre || 'Renglón de trabajo',
-                unidad:
-                  item.unidad ||
-                  item.unidad_medida?.abreviatura ||
-                  item.unidad_medida ||
-                  item.unidadMedida ||
-                  '',
-              }))
-              .sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }))
-            setProyectoPlanTrabajo(sorted)
-            if (sorted.length > 0) {
-              setRenglonSeleccionadoId(sorted[0].id)
-            }
-          } else {
-            apiGetDeduplicado(`/mantenimiento/renglon_trabajo?proyecto_id=${fd.proyectoId}`)
-              .then((resRT) => {
-                if (resRT.data?.success && Array.isArray(resRT.data.data) && resRT.data.data.length > 0) {
-                  const sorted = resRT.data.data
-                    .map((item: any) => ({
-                      id: String(item.codigo || item.id || 'R'),
-                      renglonId: item.id,
-                      desc: item.descripcion || item.nombre || 'Renglón de trabajo',
-                      unidad: item.unidad_medida || '',
-                    }))
-                    .sort((a: any, b: any) => a.id.localeCompare(b.id, undefined, { numeric: true }))
-                  setProyectoPlanTrabajo(sorted)
-                  setRenglonSeleccionadoId('')
-                } else {
-                  setProyectoPlanTrabajo(RENGLONES_FALLBACK_DEFAULT)
-                  setRenglonSeleccionadoId('')
-                }
-              })
-              .catch(() => {
-                setProyectoPlanTrabajo(RENGLONES_FALLBACK_DEFAULT)
-                setRenglonSeleccionadoId('')
-              })
+            mappedCustom = list.map((item: any) => ({
+              id: String(item.codigoDGC || item.codigo || item.id || 'R'),
+              renglonId:
+                item.renglonId ||
+                (item.id && typeof item.id === 'string' && item.id.length === 36 ? item.id : undefined),
+              desc: item.descripcion || item.desc || item.nombre || 'Renglón de trabajo',
+              unidad:
+                item.unidad ||
+                item.unidad_medida?.abreviatura ||
+                item.unidad_medida ||
+                item.unidadMedida ||
+                '',
+            }))
           }
+
+          // Unir con catálogo completo de +80 renglones DGC para garantizar que siempre estén disponibles
+          const codigosExistentes = new Set(mappedCustom.map((s) => s.id))
+          const complementarios = CATALOGO_COMPLETO_88_ITEMS.filter((c) => !codigosExistentes.has(c.id))
+          const consolidado = [...mappedCustom, ...complementarios].sort((a, b) =>
+            a.id.localeCompare(b.id, undefined, { numeric: true })
+          )
+
+          setProyectoPlanTrabajo(consolidado)
+        } else {
+          setProyectoPlanTrabajo(CATALOGO_COMPLETO_88_ITEMS)
         }
       })
       .catch(() => {
-        setProyectoPlanTrabajo(RENGLONES_FALLBACK_DEFAULT)
-        setRenglonSeleccionadoId('')
+        setProyectoPlanTrabajo(CATALOGO_COMPLETO_88_ITEMS)
       })
   }, [fd.proyectoId])
 
@@ -1181,24 +1174,26 @@ export function BitacoraForm({
                     </div>
                   </div>
 
-                  {/* Menú Desplegable del Combobox (Sin colores rojos) */}
+                  {/* Menú Desplegable del Combobox (+80 renglones con vista de ~10 elementos y scroll) */}
                   {comboboxAbierto && (
-                    <div className="absolute top-full left-0 right-0 z-50 mt-1 max-h-56 overflow-y-auto rounded-xl border border-gray-200 bg-white p-2 shadow-xl space-y-1">
-                      <div className="relative mb-2">
-                        <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                        <input
-                          type="text"
-                          value={busquedaCombobox}
-                          onChange={(e) => setBusquedaCombobox(e.target.value)}
-                          placeholder="Buscar partida por código o descripción..."
-                          className="w-full rounded-lg border border-gray-200 bg-gray-50 py-1.5 pl-8 pr-2 text-xs text-gray-800 placeholder-gray-400 focus:outline-none focus:border-gray-400"
-                          autoFocus
-                          onClick={(e) => e.stopPropagation()}
-                        />
+                    <div className="absolute top-full left-0 right-0 z-50 mt-1 max-h-[380px] overflow-y-auto rounded-xl border border-gray-200 bg-white p-2 shadow-2xl space-y-1">
+                      <div className="sticky top-0 z-10 bg-white pb-2 pt-0.5 border-b border-gray-100 mb-1">
+                        <div className="relative">
+                          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                          <input
+                            type="text"
+                            value={busquedaCombobox}
+                            onChange={(e) => setBusquedaCombobox(e.target.value)}
+                            placeholder="Buscar entre +80 renglones por código o descripción..."
+                            className="w-full rounded-lg border border-gray-200 bg-gray-50 py-1.5 pl-8 pr-2 text-xs text-gray-800 placeholder-gray-400 focus:outline-none focus:border-gray-400 focus:bg-white"
+                            autoFocus
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        </div>
                       </div>
 
                       {renglonesFiltradosCombobox.length === 0 ? (
-                        <div className="py-3 text-center text-xs text-gray-400">
+                        <div className="py-4 text-center text-xs text-gray-400">
                           No se encontraron renglones
                         </div>
                       ) : (
@@ -1260,6 +1255,7 @@ export function BitacoraForm({
                       inputMode="tel"
                       value={estInicioRenglon}
                       onChange={(e) => handleCambiarEstInicio(e.target.value)}
+                      onKeyDown={handleKeyDownEstacion}
                       placeholder={proyMinEstacion || '0+000'}
                       autoComplete="off"
                       className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 font-mono text-xs text-gray-800 placeholder-gray-400 focus:outline-none focus:border-gray-400"
@@ -1272,6 +1268,7 @@ export function BitacoraForm({
                       inputMode="tel"
                       value={estFinRenglon}
                       onChange={(e) => handleCambiarEstFin(e.target.value)}
+                      onKeyDown={handleKeyDownEstacion}
                       placeholder={proyMaxEstacion || (proyMinMeters !== null ? formatMeters(proyMinMeters + 500) : '0+500')}
                       autoComplete="off"
                       className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 font-mono text-xs text-gray-800 placeholder-gray-400 focus:outline-none focus:border-gray-400"

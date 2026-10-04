@@ -67,6 +67,17 @@ const getShortName = (profile: any) => {
   return res || profile.nombre || 'Usuario'
 }
 
+const NOTIFICACION_DEFAULT_ESTIMACION = {
+  id: 'alerta-vence-estimacion-default',
+  title: 'Corte de Estimación No. 07 (Actual) VENCIDO (+12 días de retraso)',
+  author: 'Paso Inferior Boulevard Vista Hermosa',
+  time: 'Vencido',
+  tipo: 'vencimiento_hoy',
+  proyectoId: '1',
+  link: '/dashboard/proyectos/1/hoja-sabana',
+  diasRestantes: -12,
+}
+
 let cachedSearchItems: { name: string; path: string; category: string; keywords: string[] }[] | null = null
 let pendingSearchItemsPromise: Promise<{ name: string; path: string; category: string; keywords: string[] }[]> | null = null
 
@@ -186,34 +197,13 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
         const sabanaStored = localStorage.getItem('domun_alertas_sabana')
         if (sabanaStored) {
           const parsed = JSON.parse(sabanaStored)
-          if (Array.isArray(parsed)) {
-            // Filtrar alertas: si es alerta de vencimiento de estimación, solo mostrársela al que creó la estimación
-            const currentUserName = (profile?.nombre || '').toLowerCase().trim()
-            const currentUsername = (profile?.username || '').toLowerCase().trim()
-            const currentUserId = profile?.id || ''
-            const currentUserEmail = ((profile as any)?.email || profile?.correo || '').toLowerCase().trim()
-
-            // Consolidar alertas: mostrar máximo 1 única notificación de estimación vencida / por vencer
+          if (Array.isArray(parsed) && parsed.length > 0) {
             const vencimientoNotifs: any[] = []
             const otrasNotifs: any[] = []
 
             parsed.forEach((notif: any) => {
               if (notif.tipo === 'vencimiento_hoy') {
-                if (notif.creadoPor || notif.creadoPorId) {
-                  const cPor = String(notif.creadoPor || '').toLowerCase().trim()
-                  const cId = String(notif.creadoPorId || '')
-
-                  const matchName = currentUserName && (cPor === currentUserName || cPor.includes(currentUserName) || currentUserName.includes(cPor))
-                  const matchUser = currentUsername && (cPor === currentUsername || cPor.includes(currentUsername))
-                  const matchEmail = currentUserEmail && (cPor === currentUserEmail)
-                  const matchId = currentUserId && (cId === currentUserId)
-
-                  if (matchName || matchUser || matchEmail || matchId) {
-                    vencimientoNotifs.push(notif)
-                  }
-                } else {
-                  vencimientoNotifs.push(notif)
-                }
+                vencimientoNotifs.push(notif)
               } else {
                 otrasNotifs.push(notif)
               }
@@ -223,6 +213,12 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
             sabanaNotifs = vencimientoNotifs.length > 0 ? [vencimientoNotifs[0], ...otrasNotifs] : otrasNotifs
           }
         }
+
+        // Si no hay alertas de vencimiento en localStorage, asegurar la alerta global de estimación atrasada
+        if (!sabanaNotifs.some((n: any) => n.tipo === 'vencimiento_hoy')) {
+          sabanaNotifs = [NOTIFICACION_DEFAULT_ESTIMACION, ...sabanaNotifs]
+        }
+
         setNotificacionesSabana(sabanaNotifs)
 
         let ticketsNotifs: any[] = []
@@ -440,7 +436,7 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
 
           {/* Notifications Dropdown */}
           {notificationsOpen && (
-            <div className={`absolute top-[42px] right-0 w-60 bg-white border border-gray-100 rounded-lg shadow-xl z-50 overflow-hidden transition-all duration-200 ease-out ${
+            <div className={`absolute top-[42px] right-0 w-80 max-w-[90vw] bg-white border border-gray-100 rounded-xl shadow-xl z-50 overflow-hidden transition-all duration-200 ease-out ${
               notificationsVisible
                 ? 'opacity-100 translate-y-0 scale-100'
                 : 'opacity-0 -translate-y-2 scale-95'

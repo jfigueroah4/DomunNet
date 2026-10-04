@@ -265,35 +265,37 @@ export function BitacoraFiltros({
   }, [hayProyecto, proyectoId, registrosBitacora])
 
   return (
-    <div className="w-full rounded-xl border border-gray-200 bg-white p-1.5 shadow-2xs mb-2 font-[Poppins] relative z-30 overflow-hidden">
-      <div className="flex items-center gap-1.5 text-[10px] flex-nowrap overflow-x-auto no-scrollbar w-full">
-        {/* Buscador */}
-        <div className="relative w-[135px] xl:w-[160px] shrink-0">
-          <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+    <div className="w-full rounded-xl border border-gray-200 bg-white p-1.5 shadow-2xs mb-2 font-[Poppins] relative z-30 overflow-visible">
+      <div className="flex items-center gap-1.5 text-[10px] flex-wrap xl:flex-nowrap overflow-visible w-full">
+        {/* Buscador Ampliado */}
+        <div className="relative w-[180px] xl:w-[220px] shrink-0">
+          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
             disabled={!hayProyecto}
             placeholder="Buscar..."
             value={busqueda}
             onChange={(e) => onBusquedaChange(e.target.value)}
-            className={`w-full h-[28px] border rounded-lg pl-7 pr-2 text-[10px] font-medium placeholder:text-gray-400 focus:outline-none focus:border-[#9B0F06] transition-colors ${!hayProyecto ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed' : 'bg-gray-50 border-gray-200 text-gray-800 focus:bg-white'}`}
+            className={`w-full h-[28px] border rounded-lg pl-7 pr-2 text-[10.5px] font-medium placeholder:text-gray-400 focus:outline-none focus:border-[#9B0F06] transition-colors ${!hayProyecto ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed' : 'bg-gray-50 border-gray-200 text-gray-800 focus:bg-white'}`}
           />
         </div>
 
         {/* 1. Proyecto (Combobox) */}
-        <div className="w-[155px] xl:w-[180px] shrink-0">
+        <div className="w-[170px] xl:w-[200px] shrink-0">
           <Combobox
             options={opcionesProyectos}
             value={proyectoId}
             onChange={(val) => onProyectoChange(val)}
             placeholder={proyectosActivos.length > 0 ? "Seleccionar Proyecto..." : "No hay proyectos"}
             allowNumbers={true}
+            inputClassName="h-[28px] text-[10px] !py-0 !rounded-lg font-medium"
+            dropdownClassName="z-50 shadow-2xl min-w-full w-max max-w-[380px]"
           />
         </div>
 
         {/* 2. Rol (Combobox) */}
         {!esRestringido && onRolChange && (
-          <div className="w-[115px] xl:w-[130px] shrink-0">
+          <div className="w-[125px] xl:w-[140px] shrink-0">
             <Combobox
               disabled={!hayProyecto}
               options={opcionesRoles}
@@ -301,13 +303,15 @@ export function BitacoraFiltros({
               onChange={(val) => onRolChange(val)}
               placeholder="Todos los Roles"
               allowNumbers={true}
+              inputClassName="h-[28px] text-[10px] !py-0 !rounded-lg font-medium"
+              dropdownClassName="z-50 shadow-2xl min-w-full w-max max-w-[300px]"
             />
           </div>
         )}
 
         {/* 3. Usuario (Combobox) */}
         {!esRestringido && (
-          <div className="w-[120px] xl:w-[135px] shrink-0">
+          <div className="w-[130px] xl:w-[150px] shrink-0">
             <Combobox
               disabled={!hayProyecto}
               options={opcionesUsuarios}
@@ -315,12 +319,14 @@ export function BitacoraFiltros({
               onChange={(val) => onUsuarioChange(val)}
               placeholder="Todos los Usuarios"
               allowNumbers={true}
+              inputClassName="h-[28px] text-[10px] !py-0 !rounded-lg font-medium"
+              dropdownClassName="z-50 shadow-2xl min-w-full w-max max-w-[340px]"
             />
           </div>
         )}
 
         {/* 4. Renglón (Combobox) */}
-        <div className="w-[125px] xl:w-[150px] shrink-0">
+        <div className="w-[135px] xl:w-[160px] shrink-0">
           <Combobox
             disabled={!hayProyecto}
             options={opcionesRenglones}
@@ -328,6 +334,8 @@ export function BitacoraFiltros({
             onChange={(val) => onTipoChange(val)}
             placeholder="Todos los Renglones"
             allowNumbers={true}
+            inputClassName="h-[28px] text-[10px] !py-0 !rounded-lg font-medium"
+            dropdownClassName="z-50 shadow-2xl min-w-full w-max max-w-[360px]"
           />
         </div>
 
@@ -362,7 +370,7 @@ export function BitacoraFiltros({
             disabled={!hayProyecto}
             value={estado}
             onChange={(e) => onEstadoChange(e.target.value as EstadoBitacora | 'todos')}
-            className={`h-[28px] w-[105px] rounded-lg border px-1.5 text-[9.5px] font-semibold focus:border-[#9B0F06] focus:outline-none ${!hayProyecto ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed' : 'bg-white border-gray-200 text-gray-800 cursor-pointer shadow-2xs'}`}
+            className={`h-[28px] w-[110px] rounded-lg border px-1.5 text-[9.5px] font-semibold focus:border-[#9B0F06] focus:outline-none ${!hayProyecto ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed' : 'bg-white border-gray-200 text-gray-800 cursor-pointer shadow-2xs'}`}
           >
             <option value="todos">Estado: Todos</option>
             <option value="pendiente">Pendiente</option>

@@ -1678,16 +1678,35 @@ export function ProyectoFormulario({
                     />
                   </div>
 
-                  <div>
-                    <label className={labelClass}>Acta de Inicio de Obra</label>
-                    <input
-                      type="text"
-                      maxLength={80}
-                      value={contratistaActaInicio}
-                      onChange={(e) => setContratistaActaInicio(e.target.value.slice(0, 80))}
-                      className={inputClass}
-                      placeholder="Ej: Acta No. 26-2026 de fecha 09/02/2026"
-                    />
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className={labelClass}>Número de Acta de Inicio</label>
+                      <input
+                        type="text"
+                        maxLength={40}
+                        value={contratistaActaNumero}
+                        onChange={(e) => {
+                          const val = e.target.value.slice(0, 40)
+                          setContratistaActaNumero(val)
+                          setContratistaActaInicio(formatActaString(val, contratistaActaFecha))
+                        }}
+                        className={`${inputClass} font-mono`}
+                        placeholder="Ej: 26-2026"
+                      />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Fecha de Acta</label>
+                      <input
+                        type="date"
+                        value={contratistaActaFecha}
+                        onChange={(e) => {
+                          const val = e.target.value
+                          setContratistaActaFecha(val)
+                          setContratistaActaInicio(formatActaString(contratistaActaNumero, val))
+                        }}
+                        className={inputClass}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1831,16 +1850,35 @@ export function ProyectoFormulario({
                     />
                   </div>
 
-                  <div>
-                    <label className={labelClass}>Acta de Inicio de Supervisión</label>
-                    <input
-                      type="text"
-                      maxLength={80}
-                      value={supervisoraActaInicio}
-                      onChange={(e) => setSupervisoraActaInicio(e.target.value.slice(0, 80))}
-                      className={inputClass}
-                      placeholder="Acta No. 52-2026 de fecha 07/07/2026"
-                    />
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className={labelClass}>Número de Acta</label>
+                      <input
+                        type="text"
+                        maxLength={40}
+                        value={supervisoraActaNumero}
+                        onChange={(e) => {
+                          const val = e.target.value.slice(0, 40)
+                          setSupervisoraActaNumero(val)
+                          setSupervisoraActaInicio(formatActaString(val, supervisoraActaFecha))
+                        }}
+                        className={`${inputClass} font-mono`}
+                        placeholder="Ej: 52-2026"
+                      />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Fecha de Acta</label>
+                      <input
+                        type="date"
+                        value={supervisoraActaFecha}
+                        onChange={(e) => {
+                          const val = e.target.value
+                          setSupervisoraActaFecha(val)
+                          setSupervisoraActaInicio(formatActaString(supervisoraActaNumero, val))
+                        }}
+                        className={inputClass}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>

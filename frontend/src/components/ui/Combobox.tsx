@@ -9,13 +9,27 @@ export interface ComboboxProps {
   onChange: (value: string) => void
   placeholder?: string
   className?: string
+  inputClassName?: string
+  dropdownClassName?: string
   disabled?: boolean
   hasError?: boolean
   emptyAction?: { label?: string; onClick: () => void }
   allowNumbers?: boolean
 }
 
-export function Combobox({ options, value, onChange, placeholder = 'Seleccionar...', className = '', disabled, hasError, emptyAction, allowNumbers = false }: ComboboxProps) {
+export function Combobox({
+  options,
+  value,
+  onChange,
+  placeholder = 'Seleccionar...',
+  className = '',
+  inputClassName = '',
+  dropdownClassName = '',
+  disabled,
+  hasError,
+  emptyAction,
+  allowNumbers = false,
+}: ComboboxProps) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
   const wrapperRef = useRef<HTMLDivElement>(null)
@@ -24,7 +38,7 @@ export function Combobox({ options, value, onChange, placeholder = 'Seleccionar.
     function handleClickOutside(event: MouseEvent) {
       if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
         setOpen(false)
-        const selectedLabel = options.find(o => o.value === value)?.label || ''
+        const selectedLabel = options.find((o) => o.value === value)?.label || ''
         setSearch(selectedLabel)
       }
     }
@@ -34,18 +48,18 @@ export function Combobox({ options, value, onChange, placeholder = 'Seleccionar.
 
   useEffect(() => {
     if (!open) {
-      const selectedLabel = options.find(o => o.value === value)?.label || ''
+      const selectedLabel = options.find((o) => o.value === value)?.label || ''
       setSearch(selectedLabel)
     }
   }, [value, options, open])
 
-  const selectedLabel = options.find(o => o.value === value)?.label || ''
-  
+  const selectedLabel = options.find((o) => o.value === value)?.label || ''
+
   // Show all options if search is exactly the selected label, otherwise filter
   const isSearchMatchingLabel = search === selectedLabel
-  const filteredOptions = isSearchMatchingLabel 
-    ? options 
-    : options.filter(o => o.label.toLowerCase().includes(search.toLowerCase()))
+  const filteredOptions = isSearchMatchingLabel
+    ? options
+    : options.filter((o) => o.label.toLowerCase().includes(search.toLowerCase()))
 
   return (
     <div ref={wrapperRef} className={`relative ${className}`}>
@@ -70,7 +84,7 @@ export function Combobox({ options, value, onChange, placeholder = 'Seleccionar.
               ;(e.target as HTMLInputElement).select()
             }
           }}
-          className={`w-full rounded-xl border ${hasError ? 'border-red-500 ring-1 ring-red-400' : open ? 'border-[#9B0F06]' : 'border-gray-200'} ${disabled ? 'bg-gray-100/90 text-gray-400 font-medium cursor-not-allowed select-none' : 'bg-white text-gray-700'} px-3 py-2 text-[11px] focus:border-[#9B0F06] focus:outline-none focus:ring-1 focus:ring-[#9B0F06] pr-8`}
+          className={`w-full rounded-xl border ${hasError ? 'border-red-500 ring-1 ring-red-400' : open ? 'border-[#9B0F06]' : 'border-gray-200'} ${disabled ? 'bg-gray-100/90 text-gray-400 font-medium cursor-not-allowed select-none' : 'bg-white text-gray-700'} px-3 py-2 text-[11px] focus:border-[#9B0F06] focus:outline-none focus:ring-1 focus:ring-[#9B0F06] pr-7 ${inputClassName}`}
         />
         <button
           type="button"
@@ -80,31 +94,32 @@ export function Combobox({ options, value, onChange, placeholder = 'Seleccionar.
               if (!open) setSearch('')
             }
           }}
-          className={`absolute inset-y-0 right-0 flex items-center px-2 ${disabled ? 'text-gray-300 cursor-not-allowed' : 'text-gray-400 hover:text-gray-600'}`}
+          className={`absolute inset-y-0 right-0 flex items-center px-1.5 ${disabled ? 'text-gray-300 cursor-not-allowed' : 'text-gray-400 hover:text-gray-600'}`}
         >
-          <ChevronDown size={14} />
+          <ChevronDown size={13} />
         </button>
       </div>
 
       {open && (
-        <div className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-xl border border-gray-200 bg-white py-1 shadow-lg">
+        <div className={`absolute z-50 mt-1 max-h-60 min-w-full w-max max-w-[380px] overflow-auto rounded-xl border border-gray-200 bg-white py-1 shadow-2xl left-0 ${dropdownClassName}`}>
           <div className="px-1">
             {filteredOptions.length === 0 ? (
               <div className="px-2 py-2 text-[11px] text-gray-500 text-center">No hay resultados.</div>
             ) : (
-              filteredOptions.map(option => (
+              filteredOptions.map((option) => (
                 <button
                   key={option.value}
                   type="button"
+                  title={option.label}
                   onClick={() => {
                     onChange(option.value)
                     setSearch(option.label)
                     setOpen(false)
                   }}
-                  className={`flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left text-[11px] transition-colors hover:bg-gray-100 ${value === option.value ? 'bg-gray-50 font-bold text-[#9B0F06]' : 'text-gray-700'}`}
+                  className={`flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-left text-[11px] transition-colors hover:bg-gray-100 ${value === option.value ? 'bg-gray-50 font-bold text-[#9B0F06]' : 'text-gray-700'}`}
                 >
-                  {option.label}
-                  {value === option.value && <Check size={12} className="text-[#9B0F06]" />}
+                  <span className="truncate">{option.label}</span>
+                  {value === option.value && <Check size={12} className="text-[#9B0F06] shrink-0" />}
                 </button>
               ))
             )}
