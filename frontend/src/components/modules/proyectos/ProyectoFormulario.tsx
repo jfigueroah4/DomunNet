@@ -72,6 +72,59 @@ function errorInputClass(errors: Record<string, boolean>, field: string) {
   return `w-full rounded border ${errors[field] ? 'border-red-500 ring-1 ring-red-400 bg-red-50/20' : 'border-gray-200'} bg-white px-2.5 py-1.5 text-[11px] text-gray-800 placeholder-gray-400 focus:border-[#9B0F06] focus:outline-none focus:ring-1 focus:ring-[#9B0F06] transition-colors font-medium`
 }
 
+// Helpers de validación y sanitización en tiempo real
+function sanitizeNombrePersona(val: string, maxLen = 150) {
+  // Elimina números para evitar nombres no válidos (solo permite letras, espacios, acentos, puntos y guiones)
+  return val.replace(/[0-9]/g, '').slice(0, maxLen)
+}
+
+function sanitizeTelefono(val: string, maxLen = 30) {
+  // Permite sólo dígitos, espacios, guiones, +, /, ()
+  return val.replace(/[^0-9+\s\-()\/]/g, '').slice(0, maxLen)
+}
+
+function sanitizeEmail(val: string, maxLen = 100) {
+  return val.replace(/\s+/g, '').slice(0, maxLen)
+}
+
+function sanitizeCodigo(val: string, maxLen = 30) {
+  return val.toUpperCase().replace(/[^A-Z0-9\-_]/g, '').slice(0, maxLen)
+}
+
+function sanitizeRegistro(val: string, maxLen = 40) {
+  return val.toUpperCase().slice(0, maxLen)
+}
+
+function sanitizeLicitacion(val: string, maxLen = 50) {
+  return val.toUpperCase().slice(0, maxLen)
+}
+
+function sanitizePartidaPresupuestaria(val: string, maxLen = 70) {
+  return val.replace(/[^0-9\-]/g, '').slice(0, maxLen)
+}
+
+function sanitizeCDP(val: string, maxLen = 40) {
+  return val.replace(/[^0-9A-Za-z\-]/g, '').slice(0, maxLen)
+}
+
+function sanitizeNumeroPositivo(val: string, maxLen = 15) {
+  if (!val) return ''
+  const sanitized = val.replace(/[^0-9.]/g, '')
+  const parts = sanitized.split('.')
+  if (parts.length > 2) {
+    return (parts[0] + '.' + parts.slice(1).join('')).slice(0, maxLen)
+  }
+  return sanitized.slice(0, maxLen)
+}
+
+function sanitizePorcentaje(val: string) {
+  if (!val) return ''
+  const clean = val.replace(/[^0-9.]/g, '')
+  const num = parseFloat(clean)
+  if (!isNaN(num) && num > 100) return '100'
+  return clean.slice(0, 5)
+}
+
 function siguienteCodigoVial() {
   const max = PROYECTOS_MOCK.reduce((actual, proyecto) => {
     const numero = Number(proyecto.codigo?.match(/DOM-VIAL-(\d+)/)?.[1] ?? 0)
@@ -1128,8 +1181,9 @@ export function ProyectoFormulario({
                 <label className={labelClass}>Código del Proyecto</label>
                 <input
                   type="text"
+                  maxLength={30}
                   value={codigo}
-                  onChange={(e) => setCodigo(e.target.value)}
+                  onChange={(e) => setCodigo(sanitizeCodigo(e.target.value))}
                   className={`${inputClass} font-mono font-bold text-gray-700 bg-gray-50`}
                   placeholder="DOM-VIAL-001"
                 />
@@ -1141,10 +1195,12 @@ export function ProyectoFormulario({
                 </label>
                 <input
                   type="text"
+                  maxLength={300}
                   value={nombreOficial}
                   onChange={(e) => {
-                    setNombreOficial(e.target.value)
-                    setNombre(e.target.value)
+                    const val = e.target.value.slice(0, 300)
+                    setNombreOficial(val)
+                    setNombre(val)
                     setErrors((prev) => ({ ...prev, nombreOficial: false }))
                   }}
                   className={errorInputClass(errors, 'nombreOficial')}
@@ -1182,8 +1238,10 @@ export function ProyectoFormulario({
               </label>
               <textarea
                 value={descripcion}
+                maxLength={2000}
                 onChange={(e) => {
-                  setDescripcion(e.target.value)
+                  const val = e.target.value.slice(0, 2000)
+                  setDescripcion(val)
                   setErrors((prev) => ({ ...prev, descripcion: false }))
                 }}
                 rows={5}
@@ -1280,13 +1338,11 @@ export function ProyectoFormulario({
                   Kilómetro Inicial <span className="text-[#9B0F06]">*</span>
                 </label>
                 <input
-                  type="number"
-                  min="0"
-                  max="999.999"
-                  step="0.001"
+                  type="text"
+                  maxLength={7}
                   value={kilometroInicio}
                   onChange={(e) => {
-                    setKilometroInicio(e.target.value)
+                    setKilometroInicio(sanitizeNumeroPositivo(e.target.value, 7))
                     setErrors((prev) => ({ ...prev, kilometroInicio: false }))
                   }}
                   className={errorInputClass(errors, 'kilometroInicio')}
@@ -1304,13 +1360,11 @@ export function ProyectoFormulario({
                   Kilómetro Final <span className="text-[#9B0F06]">*</span>
                 </label>
                 <input
-                  type="number"
-                  min="0"
-                  max="999.999"
-                  step="0.001"
+                  type="text"
+                  maxLength={7}
                   value={kilometroFin}
                   onChange={(e) => {
-                    setKilometroFin(e.target.value)
+                    setKilometroFin(sanitizeNumeroPositivo(e.target.value, 7))
                     setErrors((prev) => ({ ...prev, kilometroFin: false }))
                   }}
                   className={errorInputClass(errors, 'kilometroFin')}
@@ -1329,8 +1383,9 @@ export function ProyectoFormulario({
                 <label className={labelClass}>Dirección Final / Destino (Texto Corto)</label>
                 <input
                   type="text"
+                  maxLength={250}
                   value={direccionFin}
-                  onChange={(e) => setDireccionFin(e.target.value)}
+                  onChange={(e) => setDireccionFin(e.target.value.slice(0, 250))}
                   className={inputClass}
                   placeholder="Ej: Plan Grande, Palencia, Departamento de Guatemala"
                 />
@@ -1376,30 +1431,30 @@ export function ProyectoFormulario({
               icon={Briefcase}
             />
 
-            {/* Sub-tabs para Paso 3 */}
-            <div className="flex items-center gap-1.5 border-b border-gray-100 pb-2">
+            {/* Sub-tabs para Paso 3 con diseño moderno estilo underline (img3) */}
+            <div className="flex items-center gap-1 border-b border-gray-200">
               <button
                 type="button"
                 onClick={() => setSubTabPaso3('ejecutora')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold rounded-lg transition-all cursor-pointer ${
+                className={`inline-flex items-center gap-2 px-3.5 py-2 text-[11px] font-bold transition-all border-b-2 cursor-pointer ${
                   subTabPaso3 === 'ejecutora'
-                    ? 'bg-[#9B0F06] text-white shadow-2xs'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    ? 'border-[#9B0F06] text-[#9B0F06] bg-red-50/40 rounded-t-lg shadow-2xs'
+                    : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-50 rounded-t-lg font-medium'
                 }`}
               >
-                <HardHat size={12} />
+                <HardHat size={13} className={subTabPaso3 === 'ejecutora' ? 'text-[#9B0F06]' : 'text-gray-400'} />
                 <span>3.1 Empresa Ejecutora (Obra)</span>
               </button>
               <button
                 type="button"
                 onClick={() => setSubTabPaso3('supervisora')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold rounded-lg transition-all cursor-pointer ${
+                className={`inline-flex items-center gap-2 px-3.5 py-2 text-[11px] font-bold transition-all border-b-2 cursor-pointer ${
                   subTabPaso3 === 'supervisora'
-                    ? 'bg-orange-700 text-white shadow-2xs'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    ? 'border-orange-700 text-orange-700 bg-orange-50/40 rounded-t-lg shadow-2xs'
+                    : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-50 rounded-t-lg font-medium'
                 }`}
               >
-                <ShieldCheck size={12} />
+                <ShieldCheck size={13} className={subTabPaso3 === 'supervisora' ? 'text-orange-700' : 'text-gray-400'} />
                 <span>3.2 Empresa Supervisora</span>
               </button>
             </div>
@@ -1437,8 +1492,9 @@ export function ProyectoFormulario({
                     <label className={labelClass}>Nombre del Propietario / Representante</label>
                     <input
                       type="text"
+                      maxLength={150}
                       value={contratistaPropietario}
-                      onChange={(e) => setContratistaPropietario(e.target.value)}
+                      onChange={(e) => setContratistaPropietario(sanitizeNombrePersona(e.target.value))}
                       className={inputClass}
                       placeholder="Ej: Ing. William Ramón Godínez"
                     />
@@ -1448,8 +1504,9 @@ export function ProyectoFormulario({
                     <label className={labelClass}>Registro Mercantil No.</label>
                     <input
                       type="text"
+                      maxLength={40}
                       value={contratistaRegistroMercantil}
-                      onChange={(e) => setContratistaRegistroMercantil(e.target.value)}
+                      onChange={(e) => setContratistaRegistroMercantil(sanitizeRegistro(e.target.value))}
                       className={`${inputClass} font-mono`}
                       placeholder="Ej: 177228A"
                     />
@@ -1461,8 +1518,9 @@ export function ProyectoFormulario({
                     <label className={labelClass}>Dirección de la Empresa</label>
                     <input
                       type="text"
+                      maxLength={250}
                       value={contratistaDireccion}
-                      onChange={(e) => setContratistaDireccion(e.target.value)}
+                      onChange={(e) => setContratistaDireccion(e.target.value.slice(0, 250))}
                       className={inputClass}
                       placeholder="Avenida Las Américas 24-70 Zona 13"
                     />
@@ -1472,8 +1530,9 @@ export function ProyectoFormulario({
                     <label className={labelClass}>Teléfono de Contacto</label>
                     <input
                       type="text"
+                      maxLength={30}
                       value={contratistaTelefono}
-                      onChange={(e) => setContratistaTelefono(e.target.value)}
+                      onChange={(e) => setContratistaTelefono(sanitizeTelefono(e.target.value))}
                       className={inputClass}
                       placeholder="2212-9675 / 5525-1537"
                     />
@@ -1483,8 +1542,9 @@ export function ProyectoFormulario({
                     <label className={labelClass}>Correo Electrónico</label>
                     <input
                       type="email"
+                      maxLength={100}
                       value={contratistaCorreo}
-                      onChange={(e) => setContratistaCorreo(e.target.value)}
+                      onChange={(e) => setContratistaCorreo(sanitizeEmail(e.target.value))}
                       className={inputClass}
                       placeholder="contacto@empresa.com"
                     />
@@ -1493,13 +1553,35 @@ export function ProyectoFormulario({
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 pt-2 border-t border-gray-100">
                   <div>
-                    <label className={labelClass}>Superintendente / Responsable de Obra</label>
-                    <input
-                      type="text"
+                    <div className="flex items-center justify-between mb-1">
+                      <label className={labelClass}>Superintendente / Responsable de Obra</label>
+                      <button
+                        type="button"
+                        onClick={() => setOpenCrearUsuarioDrawer(true)}
+                        className="text-[9px] font-bold text-[#9B0F06] hover:text-[#7a0c05] flex items-center gap-0.5 cursor-pointer"
+                      >
+                        <Plus size={10} />
+                        <span>Crear Usuario</span>
+                      </button>
+                    </div>
+                    <Combobox
+                      options={usuariosDisponibles
+                        .filter((u: any) => u.activo !== false && u.estado !== 'Suspendido' && u.estado !== 'Desactivado')
+                        .map((u: any) => {
+                          const nombreCompleto = u.nombre || `${u.primer_nombre || ''} ${u.primer_apellido || ''}`.trim() || u.correo
+                          const rolCargo = u.cargo || u.rol || 'Profesional'
+                          return {
+                            value: nombreCompleto,
+                            label: `${nombreCompleto} - ${rolCargo}`,
+                          }
+                        })}
                       value={contratistaSuperintendente}
-                      onChange={(e) => setContratistaSuperintendente(e.target.value)}
-                      className={inputClass}
-                      placeholder="Ing. Civil Pablo Pérez - Col. Activo 3689"
+                      onChange={(val) => setContratistaSuperintendente(val)}
+                      placeholder="Buscar profesional o escribir Superintendente..."
+                      emptyAction={{
+                        label: 'Crear Nuevo Usuario',
+                        onClick: () => setOpenCrearUsuarioDrawer(true),
+                      }}
                     />
                   </div>
 
@@ -1507,8 +1589,9 @@ export function ProyectoFormulario({
                     <label className={labelClass}>Licitación Pública Nacional No.</label>
                     <input
                       type="text"
+                      maxLength={50}
                       value={contratistaLicitacion}
-                      onChange={(e) => setContratistaLicitacion(e.target.value)}
+                      onChange={(e) => setContratistaLicitacion(sanitizeLicitacion(e.target.value))}
                       className={`${inputClass} font-mono`}
                       placeholder="Ej: DGC-053-2025-C"
                     />
@@ -1518,8 +1601,9 @@ export function ProyectoFormulario({
                     <label className={labelClass}>Acta de Inicio de Obra</label>
                     <input
                       type="text"
+                      maxLength={80}
                       value={contratistaActaInicio}
-                      onChange={(e) => setContratistaActaInicio(e.target.value)}
+                      onChange={(e) => setContratistaActaInicio(e.target.value.slice(0, 80))}
                       className={inputClass}
                       placeholder="Ej: Acta No. 26-2026 de fecha 09/02/2026"
                     />
@@ -1546,9 +1630,10 @@ export function ProyectoFormulario({
                     <label className={labelClass}>Empresa Supervisora <span className="text-[#9B0F06]">*</span></label>
                     <input
                       type="text"
+                      maxLength={200}
                       value={empresaSupervisora}
                       onChange={(e) => {
-                        setEmpresaSupervisora(e.target.value)
+                        setEmpresaSupervisora(e.target.value.slice(0, 200))
                         setErrors((prev) => ({ ...prev, empresaSupervisora: false }))
                       }}
                       className={errorInputClass(errors, 'empresaSupervisora')}
@@ -1560,8 +1645,9 @@ export function ProyectoFormulario({
                     <label className={labelClass}>Propietario / Representante Legal</label>
                     <input
                       type="text"
+                      maxLength={150}
                       value={supervisoraPropietario}
-                      onChange={(e) => setSupervisoraPropietario(e.target.value)}
+                      onChange={(e) => setSupervisoraPropietario(sanitizeNombrePersona(e.target.value))}
                       className={inputClass}
                       placeholder="Ej: William Ramón Godínez Mansilla"
                     />
@@ -1571,8 +1657,9 @@ export function ProyectoFormulario({
                     <label className={labelClass}>Registro Mercantil</label>
                     <input
                       type="text"
+                      maxLength={40}
                       value={supervisoraRegistroMercantil}
-                      onChange={(e) => setSupervisoraRegistroMercantil(e.target.value)}
+                      onChange={(e) => setSupervisoraRegistroMercantil(sanitizeRegistro(e.target.value))}
                       className={`${inputClass} font-mono`}
                       placeholder="Ej: 177228A"
                     />
@@ -1584,8 +1671,9 @@ export function ProyectoFormulario({
                     <label className={labelClass}>Dirección de Supervisión</label>
                     <input
                       type="text"
+                      maxLength={250}
                       value={supervisoraDireccion}
-                      onChange={(e) => setSupervisoraDireccion(e.target.value)}
+                      onChange={(e) => setSupervisoraDireccion(e.target.value.slice(0, 250))}
                       className={inputClass}
                       placeholder="Avenida Las Américas, 24-70 Zona 13"
                     />
@@ -1595,8 +1683,9 @@ export function ProyectoFormulario({
                     <label className={labelClass}>Teléfono de Supervisión</label>
                     <input
                       type="text"
+                      maxLength={30}
                       value={supervisoraTelefono}
-                      onChange={(e) => setSupervisoraTelefono(e.target.value)}
+                      onChange={(e) => setSupervisoraTelefono(sanitizeTelefono(e.target.value))}
                       className={inputClass}
                       placeholder="2212-9675"
                     />
@@ -1606,8 +1695,9 @@ export function ProyectoFormulario({
                     <label className={labelClass}>Correo de Supervisión</label>
                     <input
                       type="email"
+                      maxLength={100}
                       value={supervisoraCorreo}
-                      onChange={(e) => setSupervisoraCorreo(e.target.value)}
+                      onChange={(e) => setSupervisoraCorreo(sanitizeEmail(e.target.value))}
                       className={inputClass}
                       placeholder="supervision@seringe.com"
                     />
@@ -1616,13 +1706,35 @@ export function ProyectoFormulario({
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 pt-2 border-t border-gray-100">
                   <div>
-                    <label className={labelClass}>Responsable Técnico de Supervisión</label>
-                    <input
-                      type="text"
+                    <div className="flex items-center justify-between mb-1">
+                      <label className={labelClass}>Responsable Técnico de Supervisión</label>
+                      <button
+                        type="button"
+                        onClick={() => setOpenCrearUsuarioDrawer(true)}
+                        className="text-[9px] font-bold text-[#9B0F06] hover:text-[#7a0c05] flex items-center gap-0.5 cursor-pointer"
+                      >
+                        <Plus size={10} />
+                        <span>Crear Usuario</span>
+                      </button>
+                    </div>
+                    <Combobox
+                      options={usuariosDisponibles
+                        .filter((u: any) => u.activo !== false && u.estado !== 'Suspendido' && u.estado !== 'Desactivado')
+                        .map((u: any) => {
+                          const nombreCompleto = u.nombre || `${u.primer_nombre || ''} ${u.primer_apellido || ''}`.trim() || u.correo
+                          const rolCargo = u.cargo || u.rol || 'Supervisor'
+                          return {
+                            value: nombreCompleto,
+                            label: `${nombreCompleto} - ${rolCargo}`,
+                          }
+                        })}
                       value={supervisoraResponsable}
-                      onChange={(e) => setSupervisoraResponsable(e.target.value)}
-                      className={inputClass}
-                      placeholder="Ing. Pablo Pérez - Colegiado 3689"
+                      onChange={(val) => setSupervisoraResponsable(val)}
+                      placeholder="Buscar profesional o escribir Responsable..."
+                      emptyAction={{
+                        label: 'Crear Nuevo Usuario',
+                        onClick: () => setOpenCrearUsuarioDrawer(true),
+                      }}
                     />
                   </div>
 
@@ -1630,8 +1742,9 @@ export function ProyectoFormulario({
                     <label className={labelClass}>Licitación Pública de Supervisión</label>
                     <input
                       type="text"
+                      maxLength={50}
                       value={supervisoraLicitacion}
-                      onChange={(e) => setSupervisoraLicitacion(e.target.value)}
+                      onChange={(e) => setSupervisoraLicitacion(sanitizeLicitacion(e.target.value))}
                       className={`${inputClass} font-mono`}
                       placeholder="DGC-054-2025-S"
                     />
@@ -1641,8 +1754,9 @@ export function ProyectoFormulario({
                     <label className={labelClass}>Acta de Inicio de Supervisión</label>
                     <input
                       type="text"
+                      maxLength={80}
                       value={supervisoraActaInicio}
-                      onChange={(e) => setSupervisoraActaInicio(e.target.value)}
+                      onChange={(e) => setSupervisoraActaInicio(e.target.value.slice(0, 80))}
                       className={inputClass}
                       placeholder="Acta No. 52-2026 de fecha 07/07/2026"
                     />
@@ -1664,30 +1778,30 @@ export function ProyectoFormulario({
               icon={Landmark}
             />
 
-            {/* Sub-tabs para Paso 4 */}
-            <div className="flex items-center gap-1.5 border-b border-gray-100 pb-2">
+            {/* Sub-tabs para Paso 4 con diseño moderno estilo underline (img3) */}
+            <div className="flex items-center gap-1 border-b border-gray-200">
               <button
                 type="button"
                 onClick={() => setSubTabPaso4('ejecucion')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold rounded-lg transition-all cursor-pointer ${
+                className={`inline-flex items-center gap-2 px-3.5 py-2 text-[11px] font-bold transition-all border-b-2 cursor-pointer ${
                   subTabPaso4 === 'ejecucion'
-                    ? 'bg-[#9B0F06] text-white shadow-2xs'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    ? 'border-[#9B0F06] text-[#9B0F06] bg-red-50/40 rounded-t-lg shadow-2xs'
+                    : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-50 rounded-t-lg font-medium'
                 }`}
               >
-                <Landmark size={12} />
+                <Landmark size={13} className={subTabPaso4 === 'ejecucion' ? 'text-[#9B0F06]' : 'text-gray-400'} />
                 <span>4.1 Partidas de Ejecución (Obra)</span>
               </button>
               <button
                 type="button"
                 onClick={() => setSubTabPaso4('supervision')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold rounded-lg transition-all cursor-pointer ${
+                className={`inline-flex items-center gap-2 px-3.5 py-2 text-[11px] font-bold transition-all border-b-2 cursor-pointer ${
                   subTabPaso4 === 'supervision'
-                    ? 'bg-orange-700 text-white shadow-2xs'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    ? 'border-orange-700 text-orange-700 bg-orange-50/40 rounded-t-lg shadow-2xs'
+                    : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-50 rounded-t-lg font-medium'
                 }`}
               >
-                <ShieldCheck size={12} />
+                <ShieldCheck size={13} className={subTabPaso4 === 'supervision' ? 'text-orange-700' : 'text-gray-400'} />
                 <span>4.2 Partidas de Supervisión</span>
               </button>
             </div>
@@ -1710,8 +1824,9 @@ export function ProyectoFormulario({
                     <label className={labelClass}>Programa Presupuestario</label>
                     <input
                       type="text"
+                      maxLength={150}
                       value={contratistaPrograma}
-                      onChange={(e) => setContratistaPrograma(e.target.value)}
+                      onChange={(e) => setContratistaPrograma(e.target.value.slice(0, 150))}
                       className={inputClass}
                       placeholder="TRANSPORTE POR CARRETERA"
                     />
@@ -1721,8 +1836,9 @@ export function ProyectoFormulario({
                     <label className={labelClass}>Subprograma</label>
                     <input
                       type="text"
+                      maxLength={150}
                       value={contratistaSubprograma}
-                      onChange={(e) => setContratistaSubprograma(e.target.value)}
+                      onChange={(e) => setContratistaSubprograma(e.target.value.slice(0, 150))}
                       className={inputClass}
                       placeholder="MEJORAMIENTO DE CARRETERAS SECUNDARIAS"
                     />
@@ -1732,8 +1848,9 @@ export function ProyectoFormulario({
                     <label className={labelClass}>Fuente de Financiamiento</label>
                     <input
                       type="text"
+                      maxLength={150}
                       value={contratistaFuenteFinanciamiento}
-                      onChange={(e) => setContratistaFuenteFinanciamiento(e.target.value)}
+                      onChange={(e) => setContratistaFuenteFinanciamiento(e.target.value.slice(0, 150))}
                       className={inputClass}
                       placeholder="Fondos nacionales"
                     />
@@ -1745,8 +1862,9 @@ export function ProyectoFormulario({
                     <label className={labelClass}>Partida Presupuestaria de Fondos Nacionales</label>
                     <input
                       type="text"
+                      maxLength={70}
                       value={contratistaPartidaFondos}
-                      onChange={(e) => setContratistaPartidaFondos(e.target.value)}
+                      onChange={(e) => setContratistaPartidaFondos(sanitizePartidaPresupuestaria(e.target.value))}
                       className={`${inputClass} font-mono font-bold text-gray-700`}
                       placeholder="2026-11130013-202-11-01-002-000-003-331-1399-52-0403-0065"
                     />
@@ -1756,8 +1874,9 @@ export function ProyectoFormulario({
                     <label className={labelClass}>CDP (Constancia Disponibilidad Presupuestaria)</label>
                     <input
                       type="text"
+                      maxLength={40}
                       value={contratistaCdp}
-                      onChange={(e) => setContratistaCdp(e.target.value)}
+                      onChange={(e) => setContratistaCdp(sanitizeCDP(e.target.value))}
                       className={`${inputClass} font-mono`}
                       placeholder="Ej: 66349939"
                     />
@@ -1769,8 +1888,9 @@ export function ProyectoFormulario({
                     <label className={labelClass}>Contrato No. y Fecha</label>
                     <input
                       type="text"
+                      maxLength={60}
                       value={contratistaContratoNumero}
-                      onChange={(e) => setContratistaContratoNumero(e.target.value)}
+                      onChange={(e) => setContratistaContratoNumero(e.target.value.slice(0, 60))}
                       className={inputClass}
                       placeholder="008-2026-DGC-CONSTRUCCION, 29/05/2026"
                     />
@@ -1780,8 +1900,9 @@ export function ProyectoFormulario({
                     <label className={labelClass}>Acuerdo Ministerial</label>
                     <input
                       type="text"
+                      maxLength={60}
                       value={contratistaAcuerdoMinisterial}
-                      onChange={(e) => setContratistaAcuerdoMinisterial(e.target.value)}
+                      onChange={(e) => setContratistaAcuerdoMinisterial(e.target.value.slice(0, 60))}
                       className={inputClass}
                       placeholder="522-2026 de fecha 09/06/2026"
                     />
@@ -1791,8 +1912,9 @@ export function ProyectoFormulario({
                     <label className={labelClass}>Número de Escritura Pública</label>
                     <input
                       type="text"
+                      maxLength={50}
                       value={numeroEscrituraPublica}
-                      onChange={(e) => setNumeroEscrituraPublica(e.target.value)}
+                      onChange={(e) => setNumeroEscrituraPublica(e.target.value.slice(0, 50))}
                       className={inputClass}
                       placeholder="Escritura No. 142-2024"
                     />
@@ -1831,8 +1953,9 @@ export function ProyectoFormulario({
                     <label className={labelClass}>Programa Presupuestario</label>
                     <input
                       type="text"
+                      maxLength={150}
                       value={supervisoraPrograma}
-                      onChange={(e) => setSupervisoraPrograma(e.target.value)}
+                      onChange={(e) => setSupervisoraPrograma(e.target.value.slice(0, 150))}
                       className={inputClass}
                       placeholder="TRANSPORTE POR CARRETERA"
                     />
@@ -1842,8 +1965,9 @@ export function ProyectoFormulario({
                     <label className={labelClass}>Subprograma</label>
                     <input
                       type="text"
+                      maxLength={150}
                       value={supervisoraSubprograma}
-                      onChange={(e) => setSupervisoraSubprograma(e.target.value)}
+                      onChange={(e) => setSupervisoraSubprograma(e.target.value.slice(0, 150))}
                       className={inputClass}
                       placeholder="MEJORAMIENTO DE CARRETERAS SECUNDARIAS"
                     />
@@ -1853,8 +1977,9 @@ export function ProyectoFormulario({
                     <label className={labelClass}>Fuente de Financiamiento</label>
                     <input
                       type="text"
+                      maxLength={150}
                       value={supervisoraFuenteFinanciamiento}
-                      onChange={(e) => setSupervisoraFuenteFinanciamiento(e.target.value)}
+                      onChange={(e) => setSupervisoraFuenteFinanciamiento(e.target.value.slice(0, 150))}
                       className={inputClass}
                       placeholder="Fondos nacionales"
                     />
@@ -1866,8 +1991,9 @@ export function ProyectoFormulario({
                     <label className={labelClass}>Partida Presupuestaria Fondos Nacionales (Supervisión)</label>
                     <input
                       type="text"
+                      maxLength={70}
                       value={supervisoraPartidaFondos}
-                      onChange={(e) => setSupervisoraPartidaFondos(e.target.value)}
+                      onChange={(e) => setSupervisoraPartidaFondos(sanitizePartidaPresupuestaria(e.target.value))}
                       className={`${inputClass} font-mono font-bold text-gray-700`}
                       placeholder="2026-11130013-202-11-01-002-000-003-188-1399-52-0403-0065"
                     />
@@ -1877,8 +2003,9 @@ export function ProyectoFormulario({
                     <label className={labelClass}>CDP Supervisión</label>
                     <input
                       type="text"
+                      maxLength={40}
                       value={supervisoraCdp}
-                      onChange={(e) => setSupervisoraCdp(e.target.value)}
+                      onChange={(e) => setSupervisoraCdp(sanitizeCDP(e.target.value))}
                       className={`${inputClass} font-mono`}
                       placeholder="Ej: 66349940"
                     />
@@ -1890,8 +2017,9 @@ export function ProyectoFormulario({
                     <label className={labelClass}>Contrato No. y Fecha</label>
                     <input
                       type="text"
+                      maxLength={60}
                       value={supervisoraContratoNumero}
-                      onChange={(e) => setSupervisoraContratoNumero(e.target.value)}
+                      onChange={(e) => setSupervisoraContratoNumero(e.target.value.slice(0, 60))}
                       className={inputClass}
                       placeholder="007-2026-DGC-SUPERVISION, 29/05/2026"
                     />
@@ -1901,8 +2029,9 @@ export function ProyectoFormulario({
                     <label className={labelClass}>Acuerdo Ministerial</label>
                     <input
                       type="text"
+                      maxLength={60}
                       value={supervisoraAcuerdoMinisterial}
-                      onChange={(e) => setSupervisoraAcuerdoMinisterial(e.target.value)}
+                      onChange={(e) => setSupervisoraAcuerdoMinisterial(e.target.value.slice(0, 60))}
                       className={inputClass}
                       placeholder="625-2026 de fecha 06/07/2026"
                     />
@@ -1924,42 +2053,42 @@ export function ProyectoFormulario({
               icon={Banknote}
             />
 
-            {/* Sub-tabs para Paso 5 */}
-            <div className="flex items-center gap-1.5 border-b border-gray-100 pb-2">
+            {/* Sub-tabs para Paso 5 con diseño moderno estilo underline (img3) */}
+            <div className="flex items-center gap-1 border-b border-gray-200">
               <button
                 type="button"
                 onClick={() => setSubTabPaso5('ejecucion')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold rounded-lg transition-all cursor-pointer ${
+                className={`inline-flex items-center gap-2 px-3.5 py-2 text-[11px] font-bold transition-all border-b-2 cursor-pointer ${
                   subTabPaso5 === 'ejecucion'
-                    ? 'bg-[#9B0F06] text-white shadow-2xs'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    ? 'border-[#9B0F06] text-[#9B0F06] bg-red-50/40 rounded-t-lg shadow-2xs'
+                    : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-50 rounded-t-lg font-medium'
                 }`}
               >
-                <Banknote size={12} />
+                <Banknote size={13} className={subTabPaso5 === 'ejecucion' ? 'text-[#9B0F06]' : 'text-gray-400'} />
                 <span>5.1 Financiero Obra (Ejecución)</span>
               </button>
               <button
                 type="button"
                 onClick={() => setSubTabPaso5('supervision')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold rounded-lg transition-all cursor-pointer ${
+                className={`inline-flex items-center gap-2 px-3.5 py-2 text-[11px] font-bold transition-all border-b-2 cursor-pointer ${
                   subTabPaso5 === 'supervision'
-                    ? 'bg-orange-700 text-white shadow-2xs'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    ? 'border-orange-700 text-orange-700 bg-orange-50/40 rounded-t-lg shadow-2xs'
+                    : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-50 rounded-t-lg font-medium'
                 }`}
               >
-                <Banknote size={12} />
+                <Banknote size={13} className={subTabPaso5 === 'supervision' ? 'text-orange-700' : 'text-gray-400'} />
                 <span>5.2 Financiero Supervisión</span>
               </button>
               <button
                 type="button"
                 onClick={() => setSubTabPaso5('consolidado')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold rounded-lg transition-all cursor-pointer ${
+                className={`inline-flex items-center gap-2 px-3.5 py-2 text-[11px] font-bold transition-all border-b-2 cursor-pointer ${
                   subTabPaso5 === 'consolidado'
-                    ? 'bg-gray-900 text-white shadow-2xs'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    ? 'border-gray-900 text-gray-900 bg-gray-100/70 rounded-t-lg shadow-2xs'
+                    : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-50 rounded-t-lg font-medium'
                 }`}
               >
-                <Banknote size={12} />
+                <Banknote size={13} className={subTabPaso5 === 'consolidado' ? 'text-gray-900' : 'text-gray-400'} />
                 <span>5.3 Consolidado Global</span>
               </button>
             </div>
@@ -1985,10 +2114,11 @@ export function ProyectoFormulario({
                     <div className="relative">
                       <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-xs">Q</span>
                       <input
-                        type="number"
+                        type="text"
+                        maxLength={15}
                         value={montoContractualOriginal}
                         onChange={(e) => {
-                          setMontoContractualOriginal(e.target.value)
+                          setMontoContractualOriginal(sanitizeNumeroPositivo(e.target.value, 15))
                           setErrors((prev) => ({ ...prev, montoContractualOriginal: false }))
                         }}
                         className={`${errorInputClass(errors, 'montoContractualOriginal')} pl-7 font-mono font-bold text-gray-900`}
@@ -2001,9 +2131,10 @@ export function ProyectoFormulario({
                     <label className={labelClass}>Porcentaje de Anticipo (%)</label>
                     <div className="flex gap-1.5 items-center">
                       <input
-                        type="number"
+                        type="text"
+                        maxLength={5}
                         value={contratistaPorcentajeAnticipo}
-                        onChange={(e) => setContratistaPorcentajeAnticipo(e.target.value)}
+                        onChange={(e) => setContratistaPorcentajeAnticipo(sanitizePorcentaje(e.target.value))}
                         className="w-20 rounded border border-gray-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-gray-800"
                         placeholder="15"
                       />
@@ -2018,8 +2149,9 @@ export function ProyectoFormulario({
                     <label className={labelClass}>Plazo Contractual en Meses</label>
                     <input
                       type="text"
+                      maxLength={50}
                       value={contratistaMesesPlazo}
-                      onChange={(e) => setContratistaMesesPlazo(e.target.value)}
+                      onChange={(e) => setContratistaMesesPlazo(e.target.value.slice(0, 50))}
                       className={inputClass}
                       placeholder="18 meses (Etapa de Construcción)"
                     />
@@ -2074,9 +2206,10 @@ export function ProyectoFormulario({
                     <div className="relative">
                       <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-xs">Q</span>
                       <input
-                        type="number"
+                        type="text"
+                        maxLength={15}
                         value={supervisoraMontoOriginal}
-                        onChange={(e) => setSupervisoraMontoOriginal(e.target.value)}
+                        onChange={(e) => setSupervisoraMontoOriginal(sanitizeNumeroPositivo(e.target.value, 15))}
                         className={`${inputClass} pl-7 font-mono font-bold text-gray-900`}
                         placeholder="13351095.20"
                       />
@@ -2087,9 +2220,10 @@ export function ProyectoFormulario({
                     <label className={labelClass}>Porcentaje de Anticipo (%)</label>
                     <div className="flex gap-1.5 items-center">
                       <input
-                        type="number"
+                        type="text"
+                        maxLength={5}
                         value={supervisoraPorcentajeAnticipo}
-                        onChange={(e) => setSupervisoraPorcentajeAnticipo(e.target.value)}
+                        onChange={(e) => setSupervisoraPorcentajeAnticipo(sanitizePorcentaje(e.target.value))}
                         className="w-20 rounded border border-gray-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-gray-800"
                         placeholder="10"
                       />
@@ -2104,8 +2238,9 @@ export function ProyectoFormulario({
                     <label className={labelClass}>Plazo Desglosado de Supervisión</label>
                     <input
                       type="text"
+                      maxLength={50}
                       value={supervisoraMesesPlazo}
-                      onChange={(e) => setSupervisoraMesesPlazo(e.target.value)}
+                      onChange={(e) => setSupervisoraMesesPlazo(e.target.value.slice(0, 50))}
                       className={inputClass}
                       placeholder="22 MESES (2 Pre, 18 Ejecución, 2 Post)"
                     />

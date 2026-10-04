@@ -443,7 +443,7 @@ export default function BitacoraPage() {
                       </div>
 
                       {/* Ubicación GPS y Departamento con solo el Icono de Mapa sin fondo */}
-                      <div className="col-span-2 sm:col-span-3 space-y-1.5 pt-1">
+                      <div className="col-span-2 sm:col-span-3 space-y-1.5 pt-1 relative">
                         <div className="flex items-center justify-between">
                           <span className="text-[8.5px] font-bold text-gray-400 uppercase tracking-wider block">
                             Ubicación y Departamento (GPS)
@@ -472,23 +472,10 @@ export default function BitacoraPage() {
                                 Lat: {drawerRegistro.coordenadasGps?.lat ? drawerRegistro.coordenadasGps.lat.toFixed(6) : ((drawerRegistro as any).lat || '14.500167')} · Lng: {drawerRegistro.coordenadasGps?.lng ? drawerRegistro.coordenadasGps.lng.toFixed(6) : ((drawerRegistro as any).lng || '-90.617015')}
                               </span>
                             </div>
-
-                            {/* Abajo de departamento: Est. Inicio, Est. Fin, y Lado */}
-                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-gray-600 font-mono pt-0.5">
-                              <span>
-                                Est. Inicio: <strong className="text-gray-900">{String(drawerRegistro.estacionInicio || (drawerRegistro as any).estacion_inicial || (drawerRegistro as any).estacion_inicio || '0+000')}</strong>
-                              </span>
-                              <span>
-                                Est. Fin: <strong className="text-gray-900">{String(drawerRegistro.estacionFin || (drawerRegistro as any).estacion_final || (drawerRegistro as any).estacion_fin || '0+500')}</strong>
-                              </span>
-                              <span>
-                                Lado: <strong className="text-gray-900">{drawerRegistro.lado || (drawerRegistro as any).lado_via || 'Ambos'}</strong>
-                              </span>
-                            </div>
                           </div>
                         </div>
 
-                        {/* Mapa Leaflet y Departamental Integrado en el Drawer */}
+                        {/* Mapa Leaflet y Departamental Flotante en el Drawer */}
                         {modalMapaGTAbierto && (
                           <BitacoraMapaInline
                             registro={drawerRegistro}
