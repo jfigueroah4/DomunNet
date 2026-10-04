@@ -1,16 +1,10 @@
 // @ts-nocheck
 'use client'
 
-
-
 import { useRouter } from 'next/navigation'
-
 import { ArrowLeft, Lock } from 'lucide-react'
-
 import { useAuthStore } from '@/stores/useAuthStore'
-
 import type { ProyectoType } from '@/validations/proyecto.schema'
-
 import ProyectoFormulario from '@/components/modules/proyectos/ProyectoFormulario'
 import { api } from '@/lib/api/cliente'
 import { toast } from 'sonner'
@@ -18,26 +12,15 @@ import { proyectoService } from '@/services/proyectos/proyecto.service'
 import { useEffect, useState } from 'react'
 import { useCustomToast } from '@/hooks/useCustomToast'
 
-
-
 export function ProyectoEditorView({
-
   modo,
-
   proyectoInicial,
-
 }: {
-
   modo: 'crear' | 'editar'
-
   proyectoInicial?: ProyectoType
-
 }) {
-
   const router = useRouter()
-
   const { profile: user } = useAuthStore()
-
   const { showSuccessToast, showErrorToast } = useCustomToast()
   const esEditar = modo === 'editar'
   const [proyectoReal, setProyectoReal] = useState<any>(proyectoInicial)
@@ -52,8 +35,6 @@ export function ProyectoEditorView({
   }, [esEditar, proyectoInicial?.id])
 
   const proyectoActual = esEditar ? proyectoReal : proyectoInicial
-
-
 
   const rolStr = (user?.rol || '').toLowerCase().trim()
   const cargoStr = (user?.cargo || '').toLowerCase().trim()
@@ -133,80 +114,43 @@ export function ProyectoEditorView({
     }
   }
 
-
-
   if (esEditar && !proyectoActual) {
-
     return (
-
       <div className="space-y-4">
-
         <button
-
           type="button"
-
           onClick={() => router.push('/dashboard/proyectos')}
-
           className="inline-flex items-center gap-2 text-xs text-gray-500 transition-colors hover:text-[#9B0F06]"
-
         >
-
           <ArrowLeft size={14} />
-
           Volver a proyectos
-
         </button>
-
         <div className="rounded-2xl bg-white p-8 text-center shadow-sm">
-
           <p className="text-sm font-semibold text-gray-700">Cargando proyecto...</p>
-
         </div>
-
       </div>
-
     )
-
   }
 
-
-
   return (
-
     <div className="space-y-3 font-[Poppins]">
-
       <div className="flex flex-wrap items-start justify-between gap-3 py-0.5">
-
         <div className="flex items-start gap-2.5">
-
           <button
-
             type="button"
-
             onClick={() =>
-
               router.push(esEditar && proyectoActual ? `/dashboard/proyectos/detalles?slug=${proyectoActual.id}` : '/dashboard/proyectos')
-
             }
-
-            className="mt-0.5 rounded-md border border-gray-200 bg-white p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-[#9B0F06]"
-
+            className="mt-0.5 p-1 text-gray-500 transition-colors hover:text-[#9B0F06] hover:bg-gray-100 rounded-md cursor-pointer"
             title="Volver"
-
           >
-
-            <ArrowLeft size={14} />
-
+            <ArrowLeft size={18} />
           </button>
 
           <div>
-
             <h1 className="m-0 text-base font-black leading-tight text-gray-900">
-
               {esEditar ? `Editar Proyecto: ${proyectoActual?.codigo || 'DOM-VIAL-001'}` : 'Nuevo Proyecto'}
-
             </h1>
-
             <p className="mt-0.5 text-[11px] text-gray-500">
               {esEditar
                 ? 'Actualice la información contractual, plazos y montos del proyecto paso a paso.'
@@ -248,15 +192,6 @@ export function ProyectoEditorView({
           }
         }}
       />
-
     </div>
-
   )
-
 }
-
-
-
-
-
-

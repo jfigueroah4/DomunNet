@@ -19,11 +19,11 @@ import { BitacoraFiltros } from '@/components/modules/bitacora/BitacoraFiltros'
 import { BitacoraCard } from '@/components/modules/bitacora/BitacoraCard'
 import { BitacoraEstadoBadge } from '@/components/modules/bitacora/BitacoraEstadoBadge'
 import { BitacoraForm } from '@/components/modules/bitacora/BitacoraForm'
+import { BitacoraMapaInline } from '@/components/modules/bitacora/BitacoraMapaInline'
 
 import { useAuthStore } from '@/stores/useAuthStore'
 import { apiGetDeduplicado } from '@/lib/api/cliente'
 import { Portal } from '@/components/ui/Portal'
-import { MapaGuatemalaDepartamentos } from '@/components/modules/fotografias/MapaGuatemalaDepartamentos'
 
 export default function BitacoraPage() {
   const searchParams = useSearchParams()
@@ -184,7 +184,7 @@ export default function BitacoraPage() {
 
   if (vista === 'crear') {
     return (
-      <div className="w-full p-2 sm:p-4 min-h-[calc(100vh-80px)]">
+      <div className="-mx-4 -mt-4 -mb-20 md:-mb-4 xl:-mx-5 min-h-[calc(100vh-65px)] bg-white">
         <BitacoraForm
           onBack={() => setVista('lista')}
           onSubmit={() => {
@@ -337,7 +337,7 @@ export default function BitacoraPage() {
                       <h2 className="text-sm font-black text-gray-900 leading-snug">
                         Detalle del Registro de Bitácora
                       </h2>
-                      <BitacoraEstadoBadge estado={drawerRegistro.estado} />
+                      <BitacoraEstadoBadge estado={drawerRegistro.estado} sinFondo={true} />
                     </div>
                     <p className="text-[10.5px] text-gray-500 font-mono flex items-center gap-1.5">
                       <Calendar size={11} className="text-[#9B0F06]" />
@@ -413,9 +413,9 @@ export default function BitacoraPage() {
                           {/* Botón de Mapa solo icono sin fondo */}
                           <button
                             type="button"
-                            onClick={() => setModalMapaGTAbierto(true)}
+                            onClick={() => setModalMapaGTAbierto((prev) => !prev)}
                             className="p-1 text-[#9B0F06] hover:text-[#5E0006] hover:scale-110 transition-all cursor-pointer focus:outline-none"
-                            title="Ver Mapa GT"
+                            title="Ver / Ocultar Mapa en el Drawer"
                           >
                             <LucideMap size={18} />
                           </button>
@@ -436,6 +436,14 @@ export default function BitacoraPage() {
                             </div>
                           </div>
                         </div>
+
+                        {/* Mapa Leaflet Integrado en el Drawer sin fondo ni modal flotante */}
+                        {modalMapaGTAbierto && (
+                          <BitacoraMapaInline
+                            registro={drawerRegistro}
+                            onClose={() => setModalMapaGTAbierto(false)}
+                          />
+                        )}
                       </div>
                     </div>
                   </div>
@@ -545,139 +553,6 @@ export default function BitacoraPage() {
         </Portal>
       )}
 
-      {/* MODAL DEL MAPA DE GUATEMALA Y RUTA DE LA OBRA (Fondo Verde Satelital Realista Leaflet/Esri + Reconocimiento de GPS) */}
-      {modalMapaGTAbierto && drawerRegistro && (
-        <Portal>
-          <div
-            className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/85 p-3 sm:p-5 backdrop-blur-sm font-[Poppins]"
-            onClick={() => setModalMapaGTAbierto(false)}
-          >
-            <div
-              className="relative w-full max-w-3xl bg-zinc-950 rounded-2xl border border-zinc-800 shadow-2xl overflow-hidden"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Encabezado del Mapa */}
-              <div className="flex items-center justify-between p-3.5 border-b border-zinc-800 bg-zinc-900/90">
-                <div className="flex items-center gap-2.5">
-                  <div className="h-8 w-8 rounded-lg bg-red-600/20 text-red-500 flex items-center justify-center">
-                    <MapPin size={16} />
-                  </div>
-                  <div>
-                    <h3 className="text-xs font-bold text-white">
-                      Ruta de Obra y Ubicación Geográfica
-                    </h3>
-                    <p className="text-[10px] text-zinc-400 font-mono">
-                      {drawerRegistro.proyectoNombre || 'Proyecto de Obra'} · {(drawerRegistro as any).departamento || (drawerRegistro as any).departamentoNombre || 'Huehuetenango'}
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setModalMapaGTAbierto(false)}
-                  className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-white transition-colors cursor-pointer"
-                  title="Cerrar mapa"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              {/* Vista del Mapa de Satélite / Terreno Verde Realista (Estilo Leaflet/Esri Satellite Terrain) */}
-              <div className="relative w-full h-[400px] sm:h-[460px] bg-[#1C2E1C] overflow-hidden select-none">
-                {/* SVG Fondo con textura de mapa topográfico satelital verde Leaflet */}
-                <svg viewBox="0 0 800 500" className="w-full h-full object-cover">
-                  <defs>
-                    <linearGradient id="leafGreenGrad" x1="0" y1="0" x2="1" y2="1">
-                      <stop offset="0%" stopColor="#1B2E1C" />
-                      <stop offset="50%" stopColor="#253D25" />
-                      <stop offset="100%" stopColor="#1A291A" />
-                    </linearGradient>
-                  </defs>
-
-                  {/* Capa de fondo satelital */}
-                  <rect width="800" height="500" fill="url(#leafGreenGrad)" />
-
-                  {/* Contornos de relieve montañoso verde oscuro/claro */}
-                  <path d="M 0 0 L 800 0 L 800 500 L 0 500 Z" fill="#1C2E1C" />
-                  <path d="M 100 20 Q 300 220 520 100 T 800 180 L 800 500 L 0 500 Z" fill="#263E26" opacity="0.8" />
-                  <path d="M 280 80 Q 580 320 780 440 L 800 500 L 150 500 Z" fill="#304C30" opacity="0.65" />
-                  <path d="M 400 180 Q 600 380 720 480 L 800 500 L 350 500 Z" fill="#213521" opacity="0.7" />
-
-                  {/* Vías secundarias beige / gris */}
-                  <path d="M 50 120 L 320 180 L 400 250 M 320 180 L 450 100 L 780 110" stroke="#D4C59E" strokeWidth="2.5" fill="none" opacity="0.6" strokeDasharray="6,4" />
-                  <path d="M 220 420 L 480 340 L 750 420" stroke="#D4C59E" strokeWidth="2" fill="none" opacity="0.5" strokeDasharray="4,4" />
-
-                  {/* RUTA PRINCIPAL DEL PROYECTO (Línea Roja #EF4444 sin parpadeos) */}
-                  <path
-                    d="M 530 150 L 535 190 L 525 240 L 530 270 L 545 320 L 580 340 L 615 365 L 610 390 L 580 405 L 610 420 L 640 430"
-                    stroke="#EF4444"
-                    strokeWidth="5"
-                    fill="none"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-
-                  {/* Puntos de Estación a lo largo de la ruta */}
-                  <g className="font-sans text-[11px] font-bold text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">
-                    <text x="250" y="85" fill="#E4E4E7">San Antonio el Cimarrón</text>
-                    <text x="350" y="140" fill="#E4E4E7">Finca La Trinidad</text>
-                    <text x="470" y="160" fill="#E4E4E7">Yuxquen</text>
-
-                    {/* Yalambojoch */}
-                    <text x="510" y="140" fill="#FFFFFF" textAnchor="middle">Yalambojoch</text>
-                    <circle cx="530" cy="150" r="4" fill="#EF4444" stroke="#FFFFFF" strokeWidth="2" />
-
-                    {/* Bulej */}
-                    <text x="500" y="255" fill="#FFFFFF" textAnchor="end">Bulej</text>
-                    <circle cx="528" cy="255" r="4.5" fill="#EF4444" stroke="#FFFFFF" strokeWidth="2" />
-
-                    {/* Patalcal */}
-                    <text x="535" y="335" fill="#FFFFFF">Patalcal</text>
-                    <circle cx="550" cy="325" r="4.5" fill="#EF4444" stroke="#FFFFFF" strokeWidth="2" />
-
-                    <text x="440" y="375" fill="#E4E4E7">Yolcultac</text>
-
-                    {/* San Mateo Ixtatán */}
-                    <text x="645" y="415" fill="#FFFFFF">San Mateo Ixtatán</text>
-                    <circle cx="640" cy="430" r="5" fill="#EF4444" stroke="#FFFFFF" strokeWidth="2" />
-
-                    {/* Escudo de Carretera 9N */}
-                    <g transform="translate(620, 420)">
-                      <rect width="22" height="15" rx="3" fill="#FFFFFF" stroke="#334155" strokeWidth="1" />
-                      <text x="11" y="11" fill="#0F172A" fontSize="9" fontWeight="900" textAnchor="middle">9N</text>
-                    </g>
-                  </g>
-                </svg>
-
-                {/* MINI MAPA DE GUATEMALA SUPERPUESTO EN LA ESQUINA SUPERIOR IZQUIERDA */}
-                <div className="absolute top-3 left-3 bg-white p-2.5 rounded-xl shadow-2xl border border-gray-200 z-20 w-44 sm:w-48">
-                  <div className="text-[9px] font-black text-gray-800 uppercase tracking-wider mb-1 text-center font-mono border-b border-gray-100 pb-1">
-                    Guatemala · {(drawerRegistro as any).departamento || (drawerRegistro as any).departamentoNombre || 'Huehuetenango'}
-                  </div>
-                  <MapaGuatemalaDepartamentos
-                    ubicacion={drawerRegistro.ubicacion || drawerRegistro.proyectoNombre || ''}
-                    departamentoSeleccionado={(drawerRegistro as any).departamento || (drawerRegistro as any).departamentoNombre || 'Huehuetenango'}
-                    soloMapa={true}
-                    compacto={true}
-                    fondoTransparente={true}
-                    className="w-full"
-                  />
-                </div>
-
-                {/* Coordenadas GPS del registro dinámicas */}
-                <div className="absolute bottom-3 right-3 bg-zinc-900/90 backdrop-blur-xs text-white px-3 py-1.5 rounded-lg border border-zinc-700 text-[10.5px] font-mono flex items-center gap-2 shadow-lg">
-                  <span className="w-2 h-2 rounded-full bg-red-500" />
-                  <span>
-                    Coordenadas GPS: {drawerRegistro.coordenadasGps?.lat
-                      ? `${drawerRegistro.coordenadasGps.lat.toFixed(6)}, ${drawerRegistro.coordenadasGps.lng?.toFixed(6)}`
-                      : '14.500167, -90.617015'}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </Portal>
-      )}
     </div>
   )
 }

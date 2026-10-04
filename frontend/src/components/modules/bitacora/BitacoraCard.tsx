@@ -9,13 +9,13 @@ interface BitacoraCardProps {
 
 export function BitacoraCard({ registro, onClick }: BitacoraCardProps) {
   const getTipoConfig = (tipo: string) => {
-    const config: Record<string, { bg: string; color: string; indicador: string; label: string }> = {
-      actividad: { bg: '#EED9B9', color: '#9B0F06', indicador: '#9B0F06', label: 'Actividad' },
-      incidente: { bg: '#FEE2E2', color: '#DC2626', indicador: '#DC2626', label: 'Incidente' },
-      visita: { bg: '#DBEAFE', color: '#0284C7', indicador: '#0284C7', label: 'Visita' },
-      inspeccion: { bg: '#E0E7FF', color: '#6366F1', indicador: '#6366F1', label: 'Inspección' },
-      material: { bg: '#DCFCE7', color: '#16A34A', indicador: '#16A34A', label: 'Laboratorio' },
-      observacion: { bg: '#F3E8FF', color: '#9333EA', indicador: '#9333EA', label: 'Observación' },
+    const config: Record<string, { indicador: string }> = {
+      actividad: { indicador: '#9B0F06' },
+      incidente: { indicador: '#DC2626' },
+      visita: { indicador: '#0284C7' },
+      inspeccion: { indicador: '#6366F1' },
+      material: { indicador: '#16A34A' },
+      observacion: { indicador: '#9333EA' },
     }
     return config[tipo] || config.actividad
   }
@@ -23,6 +23,14 @@ export function BitacoraCard({ registro, onClick }: BitacoraCardProps) {
   const tipoConfig = getTipoConfig(registro.tipo)
   const adjuntos = Array.isArray(registro.adjuntos) ? registro.adjuntos : []
   const tieneFotos = adjuntos.some((a) => a.tipo === 'imagen') || adjuntos.length > 0
+
+  const tit = registro.titulo || ''
+  const desc = registro.descripcion || ''
+  const esDescripcionDuplicada =
+    !desc ||
+    desc.trim().toLowerCase() === tit.trim().toLowerCase() ||
+    desc.toLowerCase().startsWith('registro de bitácora') ||
+    desc.toLowerCase().includes(tit.toLowerCase())
 
   return (
     <div
@@ -37,18 +45,10 @@ export function BitacoraCard({ registro, onClick }: BitacoraCardProps) {
         />
 
         <div className="flex-1 min-w-0 space-y-0.5">
-          {/* Fila superior - Badges y Hora */}
+          {/* Fila superior - Renglón y Estado en texto negro sin fondo */}
           <div className="flex items-center justify-between gap-1.5 flex-wrap">
-            <div className="flex items-center gap-1 flex-wrap">
-              {/* Badge tipo */}
-              <span
-                className="text-[7.5px] font-bold px-1.5 py-0.2 rounded-full uppercase"
-                style={{ background: tipoConfig.bg, color: tipoConfig.color }}
-              >
-                {registro.tipoIngreso === 'laboratorio' ? 'Laboratorio' : tipoConfig.label}
-              </span>
-
-              {/* Renglón de Trabajo (pequeño) */}
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Renglón de Trabajo (texto negro sin fondo) */}
               {(() => {
                 const renglonTexto =
                   (registro as any).renglon_nombre ||
@@ -62,23 +62,25 @@ export function BitacoraCard({ registro, onClick }: BitacoraCardProps) {
                   'Terracería'
 
                 return (
-                  <span className="text-[7.5px] font-semibold text-amber-900 bg-amber-50 border border-amber-200 px-1 py-0.1 rounded font-mono truncate max-w-[140px]">
+                  <span className="text-[9.5px] font-semibold text-black truncate max-w-[160px]">
                     Renglón: {renglonTexto}
                   </span>
                 )
               })()}
 
-              {/* Badge estado */}
-              <BitacoraEstadoBadge estado={registro.estado} />
+              {/* Badge estado sin fondo (texto negro) */}
+              <BitacoraEstadoBadge estado={registro.estado} sinFondo={true} />
             </div>
 
             <span className="text-[8.5px] font-mono text-gray-400 font-semibold flex-shrink-0">{registro.hora || '12:00'}</span>
           </div>
 
-          {/* Título y Descripción Compactos */}
+          {/* Título y Descripción (sin texto duplicado) */}
           <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-2">
-            <p className="text-[11px] font-extrabold text-gray-900 leading-tight truncate">{registro.titulo}</p>
-            <p className="text-[9.5px] text-gray-500 truncate leading-tight flex-1">{registro.descripcion}</p>
+            <p className="text-[11px] font-extrabold text-gray-900 leading-tight truncate">{tit}</p>
+            {!esDescripcionDuplicada && (
+              <p className="text-[9.5px] text-gray-500 truncate leading-tight flex-1">{desc}</p>
+            )}
           </div>
 
           {/* Metadatos Requeridos con Coordenadas GPS */}
@@ -116,5 +118,3 @@ export function BitacoraCard({ registro, onClick }: BitacoraCardProps) {
     </div>
   )
 }
-
-

@@ -486,7 +486,8 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
   const [tabMaestra, setTabMaestra] = useState<MasterTabType>('general')
   const [subTabGeneral, setSubTabGeneral] = useState<SubTabGeneralType>('resumen')
 
-  // Acordeón / Colapso para Ficha Técnica
+  // Acordeón / Colapso y Perspectiva para Ficha Técnica
+  const [fichaPerspectiva, setFichaPerspectiva] = useState<'obra' | 'supervision'>('obra')
   const [fichaObraAbierta, setFichaObraAbierta] = useState(true)
   const [fichaSupervisionAbierta, setFichaSupervisionAbierta] = useState(true)
 
@@ -639,7 +640,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
           </button>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5">
-              <span className="rounded bg-gray-200 px-1.5 py-0.5 font-mono text-[8.5px] font-bold text-gray-700 shrink-0">
+              <span className="font-mono text-[9px] font-bold text-gray-500 shrink-0">
                 {proyecto.codigo || 'DOM-VIAL-001'}
               </span>
               <ProyectoEstadoBadge estado={proyecto.estado || 'activo'} />
@@ -937,36 +938,60 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                           </p>
                         )}
                       </div>
-                      <span className="flex items-center gap-1 rounded-full bg-gray-200 px-2.5 py-0.5 text-[8.5px] font-bold text-gray-700">
+                      <span className="flex items-center gap-1 text-[8.5px] font-bold text-gray-500">
                         <Lock size={9} /> Liquidación Final
                       </span>
                     </div>
                   )}
                 </InfoDetailCard>
+
+                {/* Card 4: Ubicación Geográfica y Mapa en Resumen General */}
+                <div className="rounded-xl border border-gray-200 bg-white p-3.5 shadow-2xs space-y-2">
+                  <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                    <div className="flex items-center gap-2">
+                      <Globe size={13} className="text-[#9B0F06]" />
+                      <h3 className="text-xs font-bold text-gray-900">
+                        Ubicación Geográfica y Tramo Vial del Proyecto
+                      </h3>
+                    </div>
+                    <span className="text-[9px] font-medium text-gray-500">
+                      Marcador Rojo: Origen | Marcador Marrón: Límite Fin
+                    </span>
+                  </div>
+
+                  <MapaDetalleVista
+                    lat={pAny.latitud != null ? Number(pAny.latitud) : 14.623783}
+                    lng={pAny.longitud != null ? Number(pAny.longitud) : -90.344353}
+                    direccion={proyecto.direccion || proyecto.ubicacionFisica || 'Tres Quebradas, Buena Vista, Palencia'}
+                    direccionFin={pAny.direccionFin || 'Plan Grande, Palencia'}
+                    kilometroInicio={pAny.kilometroInicio ?? 5}
+                    kilometroFin={pAny.kilometroFin ?? 10}
+                  />
+                </div>
               </div>
 
               {/* Panel Lateral de Resumen */}
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {/* Avance y Días de Actividad */}
-                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-1">
-                  <section className="relative rounded-xl border border-gray-200 bg-white p-3 shadow-2xs">
+                <div className="flex flex-col gap-1.5">
+                  <section className="relative rounded-xl border border-gray-200 bg-white p-2.5 shadow-2xs">
                     <div className="flex items-start justify-between">
                       <div>
                         <span className="text-[8px] font-bold uppercase tracking-wider text-gray-400">
                           Avance Físico Actual
                         </span>
-                        <p className="mt-0.5 text-2xl font-black text-[#9B0F06]">{Math.round(proyecto.avance || 0)}%</p>
+                        <p className="mt-0.5 text-xl font-black text-[#9B0F06]">{Math.round(proyecto.avance || 0)}%</p>
                       </div>
-                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-red-50 text-[#9B0F06]">
-                        <CheckCircle2 size={16} />
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-red-50 text-[#9B0F06]">
+                        <CheckCircle2 size={14} />
                       </div>
                     </div>
 
-                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-100">
+                    <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-gray-100">
                       <div className="h-full bg-[#9B0F06]" style={{ width: `${Math.min(100, Math.max(0, proyecto.avance || 0))}%` }} />
                     </div>
 
-                    <div className="mt-2.5 grid grid-cols-2 gap-1 border-t border-gray-100 pt-1.5 text-[8.5px]">
+                    <div className="mt-2 grid grid-cols-2 gap-1 border-t border-gray-100 pt-1.5 text-[8.5px]">
                       <div>
                         <span className="block font-bold text-gray-400">Inicio:</span>
                         <span className="font-bold text-gray-700">{proyecto.fechaInicioContractual || proyecto.fechaInicio || '-'}</span>
@@ -978,7 +1003,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                     </div>
                   </section>
 
-                  <section className="flex flex-col justify-between rounded-xl border border-gray-200 bg-white p-3 shadow-2xs">
+                  <section className="flex flex-col justify-between rounded-xl border border-gray-200 bg-white p-2.5 shadow-2xs">
                     <div className="flex items-center justify-between">
                       <span className="text-[8px] font-bold uppercase tracking-wider text-gray-400">
                         Días de Actividad
@@ -987,9 +1012,9 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                         <Clock size={13} />
                       </div>
                     </div>
-                    <div className="mt-2">
+                    <div className="mt-1.5">
                       <p className="text-xl font-black text-gray-900">{diasActividad} días</p>
-                      <p className="text-[8.5px] text-gray-400">Transcurridos desde el inicio contractual</p>
+                      <p className="text-[8px] text-gray-400">Transcurridos desde el inicio contractual</p>
                     </div>
                   </section>
                 </div>
@@ -1309,447 +1334,473 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
           {/* SUB-TAB 4: FICHA TÉCNICA */}
           {subTabGeneral === 'ficha_tecnica' && (
             <div className="space-y-3">
-              {/* Sección 3.1.1: Ficha Técnica del Contrato de Obra (Sin icono según requerimiento) */}
-              <div
-                className={`rounded-xl border bg-white shadow-2xs overflow-hidden transition-all ${
-                  editingSection === 'ficha_obra' ? 'border-[#9B0F06]/40 ring-1 ring-[#9B0F06]/15' : 'border-gray-200'
-                }`}
-              >
-                <div className="w-full flex flex-wrap items-center justify-between bg-gray-50/80 px-4 py-3 border-b border-gray-200 gap-2">
-                  <div
-                    onClick={() => setFichaObraAbierta(!fichaObraAbierta)}
-                    className="flex items-center gap-2 cursor-pointer flex-1 min-w-[200px]"
-                  >
-                    <div>
-                      <h3 className="text-xs font-black uppercase tracking-wider text-gray-900">
-                        3.1.1 Información General del Contrato de Obra (Ejecución)
-                      </h3>
-                      <p className="text-[9px] text-gray-500">
-                        Datos del contratista ejecutor, partida presupuestaria y plazos
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    {canEdit && (
-                      editingSection === 'ficha_obra' ? (
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => handleSaveSection('ficha_obra')}
-                            disabled={isSaving}
-                            className="inline-flex items-center gap-1 rounded-md bg-[#9B0F06] px-2.5 py-0.5 text-[9.5px] font-bold text-white shadow-2xs hover:bg-[#5E0006] transition-colors cursor-pointer"
-                          >
-                            <Check size={11} />
-                            <span>Guardar</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={handleCancelEdit}
-                            disabled={isSaving}
-                            className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2.5 py-0.5 text-[9.5px] font-medium text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer"
-                          >
-                            <X size={11} />
-                            <span>Cancelar</span>
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setFichaObraAbierta(true)
-                            handleStartEdit('ficha_obra')
-                          }}
-                          className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2 py-0.5 text-[9.5px] font-bold text-gray-600 hover:bg-gray-100 hover:text-[#9B0F06] hover:border-red-200 transition-all cursor-pointer shadow-2xs"
-                        >
-                          <Edit2 size={10} />
-                          <span>Editar</span>
-                        </button>
-                      )
-                    )}
-
-                    <button
-                      type="button"
-                      onClick={() => setFichaObraAbierta(!fichaObraAbierta)}
-                      className="p-1 text-gray-500 hover:text-gray-800"
-                    >
-                      <ChevronDown
-                        size={16}
-                        className={`transition-transform duration-200 ${fichaObraAbierta ? 'rotate-180' : ''}`}
-                      />
-                    </button>
-                  </div>
-                </div>
-
-                {fichaObraAbierta && (
-                  <div className="p-4 space-y-3">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                      {/* Columna A: Datos del Contratista */}
-                      <div className="rounded-xl border border-gray-100 bg-gray-50/40 p-3 space-y-1">
-                        <p className="text-[9px] font-black uppercase tracking-wider text-gray-400 mb-1 border-b border-gray-200 pb-1">
-                          A. Identificación del Contratista
-                        </p>
-                        <EditableItemFichaTecnica
-                          label="Empresa Contratista"
-                          value={editingSection === 'ficha_obra' ? editFormData.empresaContratista : (proyecto.empresaContratista || 'Constructora Principal')}
-                          isEditing={editingSection === 'ficha_obra'}
-                          onChange={(v) => handleFieldChange('empresaContratista', v)}
-                        />
-                        <EditableItemFichaTecnica
-                          label="Propietario / Rep. Legal"
-                          value={editingSection === 'ficha_obra' ? editFormData.propietarioContratista : (pAny.propietarioContratista || 'Ing. Marco Antonio Estrada Morales')}
-                          isEditing={editingSection === 'ficha_obra'}
-                          onChange={(v) => handleFieldChange('propietarioContratista', v)}
-                        />
-                        <EditableItemFichaTecnica
-                          label="Registro Mercantil"
-                          value={editingSection === 'ficha_obra' ? editFormData.registroMercantilContratista : (pAny.registroMercantilContratista || '145892B')}
-                          isEditing={editingSection === 'ficha_obra'}
-                          onChange={(v) => handleFieldChange('registroMercantilContratista', v)}
-                          mono
-                        />
-                        <EditableItemFichaTecnica
-                          label="Dirección"
-                          value={editingSection === 'ficha_obra' ? editFormData.direccionContratista : (pAny.direccionContratista || '12 Calle 4-55 Zona 10, Guatemala')}
-                          isEditing={editingSection === 'ficha_obra'}
-                          onChange={(v) => handleFieldChange('direccionContratista', v)}
-                        />
-                        <EditableItemFichaTecnica
-                          label="Teléfono"
-                          value={editingSection === 'ficha_obra' ? editFormData.telefonoContratista : (pAny.telefonoContratista || '2334-9000 / 5544-1234')}
-                          isEditing={editingSection === 'ficha_obra'}
-                          onChange={(v) => handleFieldChange('telefonoContratista', v)}
-                        />
-                        <EditableItemFichaTecnica
-                          label="Responsable del Proyecto"
-                          value={editingSection === 'ficha_obra' ? editFormData.responsableNombre : (pAny.responsableNombre || 'Ing. Civil Fernando Reyes (Col. 4125)')}
-                          isEditing={editingSection === 'ficha_obra'}
-                          onChange={(v) => handleFieldChange('responsableNombre', v)}
-                        />
-                        <EditableItemFichaTecnica
-                          label="Programa"
-                          value={editingSection === 'ficha_obra' ? editFormData.programaObra : (pAny.programaObra || 'TRANSPORTE POR CARRETERA')}
-                          isEditing={editingSection === 'ficha_obra'}
-                          onChange={(v) => handleFieldChange('programaObra', v)}
-                        />
-                        <EditableItemFichaTecnica
-                          label="Subprograma"
-                          value={editingSection === 'ficha_obra' ? editFormData.subprogramaObra : (pAny.subprogramaObra || 'MEJORAMIENTO DE CARRETERAS SECUNDARIAS Y PUENTES')}
-                          isEditing={editingSection === 'ficha_obra'}
-                          onChange={(v) => handleFieldChange('subprogramaObra', v)}
-                        />
-                        <EditableItemFichaTecnica
-                          label="Fuente de Financiamiento"
-                          value={editingSection === 'ficha_obra' ? editFormData.fuenteFinanciamientoObra : (pAny.fuenteFinanciamientoObra || 'Fondos nacionales')}
-                          isEditing={editingSection === 'ficha_obra'}
-                          onChange={(v) => handleFieldChange('fuenteFinanciamientoObra', v)}
-                        />
-                      </div>
-
-                      {/* Columna B: Partida Presupuestaria y Montos */}
-                      <div className="rounded-xl border border-gray-100 bg-gray-50/40 p-3 space-y-1">
-                        <p className="text-[9px] font-black uppercase tracking-wider text-gray-400 mb-1 border-b border-gray-200 pb-1">
-                          B. Partida Presupuestaria y Términos Económicos
-                        </p>
-                        <EditableItemFichaTecnica
-                          label="Fondos Nacionales (Partida)"
-                          value={editingSection === 'ficha_obra' ? editFormData.partidaFondosObra : (pAny.partidaFondosObra || '2026-11130013-202-11-01-002-000-003-331-1399-52-0403-0065')}
-                          isEditing={editingSection === 'ficha_obra'}
-                          onChange={(v) => handleFieldChange('partidaFondosObra', v)}
-                          mono
-                        />
-                        <EditableItemFichaTecnica
-                          label="CDP (Comprobante Devengado)"
-                          value={editingSection === 'ficha_obra' ? editFormData.cdpObra : (pAny.cdpObra || '66349939')}
-                          isEditing={editingSection === 'ficha_obra'}
-                          onChange={(v) => handleFieldChange('cdpObra', v)}
-                          mono
-                        />
-                        <EditableItemFichaTecnica
-                          label="Contrato No."
-                          value={editingSection === 'ficha_obra' ? editFormData.numeroContratoOriginal : (pAny.numeroContratoOriginal || '008-2026-DGC-CONSTRUCCION, 29/05/2026')}
-                          isEditing={editingSection === 'ficha_obra'}
-                          onChange={(v) => handleFieldChange('numeroContratoOriginal', v)}
-                          mono
-                        />
-                        <EditableItemFichaTecnica
-                          label="Acuerdo Ministerial"
-                          value={editingSection === 'ficha_obra' ? editFormData.acuerdoMinisterialOriginal : (pAny.acuerdoMinisterialOriginal || '522-2026 de fecha 09/06/2026')}
-                          isEditing={editingSection === 'ficha_obra'}
-                          onChange={(v) => handleFieldChange('acuerdoMinisterialOriginal', v)}
-                          mono
-                        />
-                        <EditableItemFichaTecnica
-                          label="Monto Original del Contrato"
-                          value={editingSection === 'ficha_obra' ? (editFormData.montoContractualOriginal ?? editFormData.presupuesto) : formatearMoneda(montoObraOriginal > 0 ? montoObraOriginal : 369834297.14)}
-                          isEditing={editingSection === 'ficha_obra'}
-                          onChange={(v) => {
-                            handleFieldChange('montoContractualOriginal', v)
-                            handleFieldChange('presupuesto', v)
-                          }}
-                          type={editingSection === 'ficha_obra' ? 'number' : 'text'}
-                          highlight
-                        />
-                        <EditableItemFichaTecnica
-                          label="Porcentaje de Anticipo (%)"
-                          value={editingSection === 'ficha_obra' ? editFormData.porcentajeAnticipoObra : `${porcentajeAnticipoObra}% (${formatearMoneda(montoAnticipoObra > 0 ? montoAnticipoObra : 55475144.57)})`}
-                          isEditing={editingSection === 'ficha_obra'}
-                          onChange={(v) => handleFieldChange('porcentajeAnticipoObra', v)}
-                          type={editingSection === 'ficha_obra' ? 'number' : 'text'}
-                        />
-                        <EditableItemFichaTecnica
-                          label="Número de Meses Contratados"
-                          value={editingSection === 'ficha_obra' ? editFormData.mesesContratadosObra : (pAny.mesesContratadosObra || '18 meses (Etapa de Construcción)')}
-                          isEditing={editingSection === 'ficha_obra'}
-                          onChange={(v) => handleFieldChange('mesesContratadosObra', v)}
-                        />
-                        <EditableItemFichaTecnica
-                          label="Fecha Original de Terminación"
-                          value={editingSection === 'ficha_obra' ? editFormData.fechaTerminacionOriginalObra : (pAny.fechaTerminacionOriginalObra || 'según Acta No. 26-2026, finaliza el 09/02/2028')}
-                          isEditing={editingSection === 'ficha_obra'}
-                          onChange={(v) => handleFieldChange('fechaTerminacionOriginalObra', v)}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Separador Visual Colapsable con Flecha */}
-              <div className="flex items-center justify-center my-1">
-                <div className="h-px bg-gray-200 flex-1" />
-                <span className="px-3 py-0.5 rounded-full bg-gray-100 text-[9px] font-bold text-gray-500 uppercase tracking-widest border border-gray-200">
-                  Desglose de Contratos
+              {/* Selector de Perspectiva sin fondo gris */}
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                  Perspectiva:
                 </span>
-                <div className="h-px bg-gray-200 flex-1" />
-              </div>
-
-              {/* Sección 3.1.2: Ficha Técnica del Contrato de Supervisión (Sin icono según requerimiento) */}
-              <div
-                className={`rounded-xl border bg-white shadow-2xs overflow-hidden transition-all ${
-                  editingSection === 'ficha_supervision' ? 'border-[#9B0F06]/40 ring-1 ring-[#9B0F06]/15' : 'border-gray-200'
-                }`}
-              >
-                <div className="w-full flex flex-wrap items-center justify-between bg-gray-50/80 px-4 py-3 border-b border-gray-200 gap-2">
-                  <div
-                    onClick={() => setFichaSupervisionAbierta(!fichaSupervisionAbierta)}
-                    className="flex items-center gap-2 cursor-pointer flex-1 min-w-[200px]"
+                <div className="inline-flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setFichaPerspectiva('obra')}
+                    className={`px-3 py-1 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
+                      fichaPerspectiva === 'obra'
+                        ? 'bg-red-50 text-[#9B0F06] border border-red-200 shadow-2xs'
+                        : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+                    }`}
                   >
-                    <div>
-                      <h3 className="text-xs font-black uppercase tracking-wider text-gray-900">
-                        3.1.2 Información General del Contrato de Supervisión
-                      </h3>
-                      <p className="text-[9px] text-gray-500">
-                        Datos de la empresa supervisora, partida presupuestaria y fases
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    {canEdit && (
-                      editingSection === 'ficha_supervision' ? (
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => handleSaveSection('ficha_supervision')}
-                            disabled={isSaving}
-                            className="inline-flex items-center gap-1 rounded-md bg-[#9B0F06] px-2.5 py-0.5 text-[9.5px] font-bold text-white shadow-2xs hover:bg-[#5E0006] transition-colors cursor-pointer"
-                          >
-                            <Check size={11} />
-                            <span>Guardar</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={handleCancelEdit}
-                            disabled={isSaving}
-                            className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2.5 py-0.5 text-[9.5px] font-medium text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer"
-                          >
-                            <X size={11} />
-                            <span>Cancelar</span>
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setFichaSupervisionAbierta(true)
-                            handleStartEdit('ficha_supervision')
-                          }}
-                          className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2 py-0.5 text-[9.5px] font-bold text-gray-600 hover:bg-gray-100 hover:text-[#9B0F06] hover:border-red-200 transition-all cursor-pointer shadow-2xs"
-                        >
-                          <Edit2 size={10} />
-                          <span>Editar</span>
-                        </button>
-                      )
-                    )}
-
-                    <button
-                      type="button"
-                      onClick={() => setFichaSupervisionAbierta(!fichaSupervisionAbierta)}
-                      className="p-1 text-gray-500 hover:text-gray-800"
-                    >
-                      <ChevronDown
-                        size={16}
-                        className={`transition-transform duration-200 ${fichaSupervisionAbierta ? 'rotate-180' : ''}`}
-                      />
-                    </button>
-                  </div>
+                    Contrato de Obra (Ejecución)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFichaPerspectiva('supervision')}
+                    className={`px-3 py-1 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
+                      fichaPerspectiva === 'supervision'
+                        ? 'bg-red-50 text-[#9B0F06] border border-red-200 shadow-2xs'
+                        : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+                    }`}
+                  >
+                    Contrato de Supervisión
+                  </button>
                 </div>
+              </div>
 
-                {fichaSupervisionAbierta && (
-                  <div className="p-4 space-y-3">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                      {/* Columna A: Identificación de la Supervisora */}
-                      <div className="rounded-xl border border-gray-100 bg-gray-50/40 p-3 space-y-1">
-                        <p className="text-[9px] font-black uppercase tracking-wider text-gray-400 mb-1 border-b border-gray-200 pb-1">
-                          A. Identificación de la Supervisora
+              {/* Sección 3.1.1: Ficha Técnica del Contrato de Obra */}
+              {fichaPerspectiva === 'obra' && (
+                <div
+                  className={`rounded-xl border bg-white shadow-2xs overflow-hidden transition-all ${
+                    editingSection === 'ficha_obra' ? 'border-[#9B0F06]/40 ring-1 ring-[#9B0F06]/15' : 'border-gray-200'
+                  }`}
+                >
+                  <div className="w-full flex flex-wrap items-center justify-between bg-gray-50/80 px-4 py-3 border-b border-gray-200 gap-2">
+                    <div
+                      onClick={() => setFichaObraAbierta(!fichaObraAbierta)}
+                      className="flex items-center gap-2 cursor-pointer flex-1 min-w-[200px]"
+                    >
+                      <div>
+                        <h3 className="text-xs font-black uppercase tracking-wider text-gray-900">
+                          3.1.1 Información General del Contrato de Obra (Ejecución)
+                        </h3>
+                        <p className="text-[9px] text-gray-500">
+                          Datos del contratista ejecutor, partida presupuestaria y plazos
                         </p>
-                        <EditableItemFichaTecnica
-                          codigo="3.1.2.1"
-                          label="Empresa Supervisora"
-                          value={editingSection === 'ficha_supervision' ? editFormData.empresaSupervisora : (proyecto.empresaSupervisora || 'SERVICIOS DE INGENIERIA - SERINGE')}
-                          isEditing={editingSection === 'ficha_supervision'}
-                          onChange={(v) => handleFieldChange('empresaSupervisora', v)}
-                        />
-                        <EditableItemFichaTecnica
-                          codigo="3.1.2.2"
-                          label="Propietario"
-                          value={editingSection === 'ficha_supervision' ? editFormData.propietarioSupervisora : (pAny.propietarioSupervisora || 'William Ramón Godínez Mansilla')}
-                          isEditing={editingSection === 'ficha_supervision'}
-                          onChange={(v) => handleFieldChange('propietarioSupervisora', v)}
-                        />
-                        <EditableItemFichaTecnica
-                          codigo="3.1.2.3"
-                          label="Registro Mercantil"
-                          value={editingSection === 'ficha_supervision' ? editFormData.registroMercantilSupervisora : (pAny.registroMercantilSupervisora || '177228A')}
-                          isEditing={editingSection === 'ficha_supervision'}
-                          onChange={(v) => handleFieldChange('registroMercantilSupervisora', v)}
-                          mono
-                        />
-                        <EditableItemFichaTecnica
-                          codigo="3.1.2.4"
-                          label="Dirección"
-                          value={editingSection === 'ficha_supervision' ? editFormData.direccionSupervisora : (pAny.direccionSupervisora || 'Avenida Las Américas, 24-70 Zona 13, Guatemala')}
-                          isEditing={editingSection === 'ficha_supervision'}
-                          onChange={(v) => handleFieldChange('direccionSupervisora', v)}
-                        />
-                        <EditableItemFichaTecnica
-                          codigo="3.1.2.5"
-                          label="Teléfono"
-                          value={editingSection === 'ficha_supervision' ? editFormData.telefonoSupervisora : (pAny.telefonoSupervisora || '2212-9675 / 5525-1537')}
-                          isEditing={editingSection === 'ficha_supervision'}
-                          onChange={(v) => handleFieldChange('telefonoSupervisora', v)}
-                        />
-                        <EditableItemFichaTecnica
-                          codigo="3.1.2.6"
-                          label="Responsable del Proyecto"
-                          value={editingSection === 'ficha_supervision' ? editFormData.responsableSupervisora : (pAny.responsableSupervisora || 'Ing. Civil Pablo Osberto Pérez Gómez (Col. 3689)')}
-                          isEditing={editingSection === 'ficha_supervision'}
-                          onChange={(v) => handleFieldChange('responsableSupervisora', v)}
-                        />
-                        <EditableItemFichaTecnica
-                          codigo="3.1.2.7"
-                          label="Programa"
-                          value={editingSection === 'ficha_supervision' ? editFormData.programaSupervisora : (pAny.programaSupervisora || 'TRANSPORTE POR CARRETERA')}
-                          isEditing={editingSection === 'ficha_supervision'}
-                          onChange={(v) => handleFieldChange('programaSupervisora', v)}
-                        />
-                        <EditableItemFichaTecnica
-                          codigo="3.1.2.8"
-                          label="Subprograma"
-                          value={editingSection === 'ficha_supervision' ? editFormData.subprogramaSupervisora : (pAny.subprogramaSupervisora || 'MEJORAMIENTO DE CARRETERAS SECUNDARIAS Y PUENTES')}
-                          isEditing={editingSection === 'ficha_supervision'}
-                          onChange={(v) => handleFieldChange('subprogramaSupervisora', v)}
-                        />
-                        <EditableItemFichaTecnica
-                          codigo="3.1.2.9"
-                          label="Fuente de Financiamiento"
-                          value={editingSection === 'ficha_supervision' ? editFormData.fuenteFinanciamientoSupervisora : (pAny.fuenteFinanciamientoSupervisora || 'Fondos nacionales')}
-                          isEditing={editingSection === 'ficha_supervision'}
-                          onChange={(v) => handleFieldChange('fuenteFinanciamientoSupervisora', v)}
-                        />
-                      </div>
-
-                      {/* Columna B: Partida de Supervisión y Plazos */}
-                      <div className="rounded-xl border border-gray-100 bg-gray-50/40 p-3 space-y-1">
-                        <p className="text-[9px] font-black uppercase tracking-wider text-gray-400 mb-1 border-b border-gray-200 pb-1">
-                          B. Partida Presupuestaria y Plazos de Supervisión
-                        </p>
-                        <EditableItemFichaTecnica
-                          codigo="3.1.2.10"
-                          label="Fondos Nacionales"
-                          value={editingSection === 'ficha_supervision' ? editFormData.partidaFondosSupervisora : (pAny.partidaFondosSupervisora || '2026-11130013-202-11-01-002-000-003-188-1399-52-0403-0065')}
-                          isEditing={editingSection === 'ficha_supervision'}
-                          onChange={(v) => handleFieldChange('partidaFondosSupervisora', v)}
-                          mono
-                        />
-                        <EditableItemFichaTecnica
-                          codigo="3.1.2.11"
-                          label="CDP"
-                          value={editingSection === 'ficha_supervision' ? editFormData.cdpSupervisora : (pAny.cdpSupervisora || '66349939')}
-                          isEditing={editingSection === 'ficha_supervision'}
-                          onChange={(v) => handleFieldChange('cdpSupervisora', v)}
-                          mono
-                        />
-                        <EditableItemFichaTecnica
-                          codigo="3.1.2.12"
-                          label="Contrato No."
-                          value={editingSection === 'ficha_supervision' ? editFormData.contratoSupervisora : (pAny.contratoSupervisora || '007-2026-DGC-SUPERVISION, 29/05/2026')}
-                          isEditing={editingSection === 'ficha_supervision'}
-                          onChange={(v) => handleFieldChange('contratoSupervisora', v)}
-                          mono
-                        />
-                        <EditableItemFichaTecnica
-                          codigo="3.1.2.13"
-                          label="Acuerdo Ministerial"
-                          value={editingSection === 'ficha_supervision' ? editFormData.acuerdoSupervisora : (pAny.acuerdoSupervisora || '625-2026 de fecha 06/07/2026')}
-                          isEditing={editingSection === 'ficha_supervision'}
-                          onChange={(v) => handleFieldChange('acuerdoSupervisora', v)}
-                          mono
-                        />
-                        <EditableItemFichaTecnica
-                          codigo="3.1.2.14"
-                          label="Monto Original del Contrato"
-                          value={editingSection === 'ficha_supervision' ? editFormData.supervisoraMontoOriginal : formatearMoneda(montoSupervisionOriginal)}
-                          isEditing={editingSection === 'ficha_supervision'}
-                          onChange={(v) => handleFieldChange('supervisoraMontoOriginal', v)}
-                          type={editingSection === 'ficha_supervision' ? 'number' : 'text'}
-                          highlight
-                        />
-                        <EditableItemFichaTecnica
-                          codigo="3.1.2.15"
-                          label="Porcentaje de Anticipo (%)"
-                          value={editingSection === 'ficha_supervision' ? editFormData.porcentajeAnticipoSupervision : `${porcentajeAnticipoSupervision}% (${formatearMoneda(montoAnticipoSupervision)})`}
-                          isEditing={editingSection === 'ficha_supervision'}
-                          onChange={(v) => handleFieldChange('porcentajeAnticipoSupervision', v)}
-                          type={editingSection === 'ficha_supervision' ? 'number' : 'text'}
-                        />
-                        <EditableItemFichaTecnica
-                          codigo="3.1.2.16"
-                          label="Fecha Inicio Plazo Contractual"
-                          value={editingSection === 'ficha_supervision' ? editFormData.fechaInicioSupervisora : (pAny.fechaInicioSupervisora || 'según Acta No. 52-2026, inicio el 07/07/2026')}
-                          isEditing={editingSection === 'ficha_supervision'}
-                          onChange={(v) => handleFieldChange('fechaInicioSupervisora', v)}
-                        />
-                        <EditableItemFichaTecnica
-                          codigo="3.1.2.17"
-                          label="Número de Meses Contratados"
-                          value={editingSection === 'ficha_supervision' ? editFormData.mesesContratadosSupervisora : (pAny.mesesContratadosSupervisora || '22 MESES (2 Pre, 18 Ejecución, 2 Post)')}
-                          isEditing={editingSection === 'ficha_supervision'}
-                          onChange={(v) => handleFieldChange('mesesContratadosSupervisora', v)}
-                        />
-                        <EditableItemFichaTecnica
-                          codigo="3.1.2.18"
-                          label="Fecha Estimada de Finalización"
-                          value={editingSection === 'ficha_supervision' ? editFormData.fechaFinSupervisora : (pAny.fechaFinSupervisora || '07/05/2028')}
-                          isEditing={editingSection === 'ficha_supervision'}
-                          onChange={(v) => handleFieldChange('fechaFinSupervisora', v)}
-                        />
                       </div>
                     </div>
+
+                    <div className="flex items-center gap-2">
+                      {canEdit && (
+                        editingSection === 'ficha_obra' ? (
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleSaveSection('ficha_obra')}
+                              disabled={isSaving}
+                              className="inline-flex items-center gap-1 rounded-md bg-[#9B0F06] px-2.5 py-0.5 text-[9.5px] font-bold text-white shadow-2xs hover:bg-[#5E0006] transition-colors cursor-pointer"
+                            >
+                              <Check size={11} />
+                              <span>Guardar</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleCancelEdit}
+                              disabled={isSaving}
+                              className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2.5 py-0.5 text-[9.5px] font-medium text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer"
+                            >
+                              <X size={11} />
+                              <span>Cancelar</span>
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFichaObraAbierta(true)
+                              handleStartEdit('ficha_obra')
+                            }}
+                            className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2 py-0.5 text-[9.5px] font-bold text-gray-600 hover:bg-gray-100 hover:text-[#9B0F06] hover:border-red-200 transition-all cursor-pointer shadow-2xs"
+                          >
+                            <Edit2 size={10} />
+                            <span>Editar</span>
+                          </button>
+                        )
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => setFichaObraAbierta(!fichaObraAbierta)}
+                        className="p-1 text-gray-500 hover:text-gray-800"
+                      >
+                        <ChevronDown
+                          size={16}
+                          className={`transition-transform duration-200 ${fichaObraAbierta ? 'rotate-180' : ''}`}
+                        />
+                      </button>
+                    </div>
                   </div>
-                )}
-              </div>
+
+                  {fichaObraAbierta && (
+                    <div className="p-4 space-y-3">
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        {/* Columna A: Datos del Contratista */}
+                        <div className="rounded-xl border border-gray-100 bg-gray-50/40 p-3 space-y-1">
+                          <p className="text-[9px] font-black uppercase tracking-wider text-gray-400 mb-1 border-b border-gray-200 pb-1">
+                            A. Identificación del Contratista
+                          </p>
+                          <EditableItemFichaTecnica
+                            label="Empresa Contratista"
+                            value={editingSection === 'ficha_obra' ? editFormData.empresaContratista : (proyecto.empresaContratista || 'Constructora Principal')}
+                            isEditing={editingSection === 'ficha_obra'}
+                            onChange={(v) => handleFieldChange('empresaContratista', v)}
+                          />
+                          <EditableItemFichaTecnica
+                            label="Propietario / Rep. Legal"
+                            value={editingSection === 'ficha_obra' ? editFormData.propietarioContratista : (pAny.propietarioContratista || 'Ing. Marco Antonio Estrada Morales')}
+                            isEditing={editingSection === 'ficha_obra'}
+                            onChange={(v) => handleFieldChange('propietarioContratista', v)}
+                          />
+                          <EditableItemFichaTecnica
+                            label="Registro Mercantil"
+                            value={editingSection === 'ficha_obra' ? editFormData.registroMercantilContratista : (pAny.registroMercantilContratista || '145892B')}
+                            isEditing={editingSection === 'ficha_obra'}
+                            onChange={(v) => handleFieldChange('registroMercantilContratista', v)}
+                            mono
+                          />
+                          <EditableItemFichaTecnica
+                            label="Dirección"
+                            value={editingSection === 'ficha_obra' ? editFormData.direccionContratista : (pAny.direccionContratista || '12 Calle 4-55 Zona 10, Guatemala')}
+                            isEditing={editingSection === 'ficha_obra'}
+                            onChange={(v) => handleFieldChange('direccionContratista', v)}
+                          />
+                          <EditableItemFichaTecnica
+                            label="Teléfono"
+                            value={editingSection === 'ficha_obra' ? editFormData.telefonoContratista : (pAny.telefonoContratista || '2334-9000 / 5544-1234')}
+                            isEditing={editingSection === 'ficha_obra'}
+                            onChange={(v) => handleFieldChange('telefonoContratista', v)}
+                          />
+                          <EditableItemFichaTecnica
+                            label="Responsable del Proyecto"
+                            value={editingSection === 'ficha_obra' ? editFormData.responsableNombre : (pAny.responsableNombre || 'Ing. Civil Fernando Reyes (Col. 4125)')}
+                            isEditing={editingSection === 'ficha_obra'}
+                            onChange={(v) => handleFieldChange('responsableNombre', v)}
+                          />
+                          <EditableItemFichaTecnica
+                            label="Programa"
+                            value={editingSection === 'ficha_obra' ? editFormData.programaObra : (pAny.programaObra || 'TRANSPORTE POR CARRETERA')}
+                            isEditing={editingSection === 'ficha_obra'}
+                            onChange={(v) => handleFieldChange('programaObra', v)}
+                          />
+                          <EditableItemFichaTecnica
+                            label="Subprograma"
+                            value={editingSection === 'ficha_obra' ? editFormData.subprogramaObra : (pAny.subprogramaObra || 'MEJORAMIENTO DE CARRETERAS SECUNDARIAS Y PUENTES')}
+                            isEditing={editingSection === 'ficha_obra'}
+                            onChange={(v) => handleFieldChange('subprogramaObra', v)}
+                          />
+                          <EditableItemFichaTecnica
+                            label="Fuente de Financiamiento"
+                            value={editingSection === 'ficha_obra' ? editFormData.fuenteFinanciamientoObra : (pAny.fuenteFinanciamientoObra || 'Fondos nacionales')}
+                            isEditing={editingSection === 'ficha_obra'}
+                            onChange={(v) => handleFieldChange('fuenteFinanciamientoObra', v)}
+                          />
+                        </div>
+
+                        {/* Columna B: Partida Presupuestaria y Montos */}
+                        <div className="rounded-xl border border-gray-100 bg-gray-50/40 p-3 space-y-1">
+                          <p className="text-[9px] font-black uppercase tracking-wider text-gray-400 mb-1 border-b border-gray-200 pb-1">
+                            B. Partida Presupuestaria y Términos Económicos
+                          </p>
+                          <EditableItemFichaTecnica
+                            label="Fondos Nacionales (Partida)"
+                            value={editingSection === 'ficha_obra' ? editFormData.partidaFondosObra : (pAny.partidaFondosObra || '2026-11130013-202-11-01-002-000-003-331-1399-52-0403-0065')}
+                            isEditing={editingSection === 'ficha_obra'}
+                            onChange={(v) => handleFieldChange('partidaFondosObra', v)}
+                            mono
+                          />
+                          <EditableItemFichaTecnica
+                            label="CDP (Comprobante Devengado)"
+                            value={editingSection === 'ficha_obra' ? editFormData.cdpObra : (pAny.cdpObra || '66349939')}
+                            isEditing={editingSection === 'ficha_obra'}
+                            onChange={(v) => handleFieldChange('cdpObra', v)}
+                            mono
+                          />
+                          <EditableItemFichaTecnica
+                            label="Contrato No."
+                            value={editingSection === 'ficha_obra' ? editFormData.numeroContratoOriginal : (pAny.numeroContratoOriginal || '008-2026-DGC-CONSTRUCCION, 29/05/2026')}
+                            isEditing={editingSection === 'ficha_obra'}
+                            onChange={(v) => handleFieldChange('numeroContratoOriginal', v)}
+                            mono
+                          />
+                          <EditableItemFichaTecnica
+                            label="Acuerdo Ministerial"
+                            value={editingSection === 'ficha_obra' ? editFormData.acuerdoMinisterialOriginal : (pAny.acuerdoMinisterialOriginal || '522-2026 de fecha 09/06/2026')}
+                            isEditing={editingSection === 'ficha_obra'}
+                            onChange={(v) => handleFieldChange('acuerdoMinisterialOriginal', v)}
+                            mono
+                          />
+                          <EditableItemFichaTecnica
+                            label="Monto Original del Contrato"
+                            value={editingSection === 'ficha_obra' ? (editFormData.montoContractualOriginal ?? editFormData.presupuesto) : formatearMoneda(montoObraOriginal > 0 ? montoObraOriginal : 369834297.14)}
+                            isEditing={editingSection === 'ficha_obra'}
+                            onChange={(v) => {
+                              handleFieldChange('montoContractualOriginal', v)
+                              handleFieldChange('presupuesto', v)
+                            }}
+                            type={editingSection === 'ficha_obra' ? 'number' : 'text'}
+                            highlight
+                          />
+                          <EditableItemFichaTecnica
+                            label="Porcentaje de Anticipo (%)"
+                            value={editingSection === 'ficha_obra' ? editFormData.porcentajeAnticipoObra : `${porcentajeAnticipoObra}% (${formatearMoneda(montoAnticipoObra > 0 ? montoAnticipoObra : 55475144.57)})`}
+                            isEditing={editingSection === 'ficha_obra'}
+                            onChange={(v) => handleFieldChange('porcentajeAnticipoObra', v)}
+                            type={editingSection === 'ficha_obra' ? 'number' : 'text'}
+                          />
+                          <EditableItemFichaTecnica
+                            label="Número de Meses Contratados"
+                            value={editingSection === 'ficha_obra' ? editFormData.mesesContratadosObra : (pAny.mesesContratadosObra || '18 meses (Etapa de Construcción)')}
+                            isEditing={editingSection === 'ficha_obra'}
+                            onChange={(v) => handleFieldChange('mesesContratadosObra', v)}
+                          />
+                          <EditableItemFichaTecnica
+                            label="Fecha Original de Terminación"
+                            value={editingSection === 'ficha_obra' ? editFormData.fechaTerminacionOriginalObra : (pAny.fechaTerminacionOriginalObra || 'según Acta No. 26-2026, finaliza el 09/02/2028')}
+                            isEditing={editingSection === 'ficha_obra'}
+                            onChange={(v) => handleFieldChange('fechaTerminacionOriginalObra', v)}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Sección 3.1.2: Ficha Técnica del Contrato de Supervisión */}
+              {fichaPerspectiva === 'supervision' && (
+                <div
+                  className={`rounded-xl border bg-white shadow-2xs overflow-hidden transition-all ${
+                    editingSection === 'ficha_supervision' ? 'border-[#9B0F06]/40 ring-1 ring-[#9B0F06]/15' : 'border-gray-200'
+                  }`}
+                >
+                  <div className="w-full flex flex-wrap items-center justify-between bg-gray-50/80 px-4 py-3 border-b border-gray-200 gap-2">
+                    <div
+                      onClick={() => setFichaSupervisionAbierta(!fichaSupervisionAbierta)}
+                      className="flex items-center gap-2 cursor-pointer flex-1 min-w-[200px]"
+                    >
+                      <div>
+                        <h3 className="text-xs font-black uppercase tracking-wider text-gray-900">
+                          3.1.2 Información General del Contrato de Supervisión
+                        </h3>
+                        <p className="text-[9px] text-gray-500">
+                          Datos de la empresa supervisora, partida presupuestaria y fases
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {canEdit && (
+                        editingSection === 'ficha_supervision' ? (
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleSaveSection('ficha_supervision')}
+                              disabled={isSaving}
+                              className="inline-flex items-center gap-1 rounded-md bg-[#9B0F06] px-2.5 py-0.5 text-[9.5px] font-bold text-white shadow-2xs hover:bg-[#5E0006] transition-colors cursor-pointer"
+                            >
+                              <Check size={11} />
+                              <span>Guardar</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleCancelEdit}
+                              disabled={isSaving}
+                              className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2.5 py-0.5 text-[9.5px] font-medium text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer"
+                            >
+                              <X size={11} />
+                              <span>Cancelar</span>
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFichaSupervisionAbierta(true)
+                              handleStartEdit('ficha_supervision')
+                            }}
+                            className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2 py-0.5 text-[9.5px] font-bold text-gray-600 hover:bg-gray-100 hover:text-[#9B0F06] hover:border-red-200 transition-all cursor-pointer shadow-2xs"
+                          >
+                            <Edit2 size={10} />
+                            <span>Editar</span>
+                          </button>
+                        )
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => setFichaSupervisionAbierta(!fichaSupervisionAbierta)}
+                        className="p-1 text-gray-500 hover:text-gray-800"
+                      >
+                        <ChevronDown
+                          size={16}
+                          className={`transition-transform duration-200 ${fichaSupervisionAbierta ? 'rotate-180' : ''}`}
+                        />
+                      </button>
+                    </div>
+                  </div>
+
+                  {fichaSupervisionAbierta && (
+                    <div className="p-4 space-y-3">
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        {/* Columna A: Identificación de la Supervisora */}
+                        <div className="rounded-xl border border-gray-100 bg-gray-50/40 p-3 space-y-1">
+                          <p className="text-[9px] font-black uppercase tracking-wider text-gray-400 mb-1 border-b border-gray-200 pb-1">
+                            A. Identificación de la Supervisora
+                          </p>
+                          <EditableItemFichaTecnica
+                            codigo="3.1.2.1"
+                            label="Empresa Supervisora"
+                            value={editingSection === 'ficha_supervision' ? editFormData.empresaSupervisora : (proyecto.empresaSupervisora || 'SERVICIOS DE INGENIERIA - SERINGE')}
+                            isEditing={editingSection === 'ficha_supervision'}
+                            onChange={(v) => handleFieldChange('empresaSupervisora', v)}
+                          />
+                          <EditableItemFichaTecnica
+                            codigo="3.1.2.2"
+                            label="Propietario"
+                            value={editingSection === 'ficha_supervision' ? editFormData.propietarioSupervisora : (pAny.propietarioSupervisora || 'William Ramón Godínez Mansilla')}
+                            isEditing={editingSection === 'ficha_supervision'}
+                            onChange={(v) => handleFieldChange('propietarioSupervisora', v)}
+                          />
+                          <EditableItemFichaTecnica
+                            codigo="3.1.2.3"
+                            label="Registro Mercantil"
+                            value={editingSection === 'ficha_supervision' ? editFormData.registroMercantilSupervisora : (pAny.registroMercantilSupervisora || '177228A')}
+                            isEditing={editingSection === 'ficha_supervision'}
+                            onChange={(v) => handleFieldChange('registroMercantilSupervisora', v)}
+                            mono
+                          />
+                          <EditableItemFichaTecnica
+                            codigo="3.1.2.4"
+                            label="Dirección"
+                            value={editingSection === 'ficha_supervision' ? editFormData.direccionSupervisora : (pAny.direccionSupervisora || 'Avenida Las Américas, 24-70 Zona 13, Guatemala')}
+                            isEditing={editingSection === 'ficha_supervision'}
+                            onChange={(v) => handleFieldChange('direccionSupervisora', v)}
+                          />
+                          <EditableItemFichaTecnica
+                            codigo="3.1.2.5"
+                            label="Teléfono"
+                            value={editingSection === 'ficha_supervision' ? editFormData.telefonoSupervisora : (pAny.telefonoSupervisora || '2212-9675 / 5525-1537')}
+                            isEditing={editingSection === 'ficha_supervision'}
+                            onChange={(v) => handleFieldChange('telefonoSupervisora', v)}
+                          />
+                          <EditableItemFichaTecnica
+                            codigo="3.1.2.6"
+                            label="Responsable del Proyecto"
+                            value={editingSection === 'ficha_supervision' ? editFormData.responsableSupervisora : (pAny.responsableSupervisora || 'Ing. Civil Pablo Osberto Pérez Gómez (Col. 3689)')}
+                            isEditing={editingSection === 'ficha_supervision'}
+                            onChange={(v) => handleFieldChange('responsableSupervisora', v)}
+                          />
+                          <EditableItemFichaTecnica
+                            codigo="3.1.2.7"
+                            label="Programa"
+                            value={editingSection === 'ficha_supervision' ? editFormData.programaSupervisora : (pAny.programaSupervisora || 'TRANSPORTE POR CARRETERA')}
+                            isEditing={editingSection === 'ficha_supervision'}
+                            onChange={(v) => handleFieldChange('programaSupervisora', v)}
+                          />
+                          <EditableItemFichaTecnica
+                            codigo="3.1.2.8"
+                            label="Subprograma"
+                            value={editingSection === 'ficha_supervision' ? editFormData.subprogramaSupervisora : (pAny.subprogramaSupervisora || 'MEJORAMIENTO DE CARRETERAS SECUNDARIAS Y PUENTES')}
+                            isEditing={editingSection === 'ficha_supervision'}
+                            onChange={(v) => handleFieldChange('subprogramaSupervisora', v)}
+                          />
+                          <EditableItemFichaTecnica
+                            codigo="3.1.2.9"
+                            label="Fuente de Financiamiento"
+                            value={editingSection === 'ficha_supervision' ? editFormData.fuenteFinanciamientoSupervisora : (pAny.fuenteFinanciamientoSupervisora || 'Fondos nacionales')}
+                            isEditing={editingSection === 'ficha_supervision'}
+                            onChange={(v) => handleFieldChange('fuenteFinanciamientoSupervisora', v)}
+                          />
+                        </div>
+
+                        {/* Columna B: Partida de Supervisión y Plazos */}
+                        <div className="rounded-xl border border-gray-100 bg-gray-50/40 p-3 space-y-1">
+                          <p className="text-[9px] font-black uppercase tracking-wider text-gray-400 mb-1 border-b border-gray-200 pb-1">
+                            B. Partida Presupuestaria y Plazos de Supervisión
+                          </p>
+                          <EditableItemFichaTecnica
+                            codigo="3.1.2.10"
+                            label="Fondos Nacionales"
+                            value={editingSection === 'ficha_supervision' ? editFormData.partidaFondosSupervisora : (pAny.partidaFondosSupervisora || '2026-11130013-202-11-01-002-000-003-188-1399-52-0403-0065')}
+                            isEditing={editingSection === 'ficha_supervision'}
+                            onChange={(v) => handleFieldChange('partidaFondosSupervisora', v)}
+                            mono
+                          />
+                          <EditableItemFichaTecnica
+                            codigo="3.1.2.11"
+                            label="CDP"
+                            value={editingSection === 'ficha_supervision' ? editFormData.cdpSupervisora : (pAny.cdpSupervisora || '66349939')}
+                            isEditing={editingSection === 'ficha_supervision'}
+                            onChange={(v) => handleFieldChange('cdpSupervisora', v)}
+                            mono
+                          />
+                          <EditableItemFichaTecnica
+                            codigo="3.1.2.12"
+                            label="Contrato No."
+                            value={editingSection === 'ficha_supervision' ? editFormData.contratoSupervisora : (pAny.contratoSupervisora || '007-2026-DGC-SUPERVISION, 29/05/2026')}
+                            isEditing={editingSection === 'ficha_supervision'}
+                            onChange={(v) => handleFieldChange('contratoSupervisora', v)}
+                            mono
+                          />
+                          <EditableItemFichaTecnica
+                            codigo="3.1.2.13"
+                            label="Acuerdo Ministerial"
+                            value={editingSection === 'ficha_supervision' ? editFormData.acuerdoSupervisora : (pAny.acuerdoSupervisora || '625-2026 de fecha 06/07/2026')}
+                            isEditing={editingSection === 'ficha_supervision'}
+                            onChange={(v) => handleFieldChange('acuerdoSupervisora', v)}
+                            mono
+                          />
+                          <EditableItemFichaTecnica
+                            codigo="3.1.2.14"
+                            label="Monto Original del Contrato"
+                            value={editingSection === 'ficha_supervision' ? editFormData.supervisoraMontoOriginal : formatearMoneda(montoSupervisionOriginal)}
+                            isEditing={editingSection === 'ficha_supervision'}
+                            onChange={(v) => handleFieldChange('supervisoraMontoOriginal', v)}
+                            type={editingSection === 'ficha_supervision' ? 'number' : 'text'}
+                            highlight
+                          />
+                          <EditableItemFichaTecnica
+                            codigo="3.1.2.15"
+                            label="Porcentaje de Anticipo (%)"
+                            value={editingSection === 'ficha_supervision' ? editFormData.porcentajeAnticipoSupervision : `${porcentajeAnticipoSupervision}% (${formatearMoneda(montoAnticipoSupervision)})`}
+                            isEditing={editingSection === 'ficha_supervision'}
+                            onChange={(v) => handleFieldChange('porcentajeAnticipoSupervision', v)}
+                            type={editingSection === 'ficha_supervision' ? 'number' : 'text'}
+                          />
+                          <EditableItemFichaTecnica
+                            codigo="3.1.2.16"
+                            label="Fecha Inicio Plazo Contractual"
+                            value={editingSection === 'ficha_supervision' ? editFormData.fechaInicioSupervisora : (pAny.fechaInicioSupervisora || 'según Acta No. 52-2026, inicio el 07/07/2026')}
+                            isEditing={editingSection === 'ficha_supervision'}
+                            onChange={(v) => handleFieldChange('fechaInicioSupervisora', v)}
+                          />
+                          <EditableItemFichaTecnica
+                            codigo="3.1.2.17"
+                            label="Número de Meses Contratados"
+                            value={editingSection === 'ficha_supervision' ? editFormData.mesesContratadosSupervisora : (pAny.mesesContratadosSupervisora || '22 MESES (2 Pre, 18 Ejecución, 2 Post)')}
+                            isEditing={editingSection === 'ficha_supervision'}
+                            onChange={(v) => handleFieldChange('mesesContratadosSupervisora', v)}
+                          />
+                          <EditableItemFichaTecnica
+                            codigo="3.1.2.18"
+                            label="Fecha Estimada de Finalización"
+                            value={editingSection === 'ficha_supervision' ? editFormData.fechaFinSupervisora : (pAny.fechaFinSupervisora || '07/05/2028')}
+                            isEditing={editingSection === 'ficha_supervision'}
+                            onChange={(v) => handleFieldChange('fechaFinSupervisora', v)}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

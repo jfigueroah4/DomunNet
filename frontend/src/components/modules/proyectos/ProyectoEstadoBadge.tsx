@@ -9,33 +9,33 @@ interface ProyectoEstadoBadgeProps {
 export default function ProyectoEstadoBadge({ estado }: ProyectoEstadoBadgeProps) {
   const estadoConfig = {
     borrador: {
-      bg: 'bg-gray-100',
-      text: 'text-gray-600',
+      bg: 'bg-gray-100 border border-gray-200',
+      text: 'text-gray-700 font-bold',
       label: 'Borrador',
     },
     activo: {
-      bg: 'bg-orange-100',
-      text: 'text-[#D53E0F]',
+      bg: 'bg-emerald-50 border border-emerald-200',
+      text: 'text-emerald-700 font-bold',
       label: 'Activo',
     },
     en_revision: {
-      bg: 'bg-blue-100',
-      text: 'text-blue-700',
+      bg: 'bg-red-50 border border-red-200',
+      text: 'text-[#9B0F06] font-bold',
       label: 'En Revisión',
     },
     completado: {
-      bg: 'bg-green-100',
-      text: 'text-green-700',
+      bg: 'bg-slate-100 border border-slate-200',
+      text: 'text-slate-700 font-bold',
       label: 'Completado',
     },
     pausado: {
-      bg: 'bg-amber-100',
-      text: 'text-amber-800',
+      bg: 'bg-amber-50 border border-amber-200',
+      text: 'text-amber-800 font-bold',
       label: 'Pausado',
     },
     modificacion: {
-      bg: 'bg-amber-100',
-      text: 'text-amber-800',
+      bg: 'bg-amber-50 border border-amber-200',
+      text: 'text-amber-800 font-bold',
       label: 'En Modificación',
     },
   }
