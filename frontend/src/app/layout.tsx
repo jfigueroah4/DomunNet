@@ -17,7 +17,7 @@ export const viewport: Viewport = {
 }
 
 export const metadata: Metadata = {
-  title: 'DOMUN - Gestión inteligente de transporte',
+  title: 'DOMUN-Sistema',
   description: 'Sistema de control de obras',
   icons: {
     icon: '/logo.ico',

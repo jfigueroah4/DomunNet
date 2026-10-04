@@ -119,8 +119,8 @@ export function BitacoraMapaInline({ registro, onClose }: BitacoraMapaInlineProp
   }, [lat, lng, titulo, ubicacion])
 
   return (
-    <div className="w-full bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden my-2.5 animate-in fade-in zoom-in-95 duration-200 font-[Poppins]">
-      {/* Encabezado del Mapa Integrado en el Drawer */}
+    <div className="absolute top-full left-0 right-0 mt-1.5 z-50 w-full bg-white rounded-xl border border-gray-200 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 font-[Poppins]">
+      {/* Encabezado del Mapa Flotante en el Drawer */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 bg-gray-50/80">
         <div className="flex items-center gap-1.5 min-w-0">
           <LucideMap size={15} className="text-[#9B0F06] shrink-0" />

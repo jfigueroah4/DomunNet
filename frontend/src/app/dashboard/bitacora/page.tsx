@@ -405,7 +405,7 @@ export default function BitacoraPage() {
                       </div>
 
                       {/* Ubicación GPS y Departamento con solo el Icono de Mapa sin fondo */}
-                      <div className="sm:col-span-2 space-y-1.5">
+                      <div className="sm:col-span-2 space-y-1.5 relative">
                         <div className="flex items-center justify-between">
                           <span className="text-[8.5px] font-bold text-gray-400 uppercase tracking-wider block">
                             Ubicación y Departamento (GPS)

@@ -16,13 +16,64 @@ import {
   Save,
   Search,
   X,
-  Smile,
 } from 'lucide-react'
 import { RegistroBitacora } from '@/types/bitacora'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { api, apiGetDeduplicado } from '@/lib/api/cliente'
 import { showSuccessToast, showErrorToast } from '@/components/ui/Toast'
-import { geocodeReverse, geocodeForward } from '@/lib/utils/geocoding'
+
+const geocodeReverse = async (lat: number, lng: number) => {
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
+      {
+        headers: { 'Accept-Language': 'es' },
+        signal: AbortSignal.timeout(4500),
+      }
+    )
+    if (res.ok) {
+      const data = await res.json()
+      const addr = data.address || {}
+      const road = addr.road || addr.pedestrian || addr.highway || addr.suburb || ''
+      const locality = addr.village || addr.town || addr.city || addr.municipality || addr.county || ''
+      const state = addr.state || ''
+      const partes = [road, locality, state].filter(Boolean)
+      const direccion = partes.length > 0 ? partes.join(', ') : data.display_name?.split(',').slice(0, 3).join(', ') || ''
+      return {
+        direccion: direccion || `Lat: ${lat.toFixed(6)}, Lng: ${lng.toFixed(6)}`,
+        departamento: state || 'Guatemala',
+        municipio: locality || 'Guatemala',
+      }
+    }
+  } catch (_) {}
+  return null
+}
+
+const geocodeForward = async (texto: string) => {
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(texto + ', Guatemala')}&limit=1&addressdetails=1`,
+      {
+        headers: { 'Accept-Language': 'es' },
+        signal: AbortSignal.timeout(4500),
+      }
+    )
+    if (res.ok) {
+      const data = await res.json()
+      if (Array.isArray(data) && data.length > 0) {
+        const item = data[0]
+        const addr = item.address || {}
+        return {
+          lat: parseFloat(item.lat),
+          lng: parseFloat(item.lon),
+          departamento: addr.state || 'Guatemala',
+          municipio: addr.village || addr.town || addr.city || addr.municipality || 'Guatemala',
+        }
+      }
+    }
+  } catch (_) {}
+  return null
+}
 
 const JUSTIFICACION_SUSPENSION_PRESETS = [
   'Lluvia intensa e inundación de subrasante',
@@ -31,6 +82,15 @@ const JUSTIFICACION_SUSPENSION_PRESETS = [
   'Falla de maquinaria pesada en frente de obra',
   'Deslizamiento de talud / Bloqueo de vía',
   'Falta de suministro de mezcla asfáltica / concreto',
+  'Otra...',
+]
+
+const OBSERVACIONES_PRESETS = [
+  'Jornada laboral desarrollada con normalidad según programación',
+  'Avance conforme a lo planificado sin novedades técnicas',
+  'Control topográfico y verificación de niveles ejecutados',
+  'Toma de muestras de materiales para ensayos de laboratorio',
+  'Inspección de armado y colocación de estructuras',
   'Otra...',
 ]
 
@@ -83,6 +143,13 @@ interface FormDataBitacora {
 
 const uid = () => Math.random().toString(36).slice(2, 9)
 
+const limpiarDescripcionRenglon = (desc: string, codigo: string): string => {
+  if (!desc) return ''
+  const escapedCod = codigo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const sinCodigo = desc.replace(new RegExp(`\\s*\\(${escapedCod}\\)\\s*$`, 'i'), '').trim()
+  return sinCodigo.replace(/\s*\([0-9a-zA-Z._-]+\)\s*$/, '').trim() || desc
+}
+
 export function BitacoraForm({
   onBack,
   onSubmit,
@@ -122,6 +189,9 @@ export function BitacoraForm({
   const [motivoSuspensionPreset, setMotivoSuspensionPreset] = useState<string>('')
   const [motivoSuspensionOtra, setMotivoSuspensionOtra] = useState<string>('')
 
+  // Estado para opciones de observación
+  const [observacionPreset, setObservacionPreset] = useState<string>('Otra...')
+
   const fileInputFotoRef = useRef<HTMLInputElement>(null)
 
   const [fd, setFd] = useState<FormDataBitacora>({
@@ -130,10 +200,12 @@ export function BitacoraForm({
     fecha: today,
     turno: 'Diurno',
     ingeniero: responsableActual,
-    ubicacionGps: '',
+    ubicacionGps: 'Est. 0+000 a 0+500 (Ambos)',
     latitud: null,
     longitud: null,
     precisionGps: null,
+    departamento: '',
+    municipio: '',
     suspensionActividades: false,
     justSuspension: '',
     horaSuspension: '',
@@ -142,6 +214,29 @@ export function BitacoraForm({
     observacionesGenerales: '',
     fotografiaPrincipal: null,
   })
+
+  // Sincronizar ubicación automática cuando cambian Lado, Est. Inicio o Est. Fin (img2)
+  const sincronizarUbicacionTramo = (ini: string, fin: string, lado: string) => {
+    const texto = `Est. ${ini || '0+000'} a ${fin || '0+500'} (${lado || 'Ambos'})`
+    setFd((p) => ({ ...p, ubicacionGps: texto }))
+  }
+
+  const handleCambiarLado = (lado: 'Ambos' | 'Derecho' | 'Izquierdo') => {
+    setLadoRenglon(lado)
+    sincronizarUbicacionTramo(estInicioRenglon, estFinRenglon, lado)
+  }
+
+  const handleCambiarEstInicio = (val: string) => {
+    setEstInicioRenglon(val)
+    setErrors((p) => ({ ...p, renglones: '' }))
+    sincronizarUbicacionTramo(val, estFinRenglon, ladoRenglon)
+  }
+
+  const handleCambiarEstFin = (val: string) => {
+    setEstFinRenglon(val)
+    setErrors((p) => ({ ...p, renglones: '' }))
+    sincronizarUbicacionTramo(estInicioRenglon, val, ladoRenglon)
+  }
 
   // Auto-detectar usuario y rol en segundo plano
   useEffect(() => {
@@ -421,6 +516,20 @@ export function BitacoraForm({
     }
   }
 
+  // Limpiar información de ubicación
+  const handleLimpiarUbicacion = () => {
+    setFd((prev) => ({
+      ...prev,
+      ubicacionGps: '',
+      latitud: null,
+      longitud: null,
+      departamento: '',
+      municipio: '',
+      precisionGps: null,
+    }))
+    showSuccessToast('Ubicación borrada')
+  }
+
   // Capturar GPS con Geocodificación Inversa y soporte Multicapa (evita "No se pudo obtener la señal GPS")
   const handleObtenerUbicacionGps = () => {
     setObteniendoGps(true)
@@ -528,6 +637,16 @@ export function BitacoraForm({
       showSuccessToast('Fotografía cargada')
     }
     reader.readAsDataURL(file)
+  }
+
+  // Manejar cambio en preset de observaciones
+  const handleCambiarObservacionPreset = (val: string) => {
+    setObservacionPreset(val)
+    if (val !== 'Otra...') {
+      set('observacionesGenerales', val)
+    } else {
+      set('observacionesGenerales', '')
+    }
   }
 
   // Validaciones del formulario
@@ -734,16 +853,16 @@ export function BitacoraForm({
           )}
         </div>
 
-        {/* Centro: Título solo para pasos 2 y 3 (Se quitó 'Nueva entrada de bitácora' en paso 1) */}
+        {/* Centro: Título solo para pasos 2 y 3 (Se reduce el texto para mejor proporción) */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-16">
           {paso === 2 && (
-            <h2 className="text-xs sm:text-sm font-black tracking-widest text-[#9B0F06] uppercase text-center truncate">
-              RECORTAR Y PREVISUALIZAR EVIDENCIA
+            <h2 className="text-[11px] sm:text-xs font-bold text-[#9B0F06] uppercase text-center tracking-wider">
+              RECORTAR Y PREVISUALIZAR
             </h2>
           )}
           {paso === 3 && (
-            <h2 className="text-xs sm:text-sm font-black tracking-widest text-[#9B0F06] uppercase text-center truncate">
-              DETALLES DE LA ENTRADA DE BITÁCORA
+            <h2 className="text-[11px] sm:text-xs font-bold text-[#9B0F06] uppercase text-center tracking-wider">
+              DETALLES DE LA ENTRADA
             </h2>
           )}
         </div>
@@ -874,40 +993,49 @@ export function BitacoraForm({
       {paso === 3 && (
         <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 min-h-[calc(100vh-140px)]">
           {/* LADO IZQUIERDO: Fotografía en Grande sobre FONDO BLANCO */}
-          <div className="lg:col-span-7 bg-white flex items-center justify-center p-6 relative group border-b lg:border-b-0 lg:border-r border-gray-100">
-            {fd.fotografiaPrincipal ? (
-              <div className="relative w-full h-full min-h-[400px] lg:min-h-[580px] flex items-center justify-center bg-gray-50/50 rounded-2xl border border-gray-100 overflow-hidden">
-                <img
-                  src={fd.fotografiaPrincipal.url}
-                  alt={fd.fotografiaPrincipal.nombre}
-                  className="w-full h-full max-h-[560px] object-contain rounded-2xl"
-                />
-
-                {/* Ícono para cambiar imagen */}
+          <div className="lg:col-span-7 bg-white flex flex-col p-6 border-b lg:border-b-0 lg:border-r border-gray-100">
+            {/* Barra superior elevada sobre la foto con botón Cambiar */}
+            <div className="w-full flex items-center justify-between pb-2 mb-2">
+              <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">
+                Evidencia Fotográfica
+              </span>
+              {fd.fotografiaPrincipal && (
                 <button
                   type="button"
                   onClick={() => fileInputFotoRef.current?.click()}
-                  className="absolute top-4 right-4 p-2.5 rounded-full bg-black/60 hover:bg-black/80 text-white backdrop-blur-md transition-all shadow-md cursor-pointer border border-white/20 flex items-center gap-1.5 text-xs font-bold"
-                  title="Cambiar foto (mantiene los datos intactos)"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1 text-xs font-bold transition-all cursor-pointer shadow-2xs border border-gray-200"
+                  title="Cambiar fotografía"
                 >
-                  <ArrowLeftRight size={15} />
-                  <span className="text-[11px] pr-0.5">Cambiar</span>
+                  <ArrowLeftRight size={13} className="text-[#9B0F06]" />
+                  <span>Cambiar foto</span>
                 </button>
+              )}
+            </div>
 
-                <div className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-xs px-3 py-1 rounded-lg text-[10px] text-white/90 font-mono">
-                  {fd.fotografiaPrincipal.nombre}
-                </div>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => fileInputFotoRef.current?.click()}
-                className="flex flex-col items-center justify-center text-gray-400 hover:text-gray-700 p-8 cursor-pointer"
-              >
-                <ImagePlus size={48} className="mb-2 text-gray-400" />
-                <span className="text-xs font-bold">Adjuntar foto</span>
-              </button>
-            )}
+            {/* Contenedor de foto limpio */}
+            <div className="relative w-full flex-1 min-h-[380px] lg:min-h-[540px] flex items-center justify-center bg-gray-50/50 rounded-2xl border border-gray-100 overflow-hidden">
+              {fd.fotografiaPrincipal ? (
+                <>
+                  <img
+                    src={fd.fotografiaPrincipal.url}
+                    alt={fd.fotografiaPrincipal.nombre}
+                    className="w-full h-full max-h-[540px] object-contain rounded-2xl"
+                  />
+                  <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-xs px-3 py-1 rounded-lg text-[10px] text-white/90 font-mono">
+                    {fd.fotografiaPrincipal.nombre}
+                  </div>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => fileInputFotoRef.current?.click()}
+                  className="flex flex-col items-center justify-center text-gray-400 hover:text-gray-700 p-8 cursor-pointer"
+                >
+                  <ImagePlus size={48} className="mb-2 text-gray-400" />
+                  <span className="text-xs font-bold">Adjuntar foto</span>
+                </button>
+              )}
+            </div>
           </div>
 
           {/* LADO DERECHO: Panel con líneas divisorias limpias estilo Instagram */}
@@ -932,21 +1060,55 @@ export function BitacoraForm({
                       className="w-full text-xs text-gray-800 placeholder-gray-400 outline-none bg-transparent truncate mt-0.5"
                     />
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleObtenerUbicacionGps}
-                    disabled={obteniendoGps}
-                    className="p-2 rounded-full hover:bg-gray-100 text-gray-500 hover:text-[#9B0F06] transition-colors cursor-pointer shrink-0"
-                    title="Obtener coordenadas GPS automáticamente por GPS"
-                  >
-                    {obteniendoGps ? <Loader2 size={18} className="animate-spin text-[#9B0F06]" /> : <MapPin size={18} />}
-                  </button>
+
+                  <div className="flex items-center gap-1 shrink-0">
+                    {/* Ícono de escoba simple sin fondo para limpiar la info de ubicación */}
+                    {fd.ubicacionGps && (
+                      <button
+                        type="button"
+                        onClick={handleLimpiarUbicacion}
+                        className="p-1.5 text-gray-400 hover:text-gray-700 transition-colors cursor-pointer"
+                        title="Limpiar ubicación"
+                      >
+                        <svg
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="m14 12 7.5-7.5" />
+                          <path d="m9.5 16.5 4.5-4.5" />
+                          <path d="m3 21 6.5-6.5" />
+                          <path d="m3 21 2-5 3 3-5 2Z" />
+                          <path d="M12 21a9 9 0 0 0 9-9" />
+                        </svg>
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={handleObtenerUbicacionGps}
+                      disabled={obteniendoGps}
+                      className="p-1.5 rounded-full hover:bg-gray-100 text-gray-500 hover:text-[#9B0F06] transition-colors cursor-pointer"
+                      title="Obtener coordenadas GPS automáticamente"
+                    >
+                      {obteniendoGps ? (
+                        <Loader2 size={18} className="animate-spin text-[#9B0F06]" />
+                      ) : (
+                        <MapPin size={18} />
+                      )}
+                    </button>
+                  </div>
                 </div>
 
-                {/* Badge de Auto-Detección: Coordenadas, Departamento y Municipio */}
+                {/* Badge de Auto-Detección sin el emoji 📍 y diciendo 'Coordenada:' */}
                 {(fd.latitud || fd.departamento || fd.municipio) && (
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-gray-500 font-mono pt-1">
-                    <span className="text-[#9B0F06] font-bold">📍 Detectado:</span>
+                    <span className="text-gray-700 font-bold">Coordenada:</span>
                     {fd.latitud && fd.longitud && (
                       <span>Lat: {fd.latitud.toFixed(6)}, Lng: {fd.longitud.toFixed(6)}</span>
                     )}
@@ -960,7 +1122,7 @@ export function BitacoraForm({
                 )}
               </div>
 
-              {/* 2. Renglón de Trabajo (Combobox limpio sin fondos rojos) */}
+              {/* 2. Renglón de Trabajo (Combobox limpio sin fondos rojos ni números duplicados) */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-gray-800">
@@ -978,23 +1140,47 @@ export function BitacoraForm({
                     className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-800 cursor-pointer hover:border-gray-300 transition-colors shadow-2xs"
                   >
                     {renglonActualObj ? (
-                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <div className="flex items-center gap-2 min-w-0 flex-1 mr-2">
                         <span className="font-mono text-[10px] font-bold text-gray-800 bg-gray-100 px-1.5 py-0.5 rounded shrink-0">
                           {renglonActualObj.id}
                         </span>
                         <span className="text-xs font-medium text-gray-800 truncate">
-                          {renglonActualObj.desc}
+                          {limpiarDescripcionRenglon(renglonActualObj.desc, renglonActualObj.id)}
                         </span>
+                        {renglonActualObj.unidad && (
+                          <span className="text-[10px] font-semibold text-gray-500 font-mono bg-gray-50 px-1.5 py-0.5 rounded border border-gray-200 shrink-0">
+                            {renglonActualObj.unidad}
+                          </span>
+                        )}
                       </div>
                     ) : (
                       <span className="text-gray-400 text-xs">Selecciona un renglón...</span>
                     )}
-                    <ChevronDown
-                      size={15}
-                      className={`text-gray-400 transition-transform shrink-0 ml-1.5 ${
-                        comboboxAbierto ? 'rotate-180' : ''
-                      }`}
-                    />
+
+                    <div className="flex items-center gap-1 shrink-0">
+                      {/* Botón X para quitar el renglón seleccionado */}
+                      {renglonSeleccionadoId && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setRenglonSeleccionadoId('')
+                            setComboboxAbierto(false)
+                          }}
+                          className="p-1 rounded-full text-gray-400 hover:text-red-600 hover:bg-gray-100 transition-colors cursor-pointer"
+                          title="Quitar renglón seleccionado"
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
+
+                      <ChevronDown
+                        size={15}
+                        className={`text-gray-400 transition-transform ${
+                          comboboxAbierto ? 'rotate-180' : ''
+                        }`}
+                      />
+                    </div>
                   </div>
 
                   {/* Menú Desplegable del Combobox (Sin colores rojos) */}
@@ -1036,7 +1222,14 @@ export function BitacoraForm({
                                 <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-200 text-gray-800 shrink-0">
                                   {renglon.id}
                                 </span>
-                                <span className="text-xs font-medium truncate">{renglon.desc}</span>
+                                <span className="text-xs font-medium truncate">
+                                  {limpiarDescripcionRenglon(renglon.desc, renglon.id)}
+                                </span>
+                                {renglon.unidad && (
+                                  <span className="text-[10px] text-gray-400 font-mono shrink-0">
+                                    ({renglon.unidad})
+                                  </span>
+                                )}
                               </div>
                               {esSeleccionado && <Check size={14} className="text-gray-800 shrink-0" />}
                             </div>
@@ -1093,29 +1286,35 @@ export function BitacoraForm({
                 )}
               </div>
 
-              {/* 3. Suspensión Laboral (Ubicada abajo de Lado y Estaciones) */}
+              {/* 3. Suspensión Laboral (Con contorno negro y alineación correcta) */}
               <div className="border-b border-gray-100 pb-3.5 space-y-2">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between py-0.5">
                   <span className="text-xs font-bold text-gray-800">
                     ¿Se suspendieron labores hoy?
                   </span>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={fd.suspensionActividades}
-                      onChange={(e) => {
-                        const val = e.target.checked
-                        set('suspensionActividades', val)
-                        if (!val) {
-                          setMotivoSuspensionPreset('')
-                          setMotivoSuspensionOtra('')
-                          setErrors((p) => ({ ...p, justSuspension: '', horaSuspension: '', horaReanudacion: '' }))
-                        }
-                      }}
-                      className="sr-only peer"
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={fd.suspensionActividades}
+                    onClick={() => {
+                      const val = !fd.suspensionActividades
+                      set('suspensionActividades', val)
+                      if (!val) {
+                        setMotivoSuspensionPreset('')
+                        setMotivoSuspensionOtra('')
+                        setErrors((p) => ({ ...p, justSuspension: '', horaSuspension: '', horaReanudacion: '' }))
+                      }
+                    }}
+                    className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border border-black p-0.5 transition-colors duration-200 ease-in-out focus:outline-none ${
+                      fd.suspensionActividades ? 'bg-[#9B0F06]' : 'bg-gray-100'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-3.5 w-3.5 transform rounded-full border border-black/30 bg-white shadow-xs transition duration-200 ease-in-out ${
+                        fd.suspensionActividades ? 'translate-x-5' : 'translate-x-0'
+                      }`}
                     />
-                    <div className="w-9 h-4.5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-[#9B0F06]" />
-                  </label>
+                  </button>
                 </div>
 
                 {fd.suspensionActividades && (
@@ -1188,20 +1387,44 @@ export function BitacoraForm({
                 )}
               </div>
 
-              {/* 4. Campo de Descripción / Observaciones de la Jornada */}
-              <div className="relative pt-1 border-b border-gray-100 pb-3">
-                <textarea
-                  rows={2}
-                  value={fd.observacionesGenerales}
-                  onChange={(e) => set('observacionesGenerales', e.target.value)}
-                  placeholder="Añade una descripción u observaciones de la jornada..."
-                  maxLength={2200}
-                  className="w-full text-xs text-gray-800 placeholder-gray-400 outline-none resize-none bg-transparent"
-                />
-                <div className="flex items-center justify-between text-[10px] text-gray-400 mt-0.5">
-                  <Smile size={14} className="text-gray-400 hover:text-gray-600 cursor-pointer" />
-                  <span>{fd.observacionesGenerales.length}/2200</span>
+              {/* 4. Campo de Descripción / Observaciones de la Jornada (Con opciones antes de textarea y sin emoji) */}
+              <div className="relative pt-1 border-b border-gray-100 pb-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-gray-700">
+                    Descripción u observaciones de la jornada
+                  </span>
+                  {observacionPreset === 'Otra...' && (
+                    <span className="text-[10px] text-gray-400">
+                      {fd.observacionesGenerales.length}/2200
+                    </span>
+                  )}
                 </div>
+
+                {/* Selector de opciones frecuentes */}
+                <select
+                  value={observacionPreset}
+                  onChange={(e) => handleCambiarObservacionPreset(e.target.value)}
+                  className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs text-gray-800 focus:outline-none focus:border-gray-400"
+                >
+                  {OBSERVACIONES_PRESETS.map((obs) => (
+                    <option key={obs} value={obs}>
+                      {obs}
+                    </option>
+                  ))}
+                </select>
+
+                {/* Textarea solo cuando se selecciona 'Otra...' */}
+                {observacionPreset === 'Otra...' && (
+                  <textarea
+                    rows={2}
+                    value={fd.observacionesGenerales}
+                    onChange={(e) => set('observacionesGenerales', e.target.value)}
+                    placeholder="Añade una descripción u observaciones detalladas de la jornada..."
+                    maxLength={2200}
+                    className="w-full rounded-lg border border-gray-200 bg-white p-2 text-xs text-gray-800 placeholder-gray-400 outline-none resize-none focus:border-gray-400"
+                    autoFocus
+                  />
+                )}
               </div>
             </div>
 
