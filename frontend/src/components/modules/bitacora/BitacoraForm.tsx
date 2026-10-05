@@ -111,7 +111,67 @@ export type EvidenciaFoto = {
   id: string
   url: string
   nombre: string
+  tamanio?: string
   geo?: string
+}
+
+const comprimirImagen = async (
+  file: File,
+  maxDim = 1600,
+  quality = 0.78
+): Promise<{ base64: string; sizeFormatted: string }> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onerror = () => reject(new Error('Error al leer el archivo'))
+    reader.onload = (e) => {
+      const img = new Image()
+      img.onerror = () => reject(new Error('Error al decodificar la imagen'))
+      img.onload = () => {
+        let width = img.width
+        let height = img.height
+
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width)
+            width = maxDim
+          } else {
+            width = Math.round((width * maxDim) / height)
+            height = maxDim
+          }
+        }
+
+        const canvas = document.createElement('canvas')
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext('2d')
+        if (!ctx) {
+          const rawBase64 = e.target?.result as string
+          const rawBytes = Math.round(file.size / 1024)
+          resolve({
+            base64: rawBase64,
+            sizeFormatted: rawBytes > 1024 ? `${(rawBytes / 1024).toFixed(1)} MB` : `${rawBytes} KB`,
+          })
+          return
+        }
+
+        ctx.imageSmoothingEnabled = true
+        ctx.imageSmoothingQuality = 'high'
+        ctx.drawImage(img, 0, 0, width, height)
+
+        const compressedBase64 = canvas.toDataURL('image/jpeg', quality)
+        const approxBytes = Math.round((compressedBase64.length * 3) / 4)
+        const approxKB = Math.round(approxBytes / 1024)
+        const formatted = approxKB > 1024 ? `${(approxKB / 1024).toFixed(1)} MB` : `${approxKB} KB`
+
+        resolve({
+          base64: compressedBase64,
+          sizeFormatted: formatted,
+        })
+      }
+      img.src = e.target?.result as string
+    }
+    reader.readAsDataURL(file)
+  })
 }
 
 interface FormDataBitacora {
@@ -595,25 +655,46 @@ export function BitacoraForm({
     )
   }, [proyectoPlanTrabajo, busquedaCombobox])
 
-  // Procesar Fotografía única
-  const handleProcesarFoto = (file: File) => {
-    const reader = new FileReader()
-    reader.onload = () => {
-      const base64 = reader.result as string
-      const ext = file.name.split('.').pop()?.toUpperCase() || 'IMG'
+  // Procesar Fotografía única con Compresión Automática (Reduce 2MB-10MB a ~180KB-350KB)
+  const handleProcesarFoto = async (file: File) => {
+    try {
+      const ext = file.name.split('.').pop()?.toUpperCase() || 'JPG'
+      const { base64, sizeFormatted } = await comprimirImagen(file, 1600, 0.78)
       const nuevaFoto: EvidenciaFoto = {
         id: uid(),
         url: base64,
         nombre: `${file.name} [${ext}]`,
+        tamanio: sizeFormatted,
       }
       setFd((prev) => ({
         ...prev,
         fotografiaPrincipal: nuevaFoto,
       }))
       setPaso((prevPaso) => (prevPaso === 1 ? 2 : 3))
-      showSuccessToast('Fotografía cargada')
+      showSuccessToast(`Fotografía cargada y optimizada (${sizeFormatted})`)
+    } catch (err) {
+      console.warn('Fallo en compresión de imagen, usando lectura estándar:', err)
+      const reader = new FileReader()
+      reader.onload = () => {
+        const base64 = reader.result as string
+        const ext = file.name.split('.').pop()?.toUpperCase() || 'IMG'
+        const sizeKB = Math.round(file.size / 1024)
+        const sizeFormatted = sizeKB > 1024 ? `${(sizeKB / 1024).toFixed(1)} MB` : `${sizeKB} KB`
+        const nuevaFoto: EvidenciaFoto = {
+          id: uid(),
+          url: base64,
+          nombre: `${file.name} [${ext}]`,
+          tamanio: sizeFormatted,
+        }
+        setFd((prev) => ({
+          ...prev,
+          fotografiaPrincipal: nuevaFoto,
+        }))
+        setPaso((prevPaso) => (prevPaso === 1 ? 2 : 3))
+        showSuccessToast('Fotografía cargada')
+      }
+      reader.readAsDataURL(file)
     }
-    reader.readAsDataURL(file)
   }
 
   // Manejar cambio en preset de observaciones
@@ -862,7 +943,7 @@ export function BitacoraForm({
                 nombre: fd.fotografiaPrincipal.nombre || 'evidencia.jpg',
                 tipo: 'imagen',
                 url: urlFinalStorage,
-                tamanio: '2.1 MB',
+                tamanio: fd.fotografiaPrincipal.tamanio || '245 KB',
               },
             ]
           : [],
@@ -1372,12 +1453,12 @@ export function BitacoraForm({
                         setErrors((p) => ({ ...p, justSuspension: '', horaSuspension: '', horaReanudacion: '' }))
                       }
                     }}
-                    className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border border-black p-0.5 transition-colors duration-200 ease-in-out focus:outline-none ${
-                      fd.suspensionActividades ? 'bg-[#9B0F06]' : 'bg-gray-100'
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full p-0.5 transition-colors duration-200 ease-in-out focus:outline-none ${
+                      fd.suspensionActividades ? 'bg-[#9B0F06]' : 'bg-[#E9E9EA]'
                     }`}
                   >
                     <span
-                      className={`pointer-events-none inline-block h-3.5 w-3.5 transform rounded-full border border-gray-400 bg-white shadow-xs transition duration-200 ease-in-out ${
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
                         fd.suspensionActividades ? 'translate-x-5' : 'translate-x-0'
                       }`}
                     />

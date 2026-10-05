@@ -1,5 +1,5 @@
 import { RegistroBitacora } from '@/types/bitacora'
-import { ChevronRight, FolderOpen, User, MapPin, Camera } from 'lucide-react'
+import { ChevronRight, FolderOpen, User, MapPin } from 'lucide-react'
 import { BitacoraEstadoBadge } from './BitacoraEstadoBadge'
 
 interface BitacoraCardProps {
@@ -21,8 +21,6 @@ export function BitacoraCard({ registro, onClick }: BitacoraCardProps) {
   }
 
   const tipoConfig = getTipoConfig(registro.tipo)
-  const adjuntos = Array.isArray(registro.adjuntos) ? registro.adjuntos : []
-  const tieneFotos = adjuntos.some((a) => a.tipo === 'imagen') || adjuntos.length > 0
 
   const tit = registro.titulo || ''
   const desc = registro.descripcion || ''
@@ -62,7 +60,7 @@ export function BitacoraCard({ registro, onClick }: BitacoraCardProps) {
                   'Terracería'
 
                 return (
-                  <span className="text-[9.5px] font-semibold text-black truncate max-w-[160px]">
+                  <span className="text-[9.5px] font-semibold text-black">
                     Renglón: {renglonTexto}
                   </span>
                 )
@@ -103,13 +101,6 @@ export function BitacoraCard({ registro, onClick }: BitacoraCardProps) {
                   : registro.ubicacion || 'Lat: 14.500167, Lng: -90.617015'}
               </span>
             </span>
-
-            {tieneFotos && (
-              <span className="rounded bg-red-50 px-1 py-0.1 text-[7.5px] font-bold text-[#9B0F06] border border-red-100 flex items-center gap-0.5 ml-auto">
-                <Camera size={8} />
-                <span>Evidencia ({adjuntos.length})</span>
-              </span>
-            )}
           </div>
         </div>
 

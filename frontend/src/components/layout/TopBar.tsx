@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
-import { Search, Bell, Menu, User, LogOut, Ticket, Bot, AlertTriangle } from 'lucide-react'
+import { Search, Bell, Menu, User, LogOut, Ticket, Bot, AlertTriangle, Trash2 } from 'lucide-react'
 import { api, apiGetDeduplicado } from '@/lib/api/cliente'
 import { useAuthStore } from '@/stores/useAuthStore'
 
@@ -193,6 +193,7 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
 
     const updateNotifications = () => {
       try {
+        const notifsBorradas = localStorage.getItem('domun_notificaciones_borradas') === 'true'
         let sabanaNotifs: any[] = []
         const sabanaStored = localStorage.getItem('domun_alertas_sabana')
         if (sabanaStored) {
@@ -212,32 +213,31 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
             // Asegurar estrictamente 1 sola notificación de vencimiento en el panel
             sabanaNotifs = vencimientoNotifs.length > 0 ? [vencimientoNotifs[0], ...otrasNotifs] : otrasNotifs
           }
-        }
-
-        // Si no hay alertas de vencimiento en localStorage, asegurar la alerta global de estimación atrasada
-        if (!sabanaNotifs.some((n: any) => n.tipo === 'vencimiento_hoy')) {
-          sabanaNotifs = [NOTIFICACION_DEFAULT_ESTIMACION, ...sabanaNotifs]
+        } else if (!notifsBorradas) {
+          sabanaNotifs = [NOTIFICACION_DEFAULT_ESTIMACION]
         }
 
         setNotificacionesSabana(sabanaNotifs)
 
         let ticketsNotifs: any[] = []
         let openTickets = 0
-        const stored = localStorage.getItem('domun_support_tickets')
-        if (stored) {
-          const rawTickets = JSON.parse(stored)
-          if (Array.isArray(rawTickets)) {
-            const tickets = rawTickets.filter((t: any) => esReciente2Dias(t.createdAt))
-            openTickets = tickets.filter((t: any) => t.status !== 'cerrado').length
-            ticketsNotifs = tickets.map((t: any) => ({
-              id: t.id,
-              title: t.status === 'abierto' ? `Nuevo ticket: ${t.title}` : `Ticket ${t.status.replace(/_/g, ' ')}: ${t.title}`,
-              author: t.createdBy,
-              status: t.status,
-              time: t.createdAt,
-              link: '/dashboard/tickets',
-              tipo: 'ticket',
-            }))
+        if (!notifsBorradas) {
+          const stored = localStorage.getItem('domun_support_tickets')
+          if (stored) {
+            const rawTickets = JSON.parse(stored)
+            if (Array.isArray(rawTickets)) {
+              const tickets = rawTickets.filter((t: any) => esReciente2Dias(t.createdAt))
+              openTickets = tickets.filter((t: any) => t.status !== 'cerrado').length
+              ticketsNotifs = tickets.map((t: any) => ({
+                id: t.id,
+                title: t.status === 'abierto' ? `Nuevo ticket: ${t.title}` : `Ticket ${t.status.replace(/_/g, ' ')}: ${t.title}`,
+                author: t.createdBy,
+                status: t.status,
+                time: t.createdAt,
+                link: '/dashboard/tickets',
+                tipo: 'ticket',
+              }))
+            }
           }
         }
         setOpenTicketsCount(openTickets)
@@ -261,6 +261,19 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
       clearInterval(interval)
     }
   }, [])
+
+  const handleBorrarNotificaciones = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation()
+    try {
+      localStorage.setItem('domun_notificaciones_borradas', 'true')
+      localStorage.setItem('domun_alertas_sabana', JSON.stringify([]))
+    } catch (err) {
+      console.warn('Error borrando notificaciones:', err)
+    }
+    setNotificacionesSabana([])
+    setNotificacionesTickets([])
+    setUnreadCount(0)
+  }
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -424,11 +437,7 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
           >
             <Bell size={15} className="text-[#9B0F06]" />
             {unreadCount > 0 && (
-              <span className={`absolute -top-1 -right-1 text-[8px] font-extrabold w-3.5 h-3.5 rounded-full flex items-center justify-center ${
-                notificacionesSabana.some((n: any) => n.tipo === 'vencimiento_hoy')
-                  ? 'bg-yellow-400 text-yellow-950 border border-yellow-500 shadow-xs'
-                  : 'bg-[#9B0F06] text-white'
-              }`}>
+              <span className="absolute -top-1 -right-1 text-[8px] font-extrabold w-3.5 h-3.5 rounded-full flex items-center justify-center bg-[#9B0F06] text-white">
                 {unreadCount}
               </span>
             )}
@@ -465,40 +474,19 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
                           closeNotifications()
                           router.push(notif.link || '/dashboard/tickets')
                         }}
-                        className={`w-full text-left p-3 transition-colors flex items-start gap-2.5 cursor-pointer border-b ${
-                          esVencimientoHoy
-                            ? 'bg-yellow-400 hover:bg-yellow-500 text-yellow-950 border-yellow-500 shadow-2xs'
-                            : 'hover:bg-gray-50 border-gray-100 text-gray-800'
-                        }`}
+                        className="w-full text-left p-3 hover:bg-gray-50 transition-colors flex items-start gap-2.5 cursor-pointer border-b border-gray-100 text-gray-800 bg-white"
                       >
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
-                          esVencimientoHoy
-                            ? 'bg-yellow-500 text-yellow-950 border border-yellow-600'
-                            : notif.tipo === 'hoja_sabana'
-                            ? 'bg-amber-100 text-amber-800'
-                            : 'bg-red-50 text-[#9B0F06]'
-                        }`}>
-                          {esVencimientoHoy ? (
-                            <AlertTriangle size={12} className="stroke-[2.5]" />
-                          ) : notif.tipo === 'hoja_sabana' ? (
-                            <AlertTriangle size={12} />
-                          ) : (
-                            <Ticket size={12} />
-                          )}
-                        </div>
+                        {esVencimientoHoy || notif.tipo === 'hoja_sabana' ? (
+                          <AlertTriangle size={15} className="text-amber-500 shrink-0 mt-0.5" />
+                        ) : (
+                          <Ticket size={15} className="text-[#9B0F06] shrink-0 mt-0.5" />
+                        )}
                         <div className="min-w-0 flex-1">
-                          <p className={`text-[10.5px] leading-tight truncate ${
-                            esVencimientoHoy ? 'font-black text-yellow-950' : 'font-semibold text-gray-800'
-                          }`}>
+                          <p className="text-[10.5px] font-bold text-gray-800 leading-tight">
                             {notif.title}
                           </p>
-                          <p className={`text-[9px] mt-0.5 flex items-center justify-between ${
-                            esVencimientoHoy ? 'text-yellow-900 font-bold' : 'text-gray-400'
-                          }`}>
-                            <span className="truncate">{notif.author}</span>
-                            <span className={esVencimientoHoy ? 'bg-yellow-500 text-yellow-950 px-1.5 py-0.2 rounded text-[8px] font-black border border-yellow-600' : ''}>
-                              {notif.time}
-                            </span>
+                          <p className="text-[9px] mt-0.5 text-gray-500 truncate">
+                            {notif.author}
                           </p>
                         </div>
                       </button>
@@ -514,6 +502,19 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
                   </div>
                 )}
               </div>
+
+              {[...notificacionesSabana, ...notificacionesTickets].length > 0 && (
+                <div className="p-2 border-t border-gray-100 bg-gray-50/60 flex items-center justify-center">
+                  <button
+                    type="button"
+                    onClick={handleBorrarNotificaciones}
+                    className="inline-flex items-center gap-1.5 text-[10px] font-bold text-gray-500 hover:text-red-600 transition-colors cursor-pointer py-1 px-3 rounded-md hover:bg-red-50/80"
+                  >
+                    <Trash2 size={12} />
+                    <span>Borrar notificaciones</span>
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>

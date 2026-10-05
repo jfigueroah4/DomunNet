@@ -82,12 +82,21 @@ export default function BitacoraPage() {
       fotosBD.forEach((f: any) => {
         if (f.bitacora_entrada_id) {
           const list = fotosMap.get(String(f.bitacora_entrada_id)) || []
+          let tamStr = f.tamanio || ''
+          if (!tamStr && f.url_storage) {
+            if (f.url_storage.startsWith('data:')) {
+              const kb = Math.round((f.url_storage.length * 3) / 4 / 1024)
+              tamStr = kb > 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${kb} KB`
+            } else {
+              tamStr = '245 KB'
+            }
+          }
           list.push({
             id: f.id,
             nombre: f.descripcion || 'evidencia.jpg',
             tipo: 'imagen',
             url: f.url_storage,
-            tamanio: '2.1 MB',
+            tamanio: tamStr || '245 KB',
           })
           fotosMap.set(String(f.bitacora_entrada_id), list)
         }
@@ -619,11 +628,11 @@ export default function BitacoraPage() {
                             onClick={() => setFotoExpandida(adj.url)}
                             className="group relative overflow-hidden rounded-xl border border-gray-200 bg-gray-950 cursor-pointer shadow-xs hover:border-[#9B0F06] transition-all"
                           >
-                            <div className="aspect-[16/9] max-h-64 sm:max-h-72 w-full overflow-hidden bg-gray-100 flex items-center justify-center">
+                            <div className="h-44 sm:h-48 w-full overflow-hidden bg-gray-900 flex items-center justify-center">
                               <img
                                 src={adj.url}
                                 alt={adj.nombre || 'Evidencia'}
-                                className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                className="h-full w-full object-cover object-center group-hover:scale-105 transition-transform duration-300"
                               />
                             </div>
                             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-between p-3 opacity-90 group-hover:opacity-100 transition-opacity">
