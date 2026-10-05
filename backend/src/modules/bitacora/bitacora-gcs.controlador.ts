@@ -57,7 +57,7 @@ export async function subirEvidenciaBitacoraGCSControlador(req: Request, res: Re
     const carpeta = `bitacora/${nombreProyectoFolder}`
 
     // Intentar subida con Backblaze B2 primero, fallback a Cloudinary
-    let resultado: { urlStorage: string; publicId?: string; key?: string; proveedor: string; mensaje?: string }
+    let resultado: { urlStorage: string; publicId?: string; key?: string; proveedor: string; tamanioKB?: number; mensaje?: string }
     
     const estadoB2 = await obtenerEstadoB2()
     if (estadoB2.configurado) {
@@ -66,6 +66,7 @@ export async function subirEvidenciaBitacoraGCSControlador(req: Request, res: Re
         urlStorage: b2Res.urlStorage,
         key: b2Res.key,
         proveedor: b2Res.proveedor,
+        tamanioKB: b2Res.tamanioKB,
         mensaje: b2Res.mensaje,
       }
     } else {
@@ -98,6 +99,7 @@ export async function subirEvidenciaBitacoraGCSControlador(req: Request, res: Re
         urlStorage: resultado.urlStorage,
         publicId: resultado.publicId || resultado.key,
         proveedor: resultado.proveedor,
+        tamanio: resultado.tamanioKB ? `${resultado.tamanioKB} KB` : undefined,
         mensaje: resultado.mensaje,
       },
       'Evidencia fotográfica subida exitosamente'

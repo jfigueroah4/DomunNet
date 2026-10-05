@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { useCustomToast } from '@/hooks/useCustomToast';
 import { Eye, EyeOff, User, Lock, Info, X, ChevronDown, Trash2 } from 'lucide-react';
 import LoginInput from '@/components/ui/LoginInput';
@@ -533,6 +534,21 @@ export default function LoginPage() {
           <LoginButton type="submit" disabled={isSubmitting}>
             {isSubmitting ? 'Ingresando...' : 'Iniciar sesión'}
           </LoginButton>
+
+          {/* Legal / Policy Links */}
+          <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-center gap-4 text-[10.5px] text-white/60">
+            <Link href="/aviso-legal" className="hover:text-white hover:underline transition-colors">
+              Aviso legal
+            </Link>
+            <span>&bull;</span>
+            <Link href="/privacidad" className="hover:text-white hover:underline transition-colors">
+              Privacidad
+            </Link>
+            <span>&bull;</span>
+            <Link href="/cookies" className="hover:text-white hover:underline transition-colors">
+              Cookies
+            </Link>
+          </div>
         </form>
       </div>
 

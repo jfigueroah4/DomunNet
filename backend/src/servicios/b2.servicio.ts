@@ -1,4 +1,5 @@
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
+import sharp from 'sharp'
 import { entorno } from '@/configuracion/entorno'
 
 let s3Client: S3Client | null = null
@@ -41,13 +42,14 @@ export async function subirArchivoB2(
   nombreArchivo: string,
   contentType: string = 'image/jpeg',
   carpeta: string = 'bitacora'
-): Promise<{ urlStorage: string; key: string; proveedor: string; mensaje?: string }> {
+): Promise<{ urlStorage: string; key: string; proveedor: string; tamanioKB?: number; mensaje?: string }> {
   if (!entorno.b2.endpoint || !entorno.b2.bucketName || !entorno.b2.keyId || !entorno.b2.applicationKey) {
     console.warn('⚠️ Subida en modo simulación por falta de credenciales de Backblaze B2')
     return {
       urlStorage: `https://dummyimage.com/600x400/000/fff&text=Simulacion+B2`,
       key: `simulacion/${Date.now()}_${nombreArchivo}`,
       proveedor: 'mock-local',
+      tamanioKB: 180,
       mensaje: 'Advertencia: Faltan credenciales B2, se usó simulador',
     }
   }
@@ -60,7 +62,22 @@ export async function subirArchivoB2(
     bodyBuffer = bufferOrBase64
   }
 
+  // Optimización y compresión con Sharp en el Backend antes de guardar en Backblaze B2
+  if (contentType.startsWith('image/')) {
+    try {
+      bodyBuffer = await sharp(bodyBuffer)
+        .rotate() // Respeta orientación EXIF de cámara
+        .resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: 80, mozjpeg: true })
+        .toBuffer()
+      contentType = 'image/jpeg'
+    } catch (sharpError) {
+      console.warn('⚠️ No se pudo procesar con Sharp, subiendo buffer original:', sharpError)
+    }
+  }
+
   const key = `${carpeta}/${Date.now()}_${nombreArchivo.replace(/[^a-zA-Z0-9._-]/g, '_')}`
+  const tamanioKB = Math.round(bodyBuffer.length / 1024)
 
   const client = getS3Client()
   const command = new PutObjectCommand({
@@ -74,7 +91,6 @@ export async function subirArchivoB2(
   await client.send(command)
 
   // URL pública directa de Backblaze B2
-  // Formato: https://<bucketName>.<endpoint_host>/<key>
   const endpointHost = entorno.b2.endpoint.replace(/^https?:\/\//, '')
   const urlStorage = `https://${entorno.b2.bucketName}.${endpointHost}/${key}`
 
@@ -82,5 +98,6 @@ export async function subirArchivoB2(
     urlStorage,
     key,
     proveedor: 'backblaze-b2',
+    tamanioKB,
   }
 }

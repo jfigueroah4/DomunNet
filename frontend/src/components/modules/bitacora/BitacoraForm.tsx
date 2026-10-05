@@ -1128,7 +1128,7 @@ export function BitacoraForm({
               </button>
 
               <div className="absolute bottom-3.5 left-3.5 bg-black/60 backdrop-blur-xs px-3.5 py-1.5 rounded-full text-[10.5px] text-white font-mono">
-                {fd.fotografiaPrincipal.nombre}
+                {fd.fotografiaPrincipal.nombre} {fd.fotografiaPrincipal.tamanio ? `· ${fd.fotografiaPrincipal.tamanio}` : ''}
               </div>
             </div>
           </div>
@@ -1182,7 +1182,7 @@ export function BitacoraForm({
                     className="w-full h-full max-h-[540px] object-contain rounded-2xl"
                   />
                   <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-xs px-3 py-1 rounded-lg text-[10px] text-white/90 font-mono">
-                    {fd.fotografiaPrincipal.nombre}
+                    {fd.fotografiaPrincipal.nombre} {fd.fotografiaPrincipal.tamanio ? `· ${fd.fotografiaPrincipal.tamanio}` : ''}
                   </div>
                 </>
               ) : (

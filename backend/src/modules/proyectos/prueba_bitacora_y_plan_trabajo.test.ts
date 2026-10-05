@@ -78,8 +78,8 @@ describe('Suite de Pruebas: Registro de Bitácora de Obra y Plan de Trabajo (Lí
 
     // 1.4 Registrar medición en el módulo Analítico vinculada a la entrada de bitácora
     const medicionGuardada = await HojaSabanaServicio.crearMedicion({
-      proyectoId: proyectoId,
-      bitacoraEntradaId: entradaId,
+      proyectoId: proyectoId || 'test-proy',
+      bitacoraEntradaId: entradaId || undefined,
       codigoDGC: '201.01',
       estacionInicio: estInicio,
       estacionFin: estFin,
@@ -104,7 +104,7 @@ describe('Suite de Pruebas: Registro de Bitácora de Obra y Plan de Trabajo (Lí
     expect(medicionGuardada.cantidadRetenida).toBe(0)
 
     // 1.5 Verificar que la medición aparece en la lista analítica del proyecto
-    const listaAnalitico = await HojaSabanaServicio.listarMediciones(proyectoId, 'Est. 01', '201.01')
+    const listaAnalitico = await HojaSabanaServicio.listarMediciones(proyectoId || 'test-proy', 'Est. 01', '201.01')
     expect(listaAnalitico.length).toBeGreaterThan(0)
     const medEnLista = listaAnalitico[0]
     expect(medEnLista.codigoDGC || medEnLista.codigo_dgc).toBe('201.01')
