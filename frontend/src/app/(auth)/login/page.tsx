@@ -158,6 +158,8 @@ export default function LoginPage() {
 
     showSuccessToast("¡Sesión iniciada correctamente!");
     localStorage.removeItem('domun_failed_login_attempts');
+    localStorage.removeItem('domun_notificaciones_borradas');
+    sessionStorage.removeItem('domun_notificaciones_borradas');
 
     // Solicitar al navegador que guarde/actualice las credenciales (Credential Management API)
     try {
@@ -220,9 +222,17 @@ export default function LoginPage() {
       } catch {}
     }
 
+    try {
+      // Precargar perfil de forma inmediata para que el dashboard abra instantáneo
+      const resPerfil = await api.get('/auth/perfil');
+      if (resPerfil.data?.success && resPerfil.data?.data) {
+        localStorage.setItem('domun_user_profile', JSON.stringify(resPerfil.data.data));
+      }
+    } catch (_) {}
+
     setTimeout(() => {
-      window.location.href = '/';
-    }, 1000);
+      window.location.href = '/dashboard';
+    }, 200);
   };
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -239,8 +249,12 @@ export default function LoginPage() {
       if (storedLock) {
         const { lockUntil } = JSON.parse(storedLock);
         if (lockUntil && Date.now() < lockUntil) {
-          showErrorToast(`Demasiados intentos fallidos. Su cuenta está bloqueada temporalmente durante 1 hora.`);
-          return;
+          if (process.env.NODE_ENV !== 'production') {
+            localStorage.removeItem('domun_failed_login_attempts');
+          } else {
+            showErrorToast(`Demasiados intentos fallidos. Su cuenta está bloqueada temporalmente durante 1 hora.`);
+            return;
+          }
         }
       }
     } catch {}
@@ -264,34 +278,45 @@ export default function LoginPage() {
       const status = error?.response?.status;
       const serverMsg = error?.response?.data?.mensaje || error?.response?.data?.message;
 
+      // Si es un fallo de conexión / backend iniciando (ECONNREFUSED / 502 / 503 / 504 / red caída)
+      if (!error.response || status >= 500) {
+        showErrorToast('El servidor backend se está conectando. Por favor espera unos segundos e intenta nuevamente.');
+        return;
+      }
+
       if (status === 403 || (serverMsg && serverMsg.toLowerCase().includes('desactivad'))) {
         showErrorToast(serverMsg || 'Su cuenta se encuentra desactivada. Contacte al administrador.');
         return;
       }
 
-      let attempts = 1;
-      let lockUntil: number | null = null;
-      try {
-        const stored = localStorage.getItem('domun_failed_login_attempts');
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          if (parsed.lockUntil && Date.now() >= parsed.lockUntil) {
-            attempts = 1;
-          } else {
-            attempts = (parsed.attempts || 0) + 1;
+      // Solo contar como credenciales incorrectas si el servidor respondió con 401 o 400
+      if (status === 401 || status === 400) {
+        let attempts = 1;
+        let lockUntil: number | null = null;
+        try {
+          const stored = localStorage.getItem('domun_failed_login_attempts');
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            if (parsed.lockUntil && Date.now() >= parsed.lockUntil) {
+              attempts = 1;
+            } else {
+              attempts = (parsed.attempts || 0) + 1;
+            }
           }
+        } catch {
+          attempts = 1;
         }
-      } catch {
-        attempts = 1;
-      }
 
-      if (attempts >= 5) {
-        lockUntil = Date.now() + 3600 * 1000; // 1 hora de bloqueo
-        localStorage.setItem('domun_failed_login_attempts', JSON.stringify({ attempts, lockUntil }));
-        showErrorToast("Demasiados intentos fallidos. Su cuenta está bloqueada temporalmente durante 1 hora.");
+        if (attempts >= 5) {
+          lockUntil = Date.now() + 3600 * 1000; // 1 hora de bloqueo
+          localStorage.setItem('domun_failed_login_attempts', JSON.stringify({ attempts, lockUntil }));
+          showErrorToast("Demasiados intentos fallidos. Su cuenta está bloqueada temporalmente durante 1 hora.");
+        } else {
+          localStorage.setItem('domun_failed_login_attempts', JSON.stringify({ attempts, lockUntil: null }));
+          showErrorToast(`Credenciales incorrectas. Intento ${attempts} de 5.`);
+        }
       } else {
-        localStorage.setItem('domun_failed_login_attempts', JSON.stringify({ attempts, lockUntil: null }));
-        showErrorToast(`Credenciales incorrectas. Intento ${attempts} de 5.`);
+        showErrorToast(serverMsg || 'Error al iniciar sesión. Intenta de nuevo.');
       }
     } finally {
       setIsSubmitting(false);
@@ -366,8 +391,8 @@ export default function LoginPage() {
 
       {/* Contenedor principal centrado */}
       <div 
-        className="relative z-10 flex flex-col items-center w-[90%] max-w-[300px]"
-        style={{ transform: 'translateY(-12%)' }}
+        className="login-container relative z-10 flex flex-col items-center w-[90%] max-w-[300px]"
+        style={{ transform: 'translateY(2%)' }}
       >
 
         {/* Logo DOMUN */}
@@ -393,7 +418,7 @@ export default function LoginPage() {
         {/* Subtítulo */}
         <div className="mb-6 text-center animate-fadeIn" style={{ animationDelay: '0.04s' }}>
           <p className="text-[12px] font-light text-white/70" style={{ fontFamily: 'Poppins, sans-serif', letterSpacing: "0.02em" }}>
-            Gestión inteligente de transporte
+            Sistema para la gestión de proyectos
           </p>
         </div>
 

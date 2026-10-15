@@ -268,8 +268,14 @@ export function BitacoraInformeModal({ isOpen, onClose }: BitacoraInformeModalPr
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onClick={onClose}
+    >
+      <div 
+        className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-sm font-bold text-gray-800">Generar Informe de Bitacora</h2>
           <button onClick={onClose} className="text-gray-400 transition-colors hover:text-gray-600">
@@ -279,22 +285,22 @@ export function BitacoraInformeModal({ isOpen, onClose }: BitacoraInformeModalPr
 
         <div className="space-y-4">
           <div>
-            <label className="mb-1 block text-[11px] font-medium text-gray-600">Titulo del Informe</label>
+            <label className="mb-1 block text-xs sm:text-[11px] font-medium text-gray-600">Titulo del Informe</label>
             <input
               type="text"
               value={titulo}
               onChange={(e) => setTitulo(e.target.value)}
-              className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-700 focus:border-[#9B0F06] focus:outline-none focus:ring-1 focus:ring-[#9B0F06]"
+              className="w-full h-10 sm:h-auto rounded-lg border border-gray-200 bg-white px-3 py-2 text-base sm:text-xs text-gray-700 focus:border-[#9B0F06] focus:outline-none focus:ring-1 focus:ring-[#9B0F06]"
             />
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-[11px] font-medium text-gray-600">Proyecto</label>
+              <label className="mb-1 block text-xs sm:text-[11px] font-medium text-gray-600">Proyecto</label>
               <select
                 value={proyecto}
                 onChange={(e) => setProyecto(e.target.value)}
-                className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-700 focus:border-[#9B0F06] focus:outline-none focus:ring-1 focus:ring-[#9B0F06]"
+                className="w-full h-10 sm:h-auto rounded-lg border border-gray-200 bg-white px-3 py-2 text-base sm:text-xs text-gray-700 focus:border-[#9B0F06] focus:outline-none focus:ring-1 focus:ring-[#9B0F06]"
               >
                 <option value="todos">Todos los proyectos</option>
                 {PROYECTOS_MOCK.map((item) => (
@@ -306,11 +312,11 @@ export function BitacoraInformeModal({ isOpen, onClose }: BitacoraInformeModalPr
             </div>
 
             <div>
-              <label className="mb-1 block text-[11px] font-medium text-gray-600">Categoria</label>
+              <label className="mb-1 block text-xs sm:text-[11px] font-medium text-gray-600">Categoria</label>
               <select
                 value={categoria}
                 onChange={(e) => setCategoria(e.target.value)}
-                className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-700 focus:border-[#9B0F06] focus:outline-none focus:ring-1 focus:ring-[#9B0F06]"
+                className="w-full h-10 sm:h-auto rounded-lg border border-gray-200 bg-white px-3 py-2 text-base sm:text-xs text-gray-700 focus:border-[#9B0F06] focus:outline-none focus:ring-1 focus:ring-[#9B0F06]"
               >
                 <option value="todas">Todas las categorias</option>
                 {categorias.map((item) => (
@@ -324,21 +330,21 @@ export function BitacoraInformeModal({ isOpen, onClose }: BitacoraInformeModalPr
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-[11px] font-medium text-gray-600">Desde</label>
+              <label className="mb-1 block text-xs sm:text-[11px] font-medium text-gray-600">Desde</label>
               <input
                 type="date"
                 value={fechaDesde}
                 onChange={(e) => setFechaDesde(e.target.value)}
-                className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-700 focus:border-[#9B0F06] focus:outline-none focus:ring-1 focus:ring-[#9B0F06]"
+                className="w-full h-10 sm:h-auto rounded-lg border border-gray-200 bg-white px-3 py-2 text-base sm:text-xs text-gray-700 focus:border-[#9B0F06] focus:outline-none focus:ring-1 focus:ring-[#9B0F06]"
               />
             </div>
             <div>
-              <label className="mb-1 block text-[11px] font-medium text-gray-600">Hasta</label>
+              <label className="mb-1 block text-xs sm:text-[11px] font-medium text-gray-600">Hasta</label>
               <input
                 type="date"
                 value={fechaHasta}
                 onChange={(e) => setFechaHasta(e.target.value)}
-                className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-700 focus:border-[#9B0F06] focus:outline-none focus:ring-1 focus:ring-[#9B0F06]"
+                className="w-full h-10 sm:h-auto rounded-lg border border-gray-200 bg-white px-3 py-2 text-base sm:text-xs text-gray-700 focus:border-[#9B0F06] focus:outline-none focus:ring-1 focus:ring-[#9B0F06]"
               />
             </div>
           </div>
@@ -414,8 +420,14 @@ export function BitacoraInformeModal({ isOpen, onClose }: BitacoraInformeModalPr
         </div>
 
         {selectorFotosOpen && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
-            <div className="max-h-[88vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl">
+          <div 
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4"
+            onClick={() => setSelectorFotosOpen(false)}
+          >
+            <div 
+              className="max-h-[88vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
               <div className="mb-4 flex items-center justify-between border-b border-gray-100 pb-3">
                 <div>
                   <p className="text-sm font-bold text-gray-900">Seleccionar imagenes del informe</p>
@@ -480,15 +492,15 @@ export function BitacoraInformeModal({ isOpen, onClose }: BitacoraInformeModalPr
         <div className="mt-6 flex gap-3 border-t border-gray-100 pt-4">
           <button
             onClick={onClose}
-            className="flex-1 rounded-lg border border-gray-200 px-4 py-2 text-xs text-gray-600 transition-colors hover:bg-gray-50"
+            className="flex-1 rounded-lg border border-gray-200 px-4 py-3 sm:py-2 text-sm sm:text-xs text-gray-600 transition-colors hover:bg-gray-50 cursor-pointer"
           >
             Cancelar
           </button>
           <button
             onClick={handleGenerar}
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-[#9B0F06] px-4 py-2 text-xs text-white transition-colors hover:bg-[#6B0006]"
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-[#9B0F06] px-4 py-3 sm:py-2 text-sm sm:text-xs text-white transition-colors hover:bg-[#6B0006] cursor-pointer"
           >
-            <FileText size={13} />
+            <FileText size={15} />
             Generar
           </button>
         </div>

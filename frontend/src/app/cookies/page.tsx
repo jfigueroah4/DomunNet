@@ -2,8 +2,8 @@ import Link from 'next/link'
 import { ArrowLeft, Cookie } from 'lucide-react'
 
 export const metadata = {
-  title: 'Política de Cookies | DOMUN-Sistema',
-  description: 'Información sobre el uso de cookies técnicas y de sesión en DOMUN-Sistema.',
+  title: 'Política de Cookies',
+  description: 'Información sobre el uso de cookies técnicas y de sesión en DOMUN.',
 }
 
 export default function CookiesPage() {

@@ -63,6 +63,11 @@ export function normalizar(texto: string) {
   return texto.trim().replace(/\s+/g, ' ').toLowerCase()
 }
 
+export function capitalizarNombrePropio(texto?: string | null): string {
+  if (!texto) return ''
+  return texto.replace(/[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ]+/g, (p) => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase())
+}
+
 export function formatearFecha(valor: string | null) {
   if (!valor) return 'Nunca'
   const fecha = new Date(valor)
@@ -72,8 +77,13 @@ export function formatearFecha(valor: string | null) {
 
 export function mapearUsuario(fila: FilaUsuarioJoin, nombreRol: string | null) {
   const dato = Array.isArray(fila.dato_usuario) ? fila.dato_usuario[0] : fila.dato_usuario
+  const primerNom = capitalizarNombrePropio(dato?.primer_nombre)
+  const segundoNom = capitalizarNombrePropio(dato?.segundo_nombre)
+  const primerApe = capitalizarNombrePropio(dato?.primer_apellido)
+  const segundoApe = capitalizarNombrePropio(dato?.segundo_apellido)
+
   const nombreCompleto = dato
-    ? [`${dato.primer_nombre}`, dato.segundo_nombre, `${dato.primer_apellido}`, dato.segundo_apellido]
+    ? [primerNom, segundoNom, primerApe, segundoApe]
         .map((p) => (p ?? '').trim())
         .filter(Boolean)
         .join(' ') || 'Sin Nombre'
@@ -87,10 +97,10 @@ export function mapearUsuario(fila: FilaUsuarioJoin, nombreRol: string | null) {
 
   return {
     id: fila.id,
-    primer_nombre: dato?.primer_nombre || '',
-    segundo_nombre: dato?.segundo_nombre || '',
-    primer_apellido: dato?.primer_apellido || '',
-    segundo_apellido: dato?.segundo_apellido || '',
+    primer_nombre: primerNom,
+    segundo_nombre: segundoNom,
+    primer_apellido: primerApe,
+    segundo_apellido: segundoApe,
     username: dato?.username || '',
     nombre: nombreCompleto,
     correo: fila.correo,
@@ -319,10 +329,10 @@ export async function crearUsuario(datos: DatosUsuario) {
     .from('dato_usuario')
     .insert({
       usuario_id: nuevoUsuario.id,
-      primer_nombre: datos.primer_nombre,
-      segundo_nombre: datos.segundo_nombre || null,
-      primer_apellido: datos.primer_apellido,
-      segundo_apellido: datos.segundo_apellido || null,
+      primer_nombre: capitalizarNombrePropio(datos.primer_nombre),
+      segundo_nombre: datos.segundo_nombre ? capitalizarNombrePropio(datos.segundo_nombre) : null,
+      primer_apellido: capitalizarNombrePropio(datos.primer_apellido),
+      segundo_apellido: datos.segundo_apellido ? capitalizarNombrePropio(datos.segundo_apellido) : null,
       telefono: datos.telefono,
       email: datos.correo,
       username: usernameUnico,
@@ -435,10 +445,10 @@ export async function actualizarUsuario(id: string, datos: DatosUsuario) {
     .from('dato_usuario')
     .upsert({
       usuario_id: id,
-      primer_nombre: datos.primer_nombre,
-      segundo_nombre: datos.segundo_nombre || null,
-      primer_apellido: datos.primer_apellido,
-      segundo_apellido: datos.segundo_apellido || null,
+      primer_nombre: capitalizarNombrePropio(datos.primer_nombre),
+      segundo_nombre: datos.segundo_nombre ? capitalizarNombrePropio(datos.segundo_nombre) : null,
+      primer_apellido: capitalizarNombrePropio(datos.primer_apellido),
+      segundo_apellido: datos.segundo_apellido ? capitalizarNombrePropio(datos.segundo_apellido) : null,
       telefono: datos.telefono,
       email: datos.correo,
       username: usernameFinal,

@@ -1,7 +1,7 @@
 'use client'
 
-import React from 'react'
-import { ClipboardList, Camera } from 'lucide-react'
+import React, { useState, useEffect, useMemo } from 'react'
+import { CheckCheck, Eraser, Image as ImageIcon, Eye, ChevronLeft, ChevronRight } from 'lucide-react'
 
 interface ReportesPreviewProps {
   bitacoraFiltrada: any[]
@@ -12,122 +12,306 @@ interface ReportesPreviewProps {
   fotosParaReporte: any[]
   fotosSeleccionadas: string[]
   toggleFotoSeleccionada: (id: string) => void
+  onVerDetalle: (registro: any) => void
+  onVerFoto?: (url: string) => void
+  seleccionarTodo: () => void
+  limpiarSeleccion: () => void
 }
 
 export function ReportesPreview({
   bitacoraFiltrada,
-  bitacoraParaReporte,
+  bitacoraParaReporte: _bitacoraParaReporte,
   registrosSeleccionados,
   toggleRegistroSeleccionado,
   fotosFiltradas,
-  fotosParaReporte,
+  fotosParaReporte: _fotosParaReporte,
   fotosSeleccionadas,
   toggleFotoSeleccionada,
+  onVerDetalle,
+  onVerFoto,
+  seleccionarTodo,
+  limpiarSeleccion,
 }: ReportesPreviewProps) {
+  const tieneFotos = fotosFiltradas.length > 0
+  const [paginaActual, setPaginaActual] = useState(1)
+  const itemsPorPagina = 4
+
+  const listaCompleta = useMemo(() => {
+    return tieneFotos ? fotosFiltradas : bitacoraFiltrada
+  }, [tieneFotos, fotosFiltradas, bitacoraFiltrada])
+
+  const totalPaginas = Math.max(1, Math.ceil(listaCompleta.length / itemsPorPagina))
+
+  // Asegurar que la página actual sea válida si cambia el filtro
+  useEffect(() => {
+    if (paginaActual > totalPaginas) {
+      setPaginaActual(1)
+    }
+  }, [totalPaginas, paginaActual])
+
+  // Obtener items de la página actual (4 por hoja de reporte)
+  const itemsPaginados = useMemo(() => {
+    const inicio = (paginaActual - 1) * itemsPorPagina
+    return listaCompleta.slice(inicio, inicio + itemsPorPagina)
+  }, [listaCompleta, paginaActual])
+
   return (
-    <div className="mt-4 w-full">
-      <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
-        <div className="mb-3 flex items-center justify-between border-b border-gray-200/60 pb-3">
+    <div className="mt-3 w-full font-[Poppins]">
+      <div className="rounded-2xl border border-gray-100 bg-gray-50/70 p-3 sm:p-4">
+        <div className="mb-2.5 flex flex-wrap items-start justify-between gap-2 border-b border-gray-200/60 pb-2.5 sm:items-center">
           <div>
-            <p className="text-xs font-bold text-gray-800">Vista previa unificada de registros de bitácora</p>
-            <p className="text-[10px] text-gray-500">
-              {bitacoraParaReporte.length} de {bitacoraFiltrada.length} registros seleccionados • {fotosParaReporte.length} de {fotosFiltradas.length} fotografías incluidas
+            <h3 className="text-xs font-bold text-gray-900 leading-tight">Vista previa de imágenes</h3>
+            <p className="text-[10.5px] sm:text-[10px] text-gray-500 font-medium">
+              {tieneFotos
+                ? `${fotosSeleccionadas.length} de ${fotosFiltradas.length} seleccionadas`
+                : `${registrosSeleccionados.length} de ${bitacoraFiltrada.length} seleccionados`}
             </p>
           </div>
-          <div className="flex items-center gap-2 text-[#9B0F06]">
-            <ClipboardList size={16} />
+
+          <div className="flex items-start gap-1.5 sm:items-center">
+            <button
+              type="button"
+              onClick={seleccionarTodo}
+              className="inline-flex h-7 items-center gap-1 rounded-md border border-gray-200 bg-white px-2 text-[11px] sm:text-[10px] font-semibold text-gray-700 transition-colors hover:border-[#9B0F06] hover:text-[#9B0F06] shadow-2xs cursor-pointer active:scale-95"
+            >
+              <CheckCheck size={13} className="sm:hidden" />
+              Marcar todo
+            </button>
+            <button
+              type="button"
+              onClick={limpiarSeleccion}
+              className="inline-flex h-7 items-center gap-1 rounded-md border border-gray-200 bg-white px-2 text-[11px] sm:text-[10px] font-semibold text-gray-700 transition-colors hover:border-[#9B0F06] hover:text-[#9B0F06] shadow-2xs cursor-pointer active:scale-95"
+            >
+              <Eraser size={13} className="sm:hidden" />
+              Limpiar
+            </button>
           </div>
         </div>
 
-        <div className="max-h-[500px] space-y-3 overflow-y-auto pr-1">
-          {bitacoraFiltrada.length === 0 ? (
-            <p className="rounded-lg bg-white p-4 text-[11px] text-gray-400 text-center">
-              No hay registros de bitácora para el rango o filtros seleccionados.
-            </p>
-          ) : (
-            bitacoraFiltrada.map((registro) => {
-              const checked = registrosSeleccionados.includes(registro.id)
-              const fotosDelRegistro = fotosFiltradas.filter((foto) => foto.bitacoraId === registro.id)
+        {/* Listado de 4 elementos por página con Selección Persistente */}
+        <div className="space-y-2.5 sm:space-y-2">
+          {tieneFotos ? (
+            itemsPaginados.map((foto: any) => {
+              const checked = fotosSeleccionadas.includes(String(foto.id))
+              const regPadre = bitacoraFiltrada.find((b) => String(b.id) === String(foto.bitacoraId))
+              const fechaHora = [foto.fecha, foto.hora].filter(Boolean).join(' ') || regPadre?.fecha || ''
+              const tituloMostrar = foto.titulo || regPadre?.titulo || 'Evidencia Fotográfica'
+              const descripcionMostrar = foto.descripcion || regPadre?.descripcion || regPadre?.renglon_nombre || 'Evidencia de bitácora'
+              const fotoUrl = foto.urlMiniatura || foto.url
+
+              const registroCompleto = regPadre || {
+                id: foto.bitacoraId || foto.id,
+                titulo: tituloMostrar,
+                descripcion: descripcionMostrar,
+                fecha: foto.fecha || new Date().toISOString().slice(0, 10),
+                hora: foto.hora || '12:00',
+                adjuntos: [{ id: foto.id, url: foto.url, nombre: foto.titulo }],
+                proyectoNombre: foto.proyectoNombre || 'Proyecto Vial',
+                autor: foto.autor || 'Ingeniero Residente',
+                estacionInicio: foto.estacionInicio || '0+000',
+                estacionFin: foto.estacionFin || '0+500',
+                lado: foto.lado || 'Ambos',
+              }
+
+              return (
+                <div
+                  key={foto.id}
+                  onClick={() => toggleFotoSeleccionada(String(foto.id))}
+                  className={`rounded-xl border bg-white p-2 sm:p-2.5 flex items-center gap-2 sm:gap-3 transition-all cursor-pointer shadow-2xs select-none ${
+                    checked
+                      ? 'border-gray-200 hover:border-gray-300'
+                      : 'border-gray-100 opacity-60 bg-gray-50/50'
+                  }`}
+                >
+                  {/* Checkbox Rojo Corporativo */}
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={(e) => {
+                      e.stopPropagation()
+                      toggleFotoSeleccionada(String(foto.id))
+                    }}
+                    className="h-4 w-4 accent-[#9B0F06] cursor-pointer rounded shrink-0 ml-0.5"
+                  />
+
+                  {/* Miniatura Uniforme más compacta en móvil y que se expande al oprimirla */}
+                  <div
+                    onClick={(e) => {
+                      if (fotoUrl && onVerFoto) {
+                        e.stopPropagation()
+                        onVerFoto(fotoUrl)
+                      }
+                    }}
+                    title="Oprime para ampliar la imagen"
+                    className="relative group/thumb h-11 w-14 sm:h-12 sm:w-16 rounded-lg overflow-hidden border border-gray-200 shrink-0 bg-gray-100 flex items-center justify-center cursor-zoom-in active:scale-95 transition-transform"
+                  >
+                    {fotoUrl ? (
+                      <>
+                        <img
+                          src={fotoUrl}
+                          alt={tituloMostrar}
+                          className="h-full w-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-black/20 opacity-0 group-hover/thumb:opacity-100 transition-opacity flex items-center justify-center text-white">
+                          <Eye size={12} />
+                        </div>
+                      </>
+                    ) : (
+                      <ImageIcon size={16} className="text-gray-400" />
+                    )}
+                  </div>
+
+                  {/* Información con tipografía cómoda en móvil */}
+                  <div className="min-w-0 flex-1 space-y-0.5">
+                    <p className="text-xs font-bold text-gray-900 truncate leading-snug">
+                      {tituloMostrar}
+                    </p>
+                    {fechaHora && (
+                      <p className="text-[10px] font-mono text-gray-500 font-medium">
+                        {fechaHora}
+                      </p>
+                    )}
+                    <p className="text-[10.5px] text-gray-600 line-clamp-1 leading-tight">
+                      {descripcionMostrar}
+                    </p>
+                  </div>
+
+                  {/* Icono de Ojo para abrir Drawer */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onVerDetalle(registroCompleto)
+                    }}
+                    className="p-1.5 rounded-lg text-gray-400 hover:text-[#9B0F06] hover:bg-red-50 transition-colors shrink-0 cursor-pointer ml-auto active:scale-95"
+                    title="Ver detalles completos de la bitácora"
+                  >
+                    <Eye size={16} />
+                  </button>
+                </div>
+              )
+            })
+          ) : bitacoraFiltrada.length > 0 ? (
+            itemsPaginados.map((registro: any) => {
+              const checked = registrosSeleccionados.includes(String(registro.id))
+              const fotoUrl = registro.adjuntos?.[0]?.url || ''
+              const fechaHora = [registro.fecha, registro.hora].filter(Boolean).join(' ')
 
               return (
                 <div
                   key={registro.id}
-                  className={`rounded-xl border bg-white p-3.5 transition-all shadow-2xs ${
-                    checked ? 'border-gray-200 ring-1 ring-[#9B0F06]/10' : 'border-gray-100 opacity-60'
+                  onClick={() => toggleRegistroSeleccionado(String(registro.id))}
+                  className={`rounded-xl border bg-white p-2 sm:p-2.5 flex items-center gap-2 sm:gap-3 transition-all cursor-pointer shadow-2xs select-none ${
+                    checked
+                      ? 'border-gray-200 hover:border-gray-300'
+                      : 'border-gray-100 opacity-60 bg-gray-50/50'
                   }`}
                 >
-                  <div className="flex items-start gap-3">
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => toggleRegistroSeleccionado(registro.id)}
-                      className="mt-1 h-4 w-4 accent-[#9B0F06] cursor-pointer"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <p className="text-[12px] font-bold text-gray-800">{registro.titulo}</p>
-                          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[8.5px] font-bold uppercase text-gray-600">
-                            {registro.tipo}
-                          </span>
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={(e) => {
+                      e.stopPropagation()
+                      toggleRegistroSeleccionado(String(registro.id))
+                    }}
+                    className="h-4 w-4 accent-[#9B0F06] cursor-pointer rounded shrink-0 ml-0.5"
+                  />
+
+                  <div
+                    onClick={(e) => {
+                      if (fotoUrl && onVerFoto) {
+                        e.stopPropagation()
+                        onVerFoto(fotoUrl)
+                      }
+                    }}
+                    title="Oprime para ampliar la imagen"
+                    className="relative group/thumb h-11 w-14 sm:h-12 sm:w-16 rounded-lg overflow-hidden border border-gray-200 shrink-0 bg-gray-100 flex items-center justify-center cursor-zoom-in active:scale-95 transition-transform"
+                  >
+                    {fotoUrl ? (
+                      <>
+                        <img
+                          src={fotoUrl}
+                          alt={registro.titulo}
+                          className="h-full w-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-black/20 opacity-0 group-hover/thumb:opacity-100 transition-opacity flex items-center justify-center text-white">
+                          <Eye size={12} />
                         </div>
-                        <span className="text-[9.5px] text-gray-400 font-medium">{registro.fecha}</span>
-                      </div>
-
-                      <p className="mt-0.5 text-[9.5px] font-semibold text-[#9B0F06]">
-                        {registro.proyectoNombre || 'Proyecto Domun'}
-                      </p>
-                      <p className="mt-1 text-[11px] text-gray-600 leading-relaxed">{registro.descripcion}</p>
-
-                      {/* Fotografías adjuntas al registro en la misma fila/tarjeta */}
-                      {fotosDelRegistro.length > 0 && (
-                        <div className="mt-3 border-t border-gray-100 pt-2.5">
-                          <div className="flex items-center gap-1.5 mb-2">
-                            <Camera size={12} className="text-gray-500" />
-                            <span className="text-[9.5px] font-bold text-gray-700 uppercase tracking-wide">
-                              Fotografías adjuntas ({fotosDelRegistro.length})
-                            </span>
-                          </div>
-
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                            {fotosDelRegistro.map((foto) => {
-                              const fotoChecked = checked && fotosSeleccionadas.includes(foto.id)
-                              return (
-                                <label
-                                  key={foto.id}
-                                  className={`flex items-center gap-2.5 p-2 rounded-lg border transition-all ${
-                                    checked ? 'cursor-pointer hover:border-[#9B0F06]/30' : 'cursor-not-allowed opacity-50'
-                                  } ${fotoChecked ? 'border-emerald-200 bg-emerald-50/20' : 'border-gray-100 bg-gray-50/50'}`}
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={fotoChecked}
-                                    disabled={!checked}
-                                    onChange={() => toggleFotoSeleccionada(foto.id)}
-                                    className="h-3.5 w-3.5 accent-[#9B0F06] disabled:cursor-not-allowed"
-                                  />
-                                  <img
-                                    src={foto.urlMiniatura || foto.url}
-                                    alt={foto.titulo}
-                                    className="h-12 w-14 flex-shrink-0 rounded-md object-cover border border-gray-200"
-                                  />
-                                  <div className="min-w-0 flex-1">
-                                    <p className="line-clamp-1 text-[10px] font-bold text-gray-800">{foto.titulo}</p>
-                                    <p className="text-[8.5px] text-gray-400">{foto.fecha} {foto.hora}</p>
-                                  </div>
-                                </label>
-                              )
-                            })}
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                      </>
+                    ) : (
+                      <ImageIcon size={16} className="text-gray-400" />
+                    )}
                   </div>
+
+                  <div className="min-w-0 flex-1 space-y-0.5">
+                    <p className="text-xs font-bold text-gray-900 truncate leading-snug">
+                      {registro.titulo}
+                    </p>
+                    {fechaHora && (
+                      <p className="text-[10px] font-mono text-gray-500 font-medium">
+                        {fechaHora}
+                      </p>
+                    )}
+                    <p className="text-[10.5px] text-gray-600 line-clamp-1 leading-tight">
+                      {registro.descripcion || registro.renglon_nombre || 'Sin descripción'}
+                    </p>
+                  </div>
+
+                  {/* Icono de Ojo */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onVerDetalle(registro)
+                    }}
+                    className="p-1.5 rounded-lg text-gray-400 hover:text-[#9B0F06] hover:bg-red-50 transition-colors shrink-0 cursor-pointer ml-auto active:scale-95"
+                    title="Ver detalles completos de la bitácora"
+                  >
+                    <Eye size={16} />
+                  </button>
                 </div>
               )
             })
+          ) : (
+            <p className="rounded-xl bg-white p-6 text-xs text-gray-400 text-center font-medium">
+              No hay registros ni imágenes de bitácora para los filtros seleccionados.
+            </p>
           )}
         </div>
+
+        {/* Paginación de 4 por página (hoja de reporte) */}
+        {listaCompleta.length > 0 && (
+          <div className="paginacion-control mt-2.5 flex flex-wrap items-center justify-between gap-2 border-t border-gray-200/70 pt-2 text-[9.5px] sm:text-[11px] text-gray-500 font-medium font-[Poppins]">
+            <div className="flex items-center gap-1 text-[9.5px] sm:text-[11px]">
+              <span>Vista:</span>
+              <span className="font-bold text-gray-800">4</span>
+              <span>reg/pág ({listaCompleta.length} tot.)</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-[9.5px] sm:text-[11px]">
+              <button
+                type="button"
+                disabled={paginaActual <= 1}
+                onClick={() => setPaginaActual((p) => Math.max(1, p - 1))}
+                className="h-6 w-6 sm:h-6 sm:w-6 flex items-center justify-center rounded-md border border-gray-200 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer text-gray-600 transition-colors shadow-2xs active:scale-95 text-[9.5px]"
+                title="Página anterior"
+              >
+                <ChevronLeft size={13} />
+              </button>
+              <span className="font-mono text-[9.5px] sm:text-[10px] font-bold text-gray-700 px-1">
+                {paginaActual} / {totalPaginas}
+              </span>
+              <button
+                type="button"
+                disabled={paginaActual >= totalPaginas}
+                onClick={() => setPaginaActual((p) => Math.min(totalPaginas, p + 1))}
+                className="h-6 w-6 sm:h-6 sm:w-6 flex items-center justify-center rounded-md border border-gray-200 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer text-gray-600 transition-colors shadow-2xs active:scale-95 text-[9.5px]"
+                title="Página siguiente"
+              >
+                <ChevronRight size={13} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

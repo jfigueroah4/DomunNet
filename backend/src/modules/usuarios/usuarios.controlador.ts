@@ -25,7 +25,33 @@ export const esquemaUsuario = z.object({
   contrasena: z.string().min(6).optional(),
   proyectosAsignados: z.array(z.string()).optional(),
   username: z.string().regex(/^[a-zA-Z0-9_.-]+$/, 'Nombre de usuario inválido (sin espacios ni @)').min(3).max(30).optional().nullable().or(z.literal('')),
-  fecha_nacimiento: z.string().optional().nullable(),
+  fecha_nacimiento: z
+    .string()
+    .optional()
+    .nullable()
+    .refine(
+      (val) => {
+        if (!val || val.trim() === '') return true
+        const parts = val.split('T')[0].split('-')
+        if (parts.length !== 3) return false
+        const y = parseInt(parts[0], 10)
+        const m = parseInt(parts[1], 10)
+        const d = parseInt(parts[2], 10)
+        if (isNaN(y) || isNaN(m) || isNaN(d)) return false
+        const dateObj = new Date(y, m - 1, d)
+        if (dateObj.getFullYear() !== y || dateObj.getMonth() !== m - 1 || dateObj.getDate() !== d) return false
+        const hoy = new Date()
+        let edad = hoy.getFullYear() - y
+        const mesActual = hoy.getMonth() + 1
+        if (mesActual < m || (mesActual === m && hoy.getDate() < d)) {
+          edad--
+        }
+        return edad >= 18 && edad <= 100
+      },
+      {
+        message: 'La edad no puede ser menor a 18 años ni exceder los 100 años',
+      }
+    ),
   direccion: z.string().optional().nullable(),
 })
 

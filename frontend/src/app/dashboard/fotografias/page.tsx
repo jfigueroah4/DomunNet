@@ -12,20 +12,37 @@ interface ProjectItemProps {
   onClick: () => void
 }
 
+function obtenerUbicacionProyecto(p: any): string {
+  if (!p) return 'Huehuetenango, Guatemala'
+  const ubi = p.ubicacion || p.ubicacionFisica || p.direccion || p.tramo || ''
+  const dep = p.departamentoNombre || p.departamento_nombre || (typeof p.departamento === 'string' ? p.departamento : p.departamento?.nombre) || ''
+  const mun = p.municipioNombre || p.municipio_nombre || (typeof p.municipio === 'string' ? p.municipio : p.municipio?.nombre) || ''
+
+  if (ubi && dep && !ubi.toLowerCase().includes(dep.toLowerCase())) {
+    return `${ubi} · ${dep}${mun ? `, ${mun}` : ''}`
+  }
+  if (ubi) return ubi
+  if (dep && mun) return `${dep}, ${mun}`
+  if (dep) return dep
+  if (mun) return mun
+  return 'Huehuetenango, Guatemala'
+}
+
 const ProjectCard = memo(function ProjectCard({ proyecto, onClick }: ProjectItemProps) {
   const [imgError, setImgError] = useState(false)
   
   // Extraer foto o thumbnail si existe en el objeto del proyecto
   const imagenUrl = !imgError && (proyecto.imagenUrl || proyecto.foto_portada || proyecto.fotografias?.[0]?.urlMiniatura || proyecto.fotografias?.[0]?.url || null)
   const totalFotos = proyecto.fotografias?.length || proyecto.totalFotos || 0
+  const ubicacionTexto = obtenerUbicacionProyecto(proyecto)
 
   return (
     <button
       type="button"
       onClick={onClick}
-      className="group flex flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-all hover:shadow-md hover:border-gray-300 w-full cursor-pointer text-left focus:outline-none"
+      className="group flex flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xs transition-all hover:shadow-xs hover:border-gray-300 w-full cursor-pointer text-left focus:outline-none"
     >
-      <div className="relative h-40 w-full overflow-hidden bg-slate-100 flex items-center justify-center">
+      <div className="relative h-28 sm:h-32 w-full overflow-hidden bg-slate-100 flex items-center justify-center">
         {imagenUrl ? (
           <img
             src={imagenUrl}
@@ -36,20 +53,20 @@ const ProjectCard = memo(function ProjectCard({ proyecto, onClick }: ProjectItem
             className="h-full w-full object-cover transition-transform group-hover:scale-105"
           />
         ) : (
-          <div className="flex flex-col items-center justify-center text-gray-400 gap-1.5 p-4 text-center">
-            <ImageIcon size={32} className="text-gray-300" />
-            <span className="text-[10px] font-semibold text-gray-400">Sin fotografías</span>
+          <div className="flex flex-col items-center justify-center text-gray-400 gap-1 p-2 text-center">
+            <ImageIcon size={24} className="text-gray-300" />
+            <span className="text-[9px] font-semibold text-gray-400">Sin fotografías</span>
           </div>
         )}
-        <span className="absolute bottom-2 right-2 rounded-md bg-black/65 px-2 py-1 text-[9px] font-semibold text-white">
+        <span className="absolute bottom-1.5 right-1.5 rounded-md bg-black/65 px-1.5 py-0.5 text-[8px] font-semibold text-white">
           {totalFotos} foto{totalFotos !== 1 ? 's' : ''}
         </span>
       </div>
 
-      <div className="p-3.5 text-left w-full">
-        <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide">{proyecto.codigo || 'PROY'}</p>
-        <h3 className="mt-1 line-clamp-1 text-sm font-bold text-gray-900">{proyecto.nombre || proyecto.nombre_oficial}</h3>
-        <p className="mt-1 line-clamp-1 text-[10px] text-gray-400">{proyecto.ubicacion || proyecto.departamento_nombre || 'Sin ubicación'}</p>
+      <div className="p-2.5 text-left w-full space-y-0.5">
+        <p className="text-[8.5px] font-bold text-gray-400 uppercase tracking-wider">{proyecto.codigo || 'PROY'}</p>
+        <h3 className="line-clamp-1 text-xs font-bold text-gray-900 leading-snug">{proyecto.nombre || proyecto.nombre_oficial}</h3>
+        <p className="line-clamp-1 text-[9.5px] text-gray-500 font-medium">{ubicacionTexto}</p>
       </div>
     </button>
   )
@@ -59,14 +76,15 @@ const ProjectListItem = memo(function ProjectListItem({ proyecto, onClick }: Pro
   const [imgError, setImgError] = useState(false)
   const imagenUrl = !imgError && (proyecto.imagenUrl || proyecto.foto_portada || proyecto.fotografias?.[0]?.urlMiniatura || proyecto.fotografias?.[0]?.url || null)
   const totalFotos = proyecto.fotografias?.length || proyecto.totalFotos || 0
+  const ubicacionTexto = obtenerUbicacionProyecto(proyecto)
 
   return (
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-center gap-4 rounded-xl border border-gray-200 bg-white p-3 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md hover:border-gray-300 cursor-pointer focus:outline-none"
+      className="flex w-full items-center gap-3 rounded-lg border border-gray-200 bg-white p-2 text-left shadow-2xs transition-all hover:bg-gray-50/80 hover:border-gray-300 cursor-pointer focus:outline-none"
     >
-      <div className="relative h-16 w-24 shrink-0 overflow-hidden rounded-lg bg-slate-100 flex items-center justify-center">
+      <div className="relative h-11 w-16 sm:h-12 sm:w-20 shrink-0 overflow-hidden rounded-md bg-slate-100 flex items-center justify-center">
         {imagenUrl ? (
           <img
             src={imagenUrl}
@@ -77,22 +95,22 @@ const ProjectListItem = memo(function ProjectListItem({ proyecto, onClick }: Pro
             className="h-full w-full object-cover transition-transform hover:scale-105"
           />
         ) : (
-          <ImageIcon size={20} className="text-gray-300" />
+          <ImageIcon size={16} className="text-gray-300" />
         )}
       </div>
 
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2 mb-1">
-          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[9px] font-semibold text-gray-500">
+        <div className="flex items-center gap-1.5 mb-0.5">
+          <span className="rounded bg-gray-100 px-1.5 py-0.2 text-[8px] font-bold text-gray-500 font-mono">
             {proyecto.codigo || 'N/A'}
           </span>
-          <p className="truncate text-xs font-bold text-gray-900">{proyecto.nombre || proyecto.nombre_oficial}</p>
+          <p className="truncate text-xs font-bold text-gray-900 leading-tight">{proyecto.nombre || proyecto.nombre_oficial}</p>
         </div>
-        <p className="truncate text-[10px] text-gray-500">{proyecto.ubicacion || proyecto.departamento_nombre || 'Sin ubicación'}</p>
+        <p className="truncate text-[9.5px] text-gray-500 font-medium">{ubicacionTexto}</p>
       </div>
       
-      <div className="shrink-0 pr-2">
-         <span className="rounded-md bg-black/5 px-2 py-1 text-[10px] font-semibold text-gray-600">
+      <div className="shrink-0 pr-1">
+        <span className="rounded-md bg-black/5 px-2 py-0.5 text-[9px] font-semibold text-gray-600">
           {totalFotos} foto{totalFotos !== 1 ? 's' : ''}
         </span>
       </div>
@@ -110,6 +128,7 @@ export default function FotografiasGaleria() {
   
   // Filtros state
   const [busqueda, setBusqueda] = useState('')
+  const [proyectoFiltroId, setProyectoFiltroId] = useState('')
   const [estadoFiltro, setEstadoFiltro] = useState<EstadoProyecto | 'todos'>('todos')
   const [filtroDepa, setFiltroDepa] = useState('')
   const [filtroMuni, setFiltroMuni] = useState('')
@@ -118,14 +137,105 @@ export default function FotografiasGaleria() {
 
   useEffect(() => {
     let cancelado = false
-    apiGetDeduplicado('/proyectos')
-      .then((res) => {
-        if (!cancelado) {
-          if (res.data?.success && Array.isArray(res.data.data)) {
-            setProyectosApi(res.data.data)
+    Promise.allSettled([
+      apiGetDeduplicado('/proyectos'),
+      apiGetDeduplicado('/mantenimiento/bitacora_entrada?limite=200'),
+      apiGetDeduplicado('/mantenimiento/evidencia_fotografica?limite=200'),
+    ])
+      .then(([resProy, resBit, resEvid]) => {
+        if (cancelado) return
+
+        const proys =
+          resProy.status === 'fulfilled' && Array.isArray(resProy.value.data?.data)
+            ? resProy.value.data.data
+            : []
+        const bitacoras =
+          resBit.status === 'fulfilled' && Array.isArray(resBit.value.data?.data)
+            ? resBit.value.data.data
+            : []
+        const evidencias =
+          resEvid.status === 'fulfilled' && Array.isArray(resEvid.value.data?.data)
+            ? resEvid.value.data.data
+            : []
+
+        let locales: any[] = []
+        try {
+          locales = JSON.parse(localStorage.getItem('domun_bitacora_locales') || '[]')
+        } catch (_) {}
+
+        // Indexar bitácoras y fotos por proyecto para resolución instantánea
+        const bitacorasPorProyecto = new Map<string, any[]>()
+        bitacoras.forEach((b: any) => {
+          const pKey = String(b.proyecto_id || b.proyectoId || '').toLowerCase().trim()
+          if (pKey) {
+            const list = bitacorasPorProyecto.get(pKey) || []
+            list.push(b)
+            bitacorasPorProyecto.set(pKey, list)
           }
-          setCargando(false)
+        })
+
+        const fotosMap = new Map<string, { set: Set<string>; ultima: string | null }>()
+        const registrarFoto = (pKey: string, url: string) => {
+          if (!pKey || !url) return
+          const k = pKey.toLowerCase().trim()
+          const current = fotosMap.get(k) || { set: new Set<string>(), ultima: null }
+          current.set.add(url)
+          if (!current.ultima) current.ultima = url
+          fotosMap.set(k, current)
         }
+
+        evidencias.forEach((ev: any) => {
+          const url = ev.url_storage || ev.url || ev.url_archivo
+          if (url) {
+            if (ev.proyecto_id || ev.proyectoId) {
+              registrarFoto(String(ev.proyecto_id || ev.proyectoId), url)
+            }
+          }
+        })
+
+        locales.forEach((l: any) => {
+          const pKey = String(l.proyectoId || l.proyecto_id || '')
+          if (pKey) {
+            if (Array.isArray(l.adjuntos)) {
+              l.adjuntos.forEach((adj: any) => {
+                const url = typeof adj === 'string' ? adj : adj?.url
+                if (url) registrarFoto(pKey, url)
+              })
+            }
+            if (l.fotografiaPrincipal?.url) {
+              registrarFoto(pKey, l.fotografiaPrincipal.url)
+            }
+          }
+        })
+
+        // Mapear fotos a cada proyecto
+        const proysEnriquecidos = proys.map((p: any) => {
+          const pId = String(p.id).toLowerCase().trim()
+          const pCod = String(p.codigo || '').toLowerCase().trim()
+          const fData = fotosMap.get(pId) || (pCod ? fotosMap.get(pCod) : null) || { set: new Set<string>(), ultima: null }
+
+          if (Array.isArray(p.fotografias)) {
+            p.fotografias.forEach((f: any) => {
+              const url = typeof f === 'string' ? f : f?.urlMiniatura || f?.url
+              if (url) {
+                fData.set.add(url)
+                if (!fData.ultima) fData.ultima = url
+              }
+            })
+          }
+
+          return {
+            ...p,
+            totalFotos: fData.set.size,
+            imagenUrl: fData.ultima || p.imagenUrl || p.foto_portada || null,
+          }
+        })
+
+        setProyectosApi(proysEnriquecidos)
+        try {
+          sessionStorage.setItem('domun_fotografias_cache', JSON.stringify(proysEnriquecidos))
+        } catch (_) {}
+        setCargando(false)
       })
       .catch(() => {
         if (!cancelado) {
@@ -137,23 +247,45 @@ export default function FotografiasGaleria() {
     }
   }, [])
 
-  const proyectosConFotos = useMemo(() => {
-    // Aplicar filtros y excluir borradores
+  useEffect(() => {
+    // Hidratación instantánea desde caché de sesión
+    try {
+      const cached = sessionStorage.getItem('domun_fotografias_cache')
+      if (cached) {
+        const parsed = JSON.parse(cached)
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setProyectosApi(parsed)
+          setCargando(false)
+        }
+      }
+    } catch (_) {}
+  }, [])
+
+  const proyectosSinBorrador = useMemo(() => {
     return proyectosApi.filter((p) => {
-      const estadoNorm = (p.estado || p.estado_codigo || '').toLowerCase()
-      if (estadoNorm === 'borrador') return false
+      const estadoNorm = (p.estado || p.estado_codigo || '').toLowerCase().trim()
+      return estadoNorm !== 'borrador'
+    })
+  }, [proyectosApi])
+
+  const proyectosConFotos = useMemo(() => {
+    // Aplicar filtros sobre proyectos excluyendo borradores
+    return proyectosSinBorrador.filter((p) => {
+      if (proyectoFiltroId && String(p.id) !== String(proyectoFiltroId)) {
+        return false
+      }
 
       const pNombre = (p.nombre || p.nombre_oficial || '').toLowerCase()
       const pCodigo = (p.codigo || '').toLowerCase()
       const pUbi = (p.ubicacion || p.departamento_nombre || '').toLowerCase()
 
       const matchBusqueda = busqueda === '' || pNombre.includes(busqueda.toLowerCase()) || pCodigo.includes(busqueda.toLowerCase())
-      const matchEstado = estadoFiltro === 'todos' || estadoNorm === estadoFiltro.toLowerCase()
+      const matchEstado = estadoFiltro === 'todos' || (p.estado || p.estado_codigo || '').toLowerCase() === estadoFiltro.toLowerCase()
       const matchUbi = filtroDepa === '' || pUbi.includes(filtroDepa.toLowerCase())
       
       return matchBusqueda && matchEstado && matchUbi
     })
-  }, [proyectosApi, busqueda, estadoFiltro, filtroDepa])
+  }, [proyectosSinBorrador, busqueda, proyectoFiltroId, estadoFiltro, filtroDepa])
 
   const totalItems = proyectosConFotos.length
   const totalPaginas = Math.ceil(totalItems / porPagina) || 1
@@ -169,6 +301,7 @@ export default function FotografiasGaleria() {
 
   const handleLimpiarFiltros = () => {
     setBusqueda('')
+    setProyectoFiltroId('')
     setEstadoFiltro('todos')
     setFiltroDepa('')
     setFiltroMuni('')
@@ -178,50 +311,67 @@ export default function FotografiasGaleria() {
   }
 
   return (
-    <div className="space-y-4 font-[Poppins]">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-base font-bold text-gray-800">Fotografías de obra vial</h1>
-          <p className="text-[10px] text-gray-400 mt-1">
+    <div className="space-y-3 font-[Poppins] w-full max-w-full overflow-x-hidden touch-pan-y">
+      {/* Header con título a la izquierda y Toggle de Vistas compacto en la esquina derecha */}
+      <div className="flex items-start sm:items-center justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-[15px] sm:text-base font-bold text-gray-800 leading-tight">Fotografías de obra vial</h1>
+          <p className="text-[10px] sm:text-[10px] text-gray-400 mt-0.5 line-clamp-1 sm:line-clamp-none">
             Selecciona un frente de carretera para ver avances, inspecciones, drenajes y estructuras.
           </p>
         </div>
         
-        {/* Toggle de Vistas */}
-        <div className="flex items-center overflow-hidden rounded-md border border-gray-200 bg-white shadow-sm shrink-0">
+        {/* Toggle de Vistas: Lista / Detalles */}
+        <div className="flex items-center overflow-hidden rounded-md border border-gray-200 bg-white shadow-2xs shrink-0 self-start sm:self-auto">
           <button
             type="button"
             onClick={() => {
               setVista('lista')
               setPaginaActual(1)
             }}
-            className={`flex h-8 items-center gap-1.5 px-3 text-[10px] font-bold transition-colors cursor-pointer ${vista === 'lista' ? 'bg-[#9B0F06] text-white' : 'text-gray-600 hover:bg-gray-50'}`}
+            className={`flex h-7 sm:h-8 items-center gap-1.5 px-2.5 sm:px-3 text-[10px] font-bold transition-colors cursor-pointer ${
+              vista === 'lista'
+                ? 'bg-[#9B0F06] text-white shadow-xs'
+                : 'text-gray-600 hover:bg-gray-50'
+            }`}
+            title="Vista de lista"
           >
-            <List size={12} />
-            <span className="hidden sm:inline">Lista</span>
+            <List size={13} />
+            <span>Lista</span>
           </button>
-          <div className="w-px h-4 bg-gray-200"></div>
+          <div className="w-px h-4 bg-gray-200" />
           <button
             type="button"
             onClick={() => {
               setVista('detalles')
               setPaginaActual(1)
             }}
-            className={`flex h-8 items-center gap-1.5 px-3 text-[10px] font-bold transition-colors cursor-pointer ${vista === 'detalles' ? 'bg-[#9B0F06] text-white' : 'text-gray-600 hover:bg-gray-50'}`}
+            className={`flex h-7 sm:h-8 items-center gap-1.5 px-2.5 sm:px-3 text-[10px] font-bold transition-colors cursor-pointer ${
+              vista === 'detalles'
+                ? 'bg-[#9B0F06] text-white shadow-xs'
+                : 'text-gray-600 hover:bg-gray-50'
+            }`}
+            title="Vista de detalles"
           >
-            <LayoutGrid size={12} />
-            <span className="hidden sm:inline">Detalles</span>
+            <LayoutGrid size={13} />
+            <span>Detalles</span>
           </button>
         </div>
       </div>
       
       <ProyectoFiltros
-        proyectos={proyectosConFotos}
+        proyectos={proyectosSinBorrador}
         busqueda={busqueda}
         setBusqueda={(v) => {
           setBusqueda(v)
           setPaginaActual(1)
         }}
+        proyectoSeleccionadoId={proyectoFiltroId}
+        setProyectoSeleccionadoId={(v) => {
+          setProyectoFiltroId(v)
+          setPaginaActual(1)
+        }}
+        mostrarSelectorProyecto={true}
         estadoFiltro={estadoFiltro}
         setEstadoFiltro={(v) => {
           setEstadoFiltro(v)
@@ -252,13 +402,13 @@ export default function FotografiasGaleria() {
       />
 
       {cargando ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3].map((n) => (
-            <div key={n} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm animate-pulse">
-              <div className="h-36 bg-gray-200 rounded-lg mb-3"></div>
-              <div className="h-3 bg-gray-200 rounded w-1/4 mb-2"></div>
-              <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-              <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 sm:gap-3">
+          {[1, 2, 3, 4, 5, 6].map((n) => (
+            <div key={n} className="rounded-xl border border-gray-200 bg-white p-2.5 shadow-2xs animate-pulse">
+              <div className="h-28 sm:h-32 bg-gray-200 rounded-lg mb-2"></div>
+              <div className="h-2 bg-gray-200 rounded w-1/4 mb-1.5"></div>
+              <div className="h-3 bg-gray-200 rounded w-3/4 mb-1"></div>
+              <div className="h-2 bg-gray-200 rounded w-1/2"></div>
             </div>
           ))}
         </div>
@@ -275,7 +425,7 @@ export default function FotografiasGaleria() {
           </p>
         </div>
       ) : vista === 'detalles' ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 sm:gap-3">
           {proyectosPaginados.map((proyecto) => (
             <ProjectCard
               key={proyecto.id}
@@ -285,7 +435,7 @@ export default function FotografiasGaleria() {
           ))}
         </div>
       ) : (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-1.5">
           {proyectosPaginados.map((proyecto) => (
             <ProjectListItem
               key={proyecto.id}
@@ -297,34 +447,35 @@ export default function FotografiasGaleria() {
       )}
 
       {!cargando && totalItems > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-100 bg-white px-3 py-2.5 shadow-sm mt-4">
-          <div className="flex items-center gap-3">
-            <span className="text-[11px] text-gray-500 font-medium">Mostrar</span>
+        <div data-paginacion="true" className="paginacion-control font-[Poppins] flex flex-wrap items-center justify-between gap-2.5 rounded-xl border border-gray-100 bg-white px-3 py-2 shadow-2xs mt-3 text-[9.5px]">
+          <div className="flex items-center gap-1.5 sm:gap-2 text-[9.5px]">
+            <span className="text-gray-500 font-normal text-[9.5px]">Mostrar</span>
             <select 
               value={porPagina} 
               onChange={(e) => {
                 setPorPagina(Number(e.target.value))
                 setPaginaActual(1)
               }}
-              className="h-6 rounded border border-gray-200 bg-gray-50 px-1 text-[11px] font-bold text-gray-700 focus:border-[#9B0F06] focus:outline-none cursor-pointer"
+              className="paginacion-control h-6 rounded border border-gray-200 bg-gray-50 px-1 text-[9.5px] font-normal text-gray-700 focus:border-[#9B0F06] focus:outline-none cursor-pointer font-[Poppins]"
             >
-              <option value={3}>3</option>
-              <option value={6}>6</option>
-              <option value={10}>10</option>
-              <option value={20}>20</option>
-              <option value={50}>50</option>
+              <option value={3} className="text-[9.5px] font-[Poppins]">3</option>
+              <option value={6} className="text-[9.5px] font-[Poppins]">6</option>
+              <option value={10} className="text-[9.5px] font-[Poppins]">10</option>
+              <option value={20} className="text-[9.5px] font-[Poppins]">20</option>
+              <option value={50} className="text-[9.5px] font-[Poppins]">50</option>
             </select>
-            <div className="h-4 w-px bg-gray-200 mx-1 hidden sm:block"></div>
-            <span className="text-[11px] font-semibold text-gray-600 hidden sm:inline">
-              Página {paginaActual} de {totalPaginas} ({totalItems} proyectos)
+            <div className="h-3 w-px bg-gray-200 mx-0.5"></div>
+            <span className="text-[9.5px] font-normal text-gray-600 font-[Poppins]">
+              Página {paginaActual} de {totalPaginas}
+              <span className="hidden sm:inline text-gray-400"> ({totalItems} proyectos)</span>
             </span>
           </div>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 text-[9.5px]">
             <button
               onClick={() => setPaginaActual((p) => Math.max(1, p - 1))}
               disabled={paginaActual === 1}
-              className="rounded-lg border border-gray-200 bg-white px-3 py-1 text-[11px] font-bold text-gray-600 transition-colors hover:border-[#9B0F06] hover:text-[#9B0F06] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+              className="rounded-lg border border-gray-200 bg-white px-2.5 py-0.5 text-[9.5px] font-normal text-gray-600 transition-colors hover:border-[#9B0F06] hover:text-[#9B0F06] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer font-[Poppins]"
             >
               Anterior
             </button>
@@ -332,7 +483,7 @@ export default function FotografiasGaleria() {
             <button
               onClick={() => setPaginaActual((p) => Math.min(totalPaginas, p + 1))}
               disabled={paginaActual >= totalPaginas}
-              className="rounded-lg border border-gray-200 bg-white px-3 py-1 text-[11px] font-bold text-gray-600 transition-colors hover:border-[#9B0F06] hover:text-[#9B0F06] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+              className="rounded-lg border border-gray-200 bg-white px-2.5 py-0.5 text-[9.5px] font-normal text-gray-600 transition-colors hover:border-[#9B0F06] hover:text-[#9B0F06] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer font-[Poppins]"
             >
               Siguiente
             </button>

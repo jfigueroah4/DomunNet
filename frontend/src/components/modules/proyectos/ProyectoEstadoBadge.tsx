@@ -47,7 +47,7 @@ export default function ProyectoEstadoBadge({ estado }: ProyectoEstadoBadgeProps
   }
 
   return (
-    <span className={`${config.bg} ${config.text} text-[10px] font-semibold px-2 py-0.5 rounded-full`}>
+    <span className={`${config.bg} ${config.text} text-[8.5px] font-semibold px-2 py-0.5 rounded-full tracking-tight`}>
       {config.label}
     </span>
   )

@@ -224,7 +224,7 @@ export function EmpresaDrawer({ isOpen, onClose, onSave, mode = 'create', empres
  }
 
  const handleSiguiente = () => {
- if (validarPaso1()) {
+ if (mode === 'view' || validarPaso1()) {
  setPaso(2)
  } else {
  showErrorToast('Por favor, corrija los errores del formulario')

@@ -56,20 +56,33 @@ export async function subirEvidenciaBitacoraGCSControlador(req: Request, res: Re
 
     const carpeta = `bitacora/${nombreProyectoFolder}`
 
-    // Intentar subida con Backblaze B2 primero, fallback a Cloudinary
-    let resultado: { urlStorage: string; publicId?: string; key?: string; proveedor: string; tamanioKB?: number; mensaje?: string }
+    // Intentar subida con Backblaze B2 primero, fallback automático a Cloudinary
+    let resultado: { urlStorage: string; publicId?: string; key?: string; proveedor: string; tamanioKB?: number; mensaje?: string } = {
+      urlStorage: '',
+      proveedor: 'none',
+    }
     
+    let subioConB2 = false
     const estadoB2 = await obtenerEstadoB2()
     if (estadoB2.configurado) {
-      const b2Res = await subirArchivoB2(base64String, `evidencia_${Date.now()}.jpg`, 'image/jpeg', carpeta)
-      resultado = {
-        urlStorage: b2Res.urlStorage,
-        key: b2Res.key,
-        proveedor: b2Res.proveedor,
-        tamanioKB: b2Res.tamanioKB,
-        mensaje: b2Res.mensaje,
+      try {
+        const b2Res = await subirArchivoB2(base64String, `evidencia_${Date.now()}.jpg`, 'image/jpeg', carpeta)
+        if (b2Res && b2Res.proveedor === 'backblaze-b2') {
+          resultado = {
+            urlStorage: b2Res.urlStorage,
+            key: b2Res.key,
+            proveedor: b2Res.proveedor,
+            tamanioKB: b2Res.tamanioKB,
+            mensaje: b2Res.mensaje,
+          }
+          subioConB2 = true
+        }
+      } catch (errB2: any) {
+        console.warn('⚠️ Error al subir a Backblaze B2 (posible credencial inválida), usando Cloudinary de respaldo:', errB2?.message || errB2)
       }
-    } else {
+    }
+
+    if (!subioConB2) {
       const cloudRes = await subirArchivoCloudinary(base64String, carpeta)
       resultado = {
         urlStorage: cloudRes.urlStorage,

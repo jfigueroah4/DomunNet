@@ -6,9 +6,11 @@ import {
   ArrowLeft,
   Building2,
   CalendarDays,
+  Camera,
   Check,
   CheckCircle2,
   ChevronDown,
+  ClipboardList,
   Clock,
   Edit2,
   FileSignature,
@@ -18,23 +20,35 @@ import {
   Layers,
   Lock,
   MapPin,
+  MapPinOff,
+  MoreVertical,
   Navigation,
   Route,
   Scale,
   Trash2,
   UserCheck,
+  UserPlus,
   Users,
+  Plus,
   X,
+  FolderArchive,
 } from 'lucide-react'
 import { useAuthStore } from '@/stores/useAuthStore'
+import { useRolesStore } from '@/stores/useRolesStore'
 import { showSuccessToast, showErrorToast } from '@/hooks/useCustomToast'
 import type { ProyectoType } from '@/validations/proyecto.schema'
 import ProyectoEstadoBadge from '@/components/modules/proyectos/ProyectoEstadoBadge'
 import ProyectoInformacionFinanciera from '@/components/modules/proyectos/ProyectoInformacionFinanciera'
+import ProyectoDocumentos from '@/components/modules/proyectos/ProyectoDocumentos'
+import { Combobox } from '@/components/ui/Combobox'
+import { api, apiGetDeduplicado, limpiarCacheMemoria } from '@/lib/api/cliente'
 import { proyectoService } from '@/services/proyectos/proyecto.service'
+import { UsuarioFormularioDrawer } from '@/components/modules/usuarios/UsuarioFormularioDrawer'
+import { RenglonesBitacoraDrawer, RenglonItem } from './RenglonesBitacoraDrawer'
+import { BITACORA_MOCK } from '@/data/bitacora.mock'
 
 type MasterTabType = 'general' | 'financiera'
-type SubTabGeneralType = 'resumen' | 'intro' | 'marco_legal' | 'ficha_tecnica' | 'ubicacion'
+type SubTabGeneralType = 'resumen' | 'intro' | 'marco_legal' | 'ficha_tecnica' | 'ubicacion' | 'documentos'
 export function sanitizeNombrePersona(val: string, maxLen = 150): string {
   return val.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s.'-]/g, '').slice(0, maxLen)
 }
@@ -120,9 +134,9 @@ function MapaDetalleVista({
   kilometroFin,
   className,
 }: {
-  lat: number
-  lng: number
-  direccion: string
+  lat?: number | null
+  lng?: number | null
+  direccion?: string
   direccionFin?: string
   kilometroInicio?: string | number
   kilometroFin?: string | number
@@ -130,20 +144,51 @@ function MapaDetalleVista({
 }) {
   const mapaRef = useRef<HTMLDivElement>(null)
   const instanciaMapaRef = useRef<any>(null)
+  const [geoFallback, setGeoFallback] = useState<{ lat: number; lng: number } | null>(null)
+
+  const numLat = lat != null && !isNaN(Number(lat)) ? Number(lat) : (geoFallback?.lat ?? null)
+  const numLng = lng != null && !isNaN(Number(lng)) ? Number(lng) : (geoFallback?.lng ?? null)
+  const tieneUbicacionValida = numLat != null && numLng != null
+
+  useEffect(() => {
+    if (lat != null && lng != null && !isNaN(Number(lat)) && !isNaN(Number(lng))) return
+    const dirABuscar = (direccion || '').trim()
+    if (!dirABuscar || dirABuscar === 'Ubicación General') return
+
+    let activo = true
+    const qLimpio = dirABuscar.toLowerCase().includes('guatemala') ? dirABuscar : `${dirABuscar}, Guatemala`
+    fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(qLimpio)}&limit=1&countrycodes=gt&accept-language=es`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (!activo) return
+        if (Array.isArray(data) && data.length > 0 && data[0].lat && data[0].lon) {
+          setGeoFallback({ lat: Number(data[0].lat), lng: Number(data[0].lon) })
+        }
+      })
+      .catch(() => {})
+    return () => {
+      activo = false
+    }
+  }, [lat, lng, direccion])
 
   const kIni = parseFloat(String(kilometroInicio || '0'))
   const kFin = parseFloat(String(kilometroFin || '0'))
   const distanciaTramo = !isNaN(kIni) && !isNaN(kFin) && kFin > kIni ? kFin - kIni : 0
 
   useEffect(() => {
+    if (!tieneUbicacionValida) return
     let activo = true
     const inicializarMapa = async () => {
-      if (!mapaRef.current || instanciaMapaRef.current) return
+      if (!mapaRef.current) return
+      if (instanciaMapaRef.current) {
+        instanciaMapaRef.current.remove()
+        instanciaMapaRef.current = null
+      }
       const L = await import('leaflet')
       if (!activo || !mapaRef.current) return
 
       const mapa = L.map(mapaRef.current, {
-        center: [lat, lng],
+        center: [numLat!, numLng!],
         zoom: 13,
         zoomControl: false,
       })
@@ -163,15 +208,15 @@ function MapaDetalleVista({
         iconAnchor: [12, 30],
       })
 
-      L.marker([lat, lng], { icon: pinInicio })
+      L.marker([numLat!, numLng!], { icon: pinInicio })
         .addTo(mapa)
-        .bindTooltip(`<b>Punto de Inicio:</b><br/>${direccion}`, { permanent: false, direction: 'top' })
-        .bindPopup(`<b>Punto de Inicio:</b><br/>${direccion}`)
+        .bindTooltip(`<b>Punto de Inicio:</b><br/>${direccion || 'Ubicación'}`, { permanent: false, direction: 'top' })
+        .bindPopup(`<b>Punto de Inicio:</b><br/>${direccion || 'Ubicación'}`)
 
       if (distanciaTramo > 0) {
         const offsetLat = distanciaTramo * 0.0075
         const offsetLng = distanciaTramo * 0.0055
-        const pEnd: [number, number] = [lat + offsetLat, lng + offsetLng]
+        const pEnd: [number, number] = [numLat! + offsetLat, numLng! + offsetLng]
 
         const pinFin = L.divIcon({
           className: 'custom-end-pin',
@@ -189,7 +234,7 @@ function MapaDetalleVista({
           .bindTooltip(`<b>Punto de Conexión Fin:</b><br/>${textoFin}`, { permanent: false, direction: 'top' })
           .bindPopup(`<b>Punto de Conexión Fin:</b><br/>${textoFin}`)
 
-        const rutaPolyline = L.polyline([[lat, lng], pEnd], {
+        const rutaPolyline = L.polyline([[numLat!, numLng!], pEnd], {
           color: '#9B0F06',
           weight: 4,
           opacity: 0.85,
@@ -213,7 +258,25 @@ function MapaDetalleVista({
       instanciaMapaRef.current?.remove()
       instanciaMapaRef.current = null
     }
-  }, [lat, lng, direccion, direccionFin, distanciaTramo, kilometroFin])
+  }, [tieneUbicacionValida, numLat, numLng, direccion, direccionFin, distanciaTramo, kilometroFin])
+
+  if (!tieneUbicacionValida) {
+    return (
+      <div
+        className={`w-full overflow-hidden rounded-xl border border-dashed border-gray-300 bg-gray-50/80 p-5 flex flex-col items-center justify-center text-center shadow-xs ${
+          className?.includes('h-') ? className.split(' ').filter(c => c.startsWith('h-')).join(' ') : 'h-64'
+        }`}
+      >
+        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-gray-400 mb-2 mx-auto">
+          <MapPinOff size={20} />
+        </div>
+        <p className="text-xs font-semibold text-gray-700 font-[Poppins] text-center w-full">Ubicación no establecida</p>
+        <p className="text-[10px] text-gray-400 max-w-xs mt-1 font-[Poppins] leading-tight text-center mx-auto">
+          Aún no se ha definido la ubicación geográfica ni las coordenadas para este proyecto.
+        </p>
+      </div>
+    )
+  }
 
   return <div ref={mapaRef} className={className || "h-64 w-full overflow-hidden rounded-xl border border-gray-200 shadow-xs"} />
 }
@@ -255,7 +318,7 @@ function InfoDetailCard({
   return (
     <section
       className={`rounded-xl border bg-white p-3.5 shadow-2xs transition-all ${
-        isEditing ? 'border-[#9B0F06]/40 ring-1 ring-[#9B0F06]/15' : 'border-gray-200 hover:shadow-xs'
+        isEditing ? 'border-gray-300 ring-1 ring-gray-200' : 'border-gray-200 hover:shadow-xs'
       }`}
     >
       <div className="mb-2.5 flex items-center justify-between border-b border-gray-100 pb-2">
@@ -320,105 +383,66 @@ function getFieldValidation(
   rawVal: any,
   label: string,
   kind?: 'nombre' | 'porcentaje' | 'monto' | 'telefono' | 'email' | 'texto' | 'codigo',
-  required?: boolean
+  _required?: boolean
 ): { cleanVal: string; error: string | null } {
   const strVal = rawVal !== undefined && rawVal !== null ? String(rawVal) : ''
   const lbl = label.toLowerCase()
 
+  const isDocOrCode = /colegiado|registro|licitación|licitacion|acta|contrato|acuerdo|partida|cdp|código|codigo|escritura/i.test(lbl)
+  const isPersonaNombre = !isDocOrCode && /propietario|superintendente|responsable|delegado|representante|contacto/i.test(lbl)
+
   const detectedKind = kind || (
-    /propietario|superintendente|responsable|delegado/i.test(lbl) ? 'nombre' :
+    isDocOrCode ? 'codigo' :
+    isPersonaNombre ? 'nombre' :
     /porcentaje|anticipo/i.test(lbl) ? 'porcentaje' :
     /monto|presupuesto/i.test(lbl) ? 'monto' :
-    /teléfono|telefono/i.test(lbl) ? 'telefono' :
-    /correo|email/i.test(lbl) ? 'email' :
-    /código|codigo/i.test(lbl) ? 'codigo' : 'texto'
+    /teléfono|telefono|celular/i.test(lbl) ? 'telefono' :
+    /correo|email/i.test(lbl) ? 'email' : 'texto'
   )
 
   let clean = strVal
-  let error: string | null = null
-
-  if (detectedKind === 'nombre') {
-    const hasDigits = /[0-9]/.test(strVal)
-    clean = sanitizeNombrePersona(strVal)
-    if (required && !clean.trim()) {
-      error = 'El nombre es obligatorio y no puede quedar vacío.'
-    } else if (hasDigits) {
-      error = 'No se permiten números en nombres de personas.'
-    } else if (clean.trim().length > 0 && clean.trim().length < 2) {
-      error = 'El nombre debe contener al menos 2 letras.'
-    }
-  } else if (detectedKind === 'porcentaje') {
-    const hasLetters = /[a-zA-Z]/.test(strVal)
-    clean = strVal.replace(/[^0-9.]/g, '')
-    const parts = clean.split('.')
-    if (parts.length > 2) clean = parts[0] + '.' + parts.slice(1).join('')
-    if (required && clean === '') {
-      error = 'El porcentaje es obligatorio y no puede quedar vacío.'
-    } else if (hasLetters) {
-      error = 'No se permiten letras en porcentajes (0 a 100).'
-    } else if (clean !== '') {
-      const num = Number(clean)
-      if (isNaN(num) || num < 0 || num > 100) {
-        error = 'El porcentaje debe estar entre 0% y 100%.'
-      }
-    }
-  } else if (detectedKind === 'monto') {
-    const hasLetters = /[a-zA-Z]/.test(strVal)
-    clean = strVal.replace(/[^0-9.]/g, '')
-    const parts = clean.split('.')
-    if (parts.length > 2) clean = parts[0] + '.' + parts.slice(1).join('')
-    if (required && clean === '') {
-      error = 'El monto es obligatorio y no puede quedar vacío.'
-    } else if (hasLetters) {
-      error = 'No se permiten letras en montos monetarios.'
-    } else if (clean !== '') {
-      const num = Number(clean)
-      if (isNaN(num) || num <= 0) {
-        error = 'El monto debe ser un valor numérico mayor a 0.'
-      }
-    }
-  } else if (detectedKind === 'telefono') {
-    const hasLetters = /[a-zA-Z]/.test(strVal)
-    clean = sanitizeTelefono(strVal)
-    const digitsOnly = clean.replace(/\D/g, '')
-    if (required && !clean.trim()) {
-      error = 'El teléfono es obligatorio y no puede quedar vacío.'
-    } else if (hasLetters) {
-      error = 'No se permiten letras ni texto como PBX. Ingrese solo dígitos.'
-    } else if (clean.trim().length > 0 && digitsOnly.length < 8) {
-      error = 'Debe ingresar al menos 8 dígitos telefónicos.'
-    }
-  } else if (detectedKind === 'email') {
-    clean = strVal.replace(/\s+/g, '')
-    if (required && !clean.trim()) {
-      error = 'El correo electrónico es obligatorio y no puede quedar vacío.'
-    } else if (clean.trim().length > 0 && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean.trim())) {
-      error = 'Formato de correo electrónico inválido (ej: contacto@empresa.com).'
-    }
-  } else {
-    if (required && !clean.trim()) {
-      error = 'Este campo es obligatorio y no puede quedar vacío.'
-    }
+  if (!clean.trim()) {
+    return { cleanVal: '', error: null }
   }
 
-  return { cleanVal: clean, error }
+  if (detectedKind === 'nombre') {
+    clean = sanitizeNombrePersona(strVal)
+  } else if (detectedKind === 'porcentaje') {
+    clean = strVal.replace(/[^0-9.]/g, '')
+    const parts = clean.split('.')
+    if (parts.length > 2) clean = parts[0] + '.' + parts.slice(1).join('')
+  } else if (detectedKind === 'monto') {
+    clean = strVal.replace(/[^0-9.]/g, '')
+    const parts = clean.split('.')
+    if (parts.length > 2) clean = parts[0] + '.' + parts.slice(1).join('')
+  } else if (detectedKind === 'telefono') {
+    clean = sanitizeTelefono(strVal)
+  } else if (detectedKind === 'email') {
+    clean = strVal.replace(/\s+/g, '')
+  }
+
+  return { cleanVal: clean, error: null }
 }
 
 function EditableInfoField({
   label,
   value,
   isEditing = false,
+  readOnly = false,
   onChange,
   type = 'text',
   kind,
-  required = false,
+  required: _required = false,
   highlight,
   mono,
   placeholder,
+  userOptions,
+  onEmptyUserAction,
 }: {
   label: string
   value?: string | number | null
   isEditing?: boolean
+  readOnly?: boolean
   onChange?: (val: any) => void
   type?: 'text' | 'date' | 'number' | 'textarea' | 'email'
   kind?: 'nombre' | 'porcentaje' | 'monto' | 'telefono' | 'email' | 'texto' | 'codigo'
@@ -426,47 +450,102 @@ function EditableInfoField({
   highlight?: boolean
   mono?: boolean
   placeholder?: string
+  userOptions?: { value: string; label: string }[]
+  onEmptyUserAction?: () => void
 }) {
   const [localInput, setLocalInput] = useState<string | null>(null)
-  const [localError, setLocalError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!isEditing) {
       setLocalInput(null)
-      setLocalError(null)
     }
   }, [isEditing])
 
-  const valParaCheck = localInput !== null ? localInput : value
-  const currentCheck = useMemo(
-    () => getFieldValidation(valParaCheck, label, kind, required),
-    [valParaCheck, label, kind, required]
-  )
-
-  const activeError = localError || currentCheck.error
-
   const handleInputChange = (raw: string) => {
-    setLocalInput(raw)
-    const check = getFieldValidation(raw, label, kind, required)
-    setLocalError(check.error)
+    let val = raw
+    const isDocOrCode = /colegiado|registro|licitación|licitacion|acta|contrato|acuerdo|partida|cdp|código|codigo|escritura/i.test(label)
+    const isPersonaNombre = !isDocOrCode && /propietario|superintendente|responsable|delegado|representante|contacto/i.test(label)
+
+    const effectiveKind = kind || (
+      isDocOrCode ? 'codigo' :
+      isPersonaNombre ? 'nombre' :
+      /porcentaje|anticipo/i.test(label) ? 'porcentaje' :
+      /monto|presupuesto/i.test(label) ? 'monto' :
+      /teléfono|telefono|celular/i.test(label) ? 'telefono' :
+      /correo|email/i.test(label) ? 'email' : 'texto'
+    )
+
+    if (effectiveKind === 'nombre') {
+      val = sanitizeNombrePersona(raw)
+    } else if (effectiveKind === 'telefono') {
+      val = sanitizeTelefono(raw)
+    } else if (effectiveKind === 'porcentaje' || effectiveKind === 'monto') {
+      val = raw.replace(/[^0-9.]/g, '')
+      const parts = val.split('.')
+      if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('')
+    } else if (effectiveKind === 'email') {
+      val = raw.replace(/\s+/g, '')
+    }
+
+    setLocalInput(val)
+    const check = getFieldValidation(val, label, effectiveKind)
     onChange?.(type === 'number' ? (check.cleanVal === '' ? '' : Number(check.cleanVal)) : check.cleanVal)
   }
 
   const handleBlur = () => {
     if (localInput !== null) {
-      const check = getFieldValidation(localInput, label, kind, required)
       setLocalInput(null)
-      setLocalError(check.error)
     }
   }
 
   if (isEditing) {
-    const hasError = Boolean(activeError)
+    if (readOnly) {
+      return (
+        <div className="space-y-1">
+          <label className="text-[8.5px] font-bold uppercase tracking-wider text-gray-500 block">
+            {label}
+          </label>
+          <input
+            type="text"
+            value={value ?? ''}
+            readOnly
+            disabled
+            className={`w-full rounded-lg border border-gray-200 bg-gray-100/80 px-2.5 py-1 text-[11px] font-semibold text-gray-500 cursor-not-allowed select-none ${
+              mono ? 'font-mono' : ''
+            }`}
+          />
+        </div>
+      )
+    }
+
+    if (userOptions && userOptions.length > 0) {
+      return (
+        <div className="space-y-1">
+          <label className="text-[8.5px] font-bold uppercase tracking-wider text-gray-500 block">
+            {label}
+          </label>
+          <Combobox
+            options={userOptions}
+            value={String(value || '')}
+            onChange={(val) => {
+              setLocalInput(null)
+              onChange?.(val)
+            }}
+            placeholder={placeholder || `Seleccionar ${label.toLowerCase()}...`}
+            emptyAction={onEmptyUserAction ? {
+              label: '+ Crear nuevo usuario',
+              onClick: onEmptyUserAction,
+            } : undefined}
+          />
+        </div>
+      )
+    }
+
     const displayVal = localInput !== null ? localInput : (value ?? '')
     return (
       <div className="space-y-1">
         <label className="text-[8.5px] font-bold uppercase tracking-wider text-gray-500 block">
-          {label} {required && <span className="text-[#9B0F06] font-bold">*</span>}
+          {label}
         </label>
         {type === 'textarea' ? (
           <textarea
@@ -475,11 +554,7 @@ function EditableInfoField({
             onBlur={handleBlur}
             rows={3}
             placeholder={placeholder || `Ingresa ${label.toLowerCase()}`}
-            className={`w-full rounded-lg border p-2 text-[11px] font-medium transition-all resize-y focus:outline-none ${
-              hasError
-                ? 'border-red-500 ring-1 ring-red-400 bg-red-50/20 text-red-900'
-                : 'border-gray-300 bg-gray-50/40 text-gray-900 focus:border-[#9B0F06] focus:bg-white focus:ring-1 focus:ring-[#9B0F06]'
-            }`}
+            className="w-full rounded-lg border border-gray-300 bg-white p-2 text-[11px] font-medium text-gray-900 transition-all resize-y focus:border-[#9B0F06] focus:outline-none focus:ring-1 focus:ring-[#9B0F06]"
           />
         ) : (
           <input
@@ -489,17 +564,8 @@ function EditableInfoField({
             onChange={(e) => handleInputChange(e.target.value)}
             onBlur={handleBlur}
             placeholder={placeholder || `Ingresa ${label.toLowerCase()}`}
-            className={`w-full rounded-lg border px-2.5 py-1 text-[11px] font-semibold transition-all focus:outline-none ${
-              hasError
-                ? 'border-red-500 ring-1 ring-red-400 bg-red-50/20 text-red-900'
-                : 'border-gray-300 bg-gray-50/40 text-gray-900 focus:border-[#9B0F06] focus:bg-white focus:ring-1 focus:ring-[#9B0F06]'
-            } ${mono ? 'font-mono' : ''}`}
+            className="w-full rounded-lg border border-gray-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-gray-900 transition-all focus:border-[#9B0F06] focus:outline-none focus:ring-1 focus:ring-[#9B0F06]"
           />
-        )}
-        {hasError && (
-          <p className="text-[8.5px] font-bold text-red-600 mt-0.5 flex items-center gap-1">
-            <span>⚠</span> {activeError}
-          </p>
         )}
       </div>
     )
@@ -509,9 +575,9 @@ function EditableInfoField({
     <div>
       <p className="text-[8.5px] font-bold uppercase tracking-wider text-gray-400">{label}</p>
       <p
-        className={`mt-0.5 text-[11px] font-semibold leading-tight ${
+        className={`mt-0.5 text-[11px] font-semibold leading-tight ${mono ? 'font-mono' : ''} ${
           highlight ? 'text-[#9B0F06]' : 'text-gray-800'
-        } ${mono ? 'font-mono' : ''}`}
+        }`}
       >
         {value !== undefined && value !== null && value !== '' ? value : '-'}
       </p>
@@ -527,10 +593,12 @@ function EditableItemFichaTecnica({
   onChange,
   type = 'text',
   kind,
-  required = false,
+  required: _required = false,
   highlight,
-  mono,
+  mono: _mono,
   placeholder,
+  userOptions,
+  onEmptyUserAction,
 }: {
   codigo?: string
   label: string
@@ -543,49 +611,87 @@ function EditableItemFichaTecnica({
   highlight?: boolean
   mono?: boolean
   placeholder?: string
+  userOptions?: { value: string; label: string }[]
+  onEmptyUserAction?: () => void
 }) {
   const [localInput, setLocalInput] = useState<string | null>(null)
-  const [localError, setLocalError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!isEditing) {
       setLocalInput(null)
-      setLocalError(null)
     }
   }, [isEditing])
 
-  const valParaCheck = localInput !== null ? localInput : value
-  const currentCheck = useMemo(
-    () => getFieldValidation(valParaCheck, label, kind, required),
-    [valParaCheck, label, kind, required]
-  )
-
-  const activeError = localError || currentCheck.error
-
   const handleInputChange = (raw: string) => {
-    setLocalInput(raw)
-    const check = getFieldValidation(raw, label, kind, required)
-    setLocalError(check.error)
+    let val = raw
+    const isDocOrCode = /colegiado|registro|licitación|licitacion|acta|contrato|acuerdo|partida|cdp|código|codigo|escritura/i.test(label)
+    const isPersonaNombre = !isDocOrCode && /propietario|superintendente|responsable|delegado|representante|contacto/i.test(label)
+
+    const effectiveKind = kind || (
+      isDocOrCode ? 'codigo' :
+      isPersonaNombre ? 'nombre' :
+      /porcentaje|anticipo/i.test(label) ? 'porcentaje' :
+      /monto|presupuesto/i.test(label) ? 'monto' :
+      /teléfono|telefono|celular/i.test(label) ? 'telefono' :
+      /correo|email/i.test(label) ? 'email' : 'texto'
+    )
+
+    if (effectiveKind === 'nombre') {
+      val = sanitizeNombrePersona(raw)
+    } else if (effectiveKind === 'telefono') {
+      val = sanitizeTelefono(raw)
+    } else if (effectiveKind === 'porcentaje' || effectiveKind === 'monto') {
+      val = raw.replace(/[^0-9.]/g, '')
+      const parts = val.split('.')
+      if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('')
+    } else if (effectiveKind === 'email') {
+      val = raw.replace(/\s+/g, '')
+    }
+
+    setLocalInput(val)
+    const check = getFieldValidation(val, label, effectiveKind)
     onChange?.(type === 'number' ? (check.cleanVal === '' ? '' : Number(check.cleanVal)) : check.cleanVal)
   }
 
   const handleBlur = () => {
     if (localInput !== null) {
-      const check = getFieldValidation(localInput, label, kind, required)
       setLocalInput(null)
-      setLocalError(check.error)
     }
   }
 
   if (isEditing) {
-    const hasError = Boolean(activeError)
+    if (userOptions && userOptions.length > 0) {
+      return (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 py-1 px-2 border-b border-gray-100 last:border-0 rounded">
+          <div className="flex items-center gap-1.5 min-w-0 sm:w-1/2 pt-1">
+            {codigo && <span className="font-mono text-[9px] font-bold text-gray-400 shrink-0">{codigo}</span>}
+            <span className="text-[10px] font-semibold text-gray-700 truncate">{label}:</span>
+          </div>
+          <div className="sm:w-1/2">
+            <Combobox
+              options={userOptions}
+              value={String(value || '')}
+              onChange={(val) => {
+                setLocalInput(null)
+                onChange?.(val)
+              }}
+              placeholder={placeholder || `Seleccionar ${label.toLowerCase()}...`}
+              emptyAction={onEmptyUserAction ? {
+                label: '+ Crear nuevo usuario',
+                onClick: onEmptyUserAction,
+              } : undefined}
+            />
+          </div>
+        </div>
+      )
+    }
+
     const displayVal = localInput !== null ? localInput : (value ?? '')
     return (
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-1.5 py-1 px-2 border-b border-gray-100 last:border-0 rounded">
         <div className="flex items-center gap-1.5 min-w-0 sm:w-1/2 pt-1">
           {codigo && <span className="font-mono text-[9px] font-bold text-gray-400 shrink-0">{codigo}</span>}
           <span className="text-[10px] font-semibold text-gray-700 truncate">{label}:</span>
-          {required && <span className="text-[#9B0F06] font-bold">*</span>}
         </div>
         <div className="sm:w-1/2">
           <input
@@ -595,33 +701,24 @@ function EditableItemFichaTecnica({
             onChange={(e) => handleInputChange(e.target.value)}
             onBlur={handleBlur}
             placeholder={placeholder || label}
-            className={`w-full rounded-md border px-2 py-1 text-[10.5px] font-semibold transition-all focus:outline-none ${
-              hasError
-                ? 'border-red-500 ring-1 ring-red-400 bg-red-50/20 text-red-900'
-                : 'border-gray-300 bg-white text-gray-900 focus:border-[#9B0F06] focus:ring-1 focus:ring-[#9B0F06]'
-            } ${mono ? 'font-mono' : ''}`}
+            className="w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-[10.5px] font-semibold text-gray-900 transition-all focus:border-[#9B0F06] focus:outline-none focus:ring-1 focus:ring-[#9B0F06]"
           />
-          {hasError && (
-            <p className="text-[8.5px] font-bold text-red-600 mt-0.5 flex items-center gap-1">
-              <span>⚠</span> {activeError}
-            </p>
-          )}
         </div>
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1 py-1.5 border-b border-gray-100 text-[11px] last:border-0 hover:bg-gray-50/60 px-2 rounded transition-colors">
+    <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1 py-1.5 border-b border-gray-100 text-[11px] last:border-0 hover:bg-gray-50/60 px-2 rounded transition-colors font-[Poppins]">
       <div className="flex items-center gap-1.5 min-w-0">
-        {codigo && <span className="font-mono text-[9px] font-bold text-gray-400 shrink-0">{codigo}</span>}
+        {codigo && <span className="text-[9px] font-bold text-gray-400 shrink-0">{codigo}</span>}
         <span className="font-medium text-gray-600 truncate">{label}:</span>
       </div>
       <div className="sm:text-right pl-3 sm:pl-0">
         <span
           className={`font-semibold ${
             highlight ? 'text-[#9B0F06] font-bold' : 'text-gray-900'
-          } ${mono ? 'font-mono' : ''}`}
+          }`}
         >
           {value !== undefined && value !== null && value !== '' ? value : '-'}
         </span>
@@ -636,100 +733,117 @@ function obtenerValoresCompletosProyecto(p?: ProyectoType | any): Record<string,
   const cEjec = p.contratoEjecucion || pAny.contratoEjecucion || {}
   const cSup = p.contratoSupervision || pAny.contratoSupervision || {}
 
-  const montoObra = Number(cEjec.montoOriginal || p.montoContractualOriginal || p.presupuesto || 369834297.14)
-  const pctAnticipoObra = Number(cEjec.porcentajeAnticipo || pAny.porcentajeAnticipoObra || pAny.porcentaje_anticipo || 15)
-  const montoSup = Number(cSup.montoOriginal || pAny.supervisoraMontoOriginal || pAny.monto_supervision || 13351095.20)
-  const pctAnticipoSup = Number(cSup.porcentajeAnticipo || pAny.porcentajeAnticipoSupervision || 10)
+  const montoObra = Number(cEjec.montoOriginal || p.montoContractualOriginal || p.presupuesto || pAny.monto_original || 0)
+  const pctAnticipoObra = Number(cEjec.porcentajeAnticipo || pAny.porcentajeAnticipoObra || pAny.porcentaje_anticipo || 0)
+  const montoSup = Number(cSup.montoOriginal || pAny.supervisoraMontoOriginal || pAny.monto_supervision || 0)
+  const pctAnticipoSup = Number(cSup.porcentajeAnticipo || pAny.porcentajeAnticipoSupervision || 0)
+
+  const parsedActaEjec = parseActaString(cEjec.actaInicioNumero || pAny.actaInicioEjecutora || '')
+  const parsedActaSup = parseActaString(cSup.actaInicioNumero || pAny.actaInicioSupervisora || '')
+
+  const rawDir = (p.direccion || p.ubicacionFisica || p.ubicacion || '').trim()
+  const cleanDir = rawDir === 'Ubicación General' ? '' : rawDir
+  const rawLat = pAny.latitud ?? pAny.coordenadasMapa?.lat ?? pAny.coordenadas?.lat
+  const rawLng = pAny.longitud ?? pAny.coordenadasMapa?.lng ?? pAny.coordenadas?.lng
+  const latVal = rawLat != null && rawLat !== '' && !isNaN(Number(rawLat)) ? Number(rawLat) : null
+  const lngVal = rawLng != null && rawLng !== '' && !isNaN(Number(rawLng)) ? Number(rawLng) : null
+  const coordenadasTexto = latVal != null && lngVal != null ? `${latVal.toFixed(6)}, ${lngVal.toFixed(6)}` : (pAny.coordenadas && pAny.coordenadas !== '-' ? pAny.coordenadas : '-')
 
   return {
     ...p,
     ...pAny,
     // Identificación
-    nombreOficial: p.nombreOficial || p.nombre || 'CONSTRUCCIÓN DE PASO A DESNIVEL E INTERSECCIÓN VIAL',
-    nombre: p.nombre || p.nombreOficial || 'CONSTRUCCIÓN DE PASO A DESNIVEL E INTERSECCIÓN VIAL',
-    codigo: p.codigo || 'DOM-VIAL-001',
-    direccion: p.direccion || 'Tres Quebradas, Buena Vista, Palencia',
-    ubicacionFisica: p.ubicacionFisica || p.ubicacion || 'Palencia, Guatemala',
-    ubicacion: p.ubicacion || p.ubicacionFisica || 'Palencia, Guatemala',
-    descripcion: p.descripcion || 'Mejoramiento de tramo carretero y obras de arte complementarias.',
+    nombreOficial: p.nombreOficial || p.nombre || '',
+    nombre: p.nombre || p.nombreOficial || '',
+    codigo: p.codigo || '',
+    direccion: cleanDir,
+    ubicacionFisica: cleanDir,
+    ubicacion: cleanDir,
+    latitud: latVal,
+    longitud: lngVal,
+    coordenadas: coordenadasTexto,
+    coordenadasMapa: latVal != null && lngVal != null
+      ? { lat: latVal, lng: lngVal, puntoTexto: cleanDir || 'Punto de obra' }
+      : pAny.coordenadasMapa,
+    descripcion: p.descripcion || '',
 
     // Entidades
-    entidadContratante: p.entidadContratante || 'Dirección General de Caminos (DGC)',
-    empresaContratista: p.empresaContratista || cEjec.empresaNombre || 'Constructora y Pavimentos S.A.',
-    empresaSupervisora: p.empresaSupervisora || cSup.empresaNombre || 'SERVICIOS DE INGENIERIA - SERINGE',
-    delegadoResidente: p.delegadoResidente || cSup.responsable || pAny.delegadoResidente || 'Ing. Civil Pablo Osberto Pérez Gómez (Col. 3689)',
+    entidadContratante: p.entidadContratante || pAny.entidad_contratante || '',
+    empresaContratista: p.empresaContratista || cEjec.empresaNombre || pAny.empresa_contratista || '',
+    empresaSupervisora: p.empresaSupervisora || cSup.empresaNombre || pAny.empresa_supervisora || '',
+    delegadoResidente: p.delegadoResidente || cSup.responsable || pAny.delegadoResidente || pAny.delegado_residente || '',
 
     // Contrato Resumen
-    fechaAdjudicacion: p.fechaAdjudicacion || '2026-09-06',
-    numeroEscrituraPublica: p.numeroEscrituraPublica || '142AA',
-    fechaInicioContractual: p.fechaInicioContractual || p.fechaInicio || cEjec.fechaInicio || '2026-09-08',
-    fechaInicio: p.fechaInicio || p.fechaInicioContractual || cEjec.fechaInicio || '2026-09-08',
-    fechaFinContractualPlan: pAny.fechaFinContractualPlan || p.fechaFin || cEjec.fechaFin || '2026-09-30',
-    fechaFin: p.fechaFin || pAny.fechaFinContractualPlan || cEjec.fechaFin || '2026-09-30',
-    plazoEjecucionContractualOriginal: p.plazoEjecucionContractualOriginal || '22 días',
-    fechaFinalizacionReal: p.fechaFinalizacionReal || '2026-09-30',
-    plazoEjecucionRealAmpliado: p.plazoEjecucionRealAmpliado || '-',
-    montoFinancieroFinalEjecutado: p.montoFinancieroFinalEjecutado ?? pAny.montoFinal ?? null,
-    montoFinal: pAny.montoFinal ?? p.montoFinancieroFinalEjecutado ?? null,
+    fechaAdjudicacion: p.fechaAdjudicacion || pAny.fecha_adjudicacion || '',
+    numeroEscrituraPublica: p.numeroEscrituraPublica || pAny.numero_escritura_publica || '',
+    fechaInicioContractual: p.fechaInicioContractual || p.fechaInicio || cEjec.fechaInicio || pAny.fecha_inicio || '',
+    fechaInicio: p.fechaInicio || p.fechaInicioContractual || cEjec.fechaInicio || pAny.fecha_inicio || '',
+    fechaFinContractualPlan: pAny.fechaFinContractualPlan || p.fechaFin || cEjec.fechaFin || pAny.fecha_fin || '',
+    fechaFin: p.fechaFin || pAny.fechaFinContractualPlan || cEjec.fechaFin || pAny.fecha_fin || '',
+    plazoEjecucionContractualOriginal: p.plazoEjecucionContractualOriginal || pAny.plazo_contractual || '',
+    fechaFinalizacionReal: p.fechaFinalizacionReal || pAny.fecha_finalizacion_real || '',
+    plazoEjecucionRealAmpliado: p.plazoEjecucionRealAmpliado || pAny.plazo_ejecucion_ampliado || '',
+    montoFinancieroFinalEjecutado: p.montoFinancieroFinalEjecutado ?? pAny.montoFinal ?? pAny.monto_final ?? null,
+    montoFinal: pAny.montoFinal ?? p.montoFinancieroFinalEjecutado ?? pAny.monto_final ?? null,
 
     // Marco Legal Contratista
-    licitacionEjecutora: cEjec.licitacionNumero || pAny.licitacionEjecutora || 'Licitación Pública Nacional No. DGC-053-2025-C',
-    propietarioContratista: cEjec.propietario || pAny.propietarioContratista || 'Ing. Marco Antonio Estrada Morales',
-    registroMercantilContratista: cEjec.registroMercantil || pAny.registroMercantilContratista || '145892B',
-    direccionContratista: cEjec.direccion || pAny.direccionContratista || '12 Calle 4-55 Zona 10, Edificio Gran Vía, Nivel 8, Guatemala',
-    actaInicioEjecutora: cEjec.actaInicioNumero || pAny.actaInicioEjecutora || 'Acta No. 26-2026 de fecha 09/02/2026',
-    actaInicioNumeroEjecutora: pAny.actaInicioNumeroEjecutora || parseActaString(cEjec.actaInicioNumero || pAny.actaInicioEjecutora || 'Acta No. 26-2026 de fecha 09/02/2026').numero,
-    actaInicioFechaEjecutora: pAny.actaInicioFechaEjecutora || parseActaString(cEjec.actaInicioNumero || pAny.actaInicioEjecutora || 'Acta No. 26-2026 de fecha 09/02/2026').fecha,
-    superintendente: cEjec.responsable || pAny.superintendente || 'Ing. Civil Fernando José Reyes Cabrera',
-    colegiadoSuperintendente: pAny.colegiadoSuperintendente || 'Colegiado Activo No. 4125',
-    telefonoContratista: limpiarTelefono(cEjec.telefono || pAny.telefonoContratista) || '2334-9000',
-    correoContratista: cEjec.correo || pAny.correoContratista || extraerCorreoDeTexto(cEjec.telefono || pAny.telefonoContratista) || 'contacto@constructora.com',
+    licitacionEjecutora: cEjec.licitacionNumero || pAny.licitacionEjecutora || '',
+    propietarioContratista: cEjec.propietario || pAny.propietarioContratista || '',
+    registroMercantilContratista: cEjec.registroMercantil || pAny.registroMercantilContratista || '',
+    direccionContratista: cEjec.direccion || pAny.direccionContratista || '',
+    actaInicioEjecutora: cEjec.actaInicioNumero || pAny.actaInicioEjecutora || '',
+    actaInicioNumeroEjecutora: pAny.actaInicioNumeroEjecutora || parsedActaEjec.numero,
+    actaInicioFechaEjecutora: pAny.actaInicioFechaEjecutora || parsedActaEjec.fecha,
+    superintendente: cEjec.responsable || pAny.superintendente || '',
+    colegiadoSuperintendente: pAny.colegiadoSuperintendente || '',
+    telefonoContratista: limpiarTelefono(cEjec.telefono || pAny.telefonoContratista) || '',
+    correoContratista: cEjec.correo || pAny.correoContratista || extraerCorreoDeTexto(cEjec.telefono || pAny.telefonoContratista) || '',
 
     // Marco Legal Supervisora
-    licitacionSupervisora: cSup.licitacionNumero || pAny.licitacionSupervisora || 'Licitación Pública No. DGC-SUP-012-2025',
-    propietarioSupervisora: cSup.propietario || pAny.propietarioSupervisora || 'William Ramón Godínez Mansilla',
-    registroMercantilSupervisora: cSup.registroMercantil || pAny.registroMercantilSupervisora || '177228A',
-    direccionSupervisora: cSup.direccion || pAny.direccionSupervisora || 'Avenida Las Américas, 24-70 Zona 13, Guatemala',
-    telefonoSupervisora: limpiarTelefono(cSup.telefono || pAny.telefonoSupervisora) || '2212-9675 / 5525-1537',
-    correoSupervisora: cSup.correo || pAny.correoSupervisora || 'supervision@seringe.com.gt',
-    actaInicioSupervisora: cSup.actaInicioNumero || pAny.actaInicioSupervisora || 'Acta No. 52-2026 de fecha 07/07/2026',
-    actaInicioNumeroSupervisora: pAny.actaInicioNumeroSupervisora || parseActaString(cSup.actaInicioNumero || pAny.actaInicioSupervisora || 'Acta No. 52-2026 de fecha 07/07/2026').numero,
-    actaInicioFechaSupervisora: pAny.actaInicioFechaSupervisora || parseActaString(cSup.actaInicioNumero || pAny.actaInicioSupervisora || 'Acta No. 52-2026 de fecha 07/07/2026').fecha,
+    licitacionSupervisora: cSup.licitacionNumero || pAny.licitacionSupervisora || '',
+    propietarioSupervisora: cSup.propietario || pAny.propietarioSupervisora || '',
+    registroMercantilSupervisora: cSup.registroMercantil || pAny.registroMercantilSupervisora || '',
+    direccionSupervisora: cSup.direccion || pAny.direccionSupervisora || '',
+    telefonoSupervisora: limpiarTelefono(cSup.telefono || pAny.telefonoSupervisora) || '',
+    correoSupervisora: cSup.correo || pAny.correoSupervisora || '',
+    actaInicioSupervisora: cSup.actaInicioNumero || pAny.actaInicioSupervisora || '',
+    actaInicioNumeroSupervisora: pAny.actaInicioNumeroSupervisora || parsedActaSup.numero,
+    actaInicioFechaSupervisora: pAny.actaInicioFechaSupervisora || parsedActaSup.fecha,
 
     // Ficha Técnica Obra
-    responsableNombre: cEjec.responsable || pAny.responsableNombre || 'Ing. Civil Fernando Reyes (Col. 4125)',
-    programaObra: cEjec.programa || pAny.programaObra || 'TRANSPORTE POR CARRETERA',
-    subprogramaObra: cEjec.subprograma || pAny.subprogramaObra || 'MEJORAMIENTO DE CARRETERAS SECUNDARIAS Y PUENTES',
-    fuenteFinanciamientoObra: cEjec.fuenteFinanciamiento || pAny.fuenteFinanciamientoObra || 'Fondos nacionales',
-    partidaFondosObra: cEjec.partidaFondos || pAny.partidaFondosObra || '2026-11130013-202-11-01-002-000-003-331-1399-52-0403-0065',
-    cdpObra: cEjec.cdp || pAny.cdpObra || '66349939',
-    numeroContratoOriginal: cEjec.contratoNumero || pAny.numeroContratoOriginal || '008-2026-DGC-CONSTRUCCION, 29/05/2026',
-    acuerdoMinisterialOriginal: cEjec.acuerdoMinisterial || pAny.acuerdoMinisterialOriginal || '522-2026 de fecha 09/06/2026',
+    responsableNombre: cEjec.responsable || pAny.responsableNombre || '',
+    programaObra: cEjec.programa || pAny.programaObra || '',
+    subprogramaObra: cEjec.subprograma || pAny.subprogramaObra || '',
+    fuenteFinanciamientoObra: cEjec.fuenteFinanciamiento || pAny.fuenteFinanciamientoObra || '',
+    partidaFondosObra: cEjec.partidaFondos || pAny.partidaFondosObra || '',
+    cdpObra: cEjec.cdp || pAny.cdpObra || '',
+    numeroContratoOriginal: cEjec.contratoNumero || pAny.numeroContratoOriginal || '',
+    acuerdoMinisterialOriginal: cEjec.acuerdoMinisterial || pAny.acuerdoMinisterialOriginal || '',
     montoContractualOriginal: montoObra,
     presupuesto: montoObra,
     porcentajeAnticipoObra: pctAnticipoObra,
-    mesesContratadosObra: cEjec.plazoMesesDetalle || pAny.mesesContratadosObra || '18 meses (Etapa de Construcción)',
-    fechaTerminacionOriginalObra: cEjec.fechaFin || pAny.fechaTerminacionOriginalObra || 'según Acta No. 26-2026, finaliza el 09/02/2028',
+    mesesContratadosObra: cEjec.plazoMesesDetalle || pAny.mesesContratadosObra || '',
+    fechaTerminacionOriginalObra: cEjec.fechaFin || pAny.fechaTerminacionOriginalObra || '',
 
     // Ficha Técnica Supervisión
-    responsableSupervisora: cSup.responsable || pAny.responsableSupervisora || 'Ing. Civil Pablo Osberto Pérez Gómez (Col. 3689)',
-    programaSupervisora: cSup.programa || pAny.programaSupervisora || 'TRANSPORTE POR CARRETERA',
-    subprogramaSupervisora: cSup.subprograma || pAny.subprogramaSupervisora || 'MEJORAMIENTO DE CARRETERAS SECUNDARIAS Y PUENTES',
-    fuenteFinanciamientoSupervisora: cSup.fuenteFinanciamiento || pAny.fuenteFinanciamientoSupervisora || 'Fondos nacionales',
-    partidaFondosSupervisora: cSup.partidaFondos || pAny.partidaFondosSupervisora || '2026-11130013-202-11-01-002-000-003-188-1399-52-0403-0065',
-    cdpSupervisora: cSup.cdp || pAny.cdpSupervisora || '66349939',
-    contratoSupervisora: cSup.contratoNumero || pAny.contratoSupervisora || '007-2026-DGC-SUPERVISION, 29/05/2026',
-    acuerdoSupervisora: cSup.acuerdoMinisterial || pAny.acuerdoSupervisora || '625-2026 de fecha 06/07/2026',
+    responsableSupervisora: cSup.responsable || pAny.responsableSupervisora || '',
+    programaSupervisora: cSup.programa || pAny.programaSupervisora || '',
+    subprogramaSupervisora: cSup.subprograma || pAny.subprogramaSupervisora || '',
+    fuenteFinanciamientoSupervisora: cSup.fuenteFinanciamiento || pAny.fuenteFinanciamientoSupervisora || '',
+    partidaFondosSupervisora: cSup.partidaFondos || pAny.partidaFondosSupervisora || '',
+    cdpSupervisora: cSup.cdp || pAny.cdpSupervisora || '',
+    contratoSupervisora: cSup.contratoNumero || pAny.contratoSupervisora || '',
+    acuerdoSupervisora: cSup.acuerdoMinisterial || pAny.acuerdoSupervisora || '',
     supervisoraMontoOriginal: montoSup,
     porcentajeAnticipoSupervision: pctAnticipoSup,
-    fechaInicioSupervisora: cSup.fechaInicio || pAny.fechaInicioSupervisora || 'según Acta No. 52-2026, inicio el 07/07/2026',
-    mesesContratadosSupervisora: cSup.plazoMesesDetalle || pAny.mesesContratadosSupervisora || '22 MESES (2 Pre, 18 Ejecución, 2 Post)',
-    fechaFinSupervisora: cSup.fechaFin || pAny.fechaFinSupervisora || '07/05/2028',
+    fechaInicioSupervisora: cSup.fechaInicio || pAny.fechaInicioSupervisora || '',
+    mesesContratadosSupervisora: cSup.plazoMesesDetalle || pAny.mesesContratadosSupervisora || '',
+    fechaFinSupervisora: cSup.fechaFin || pAny.fechaFinSupervisora || '',
 
     // Ubicación
-    direccionFin: p.direccionFin || pAny.direccion_fin || 'Plan Grande, Palencia, Departamento de Guatemala',
-    kilometroInicio: pAny.kilometroInicio ?? pAny.kilometro_inicio ?? '5.000',
-    kilometroFin: pAny.kilometroFin ?? pAny.kilometro_fin ?? '10.000',
+    direccionFin: p.direccionFin || pAny.direccion_fin || '',
+    kilometroInicio: pAny.kilometroInicio ?? pAny.kilometro_inicio ?? '',
+    kilometroFin: pAny.kilometroFin ?? pAny.kilometro_fin ?? '',
   }
 }
 
@@ -747,8 +861,197 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
   const [fichaSupervisionAbierta, setFichaSupervisionAbierta] = useState(true)
 
   const [proyecto, setProyecto] = useState<ProyectoType | undefined>(initialProyecto)
+  const [activandoProyecto, setActivandoProyecto] = useState(false)
   const canEdit = user?.rol !== 'contratante' && user?.rol !== 'contratista'
   const canManageTeam = String(user?.rol).toLowerCase() === 'administrador' || String(user?.rol).toLowerCase() === 'gerencia'
+
+  useEffect(() => {
+    if (initialProyecto) {
+      setProyecto(initialProyecto)
+    }
+  }, [initialProyecto])
+
+  useEffect(() => {
+    const slug = initialProyecto?.id || (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('slug') : null)
+    if (!slug) return
+
+    api.get(`/proyectos/${slug}`)
+      .then((res) => {
+        if (res.data?.data) {
+          const raw = res.data.data
+          setProyecto((prev) => ({
+            ...(prev || {}),
+            ...raw,
+            estado: (raw.estado || 'activo').toLowerCase() as any,
+          }))
+        }
+      })
+      .catch((err) => {
+        console.warn('Error sincronizando proyecto en detalle:', err)
+      })
+  }, [initialProyecto?.id])
+
+  const handleActivarProyectoDirecto = async () => {
+    if (!proyecto?.id) return
+    setActivandoProyecto(true)
+    try {
+      await api.patch(`/proyectos/${proyecto.id}/estado`, { estado_codigo: 'activo' })
+      limpiarCacheMemoria()
+      try {
+        sessionStorage.removeItem('domun_proyectos_cache')
+        sessionStorage.removeItem(`domun_api_cache:/proyectos/${proyecto.id}`)
+      } catch {}
+      setProyecto((prev) => (prev ? { ...prev, estado: 'activo' } : prev))
+      showSuccessToast('¡Proyecto activado exitosamente!')
+      router.refresh()
+    } catch (err: any) {
+      const msg = err.response?.data?.message || err.response?.data?.error || err.message || 'No se pudo activar el proyecto'
+      showErrorToast(msg)
+    } finally {
+      setActivandoProyecto(false)
+    }
+  }
+
+  // Menú desplegable de 3 puntos (Bitácora, Fotos, Reportes, Renglones)
+  const [menuOpcionesAbierto, setMenuOpcionesAbierto] = useState(false)
+  const menuOpcionesRef = useRef<HTMLDivElement>(null)
+  const [verificandoBitacora, setVerificandoBitacora] = useState(false)
+
+  // Modo Manual y Drawer de Renglones de Obra
+  const esModoManual = Boolean(
+    (proyecto as any)?.modoGestionFinanciera === 'manual' ||
+    (proyecto as any)?.modo_gestion_financiera === 'manual' ||
+    (proyecto as any)?.usarModoSabana === false ||
+    (proyecto as any)?.modo_sabana === false ||
+    (proyecto as any)?.plantilla === 'manual' ||
+    (proyecto as any)?.tipo_ingreso === 'manual' ||
+    (proyecto as any)?.tipoIngreso === 'manual'
+  )
+
+  const [drawerRenglonesAbierto, setDrawerRenglonesAbierto] = useState(false)
+  const [renglonesProyecto, setRenglonesProyecto] = useState<RenglonItem[]>(() => {
+    const rawR = (initialProyecto as any)?.renglones || (initialProyecto as any)?.planTrabajo || (initialProyecto as any)?.renglones_sabana || []
+    if (Array.isArray(rawR) && rawR.length > 0) {
+      return rawR.map((r: any) => ({
+        id: String(r.codigoDGC || r.codigo || r.id),
+        codigoDGC: String(r.codigoDGC || r.codigo || r.id),
+        descripcion: r.descripcion || '',
+        unidad: r.unidad || 'm³',
+        capituloId: r.capituloId || 1,
+        capituloNombre: r.capituloNombre || '',
+        cantidadContratada: r.cantidadContratada ?? 1,
+        costoUnitarioDirecto: r.costoUnitarioDirecto ?? 0,
+        esPersonalizado: Boolean(r.esPersonalizado),
+        seleccionado: r.seleccionado !== false,
+      }))
+    }
+    return []
+  })
+
+  useEffect(() => {
+    if (proyecto) {
+      const rawR = (proyecto as any)?.renglones || (proyecto as any)?.planTrabajo || (proyecto as any)?.renglones_sabana || []
+      if (Array.isArray(rawR) && rawR.length > 0) {
+        setRenglonesProyecto(
+          rawR.map((r: any) => ({
+            id: String(r.codigoDGC || r.codigo || r.id),
+            codigoDGC: String(r.codigoDGC || r.codigo || r.id),
+            descripcion: r.descripcion || '',
+            unidad: r.unidad || 'm³',
+            capituloId: r.capituloId || 1,
+            capituloNombre: r.capituloNombre || '',
+            cantidadContratada: r.cantidadContratada ?? 1,
+            costoUnitarioDirecto: r.costoUnitarioDirecto ?? 0,
+            esPersonalizado: Boolean(r.esPersonalizado),
+            seleccionado: r.seleccionado !== false,
+          }))
+        )
+      }
+    }
+  }, [proyecto])
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuOpcionesRef.current && !menuOpcionesRef.current.contains(event.target as Node)) {
+        setMenuOpcionesAbierto(false)
+      }
+    }
+    if (menuOpcionesAbierto) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [menuOpcionesAbierto])
+
+  const verificarTieneBitacoras = async (): Promise<boolean> => {
+    if (!proyecto?.id) return false
+    try {
+      const res = await apiGetDeduplicado('/mantenimiento/bitacora_entrada?limite=300')
+      const entradasBD = Array.isArray(res?.data?.data) ? res.data.data : []
+
+      let locales: any[] = []
+      try {
+        locales = JSON.parse(localStorage.getItem('domun_bitacora_locales') || '[]')
+      } catch (_) {}
+
+      const proyIdStr = String(proyecto.id)
+      const tieneEnBD = entradasBD.some((e: any) => String(e.proyecto_id) === proyIdStr || String(e.proyectoId) === proyIdStr)
+      const tieneEnLocales = locales.some((e: any) => String(e.proyectoId) === proyIdStr || String(e.proyecto_id) === proyIdStr)
+      const tieneEnMock = BITACORA_MOCK.some((m: any) => String(m.proyectoId) === proyIdStr)
+
+      return tieneEnBD || tieneEnLocales || tieneEnMock
+    } catch (err) {
+      console.warn('Error al verificar bitácoras:', err)
+      return false
+    }
+  }
+
+  const handleNavegarOpcion = async (destino: 'bitacora' | 'fotografias' | 'reportes') => {
+    setMenuOpcionesAbierto(false)
+    if (!proyecto?.id) return
+
+    setVerificandoBitacora(true)
+    const tieneBitacoras = await verificarTieneBitacoras()
+    setVerificandoBitacora(false)
+
+    if (!tieneBitacoras) {
+      if (destino === 'bitacora') {
+        showErrorToast('Este proyecto aún no cuenta con registros de bitácora.')
+      } else if (destino === 'fotografias') {
+        showErrorToast('Este proyecto aún no cuenta con registros de bitácora ni fotografías.')
+      } else if (destino === 'reportes') {
+        showErrorToast('No se puede generar reporte porque este proyecto no cuenta con registros de bitácora.')
+      }
+      return
+    }
+
+    if (destino === 'bitacora') {
+      router.push(`/dashboard/bitacora?proyectoId=${proyecto.id}`)
+    } else if (destino === 'fotografias') {
+      router.push(`/dashboard/fotografias/${proyecto.id}`)
+    } else if (destino === 'reportes') {
+      router.push(`/dashboard/reportes?proyectoId=${proyecto.id}`)
+    }
+  }
+
+  const handleGuardarRenglonesManual = async (seleccionados: RenglonItem[]) => {
+    setRenglonesProyecto(seleccionados)
+    if (proyecto?.id) {
+      try {
+        await (proyectoService.actualizarProyecto as any)(proyecto.id, {
+          renglones: seleccionados,
+          planTrabajo: seleccionados,
+          renglones_seleccionados: seleccionados,
+        })
+        setProyecto((prev) => (prev ? ({ ...prev, renglones: seleccionados, planTrabajo: seleccionados } as any) : prev))
+        showSuccessToast('Renglones de obra actualizados correctamente')
+      } catch (err) {
+        console.error('Error al actualizar renglones:', err)
+        showErrorToast('Error al persistir renglones en el servidor')
+      }
+    }
+  }
 
   // Estado para edición en línea por sección
   const [editingSection, setEditingSection] = useState<string | null>(null)
@@ -757,6 +1060,102 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
 
   const [memberToDelete, setMemberToDelete] = useState<{ id: string; nombre: string; rol: string } | null>(null)
   const [isEquipoModalOpen, setIsEquipoModalOpen] = useState(false)
+  const [usuariosDisponibles, setUsuariosDisponibles] = useState<any[]>([])
+  const [selectedUsuarioIdParaEquipo, setSelectedUsuarioIdParaEquipo] = useState('')
+  const [selectedRolParaEquipo, setSelectedRolParaEquipo] = useState('IngenieroResidente')
+  const [isCrearUsuarioOpen, setIsCrearUsuarioOpen] = useState(false)
+  const { roles: rolesList, fetchRoles } = useRolesStore()
+
+  const handleAbrirCrearUsuario = () => {
+    setIsEquipoModalOpen(false)
+    setIsCrearUsuarioOpen(true)
+  }
+
+  const cargarUsuarios = async () => {
+    try {
+      const res = await apiGetDeduplicado('/usuarios')
+      const data = res.data?.data || res.data || []
+      if (Array.isArray(data)) {
+        setUsuariosDisponibles(data)
+      }
+    } catch (e) {
+      console.warn('Error cargando usuarios:', e)
+    }
+  }
+
+  useEffect(() => {
+    void cargarUsuarios()
+  }, [])
+
+  const userOptionsGenerales = useMemo(() => {
+    return usuariosDisponibles
+      .filter((u: any) => u.activo !== false && u.estado !== 'Suspendido' && u.estado !== 'Desactivado')
+      .map((u: any) => {
+        const nombreCompleto = u.nombre || `${u.primer_nombre || ''} ${u.primer_apellido || ''}`.trim() || u.correo
+        const rolCargo = u.cargo || u.rol || 'Profesional'
+        return {
+          value: nombreCompleto,
+          label: `${nombreCompleto} - ${rolCargo}`,
+        }
+      })
+  }, [usuariosDisponibles])
+
+  const userOptionsIngenieros = useMemo(() => {
+    return usuariosDisponibles
+      .filter((u: any) => {
+        if (u.activo === false || u.estado === 'Suspendido' || u.estado === 'Desactivado') return false
+        const r = (u.rol || u.cargo || '').toLowerCase().replace(/\s+/g, '')
+        return r.includes('ingeniero') || r.includes('residente') || r.includes('admin') || r.includes('director') || r.includes('gerenc') || r.includes('supervis')
+      })
+      .map((u: any) => {
+        const nombreCompleto = u.nombre || `${u.primer_nombre || ''} ${u.primer_apellido || ''}`.trim() || u.correo
+        const rolCargo = u.cargo || u.rol || 'Ingeniero'
+        return {
+          value: nombreCompleto,
+          label: `${nombreCompleto} - ${rolCargo}`,
+        }
+      })
+  }, [usuariosDisponibles])
+
+  useEffect(() => {
+    if (isEquipoModalOpen) {
+      void cargarUsuarios()
+      void fetchRoles({ bypassCache: true })
+    }
+  }, [isEquipoModalOpen, fetchRoles])
+
+  const handleAgregarMiembroAEquipo = async () => {
+    if (!proyecto || !selectedUsuarioIdParaEquipo) return
+    const userObj = usuariosDisponibles.find((u: any) => String(u.id) === String(selectedUsuarioIdParaEquipo))
+    if (!userObj) return
+
+    const nombreCompleto = userObj.nombre || `${userObj.primer_nombre || ''} ${userObj.primer_apellido || ''}`.trim() || userObj.correo
+    const nuevoMiembro = {
+      id: userObj.id,
+      nombre: nombreCompleto,
+      rol: selectedRolParaEquipo || userObj.cargo || userObj.rol || 'Profesional',
+    }
+
+    const equipoActual = proyecto.equipo || []
+    if (equipoActual.some((m: any) => String(m.id) === String(nuevoMiembro.id) || m.nombre === nuevoMiembro.nombre)) {
+      showErrorToast('Este usuario ya está asignado al equipo del proyecto')
+      return
+    }
+
+    const nuevoEquipo = [...equipoActual, nuevoMiembro]
+    setProyecto({ ...proyecto, equipo: nuevoEquipo })
+    setSelectedUsuarioIdParaEquipo('')
+
+    try {
+      await proyectoService.actualizarProyecto(proyecto.id, { equipo: nuevoEquipo })
+      showSuccessToast(`Se agregó a ${nombreCompleto} al equipo`)
+    } catch (err) {
+      console.error('Error al guardar nuevo miembro:', err)
+      showErrorToast('Error al persistir el nuevo miembro en el servidor')
+    }
+  }
+
+  const [buscandoCoords, setBuscandoCoords] = useState(false)
 
   // Sincronizar datos al inicializar o cambiar initialProyecto
   useEffect(() => {
@@ -764,8 +1163,86 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
       setProyecto(initialProyecto)
       const valores = obtenerValoresCompletosProyecto(initialProyecto)
       setEditFormData(valores)
+
+      const pInit = initialProyecto as any
+      if (pInit.latitud == null || pInit.longitud == null) {
+        const dirInicial = (initialProyecto.direccion || initialProyecto.ubicacionFisica || initialProyecto.ubicacion || '').trim()
+        if (dirInicial && dirInicial !== 'Ubicación General') {
+          const query = encodeURIComponent(`${dirInicial}, Guatemala`)
+          fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&q=${query}&limit=1&countrycodes=gt&accept-language=es`)
+            .then((r) => (r.ok ? r.json() : []))
+            .then((res) => {
+              if (Array.isArray(res) && res[0]) {
+                const lat = Number.parseFloat(res[0].lat)
+                const lng = Number.parseFloat(res[0].lon)
+                if (!isNaN(lat) && !isNaN(lng)) {
+                  const coordsStr = `${lat.toFixed(6)}, ${lng.toFixed(6)}`
+                  setProyecto((prev) => (prev ? ({ ...prev, latitud: lat, longitud: lng } as any) : prev))
+                  setEditFormData((prev) => ({ ...prev, latitud: lat, longitud: lng, coordenadas: coordsStr }))
+                }
+              }
+            })
+            .catch(() => {})
+        } else if (typeof navigator !== 'undefined' && navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              const lat = Number(pos.coords.latitude.toFixed(6))
+              const lng = Number(pos.coords.longitude.toFixed(6))
+              const coordsStr = `${lat.toFixed(6)}, ${lng.toFixed(6)}`
+              setProyecto((prev) => (prev ? ({ ...prev, latitud: lat, longitud: lng } as any) : prev))
+              setEditFormData((prev) => ({ ...prev, latitud: lat, longitud: lng, coordenadas: coordsStr }))
+            },
+            () => {},
+            { timeout: 5000 }
+          )
+        }
+      }
     }
   }, [initialProyecto])
+
+  // Sincronizar editFormData cuando proyecto se actualice (ej: tras guardar o sincronizar con backend)
+  useEffect(() => {
+    if (proyecto && !editingSection) {
+      setEditFormData(obtenerValoresCompletosProyecto(proyecto))
+    }
+  }, [proyecto, editingSection])
+
+  // Identificar coordenadas automáticamente al escribir la dirección en modo edición
+  useEffect(() => {
+    if (editingSection !== 'resumen_identificacion') return
+    const dir = (editFormData.direccion || '').trim()
+    if (!dir || dir.length < 3 || dir === 'Ubicación General') return
+
+    const timer = window.setTimeout(async () => {
+      try {
+        setBuscandoCoords(true)
+        const query = encodeURIComponent(`${dir}, Guatemala`)
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${query}&limit=1&countrycodes=gt&accept-language=es`
+        )
+        if (!res.ok) return
+        const data = await res.json()
+        if (Array.isArray(data) && data[0]) {
+          const lat = Number.parseFloat(data[0].lat)
+          const lng = Number.parseFloat(data[0].lon)
+          if (!isNaN(lat) && !isNaN(lng)) {
+            setEditFormData((prev) => ({
+              ...prev,
+              latitud: Number(lat.toFixed(6)),
+              longitud: Number(lng.toFixed(6)),
+              coordenadas: `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
+            }))
+          }
+        }
+      } catch {
+        // Ignorar errores de red al geocodificar
+      } finally {
+        setBuscandoCoords(false)
+      }
+    }, 550)
+
+    return () => window.clearTimeout(timer)
+  }, [editFormData.direccion, editingSection])
 
   // Iniciar edición de una sección preservando el 100% de datos
   const handleStartEdit = (sectionKey: string) => {
@@ -796,11 +1273,6 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
         const nom = (editFormData.nombreOficial || editFormData.nombre || '').trim()
         if (!nom) {
           showErrorToast('El nombre oficial del proyecto no puede estar vacío.')
-          setIsSaving(false)
-          return
-        }
-        if (!(editFormData.codigo || '').trim()) {
-          showErrorToast('El código del proyecto no puede estar vacío.')
           setIsSaving(false)
           return
         }
@@ -910,6 +1382,8 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
         if (!editFormData.contratoEjecucion) editFormData.contratoEjecucion = {}
         editFormData.contratoEjecucion = {
           ...editFormData.contratoEjecucion,
+          licitacionNumero: editFormData.licitacionEjecutora,
+          registroMercantil: editFormData.registroMercantilContratista,
           empresaNombre: editFormData.empresaContratista,
           propietario: editFormData.propietarioContratista,
           direccion: editFormData.direccionContratista,
@@ -962,6 +1436,8 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
         if (!editFormData.contratoSupervision) editFormData.contratoSupervision = {}
         editFormData.contratoSupervision = {
           ...editFormData.contratoSupervision,
+          licitacionNumero: editFormData.licitacionSupervisora,
+          registroMercantil: editFormData.registroMercantilSupervisora,
           empresaNombre: editFormData.empresaSupervisora,
           propietario: editFormData.propietarioSupervisora,
           direccion: editFormData.direccionSupervisora,
@@ -1105,7 +1581,30 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
         }
       }
 
-      await proyectoService.actualizarProyecto(proyecto.id, editFormData)
+      const contratosParaActualizar: any[] = []
+      if (editFormData.contratoEjecucion && Object.keys(editFormData.contratoEjecucion).length > 0) {
+        contratosParaActualizar.push({
+          tipo: 'EJECUCION',
+          ...editFormData.contratoEjecucion,
+        })
+      }
+      if (editFormData.contratoSupervision && Object.keys(editFormData.contratoSupervision).length > 0) {
+        contratosParaActualizar.push({
+          tipo: 'SUPERVISION',
+          ...editFormData.contratoSupervision,
+        })
+      }
+      if (contratosParaActualizar.length > 0) {
+        editFormData.contratos = contratosParaActualizar
+      }
+
+      const payloadParaEnviar = {
+        ...editFormData,
+        latitud: editFormData.latitud ?? editFormData.coordenadasMapa?.lat,
+        longitud: editFormData.longitud ?? editFormData.coordenadasMapa?.lng,
+      }
+
+      await (proyectoService.actualizarProyecto as any)(proyecto.id, payloadParaEnviar)
       setProyecto((prev) => (prev ? { ...prev, ...editFormData } : prev))
       setEditingSection(null)
       showSuccessToast('Datos del proyecto actualizados correctamente')
@@ -1148,18 +1647,18 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
     )
   }
 
-  const pAny = proyecto as any
+  const pAny = useMemo(() => obtenerValoresCompletosProyecto(proyecto), [proyecto])
   const equipoCompleto = proyecto.equipo || []
   const equipoVisible = equipoCompleto.slice(0, 3)
   const tieneMasDeTres = equipoCompleto.length > 3
 
   // Cálculos de montos y anticipos para contratos
   const montoObraOriginal = Number(proyecto.montoContractualOriginal || proyecto.presupuesto || 0)
-  const porcentajeAnticipoObra = Number(pAny.porcentajeAnticipoObra || pAny.porcentaje_anticipo || 15)
+  const porcentajeAnticipoObra = Number(pAny.porcentajeAnticipoObra ?? pAny.porcentaje_anticipo ?? 0)
   const montoAnticipoObra = (montoObraOriginal * porcentajeAnticipoObra) / 100
 
-  const montoSupervisionOriginal = Number(pAny.supervisoraMontoOriginal || pAny.monto_supervision || 13351095.20)
-  const porcentajeAnticipoSupervision = Number(pAny.porcentajeAnticipoSupervision || 10)
+  const montoSupervisionOriginal = Number(pAny.supervisoraMontoOriginal || pAny.monto_supervision || 0)
+  const porcentajeAnticipoSupervision = Number(pAny.porcentajeAnticipoSupervision ?? 0)
   const montoAnticipoSupervision = (montoSupervisionOriginal * porcentajeAnticipoSupervision) / 100
 
   const handleConfirmEliminarMiembro = async () => {
@@ -1185,13 +1684,14 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
     { id: 'marco_legal', label: 'Marco Legal', icon: Scale },
     { id: 'ficha_tecnica', label: 'Ficha Técnica', icon: FileSignature },
     { id: 'ubicacion', label: 'Ubicación', icon: MapPin },
+    { id: 'documentos', label: 'Documentos', icon: FolderArchive },
   ]
 
   return (
-    <div className="space-y-3 font-[Poppins]">
-      {/* Barra de Encabezado Superior */}
-      <div className="flex items-start justify-between gap-4 py-0.5">
-        <div className="flex items-start gap-2.5 min-w-0 flex-1 max-w-[calc(100%-380px)]">
+    <div className="project-detail-view space-y-3 font-[Poppins]">
+      {/* Barra de Encabezado Superior Responsive */}
+      <div className="flex flex-col sm:flex-row items-start justify-between gap-3 sm:gap-4 py-0.5">
+        <div className="flex items-start gap-2.5 min-w-0 w-full sm:flex-1 sm:max-w-[calc(100%-380px)]">
           <button
             type="button"
             onClick={() => router.push('/dashboard/proyectos')}
@@ -1201,45 +1701,59 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
             <ArrowLeft size={16} />
           </button>
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-2.5 flex-wrap">
               <span className="font-mono text-[9px] font-bold text-gray-500 shrink-0">
                 {proyecto.codigo || 'DOM-VIAL-001'}
               </span>
-              <ProyectoEstadoBadge estado={proyecto.estado || 'activo'} />
+              <div className="flex items-center gap-2">
+                <ProyectoEstadoBadge estado={proyecto.estado || 'activo'} />
+                {canEdit && String(proyecto.estado || '').toLowerCase() === 'borrador' && (
+                  <button
+                    type="button"
+                    onClick={handleActivarProyectoDirecto}
+                    disabled={activandoProyecto}
+                    className="inline-flex items-center gap-1 rounded-md bg-emerald-600 hover:bg-emerald-700 px-2.5 py-0.5 text-[10px] font-bold text-white shadow-2xs transition-colors cursor-pointer disabled:opacity-60 font-[Poppins]"
+                    title="Pasar proyecto a estado Activo"
+                  >
+                    <CheckCircle2 size={12} />
+                    <span>{activandoProyecto ? 'Activando...' : 'Activar Proyecto'}</span>
+                  </button>
+                )}
+              </div>
             </div>
-            <h1 className="mt-0.5 text-sm font-black text-gray-900 leading-tight truncate">
+            <h1 className="mt-0.5 text-base sm:text-sm font-semibold text-gray-900 leading-tight truncate font-[Poppins]">
               {proyecto.nombreOficial || proyecto.nombre}
             </h1>
-            <div className="mt-0.5 flex items-start gap-1 text-[10px] text-gray-600 font-medium">
-              <MapPin size={11} className="text-[#9B0F06] shrink-0 mt-0.5" />
+            <div className="mt-0.5 flex items-start gap-1 text-xs sm:text-[10px] text-gray-600 font-medium">
+              <MapPin size={12} className="text-[#9B0F06] shrink-0 mt-0.5" />
               <div className="min-w-0">
                 <p className="line-clamp-2 leading-snug text-gray-600">
                   {proyecto.direccion ? `${proyecto.direccion}` : ''}
                   {proyecto.direccion && (proyecto.ubicacionFisica || proyecto.ubicacion) ? ' — ' : ''}
-                  {proyecto.ubicacionFisica || proyecto.ubicacion || 'Guatemala'}
+                  {proyecto.ubicacionFisica || proyecto.ubicacion || (proyecto.direccion ? '' : 'Sin ubicación definida')}
                 </p>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Bloque Superior Derecho: Toggle Segmentado Estilo img4 (Blanco con icono/texto rojo activo) + Botón Editar Proyecto */}
-        <div className="flex items-center gap-2 shrink-0 self-start">
-          <div className="inline-flex items-center rounded-lg border border-gray-200/90 bg-gray-100/90 p-0.5 text-[10px] shadow-2xs font-[Poppins]">
+        {/* Bloque Superior Derecho: Toggle Segmentado Estilo img4 + Botón Editar Proyecto */}
+        <div className="project-detail-actions flex w-full flex-nowrap items-center justify-between gap-1.5 sm:w-auto sm:justify-end sm:gap-2 shrink-0 self-start">
+          <div className="inline-flex min-w-0 shrink items-center rounded-lg border border-gray-200/90 bg-gray-100/90 p-0.5 text-[10px] shadow-2xs font-[Poppins]">
             <button
               type="button"
               onClick={() => {
                 setTabMaestra('general')
                 setEditingSection(null)
               }}
-              className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[10.5px] font-bold transition-all cursor-pointer ${
+              className={`inline-flex min-w-0 items-center gap-1 rounded-md px-2 sm:px-3 py-1.5 text-[10.5px] font-bold transition-all cursor-pointer ${
                 tabMaestra === 'general'
                   ? 'bg-white text-[#9B0F06] border border-gray-200/80 shadow-xs'
                   : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/50'
               }`}
             >
               <Info size={12} className={tabMaestra === 'general' ? 'text-[#9B0F06]' : 'text-gray-500'} />
-              <span>Información General</span>
+              <span className="truncate"><span className="sm:hidden">General</span><span className="hidden sm:inline">Información General</span></span>
             </button>
             <button
               type="button"
@@ -1247,27 +1761,93 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                 setTabMaestra('financiera')
                 setEditingSection(null)
               }}
-              className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[10.5px] font-bold transition-all cursor-pointer ${
+              className={`inline-flex min-w-0 items-center gap-1 rounded-md px-2 sm:px-3 py-1.5 text-[10.5px] font-bold transition-all cursor-pointer ${
                 tabMaestra === 'financiera'
                   ? 'bg-white text-[#9B0F06] border border-gray-200/80 shadow-xs'
                   : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/50'
               }`}
             >
               <CalendarDays size={12} className={tabMaestra === 'financiera' ? 'text-[#9B0F06]' : 'text-gray-500'} />
-              <span>Información Financiera</span>
+              <span className="truncate"><span className="sm:hidden">Financiera</span><span className="hidden sm:inline">Información Financiera</span></span>
             </button>
           </div>
 
-          {canEdit && (
-            <button
-              type="button"
-              onClick={() => router.push(`/dashboard/proyectos/editar?slug=${proyecto.id}`)}
-              className="shrink-0 whitespace-nowrap inline-flex h-8 items-center gap-1.5 rounded-md bg-[#9B0F06] px-3.5 text-[11px] font-bold text-white shadow-xs transition-colors hover:bg-[#5E0006] cursor-pointer"
-            >
-              <Edit2 size={12} />
-              Editar Proyecto
-            </button>
-          )}
+          <div className="flex shrink-0 items-center gap-1.5">
+            {canEdit && (
+              <button
+                type="button"
+                onClick={() => router.push(`/dashboard/proyectos/editar?slug=${proyecto.id}`)}
+                className="shrink-0 whitespace-nowrap inline-flex h-8 items-center gap-1 rounded-md bg-[#9B0F06] px-2 sm:px-3.5 text-[11px] font-bold text-white shadow-xs transition-colors hover:bg-[#5E0006] cursor-pointer"
+              >
+                <Edit2 size={12} />
+                <span className="sm:hidden">Editar</span><span className="hidden sm:inline">Editar Proyecto</span>
+              </button>
+            )}
+
+            {/* Menú de opciones adicionales (3 puntos) */}
+            <div className="relative" ref={menuOpcionesRef}>
+              <button
+                type="button"
+                onClick={() => setMenuOpcionesAbierto((prev) => !prev)}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-700 shadow-2xs hover:bg-gray-50 hover:text-gray-900 transition-colors cursor-pointer"
+                title="Más opciones del proyecto"
+                aria-label="Más opciones"
+              >
+                <MoreVertical size={16} />
+              </button>
+
+              {menuOpcionesAbierto && (
+                <div className="absolute right-0 top-full mt-1.5 w-60 rounded-xl border border-gray-200 bg-white p-1.5 shadow-xl z-50 animate-in fade-in zoom-in-95 duration-100 font-[Poppins]">
+                  <button
+                    type="button"
+                    onClick={() => handleNavegarOpcion('bitacora')}
+                    disabled={verificandoBitacora}
+                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-semibold text-gray-700 hover:bg-red-50 hover:text-[#9B0F06] transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    <ClipboardList size={15} className="text-gray-400 group-hover:text-[#9B0F06]" />
+                    <span>Registros de bitácora</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleNavegarOpcion('fotografias')}
+                    disabled={verificandoBitacora}
+                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-semibold text-gray-700 hover:bg-red-50 hover:text-[#9B0F06] transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    <Camera size={15} className="text-gray-400 group-hover:text-[#9B0F06]" />
+                    <span>Fotografías del proyecto</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleNavegarOpcion('reportes')}
+                    disabled={verificandoBitacora}
+                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-semibold text-gray-700 hover:bg-red-50 hover:text-[#9B0F06] transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    <FileText size={15} className="text-gray-400 group-hover:text-[#9B0F06]" />
+                    <span>Generar reporte</span>
+                  </button>
+
+                  {esModoManual && (
+                    <>
+                      <div className="my-1 border-t border-gray-100" />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMenuOpcionesAbierto(false)
+                          setDrawerRenglonesAbierto(true)
+                        }}
+                        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-semibold text-gray-700 hover:bg-red-50 hover:text-[#9B0F06] transition-colors cursor-pointer"
+                      >
+                        <Layers size={15} className="text-gray-400 group-hover:text-[#9B0F06]" />
+                        <span>Gestionar Renglones de Obra</span>
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1328,38 +1908,42 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                     />
                     <EditableInfoField
                       label="Código del Proyecto"
-                      value={editingSection === 'resumen_identificacion' ? editFormData.codigo : (proyecto.codigo || 'PROY-5916')}
+                      value={proyecto.codigo || editFormData.codigo || 'PROY-5916'}
                       isEditing={editingSection === 'resumen_identificacion'}
-                      onChange={(v) => handleFieldChange('codigo', v)}
+                      readOnly
                       mono
                       kind="codigo"
-                      placeholder="DOM-VIAL-001"
-                      required
                     />
                     <EditableInfoField
                       label="Dirección (Texto Corto)"
-                      value={editingSection === 'resumen_identificacion' ? editFormData.direccion : (proyecto.direccion || 'Tres Quebradas, Buena Vista, Palencia')}
+                      value={editingSection === 'resumen_identificacion' ? editFormData.direccion : (proyecto.direccion || '')}
                       isEditing={editingSection === 'resumen_identificacion'}
-                      onChange={(v) => handleFieldChange('direccion', v)}
+                      onChange={(v) => {
+                        handleFieldChange('direccion', v)
+                        handleFieldChange('ubicacionFisica', v)
+                        handleFieldChange('ubicacion', v)
+                      }}
                       placeholder="Dirección o tramo corto"
                       required
                     />
                     <EditableInfoField
-                      label="Ubicación Física"
-                      value={editingSection === 'resumen_identificacion' ? (editFormData.ubicacionFisica || editFormData.ubicacion) : (proyecto.ubicacionFisica || proyecto.ubicacion || 'Palencia, Guatemala')}
+                      label="Coordenadas"
+                      value={
+                        editingSection === 'resumen_identificacion'
+                          ? (buscandoCoords
+                              ? 'Identificando coordenadas...'
+                              : (editFormData.coordenadas || (editFormData.latitud != null && editFormData.longitud != null ? `${Number(editFormData.latitud).toFixed(6)}, ${Number(editFormData.longitud).toFixed(6)}` : '-')))
+                          : (pAny.latitud != null && pAny.longitud != null && pAny.latitud !== '' && pAny.longitud !== '' ? `${Number(pAny.latitud).toFixed(6)}, ${Number(pAny.longitud).toFixed(6)}` : '-')
+                      }
                       isEditing={editingSection === 'resumen_identificacion'}
-                      onChange={(v) => {
-                        handleFieldChange('ubicacionFisica', v)
-                        handleFieldChange('ubicacion', v)
-                      }}
-                      placeholder="Ubicación física del proyecto"
-                      required
+                      readOnly
+                      mono
                     />
                   </div>
                   <div className="mt-2.5 border-t border-gray-100 pt-2">
                     <EditableInfoField
                       label="Descripción del Alcance Vial"
-                      value={editingSection === 'resumen_identificacion' ? editFormData.descripcion : (proyecto.descripcion || 'Mejoramiento de tramo carretero y obras de arte complementarias.')}
+                      value={editingSection === 'resumen_identificacion' ? editFormData.descripcion : (proyecto.descripcion || '')}
                       isEditing={editingSection === 'resumen_identificacion'}
                       onChange={(v) => handleFieldChange('descripcion', v)}
                       type="textarea"
@@ -1383,7 +1967,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                   <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                     <EditableInfoField
                       label="Entidad Contratante / Propietaria"
-                      value={editingSection === 'resumen_entidades' ? editFormData.entidadContratante : (proyecto.entidadContratante || 'Dirección General de Caminos (DGC)')}
+                      value={editingSection === 'resumen_entidades' ? editFormData.entidadContratante : (proyecto.entidadContratante || '')}
                       isEditing={editingSection === 'resumen_entidades'}
                       onChange={(v) => handleFieldChange('entidadContratante', v)}
                       placeholder="Ej: Dirección General de Caminos (DGC)"
@@ -1391,7 +1975,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                     />
                     <EditableInfoField
                       label="Empresa Contratista Ejecutora"
-                      value={editingSection === 'resumen_entidades' ? editFormData.empresaContratista : (proyecto.empresaContratista || 'Constructora y Pavimentos S.A.')}
+                      value={editingSection === 'resumen_entidades' ? editFormData.empresaContratista : (proyecto.empresaContratista || '')}
                       isEditing={editingSection === 'resumen_entidades'}
                       onChange={(v) => handleFieldChange('empresaContratista', v)}
                       placeholder="Ej: Constructora y Pavimentos S.A."
@@ -1399,18 +1983,20 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                     />
                     <EditableInfoField
                       label="Empresa Supervisora de Obra"
-                      value={editingSection === 'resumen_entidades' ? editFormData.empresaSupervisora : (proyecto.empresaSupervisora || 'SERVICIOS DE INGENIERIA - SERINGE')}
+                      value={editingSection === 'resumen_entidades' ? editFormData.empresaSupervisora : (proyecto.empresaSupervisora || '')}
                       isEditing={editingSection === 'resumen_entidades'}
                       onChange={(v) => handleFieldChange('empresaSupervisora', v)}
-                      placeholder="Ej: SERVICIOS DE INGENIERIA - SERINGE"
+                      placeholder="Ej: SERVICIOS DE INGENIERIA"
                       required
                     />
                     <EditableInfoField
                       label="Delegado Residente de Proyecto"
-                      value={editingSection === 'resumen_entidades' ? editFormData.delegadoResidente : (proyecto.delegadoResidente || 'Ing. Raúl Alvarado')}
+                      value={editingSection === 'resumen_entidades' ? editFormData.delegadoResidente : (proyecto.delegadoResidente || '')}
                       isEditing={editingSection === 'resumen_entidades'}
                       onChange={(v) => handleFieldChange('delegadoResidente', v)}
-                      placeholder="Ej: Ing. Raúl Alvarado"
+                      placeholder="Seleccionar Delegado Residente..."
+                      userOptions={userOptionsIngenieros.length > 0 ? userOptionsIngenieros : userOptionsGenerales}
+                      onEmptyUserAction={handleAbrirCrearUsuario}
                       kind="nombre"
                       required
                     />
@@ -1431,22 +2017,21 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                   <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
                     <EditableInfoField
                       label="Fecha de Adjudicación"
-                      value={editingSection === 'resumen_contrato' ? editFormData.fechaAdjudicacion : (proyecto.fechaAdjudicacion || '2026-09-06')}
+                      value={editingSection === 'resumen_contrato' ? editFormData.fechaAdjudicacion : (proyecto.fechaAdjudicacion || '')}
                       isEditing={editingSection === 'resumen_contrato'}
                       onChange={(v) => handleFieldChange('fechaAdjudicacion', v)}
                       type="date"
                     />
                     <EditableInfoField
                       label="N° Escritura Pública"
-                      value={editingSection === 'resumen_contrato' ? editFormData.numeroEscrituraPublica : (proyecto.numeroEscrituraPublica || '142AA')}
+                      value={editingSection === 'resumen_contrato' ? editFormData.numeroEscrituraPublica : (proyecto.numeroEscrituraPublica || '')}
                       isEditing={editingSection === 'resumen_contrato'}
                       onChange={(v) => handleFieldChange('numeroEscrituraPublica', v)}
-                      mono
                       placeholder="142AA"
                     />
                     <EditableInfoField
                       label="Fecha Inicio Contractual"
-                      value={editingSection === 'resumen_contrato' ? (editFormData.fechaInicioContractual || editFormData.fechaInicio) : (proyecto.fechaInicioContractual || proyecto.fechaInicio || '2026-09-08')}
+                      value={editingSection === 'resumen_contrato' ? (editFormData.fechaInicioContractual || editFormData.fechaInicio) : (proyecto.fechaInicioContractual || proyecto.fechaInicio || '')}
                       isEditing={editingSection === 'resumen_contrato'}
                       onChange={(v) => {
                         handleFieldChange('fechaInicioContractual', v)
@@ -1456,7 +2041,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                     />
                     <EditableInfoField
                       label="Fecha Final Contractual"
-                      value={editingSection === 'resumen_contrato' ? (editFormData.fechaFinContractualPlan || editFormData.fechaFin) : ((proyecto as any).fechaFinContractualPlan || proyecto.fechaFin || '2026-09-30')}
+                      value={editingSection === 'resumen_contrato' ? (editFormData.fechaFinContractualPlan || editFormData.fechaFin) : ((proyecto as any).fechaFinContractualPlan || proyecto.fechaFin || '')}
                       isEditing={editingSection === 'resumen_contrato'}
                       onChange={(v) => {
                         handleFieldChange('fechaFinContractualPlan', v)
@@ -1466,21 +2051,21 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                     />
                     <EditableInfoField
                       label="Plazo Contractual Original"
-                      value={editingSection === 'resumen_contrato' ? editFormData.plazoEjecucionContractualOriginal : (proyecto.plazoEjecucionContractualOriginal || '22 días')}
+                      value={editingSection === 'resumen_contrato' ? editFormData.plazoEjecucionContractualOriginal : (proyecto.plazoEjecucionContractualOriginal || '')}
                       isEditing={editingSection === 'resumen_contrato'}
                       onChange={(v) => handleFieldChange('plazoEjecucionContractualOriginal', v)}
-                      placeholder="Ej: 22 días"
+                      placeholder="Ej: 365 días"
                     />
                     <EditableInfoField
                       label="Fecha Finalización Real"
-                      value={editingSection === 'resumen_contrato' ? editFormData.fechaFinalizacionReal : (proyecto.fechaFinalizacionReal || '2026-09-30')}
+                      value={editingSection === 'resumen_contrato' ? editFormData.fechaFinalizacionReal : (proyecto.fechaFinalizacionReal || '')}
                       isEditing={editingSection === 'resumen_contrato'}
                       onChange={(v) => handleFieldChange('fechaFinalizacionReal', v)}
                       type="date"
                     />
                     <EditableInfoField
                       label="Plazo Real Ampliado"
-                      value={editingSection === 'resumen_contrato' ? editFormData.plazoEjecucionRealAmpliado : (proyecto.plazoEjecucionRealAmpliado || '-')}
+                      value={editingSection === 'resumen_contrato' ? editFormData.plazoEjecucionRealAmpliado : (proyecto.plazoEjecucionRealAmpliado || '')}
                       isEditing={editingSection === 'resumen_contrato'}
                       onChange={(v) => handleFieldChange('plazoEjecucionRealAmpliado', v)}
                       placeholder="Ej: 0 días"
@@ -1495,10 +2080,14 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                         </span>
                         {editingSection === 'resumen_contrato' ? (
                           <input
-                            type="number"
+                            type="text"
+                            inputMode="decimal"
                             value={editFormData.montoFinancieroFinalEjecutado ?? editFormData.montoFinal ?? ''}
                             onChange={(e) => {
-                              const val = e.target.value === '' ? '' : Number(e.target.value)
+                              const clean = e.target.value.replace(/[^0-9.]/g, '')
+                              const parts = clean.split('.')
+                              const finalClean = parts.length > 2 ? parts[0] + '.' + parts.slice(1).join('') : clean
+                              const val = finalClean === '' ? '' : Number(finalClean)
                               handleFieldChange('montoFinancieroFinalEjecutado', val)
                               handleFieldChange('montoFinal', val)
                             }}
@@ -1585,12 +2174,20 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                   </div>
 
                   <MapaDetalleVista
-                    lat={pAny.latitud != null ? Number(pAny.latitud) : 14.623783}
-                    lng={pAny.longitud != null ? Number(pAny.longitud) : -90.344353}
-                    direccion={proyecto.direccion || proyecto.ubicacionFisica || 'Tres Quebradas, Buena Vista, Palencia'}
-                    direccionFin={pAny.direccionFin || 'Plan Grande, Palencia'}
-                    kilometroInicio={pAny.kilometroInicio ?? 5}
-                    kilometroFin={pAny.kilometroFin ?? 10}
+                    lat={
+                      editingSection === 'resumen_identificacion'
+                        ? (editFormData.latitud != null && editFormData.latitud !== '' ? Number(editFormData.latitud) : null)
+                        : (pAny.latitud != null && pAny.latitud !== '' ? Number(pAny.latitud) : null)
+                    }
+                    lng={
+                      editingSection === 'resumen_identificacion'
+                        ? (editFormData.longitud != null && editFormData.longitud !== '' ? Number(editFormData.longitud) : null)
+                        : (pAny.longitud != null && pAny.longitud !== '' ? Number(pAny.longitud) : null)
+                    }
+                    direccion={(editingSection === 'resumen_identificacion' ? editFormData.direccion : proyecto.direccion) || proyecto.ubicacionFisica || ''}
+                    direccionFin={pAny.direccionFin || ''}
+                    kilometroInicio={pAny.kilometroInicio ?? 0}
+                    kilometroFin={pAny.kilometroFin ?? 0}
                     className="h-44 w-full overflow-hidden rounded-lg border border-gray-200 shadow-2xs"
                   />
                 </section>
@@ -1643,7 +2240,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
               {/* Panel Amplio de Lectura para Descripción y Alcance con Lápiz */}
               <div
                 className={`rounded-xl border bg-white p-6 shadow-2xs transition-all ${
-                  editingSection === 'intro' ? 'border-[#9B0F06]/40 ring-1 ring-[#9B0F06]/15' : 'border-gray-200'
+                  editingSection === 'intro' ? 'border-gray-300 ring-1 ring-gray-200' : 'border-gray-200'
                 }`}
               >
                 <div className="mb-4 flex items-center justify-between border-b border-gray-100 pb-3">
@@ -1707,8 +2304,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                     />
                   ) : (
                     <p className="whitespace-pre-line text-xs font-normal leading-relaxed text-gray-700 min-h-[140px]">
-                      {proyecto.descripcion ||
-                        `El presente proyecto comprende la ejecución de trabajos viales integrales, incluyendo la conformación de subbase y base granular, pavimentación asfáltica, construcción de cunetas de drenaje longitudinal y transversal, señalización horizontal y vertical reglamentaria, así como obras de arte y mitigación ambiental conforme a las normas técnicas y Libro Azul de la Dirección General de Caminos (DGC).`}
+                      {proyecto.descripcion || 'Sin descripción registrada para este proyecto.'}
                     </p>
                   )}
                 </div>
@@ -1734,16 +2330,15 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                   <div className="space-y-2 rounded-lg border border-gray-100 bg-gray-50/50 p-3">
                     <EditableInfoField
                       label="Licitación Pública Nacional"
-                      value={editingSection === 'marco_legal_contratista' ? editFormData.licitacionEjecutora : (pAny.licitacionEjecutora || 'Licitación Pública Nacional No. DGC-053-2025-C')}
+                      value={editingSection === 'marco_legal_contratista' ? editFormData.licitacionEjecutora : (pAny.licitacionEjecutora || '')}
                       isEditing={editingSection === 'marco_legal_contratista'}
                       onChange={(v) => handleFieldChange('licitacionEjecutora', v)}
-                      mono
                       highlight
                       placeholder="DGC-053-2025-C"
                     />
                     <EditableInfoField
                       label="Nombre de Empresa Ejecutora"
-                      value={editingSection === 'marco_legal_contratista' ? editFormData.empresaContratista : (proyecto.empresaContratista || 'Constructora y Pavimentos S.A.')}
+                      value={editingSection === 'marco_legal_contratista' ? editFormData.empresaContratista : (proyecto.empresaContratista || '')}
                       isEditing={editingSection === 'marco_legal_contratista'}
                       onChange={(v) => handleFieldChange('empresaContratista', v)}
                       placeholder="Constructora y Pavimentos S.A."
@@ -1751,7 +2346,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                     />
                     <EditableInfoField
                       label="Nombre de Propietario / Representante Legal"
-                      value={editingSection === 'marco_legal_contratista' ? editFormData.propietarioContratista : (pAny.propietarioContratista || 'Ing. Marco Antonio Estrada Morales')}
+                      value={editingSection === 'marco_legal_contratista' ? editFormData.propietarioContratista : (pAny.propietarioContratista || '')}
                       isEditing={editingSection === 'marco_legal_contratista'}
                       onChange={(v) => handleFieldChange('propietarioContratista', v)}
                       placeholder="Representante Legal"
@@ -1760,7 +2355,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                     />
                     <EditableInfoField
                       label="Dirección de la Empresa"
-                      value={editingSection === 'marco_legal_contratista' ? editFormData.direccionContratista : (pAny.direccionContratista || '12 Calle 4-55 Zona 10, Edificio Gran Vía, Nivel 8, Guatemala')}
+                      value={editingSection === 'marco_legal_contratista' ? editFormData.direccionContratista : (pAny.direccionContratista || '')}
                       isEditing={editingSection === 'marco_legal_contratista'}
                       onChange={(v) => handleFieldChange('direccionContratista', v)}
                       placeholder="Dirección fiscal"
@@ -1780,7 +2375,6 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                             handleFieldChange('actaInicioNumeroEjecutora', v)
                             handleFieldChange('actaInicioEjecutora', formatActaString(v, editFormData.actaInicioFechaEjecutora))
                           }}
-                          mono
                           placeholder="Ej: 26-2026"
                         />
                         <EditableInfoField
@@ -1797,32 +2391,33 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                     ) : (
                       <EditableInfoField
                         label="Acta de Inicio y de Plazo"
-                        value={formatActaString(editFormData.actaInicioNumeroEjecutora, editFormData.actaInicioFechaEjecutora) || editFormData.actaInicioEjecutora || (pAny.actaInicioEjecutora || 'Acta No. 26-2026 de fecha 09/02/2026')}
-                        mono
+                        value={formatActaString(editFormData.actaInicioNumeroEjecutora, editFormData.actaInicioFechaEjecutora) || editFormData.actaInicioEjecutora || (pAny.actaInicioEjecutora || '')}
                       />
                     )}
 
                     <EditableInfoField
                       label="Nombramiento de Superintendente"
-                      value={editingSection === 'marco_legal_contratista' ? editFormData.superintendente : (pAny.superintendente || 'Ing. Civil Fernando José Reyes Cabrera')}
+                      value={editingSection === 'marco_legal_contratista' ? editFormData.superintendente : (pAny.superintendente || '')}
                       isEditing={editingSection === 'marco_legal_contratista'}
                       onChange={(v) => handleFieldChange('superintendente', v)}
-                      placeholder="Superintendente de Obra"
+                      placeholder="Seleccionar o escribir Superintendente..."
+                      userOptions={userOptionsGenerales}
+                      onEmptyUserAction={handleAbrirCrearUsuario}
                       kind="nombre"
                       required
                     />
                     <EditableInfoField
                       label="Colegiado Activo de Superintendente"
-                      value={editingSection === 'marco_legal_contratista' ? editFormData.colegiadoSuperintendente : (pAny.colegiadoSuperintendente || 'Colegiado Activo No. 4125')}
+                      value={editingSection === 'marco_legal_contratista' ? editFormData.colegiadoSuperintendente : (pAny.colegiadoSuperintendente || '')}
                       isEditing={editingSection === 'marco_legal_contratista'}
                       onChange={(v) => handleFieldChange('colegiadoSuperintendente', v)}
-                      mono
+                      kind="codigo"
                       placeholder="Col. No. 4125"
                     />
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <EditableInfoField
                         label="Teléfono de Contacto"
-                        value={editingSection === 'marco_legal_contratista' ? editFormData.telefonoContratista : (editFormData.telefonoContratista || '2334-9000')}
+                        value={editingSection === 'marco_legal_contratista' ? editFormData.telefonoContratista : (editFormData.telefonoContratista || '')}
                         isEditing={editingSection === 'marco_legal_contratista'}
                         onChange={(v) => handleFieldChange('telefonoContratista', v)}
                         placeholder="2334-9000"
@@ -1831,7 +2426,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                       />
                       <EditableInfoField
                         label="Correo Electrónico"
-                        value={editingSection === 'marco_legal_contratista' ? editFormData.correoContratista : (editFormData.correoContratista || 'contacto@constructora.com')}
+                        value={editingSection === 'marco_legal_contratista' ? editFormData.correoContratista : (editFormData.correoContratista || '')}
                         isEditing={editingSection === 'marco_legal_contratista'}
                         type="email"
                         kind="email"
@@ -1844,7 +2439,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                 </div>
               </InfoDetailCard>
 
-              {/* Bloque 2: Estatus Contractual de la Empresa Supervisora (Sin icono en encabezado según requerimiento) */}
+              {/* Bloque 2: Estatus Contractual de la Empresa Supervisora */}
               <InfoDetailCard
                 title="2. ESTATUS CONTRACTUAL DE LA EMPRESA SUPERVISORA"
                 badge="Contrato de Supervisión"
@@ -1859,16 +2454,15 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                   <div className="space-y-2 rounded-lg border border-gray-100 bg-gray-50/50 p-3">
                     <EditableInfoField
                       label="Licitación Pública Supervisora"
-                      value={editingSection === 'marco_legal_supervisora' ? editFormData.licitacionSupervisora : (pAny.licitacionSupervisora || 'Licitación Pública No. DGC-SUP-012-2025')}
+                      value={editingSection === 'marco_legal_supervisora' ? editFormData.licitacionSupervisora : (pAny.licitacionSupervisora || '')}
                       isEditing={editingSection === 'marco_legal_supervisora'}
                       onChange={(v) => handleFieldChange('licitacionSupervisora', v)}
-                      mono
                       highlight
                       placeholder="DGC-SUP-012-2025"
                     />
                     <EditableInfoField
                       label="Nombre Empresa Supervisora"
-                      value={editingSection === 'marco_legal_supervisora' ? editFormData.empresaSupervisora : (proyecto.empresaSupervisora || 'SERVICIOS DE INGENIERIA - SERINGE')}
+                      value={editingSection === 'marco_legal_supervisora' ? editFormData.empresaSupervisora : (proyecto.empresaSupervisora || '')}
                       isEditing={editingSection === 'marco_legal_supervisora'}
                       onChange={(v) => handleFieldChange('empresaSupervisora', v)}
                       placeholder="SERVICIOS DE INGENIERIA"
@@ -1876,7 +2470,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                     />
                     <EditableInfoField
                       label="Nombre Propietario (Contacto)"
-                      value={editingSection === 'marco_legal_supervisora' ? editFormData.propietarioSupervisora : (pAny.propietarioSupervisora || 'William Ramón Godínez Mansilla')}
+                      value={editingSection === 'marco_legal_supervisora' ? editFormData.propietarioSupervisora : (pAny.propietarioSupervisora || '')}
                       isEditing={editingSection === 'marco_legal_supervisora'}
                       onChange={(v) => handleFieldChange('propietarioSupervisora', v)}
                       placeholder="Propietario / Contacto"
@@ -1885,7 +2479,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                     />
                     <EditableInfoField
                       label="Dirección"
-                      value={editingSection === 'marco_legal_supervisora' ? editFormData.direccionSupervisora : (pAny.direccionSupervisora || 'Avenida Las Américas, 24-70 Zona 13, Guatemala')}
+                      value={editingSection === 'marco_legal_supervisora' ? editFormData.direccionSupervisora : (pAny.direccionSupervisora || '')}
                       isEditing={editingSection === 'marco_legal_supervisora'}
                       onChange={(v) => handleFieldChange('direccionSupervisora', v)}
                       placeholder="Dirección fiscal"
@@ -1897,7 +2491,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <EditableInfoField
                         label="Teléfono de Contacto"
-                        value={editingSection === 'marco_legal_supervisora' ? editFormData.telefonoSupervisora : (editFormData.telefonoSupervisora || '2212-9675 / 5525-1537')}
+                        value={editingSection === 'marco_legal_supervisora' ? editFormData.telefonoSupervisora : (editFormData.telefonoSupervisora || '')}
                         isEditing={editingSection === 'marco_legal_supervisora'}
                         onChange={(v) => handleFieldChange('telefonoSupervisora', v)}
                         placeholder="2212-9675 / 5525-1537"
@@ -1906,7 +2500,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                       />
                       <EditableInfoField
                         label="Correo Electrónico"
-                        value={editingSection === 'marco_legal_supervisora' ? editFormData.correoSupervisora : (editFormData.correoSupervisora || 'supervision@seringe.com.gt')}
+                        value={editingSection === 'marco_legal_supervisora' ? editFormData.correoSupervisora : (editFormData.correoSupervisora || '')}
                         isEditing={editingSection === 'marco_legal_supervisora'}
                         type="email"
                         kind="email"
@@ -1927,7 +2521,6 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                             handleFieldChange('actaInicioNumeroSupervisora', v)
                             handleFieldChange('actaInicioSupervisora', formatActaString(v, editFormData.actaInicioFechaSupervisora))
                           }}
-                          mono
                           placeholder="Ej: 52-2026"
                         />
                         <EditableInfoField
@@ -1944,14 +2537,13 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                     ) : (
                       <EditableInfoField
                         label="Acta de Inicio de Supervisión"
-                        value={formatActaString(editFormData.actaInicioNumeroSupervisora, editFormData.actaInicioFechaSupervisora) || editFormData.actaInicioSupervisora || (pAny.actaInicioSupervisora || 'Acta No. 52-2026 de fecha 07/07/2026')}
-                        mono
+                        value={formatActaString(editFormData.actaInicioNumeroSupervisora, editFormData.actaInicioFechaSupervisora) || editFormData.actaInicioSupervisora || (pAny.actaInicioSupervisora || '')}
                       />
                     )}
 
                     <EditableInfoField
                       label="Delegado Residente de Proyecto"
-                      value={editingSection === 'marco_legal_supervisora' ? editFormData.delegadoResidente : (proyecto.delegadoResidente || 'Ing. Civil Pablo Osberto Pérez Gómez (Col. 3689)')}
+                      value={editingSection === 'marco_legal_supervisora' ? editFormData.delegadoResidente : (proyecto.delegadoResidente || '')}
                       isEditing={editingSection === 'marco_legal_supervisora'}
                       onChange={(v) => handleFieldChange('delegadoResidente', v)}
                       placeholder="Ing. Delegado Residente"
@@ -1967,7 +2559,17 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                     <span className="text-[10.5px] font-bold text-gray-800">
                       Profesionales y Técnicos Asignados a la Supervisión
                     </span>
-                    <span className="text-[9px] font-bold text-gray-500">{equipoCompleto.length} profesionales</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[9px] font-bold text-gray-500">{equipoCompleto.length} profesionales</span>
+                      <button
+                        type="button"
+                        onClick={() => setIsEquipoModalOpen(true)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-[10px] font-bold text-[#9B0F06] transition-colors shadow-2xs cursor-pointer"
+                      >
+                        <Users size={12} />
+                        <span>Gestionar Equipo</span>
+                      </button>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -2033,7 +2635,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
               {fichaPerspectiva === 'obra' && (
                 <div
                   className={`rounded-xl border bg-white shadow-2xs overflow-hidden transition-all ${
-                    editingSection === 'ficha_obra' ? 'border-[#9B0F06]/40 ring-1 ring-[#9B0F06]/15' : 'border-gray-200'
+                    editingSection === 'ficha_obra' ? 'border-gray-300 ring-1 ring-gray-200' : 'border-gray-200'
                   }`}
                 >
                   <div className="w-full flex flex-wrap items-center justify-between bg-gray-50/80 px-4 py-3 border-b border-gray-200 gap-2">
@@ -2112,14 +2714,14 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                           </p>
                           <EditableItemFichaTecnica
                             label="Empresa Contratista"
-                            value={editingSection === 'ficha_obra' ? editFormData.empresaContratista : (proyecto.empresaContratista || 'Constructora Principal')}
+                            value={editingSection === 'ficha_obra' ? editFormData.empresaContratista : (proyecto.empresaContratista || '')}
                             isEditing={editingSection === 'ficha_obra'}
                             onChange={(v) => handleFieldChange('empresaContratista', v)}
                             required
                           />
                           <EditableItemFichaTecnica
                             label="Propietario / Rep. Legal"
-                            value={editingSection === 'ficha_obra' ? editFormData.propietarioContratista : (pAny.propietarioContratista || 'Ing. Marco Antonio Estrada Morales')}
+                            value={editingSection === 'ficha_obra' ? editFormData.propietarioContratista : (pAny.propietarioContratista || '')}
                             isEditing={editingSection === 'ficha_obra'}
                             onChange={(v) => handleFieldChange('propietarioContratista', v)}
                             kind="nombre"
@@ -2127,7 +2729,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                           />
                           <EditableItemFichaTecnica
                             label="Registro Mercantil"
-                            value={editingSection === 'ficha_obra' ? editFormData.registroMercantilContratista : (pAny.registroMercantilContratista || '145892B')}
+                            value={editingSection === 'ficha_obra' ? editFormData.registroMercantilContratista : (pAny.registroMercantilContratista || '')}
                             isEditing={editingSection === 'ficha_obra'}
                             onChange={(v) => handleFieldChange('registroMercantilContratista', v)}
                             kind="codigo"
@@ -2135,41 +2737,44 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                           />
                           <EditableItemFichaTecnica
                             label="Dirección"
-                            value={editingSection === 'ficha_obra' ? editFormData.direccionContratista : (pAny.direccionContratista || '12 Calle 4-55 Zona 10, Guatemala')}
+                            value={editingSection === 'ficha_obra' ? editFormData.direccionContratista : (pAny.direccionContratista || '')}
                             isEditing={editingSection === 'ficha_obra'}
                             onChange={(v) => handleFieldChange('direccionContratista', v)}
                             required
                           />
                           <EditableItemFichaTecnica
                             label="Teléfono"
-                            value={editingSection === 'ficha_obra' ? editFormData.telefonoContratista : (pAny.telefonoContratista || '2334-9000 / 5544-1234')}
+                            value={editingSection === 'ficha_obra' ? editFormData.telefonoContratista : (pAny.telefonoContratista || '')}
                             isEditing={editingSection === 'ficha_obra'}
                             onChange={(v) => handleFieldChange('telefonoContratista', v)}
                             kind="telefono"
                           />
                           <EditableItemFichaTecnica
                             label="Responsable del Proyecto"
-                            value={editingSection === 'ficha_obra' ? editFormData.responsableNombre : (pAny.responsableNombre || 'Ing. Civil Fernando Reyes (Col. 4125)')}
+                            value={editingSection === 'ficha_obra' ? editFormData.responsableNombre : (pAny.responsableNombre || '')}
                             isEditing={editingSection === 'ficha_obra'}
                             onChange={(v) => handleFieldChange('responsableNombre', v)}
+                            placeholder="Seleccionar o buscar responsable..."
+                            userOptions={userOptionsIngenieros.length > 0 ? userOptionsIngenieros : userOptionsGenerales}
+                            onEmptyUserAction={handleAbrirCrearUsuario}
                             kind="nombre"
                             required
                           />
                           <EditableItemFichaTecnica
                             label="Programa"
-                            value={editingSection === 'ficha_obra' ? editFormData.programaObra : (pAny.programaObra || 'TRANSPORTE POR CARRETERA')}
+                            value={editingSection === 'ficha_obra' ? editFormData.programaObra : (pAny.programaObra || '')}
                             isEditing={editingSection === 'ficha_obra'}
                             onChange={(v) => handleFieldChange('programaObra', v)}
                           />
                           <EditableItemFichaTecnica
                             label="Subprograma"
-                            value={editingSection === 'ficha_obra' ? editFormData.subprogramaObra : (pAny.subprogramaObra || 'MEJORAMIENTO DE CARRETERAS SECUNDARIAS Y PUENTES')}
+                            value={editingSection === 'ficha_obra' ? editFormData.subprogramaObra : (pAny.subprogramaObra || '')}
                             isEditing={editingSection === 'ficha_obra'}
                             onChange={(v) => handleFieldChange('subprogramaObra', v)}
                           />
                           <EditableItemFichaTecnica
                             label="Fuente de Financiamiento"
-                            value={editingSection === 'ficha_obra' ? editFormData.fuenteFinanciamientoObra : (pAny.fuenteFinanciamientoObra || 'Fondos nacionales')}
+                            value={editingSection === 'ficha_obra' ? editFormData.fuenteFinanciamientoObra : (pAny.fuenteFinanciamientoObra || '')}
                             isEditing={editingSection === 'ficha_obra'}
                             onChange={(v) => handleFieldChange('fuenteFinanciamientoObra', v)}
                           />
@@ -2182,35 +2787,31 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                           </p>
                           <EditableItemFichaTecnica
                             label="Fondos Nacionales (Partida)"
-                            value={editingSection === 'ficha_obra' ? editFormData.partidaFondosObra : (pAny.partidaFondosObra || '2026-11130013-202-11-01-002-000-003-331-1399-52-0403-0065')}
+                            value={editingSection === 'ficha_obra' ? editFormData.partidaFondosObra : (pAny.partidaFondosObra || '')}
                             isEditing={editingSection === 'ficha_obra'}
                             onChange={(v) => handleFieldChange('partidaFondosObra', v)}
-                            mono
                           />
                           <EditableItemFichaTecnica
                             label="CDP (Comprobante Devengado)"
-                            value={editingSection === 'ficha_obra' ? editFormData.cdpObra : (pAny.cdpObra || '66349939')}
+                            value={editingSection === 'ficha_obra' ? editFormData.cdpObra : (pAny.cdpObra || '')}
                             isEditing={editingSection === 'ficha_obra'}
                             onChange={(v) => handleFieldChange('cdpObra', v)}
-                            mono
                           />
                           <EditableItemFichaTecnica
                             label="Contrato No."
-                            value={editingSection === 'ficha_obra' ? editFormData.numeroContratoOriginal : (pAny.numeroContratoOriginal || '008-2026-DGC-CONSTRUCCION, 29/05/2026')}
+                            value={editingSection === 'ficha_obra' ? editFormData.numeroContratoOriginal : (pAny.numeroContratoOriginal || '')}
                             isEditing={editingSection === 'ficha_obra'}
                             onChange={(v) => handleFieldChange('numeroContratoOriginal', v)}
-                            mono
                           />
                           <EditableItemFichaTecnica
                             label="Acuerdo Ministerial"
-                            value={editingSection === 'ficha_obra' ? editFormData.acuerdoMinisterialOriginal : (pAny.acuerdoMinisterialOriginal || '522-2026 de fecha 09/06/2026')}
+                            value={editingSection === 'ficha_obra' ? editFormData.acuerdoMinisterialOriginal : (pAny.acuerdoMinisterialOriginal || '')}
                             isEditing={editingSection === 'ficha_obra'}
                             onChange={(v) => handleFieldChange('acuerdoMinisterialOriginal', v)}
-                            mono
                           />
                           <EditableItemFichaTecnica
                             label="Monto Original del Contrato"
-                            value={editingSection === 'ficha_obra' ? (editFormData.montoContractualOriginal ?? editFormData.presupuesto) : formatearMoneda(montoObraOriginal > 0 ? montoObraOriginal : 369834297.14)}
+                            value={editingSection === 'ficha_obra' ? (editFormData.montoContractualOriginal ?? editFormData.presupuesto) : (montoObraOriginal > 0 ? formatearMoneda(montoObraOriginal) : '-')}
                             isEditing={editingSection === 'ficha_obra'}
                             onChange={(v) => {
                               handleFieldChange('montoContractualOriginal', v)
@@ -2223,7 +2824,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                           />
                           <EditableItemFichaTecnica
                             label="Porcentaje de Anticipo (%)"
-                            value={editingSection === 'ficha_obra' ? editFormData.porcentajeAnticipoObra : `${porcentajeAnticipoObra}% (${formatearMoneda(montoAnticipoObra > 0 ? montoAnticipoObra : 55475144.57)})`}
+                            value={editingSection === 'ficha_obra' ? editFormData.porcentajeAnticipoObra : (porcentajeAnticipoObra > 0 ? `${porcentajeAnticipoObra}% (${formatearMoneda(montoAnticipoObra)})` : '0% (Q 0.00)')}
                             isEditing={editingSection === 'ficha_obra'}
                             onChange={(v) => handleFieldChange('porcentajeAnticipoObra', v)}
                             type={editingSection === 'ficha_obra' ? 'number' : 'text'}
@@ -2232,13 +2833,13 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                           />
                           <EditableItemFichaTecnica
                             label="Número de Meses Contratados"
-                            value={editingSection === 'ficha_obra' ? editFormData.mesesContratadosObra : (pAny.mesesContratadosObra || '18 meses (Etapa de Construcción)')}
+                            value={editingSection === 'ficha_obra' ? editFormData.mesesContratadosObra : (pAny.mesesContratadosObra || '')}
                             isEditing={editingSection === 'ficha_obra'}
                             onChange={(v) => handleFieldChange('mesesContratadosObra', v)}
                           />
                           <EditableItemFichaTecnica
                             label="Fecha Original de Terminación"
-                            value={editingSection === 'ficha_obra' ? editFormData.fechaTerminacionOriginalObra : (pAny.fechaTerminacionOriginalObra || 'según Acta No. 26-2026, finaliza el 09/02/2028')}
+                            value={editingSection === 'ficha_obra' ? editFormData.fechaTerminacionOriginalObra : (pAny.fechaTerminacionOriginalObra || '')}
                             isEditing={editingSection === 'ficha_obra'}
                             onChange={(v) => handleFieldChange('fechaTerminacionOriginalObra', v)}
                           />
@@ -2253,7 +2854,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
               {fichaPerspectiva === 'supervision' && (
                 <div
                   className={`rounded-xl border bg-white shadow-2xs overflow-hidden transition-all ${
-                    editingSection === 'ficha_supervision' ? 'border-[#9B0F06]/40 ring-1 ring-[#9B0F06]/15' : 'border-gray-200'
+                    editingSection === 'ficha_supervision' ? 'border-gray-300 ring-1 ring-gray-200' : 'border-gray-200'
                   }`}
                 >
                   <div className="w-full flex flex-wrap items-center justify-between bg-gray-50/80 px-4 py-3 border-b border-gray-200 gap-2">
@@ -2333,7 +2934,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                           <EditableItemFichaTecnica
                             codigo="3.1.2.1"
                             label="Empresa Supervisora"
-                            value={editingSection === 'ficha_supervision' ? editFormData.empresaSupervisora : (proyecto.empresaSupervisora || 'SERVICIOS DE INGENIERIA - SERINGE')}
+                            value={editingSection === 'ficha_supervision' ? editFormData.empresaSupervisora : (proyecto.empresaSupervisora || '')}
                             isEditing={editingSection === 'ficha_supervision'}
                             onChange={(v) => handleFieldChange('empresaSupervisora', v)}
                             required
@@ -2341,7 +2942,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                           <EditableItemFichaTecnica
                             codigo="3.1.2.2"
                             label="Propietario"
-                            value={editingSection === 'ficha_supervision' ? editFormData.propietarioSupervisora : (pAny.propietarioSupervisora || 'William Ramón Godínez Mansilla')}
+                            value={editingSection === 'ficha_supervision' ? editFormData.propietarioSupervisora : (pAny.propietarioSupervisora || '')}
                             isEditing={editingSection === 'ficha_supervision'}
                             onChange={(v) => handleFieldChange('propietarioSupervisora', v)}
                             kind="nombre"
@@ -2350,16 +2951,15 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                           <EditableItemFichaTecnica
                             codigo="3.1.2.3"
                             label="Registro Mercantil"
-                            value={editingSection === 'ficha_supervision' ? editFormData.registroMercantilSupervisora : (pAny.registroMercantilSupervisora || '177228A')}
+                            value={editingSection === 'ficha_supervision' ? editFormData.registroMercantilSupervisora : (pAny.registroMercantilSupervisora || '')}
                             isEditing={editingSection === 'ficha_supervision'}
                             onChange={(v) => handleFieldChange('registroMercantilSupervisora', v)}
                             kind="codigo"
-                            mono
                           />
                           <EditableItemFichaTecnica
                             codigo="3.1.2.4"
                             label="Dirección"
-                            value={editingSection === 'ficha_supervision' ? editFormData.direccionSupervisora : (pAny.direccionSupervisora || 'Avenida Las Américas, 24-70 Zona 13, Guatemala')}
+                            value={editingSection === 'ficha_supervision' ? editFormData.direccionSupervisora : (pAny.direccionSupervisora || '')}
                             isEditing={editingSection === 'ficha_supervision'}
                             onChange={(v) => handleFieldChange('direccionSupervisora', v)}
                             required
@@ -2367,7 +2967,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                           <EditableItemFichaTecnica
                             codigo="3.1.2.5"
                             label="Teléfono"
-                            value={editingSection === 'ficha_supervision' ? editFormData.telefonoSupervisora : (pAny.telefonoSupervisora || '2212-9675 / 5525-1537')}
+                            value={editingSection === 'ficha_supervision' ? editFormData.telefonoSupervisora : (pAny.telefonoSupervisora || '')}
                             isEditing={editingSection === 'ficha_supervision'}
                             onChange={(v) => handleFieldChange('telefonoSupervisora', v)}
                             kind="telefono"
@@ -2375,30 +2975,33 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                           <EditableItemFichaTecnica
                             codigo="3.1.2.6"
                             label="Responsable del Proyecto"
-                            value={editingSection === 'ficha_supervision' ? editFormData.responsableSupervisora : (pAny.responsableSupervisora || 'Ing. Civil Pablo Osberto Pérez Gómez (Col. 3689)')}
+                            value={editingSection === 'ficha_supervision' ? editFormData.responsableSupervisora : (pAny.responsableSupervisora || '')}
                             isEditing={editingSection === 'ficha_supervision'}
                             onChange={(v) => handleFieldChange('responsableSupervisora', v)}
+                            placeholder="Seleccionar o buscar responsable..."
+                            userOptions={userOptionsIngenieros.length > 0 ? userOptionsIngenieros : userOptionsGenerales}
+                            onEmptyUserAction={handleAbrirCrearUsuario}
                             kind="nombre"
                             required
                           />
                           <EditableItemFichaTecnica
                             codigo="3.1.2.7"
                             label="Programa"
-                            value={editingSection === 'ficha_supervision' ? editFormData.programaSupervisora : (pAny.programaSupervisora || 'TRANSPORTE POR CARRETERA')}
+                            value={editingSection === 'ficha_supervision' ? editFormData.programaSupervisora : (pAny.programaSupervisora || '')}
                             isEditing={editingSection === 'ficha_supervision'}
                             onChange={(v) => handleFieldChange('programaSupervisora', v)}
                           />
                           <EditableItemFichaTecnica
                             codigo="3.1.2.8"
                             label="Subprograma"
-                            value={editingSection === 'ficha_supervision' ? editFormData.subprogramaSupervisora : (pAny.subprogramaSupervisora || 'MEJORAMIENTO DE CARRETERAS SECUNDARIAS Y PUENTES')}
+                            value={editingSection === 'ficha_supervision' ? editFormData.subprogramaSupervisora : (pAny.subprogramaSupervisora || '')}
                             isEditing={editingSection === 'ficha_supervision'}
                             onChange={(v) => handleFieldChange('subprogramaSupervisora', v)}
                           />
                           <EditableItemFichaTecnica
                             codigo="3.1.2.9"
                             label="Fuente de Financiamiento"
-                            value={editingSection === 'ficha_supervision' ? editFormData.fuenteFinanciamientoSupervisora : (pAny.fuenteFinanciamientoSupervisora || 'Fondos nacionales')}
+                            value={editingSection === 'ficha_supervision' ? editFormData.fuenteFinanciamientoSupervisora : (pAny.fuenteFinanciamientoSupervisora || '')}
                             isEditing={editingSection === 'ficha_supervision'}
                             onChange={(v) => handleFieldChange('fuenteFinanciamientoSupervisora', v)}
                           />
@@ -2412,39 +3015,35 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                           <EditableItemFichaTecnica
                             codigo="3.1.2.10"
                             label="Fondos Nacionales"
-                            value={editingSection === 'ficha_supervision' ? editFormData.partidaFondosSupervisora : (pAny.partidaFondosSupervisora || '2026-11130013-202-11-01-002-000-003-188-1399-52-0403-0065')}
+                            value={editingSection === 'ficha_supervision' ? editFormData.partidaFondosSupervisora : (pAny.partidaFondosSupervisora || '')}
                             isEditing={editingSection === 'ficha_supervision'}
                             onChange={(v) => handleFieldChange('partidaFondosSupervisora', v)}
-                            mono
                           />
                           <EditableItemFichaTecnica
                             codigo="3.1.2.11"
                             label="CDP"
-                            value={editingSection === 'ficha_supervision' ? editFormData.cdpSupervisora : (pAny.cdpSupervisora || '66349939')}
+                            value={editingSection === 'ficha_supervision' ? editFormData.cdpSupervisora : (pAny.cdpSupervisora || '')}
                             isEditing={editingSection === 'ficha_supervision'}
                             onChange={(v) => handleFieldChange('cdpSupervisora', v)}
-                            mono
                           />
                           <EditableItemFichaTecnica
                             codigo="3.1.2.12"
                             label="Contrato No."
-                            value={editingSection === 'ficha_supervision' ? editFormData.contratoSupervisora : (pAny.contratoSupervisora || '007-2026-DGC-SUPERVISION, 29/05/2026')}
+                            value={editingSection === 'ficha_supervision' ? editFormData.contratoSupervisora : (pAny.contratoSupervisora || '')}
                             isEditing={editingSection === 'ficha_supervision'}
                             onChange={(v) => handleFieldChange('contratoSupervisora', v)}
-                            mono
                           />
                           <EditableItemFichaTecnica
                             codigo="3.1.2.13"
                             label="Acuerdo Ministerial"
-                            value={editingSection === 'ficha_supervision' ? editFormData.acuerdoSupervisora : (pAny.acuerdoSupervisora || '625-2026 de fecha 06/07/2026')}
+                            value={editingSection === 'ficha_supervision' ? editFormData.acuerdoSupervisora : (pAny.acuerdoSupervisora || '')}
                             isEditing={editingSection === 'ficha_supervision'}
                             onChange={(v) => handleFieldChange('acuerdoSupervisora', v)}
-                            mono
                           />
                           <EditableItemFichaTecnica
                             codigo="3.1.2.14"
                             label="Monto Original del Contrato"
-                            value={editingSection === 'ficha_supervision' ? editFormData.supervisoraMontoOriginal : formatearMoneda(montoSupervisionOriginal)}
+                            value={editingSection === 'ficha_supervision' ? editFormData.supervisoraMontoOriginal : (montoSupervisionOriginal > 0 ? formatearMoneda(montoSupervisionOriginal) : 'Q 0.00')}
                             isEditing={editingSection === 'ficha_supervision'}
                             onChange={(v) => handleFieldChange('supervisoraMontoOriginal', v)}
                             type={editingSection === 'ficha_supervision' ? 'number' : 'text'}
@@ -2455,7 +3054,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                           <EditableItemFichaTecnica
                             codigo="3.1.2.15"
                             label="Porcentaje de Anticipo (%)"
-                            value={editingSection === 'ficha_supervision' ? editFormData.porcentajeAnticipoSupervision : `${porcentajeAnticipoSupervision}% (${formatearMoneda(montoAnticipoSupervision)})`}
+                            value={editingSection === 'ficha_supervision' ? editFormData.porcentajeAnticipoSupervision : (porcentajeAnticipoSupervision > 0 ? `${porcentajeAnticipoSupervision}% (${formatearMoneda(montoAnticipoSupervision)})` : '0% (Q 0.00)')}
                             isEditing={editingSection === 'ficha_supervision'}
                             onChange={(v) => handleFieldChange('porcentajeAnticipoSupervision', v)}
                             type={editingSection === 'ficha_supervision' ? 'number' : 'text'}
@@ -2465,21 +3064,21 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                           <EditableItemFichaTecnica
                             codigo="3.1.2.16"
                             label="Fecha Inicio Plazo Contractual"
-                            value={editingSection === 'ficha_supervision' ? editFormData.fechaInicioSupervisora : (pAny.fechaInicioSupervisora || 'según Acta No. 52-2026, inicio el 07/07/2026')}
+                            value={editingSection === 'ficha_supervision' ? editFormData.fechaInicioSupervisora : (pAny.fechaInicioSupervisora || '')}
                             isEditing={editingSection === 'ficha_supervision'}
                             onChange={(v) => handleFieldChange('fechaInicioSupervisora', v)}
                           />
                           <EditableItemFichaTecnica
                             codigo="3.1.2.17"
                             label="Número de Meses Contratados"
-                            value={editingSection === 'ficha_supervision' ? editFormData.mesesContratadosSupervisora : (pAny.mesesContratadosSupervisora || '22 MESES (2 Pre, 18 Ejecución, 2 Post)')}
+                            value={editingSection === 'ficha_supervision' ? editFormData.mesesContratadosSupervisora : (pAny.mesesContratadosSupervisora || '')}
                             isEditing={editingSection === 'ficha_supervision'}
                             onChange={(v) => handleFieldChange('mesesContratadosSupervisora', v)}
                           />
                           <EditableItemFichaTecnica
                             codigo="3.1.2.18"
                             label="Fecha Estimada de Finalización"
-                            value={editingSection === 'ficha_supervision' ? editFormData.fechaFinSupervisora : (pAny.fechaFinSupervisora || '07/05/2028')}
+                            value={editingSection === 'ficha_supervision' ? editFormData.fechaFinSupervisora : (pAny.fechaFinSupervisora || '')}
                             isEditing={editingSection === 'ficha_supervision'}
                             onChange={(v) => handleFieldChange('fechaFinSupervisora', v)}
                           />
@@ -2492,7 +3091,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
             </div>
           )}
 
-          {/* SUB-TAB 5: UBICACIÓN (Sin lápiz de edición / modo visualización unificado) */}
+          {/* SUB-TAB 5: UBICACIÓN */}
           {subTabGeneral === 'ubicacion' && (
             <div className="space-y-3">
               {/* Resumen del Tramo y Coordenadas con paleta consistente */}
@@ -2505,20 +3104,19 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                   </div>
                   <EditableInfoField
                     label="Departamento Inicial (Origen)"
-                    value={pAny.departamentoNombre || 'Guatemala'}
+                    value={pAny.departamentoNombre || ''}
                   />
                   <EditableInfoField
                     label="Municipio Inicial (Origen)"
-                    value={pAny.municipioNombre || 'Palencia'}
+                    value={pAny.municipioNombre || ''}
                   />
                   <EditableInfoField
                     label="Dirección Inicial (Texto Corto)"
-                    value={proyecto.direccion || proyecto.ubicacionFisica || 'Tres Quebradas, Buena Vista, Palencia'}
+                    value={proyecto.direccion || proyecto.ubicacionFisica || ''}
                   />
                   <EditableInfoField
                     label="Kilómetro Inicial (Formato DGC)"
-                    value={`Estación Km ${(pAny.kilometroInicio ?? 5)} + 000m`}
-                    mono
+                    value={pAny.kilometroInicio != null && pAny.kilometroInicio !== '' ? `Estación Km ${pAny.kilometroInicio} + 000m` : '-'}
                   />
                 </div>
 
@@ -2530,24 +3128,23 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                   </div>
                   <EditableInfoField
                     label="Departamento Final (Límite Tramo)"
-                    value={pAny.departamentoFinNombre || 'Guatemala'}
+                    value={pAny.departamentoFinNombre || ''}
                   />
                   <EditableInfoField
                     label="Municipio Final (Límite Tramo)"
-                    value={pAny.municipioFinNombre || 'Palencia'}
+                    value={pAny.municipioFinNombre || ''}
                   />
                   <EditableInfoField
                     label="Dirección Final / Destino"
-                    value={pAny.direccionFin || 'Plan Grande, Palencia, Departamento de Guatemala'}
+                    value={pAny.direccionFin || ''}
                   />
                   <EditableInfoField
                     label="Kilómetro Final (Formato DGC)"
-                    value={`Estación Km ${(pAny.kilometroFin ?? 10)} + 000m`}
-                    mono
+                    value={pAny.kilometroFin != null && pAny.kilometroFin !== '' ? `Estación Km ${pAny.kilometroFin} + 000m` : '-'}
                   />
                 </div>
 
-                {/* Distancia y Coordenadas (Tarjeta Blanca Unificada) */}
+                {/* Distancia y Coordenadas */}
                 <div className="rounded-xl border border-gray-200 bg-white p-3 shadow-2xs flex flex-col justify-between">
                   <div>
                     <div className="flex items-center gap-1.5 text-[#9B0F06] font-bold text-[11px] mb-1">
@@ -2555,17 +3152,17 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                       <span>DISTANCIA DEL TRAMO</span>
                     </div>
                     <p className="text-xl font-black text-gray-900">
-                      {Math.max(1, (Number(pAny.kilometroFin || 10) - Number(pAny.kilometroInicio || 5))).toFixed(1)} km
+                      {Math.max(0, (Number(pAny.kilometroFin || 0) - Number(pAny.kilometroInicio || 0))).toFixed(1)} km
                     </p>
                     <p className="text-[9.5px] text-gray-400">
-                      ({(Math.max(1, (Number(pAny.kilometroFin || 10) - Number(pAny.kilometroInicio || 5))) * 1000).toLocaleString('es-GT')} m)
+                      ({(Math.max(0, (Number(pAny.kilometroFin || 0) - Number(pAny.kilometroInicio || 0))) * 1000).toLocaleString('es-GT')} m)
                     </p>
                   </div>
 
-                  <div className="border-t border-gray-100 pt-2 text-[9px] font-mono text-gray-600 space-y-0.5 mt-2">
-                    <p>Lat: {pAny.latitud ?? 14.623783}°</p>
-                    <p>Lng: {pAny.longitud ?? -90.344353}°</p>
-                    <p className="text-[8px] text-gray-400 font-sans">Sistema Geodésico WGS84</p>
+                  <div className="border-t border-gray-100 pt-2 text-[9px] text-gray-600 space-y-0.5 mt-2">
+                    <p>Lat: {pAny.latitud != null && pAny.latitud !== '' ? `${Number(pAny.latitud).toFixed(6)}°` : '-'}</p>
+                    <p>Lng: {pAny.longitud != null && pAny.longitud !== '' ? `${Number(pAny.longitud).toFixed(6)}°` : '-'}</p>
+                    <p className="text-[8px] text-gray-400 font-[Poppins]">Sistema Geodésico WGS84</p>
                   </div>
                 </div>
               </div>
@@ -2585,14 +3182,27 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                 </div>
 
                 <MapaDetalleVista
-                  lat={pAny.latitud != null ? Number(pAny.latitud) : 14.623783}
-                  lng={pAny.longitud != null ? Number(pAny.longitud) : -90.344353}
-                  direccion={proyecto.direccion || proyecto.ubicacionFisica || 'Tres Quebradas, Buena Vista, Palencia'}
-                  direccionFin={pAny.direccionFin || 'Plan Grande, Palencia'}
-                  kilometroInicio={pAny.kilometroInicio ?? 5}
-                  kilometroFin={pAny.kilometroFin ?? 10}
+                  lat={pAny.latitud != null && pAny.latitud !== '' ? Number(pAny.latitud) : null}
+                  lng={pAny.longitud != null && pAny.longitud !== '' ? Number(pAny.longitud) : null}
+                  direccion={proyecto.direccion || proyecto.ubicacionFisica || ''}
+                  direccionFin={pAny.direccionFin || ''}
+                  kilometroInicio={pAny.kilometroInicio ?? 0}
+                  kilometroFin={pAny.kilometroFin ?? 0}
                 />
               </div>
+            </div>
+          )}
+
+          {/* SUB-TAB 6: DOCUMENTOS (Estilo img3 con Supabase Storage) */}
+          {subTabGeneral === 'documentos' && (
+            <div className="space-y-3">
+              <ProyectoDocumentos
+                proyectoId={proyecto?.id}
+                documentos={proyecto?.documentos as any}
+                onDocumentosChange={(nuevosDocs: any) => {
+                  setProyecto((prev) => (prev ? ({ ...prev, documentos: nuevosDocs } as any) : prev))
+                }}
+              />
             </div>
           )}
         </div>
@@ -2626,37 +3236,124 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-4 space-y-2">
-                {equipoCompleto.map((miembro) => (
-                  <div
-                    key={miembro.id}
-                    className="flex items-center justify-between rounded-xl border border-gray-100 bg-white p-2.5 shadow-2xs hover:border-gray-200 transition-colors"
+              {/* Formulario para asignar y crear usuarios */}
+              <div className="border-b border-gray-100 bg-gray-50/70 p-3 space-y-2.5 shrink-0">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-600">
+                    Asignar Usuario al Equipo
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleAbrirCrearUsuario}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-100 hover:bg-gray-200 px-2.5 py-1 text-[10px] font-semibold text-gray-700 transition-colors cursor-pointer shadow-2xs"
                   >
-                    <div className="flex items-center gap-2.5">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-red-100 text-[10px] font-bold text-[#9B0F06]">
-                        {getInitials(miembro.nombre)}
-                      </div>
-                      <div>
-                        <p className="text-[11px] font-bold text-gray-900">{miembro.nombre}</p>
-                        <p className="text-[9px] font-medium text-gray-500">{miembro.rol}</p>
-                      </div>
+                    <UserPlus size={12} className="text-gray-500" />
+                    <span>+ Crear Nuevo Usuario</span>
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  <div>
+                    <label className="block text-[9.5px] font-bold text-gray-500 mb-1">
+                      Seleccionar Usuario Existente:
+                    </label>
+                    <Combobox
+                      options={usuariosDisponibles.map((u: any) => ({
+                        value: u.id,
+                        label: `${u.nombre || (u.primer_nombre ? `${u.primer_nombre} ${u.primer_apellido || ''}` : u.correo)} — ${u.cargo || u.rol || 'Usuario'}`,
+                      }))}
+                      value={selectedUsuarioIdParaEquipo}
+                      onChange={(val) => setSelectedUsuarioIdParaEquipo(val)}
+                      placeholder="Buscar y seleccionar usuario..."
+                      emptyAction={{
+                        label: '+ Crear nuevo usuario',
+                        onClick: handleAbrirCrearUsuario,
+                      }}
+                      allowNumbers
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1">
+                      <label className="block text-[9.5px] font-bold text-gray-500 mb-1">
+                        Rol en el Proyecto:
+                      </label>
+                      <select
+                        value={selectedRolParaEquipo}
+                        onChange={(e) => setSelectedRolParaEquipo(e.target.value)}
+                        className="w-full rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-gray-800 focus:border-[#9B0F06] focus:outline-none focus:ring-1 focus:ring-[#9B0F06]"
+                      >
+                        {rolesList && rolesList.length > 0 ? (
+                          rolesList
+                            .filter((r) => r.estado !== 'Inactivo' && (r as any).activo !== false)
+                            .map((r) => (
+                              <option key={r.id || r.nombre} value={r.nombre}>
+                                {r.nombre}
+                              </option>
+                            ))
+                        ) : (
+                          <>
+                            <option value="IngenieroResidente">Ingeniero Residente</option>
+                            <option value="Supervisor">Supervisor</option>
+                            <option value="Inspector">Inspector</option>
+                            <option value="AuxiliarDeCampo">Auxiliar de Campo</option>
+                            <option value="Laboratorista">Laboratorista</option>
+                            <option value="Gerencia">Gerencia</option>
+                            <option value="Administrador">Administrador</option>
+                            <option value="Contratante">Contratante</option>
+                          </>
+                        )}
+                      </select>
                     </div>
-                    {canManageTeam ? (
+
+                    <div className="self-end">
                       <button
                         type="button"
-                        onClick={() => setMemberToDelete(miembro)}
-                        className="rounded-lg border border-red-200 bg-red-50 p-1.5 text-red-600 hover:bg-red-100 hover:text-red-700 transition-colors cursor-pointer"
-                        title="Eliminar del equipo del proyecto"
+                        disabled={!selectedUsuarioIdParaEquipo}
+                        onClick={handleAgregarMiembroAEquipo}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-[#9B0F06] px-3 py-1.5 text-[11px] font-bold text-white hover:bg-[#5E0006] transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-2xs"
                       >
-                        <Trash2 size={14} />
+                        <Plus size={13} />
+                        <span>Asignar</span>
                       </button>
-                    ) : (
-                      <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[8px] font-bold text-emerald-700">
-                        Activo
-                      </span>
-                    )}
+                    </div>
                   </div>
-                ))}
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                {equipoCompleto.length === 0 ? (
+                  <div className="p-6 text-center text-[11px] text-gray-400">
+                    No hay miembros asignados al equipo actualmente.
+                  </div>
+                ) : (
+                  equipoCompleto.map((miembro) => (
+                    <div
+                      key={miembro.id}
+                      className="flex items-center justify-between rounded-xl border border-gray-100 bg-white p-2.5 shadow-2xs hover:border-gray-200 transition-colors"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-red-100 text-[10px] font-bold text-[#9B0F06]">
+                          {getInitials(miembro.nombre)}
+                        </div>
+                        <div>
+                          <p className="text-[11px] font-bold text-gray-900">{miembro.nombre}</p>
+                          <p className="text-[9px] font-medium text-gray-500">{miembro.rol}</p>
+                        </div>
+                      </div>
+                      {canManageTeam && (
+                        <button
+                          type="button"
+                          onClick={() => setMemberToDelete(miembro)}
+                          className="rounded-lg border border-red-200 bg-red-50 p-1.5 text-red-600 hover:bg-red-100 hover:text-red-700 transition-colors cursor-pointer"
+                          title="Eliminar del equipo del proyecto"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
+                  ))
+                )}
               </div>
 
               <div className="border-t border-gray-100 p-3 bg-gray-50 flex justify-end shrink-0">
@@ -2726,6 +3423,35 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
             </div>
           </div>
         </>
+      )}
+
+      {/* Drawer para Crear Usuario desde Detalle de Proyecto */}
+      <UsuarioFormularioDrawer
+        isOpen={isCrearUsuarioOpen}
+        onClose={() => {
+          setIsCrearUsuarioOpen(false)
+          setIsEquipoModalOpen(true)
+        }}
+        onSave={(newUser: any) => {
+          cargarUsuarios()
+          setIsCrearUsuarioOpen(false)
+          setIsEquipoModalOpen(true)
+          if (newUser?.id) {
+            setSelectedUsuarioIdParaEquipo(newUser.id)
+          }
+        }}
+        rolInicial="IngenieroResidente"
+        ocultarEmpresaContratista={true}
+      />
+
+      {/* Drawer para Gestión Directa de Renglones en Modo Manual */}
+      {esModoManual && (
+        <RenglonesBitacoraDrawer
+          isOpen={drawerRenglonesAbierto}
+          onClose={() => setDrawerRenglonesAbierto(false)}
+          renglonesActuales={renglonesProyecto}
+          onGuardar={handleGuardarRenglonesManual}
+        />
       )}
     </div>
   )

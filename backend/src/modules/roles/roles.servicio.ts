@@ -137,10 +137,38 @@ export async function obtenerRolPorNombre(nombre: string) {
   return mapearRolBase(fila, permisos, usuariosAsignados)
 }
 
-function agruparPermisos(permisosLista?: string[]): Record<string, string[]> {
+function agruparPermisos(permisosLista?: string[], nivel?: number): Record<string, string[]> {
   const permisosAgrupados: Record<string, string[]> = {}
+  
+  const esTotalAdmin = (nivel && nivel >= 100) ||
+    permisosLista?.includes('*') ||
+    permisosLista?.includes('*.*') ||
+    permisosLista?.includes('Acceso completo') ||
+    (permisosLista && permisosLista.length >= 20)
+
+  if (esTotalAdmin) {
+    permisosAgrupados['*'] = ['*']
+    permisosAgrupados['usuarios'] = ['read', 'write', 'delete', '*']
+    permisosAgrupados['roles'] = ['read', 'write', 'delete', '*']
+    permisosAgrupados['proyectos'] = ['read', 'write', 'delete', 'crear', 'actualizar', 'eliminar', '*']
+    permisosAgrupados['bitacora'] = ['read', 'write', 'crear', 'aprobar', 'firmar', '*']
+    permisosAgrupados['evidencia_fotografica'] = ['read', 'write', '*']
+    permisosAgrupados['reportes'] = ['read', 'write', 'generar', 'avanzado', '*']
+    permisosAgrupados['configuracion'] = ['read', 'write', '*']
+    permisosAgrupados['mantenimiento'] = ['read', 'write', '*']
+    permisosAgrupados['catalogos'] = ['read', 'write', '*']
+    permisosAgrupados['backup'] = ['read', 'write', '*']
+    permisosAgrupados['notificaciones'] = ['read', 'write', '*']
+    permisosAgrupados['hoja_sabana'] = ['leer', 'crear', 'aprobar', 'eliminar', '*']
+    permisosAgrupados['pendientes'] = ['procesar', '*']
+    permisosAgrupados['dashboard'] = ['completo', 'ejecutivo', 'limitado', '*']
+  }
+
   if (permisosLista) {
     for (const p of permisosLista) {
+      if (!p) continue
+      const pNorm = p.trim().toLowerCase()
+
       if (p.includes('.')) {
         const parts = p.split('.')
         const mod = parts[0]
@@ -148,6 +176,67 @@ function agruparPermisos(permisosLista?: string[]): Record<string, string[]> {
         if (!permisosAgrupados[mod]) permisosAgrupados[mod] = []
         if (!permisosAgrupados[mod].includes(acc)) permisosAgrupados[mod].push(acc)
       } else {
+        // Mapeo de nombres humanos a módulos técnicos
+        if (pNorm.includes('proyecto')) {
+          if (!permisosAgrupados['proyectos']) permisosAgrupados['proyectos'] = []
+          if (pNorm.includes('ver')) permisosAgrupados['proyectos'].push('read')
+          if (pNorm.includes('crear') || pNorm.includes('editar')) permisosAgrupados['proyectos'].push('write', 'actualizar', 'crear')
+          if (pNorm.includes('eliminar')) permisosAgrupados['proyectos'].push('delete', 'eliminar')
+          if (!pNorm.includes('ver') && !pNorm.includes('crear') && !pNorm.includes('eliminar')) permisosAgrupados['proyectos'].push('*')
+        }
+        if (pNorm.includes('bitacora') || pNorm.includes('bitácora')) {
+          if (!permisosAgrupados['bitacora']) permisosAgrupados['bitacora'] = []
+          if (pNorm.includes('crear')) permisosAgrupados['bitacora'].push('write', 'crear')
+          if (pNorm.includes('aprobar')) permisosAgrupados['bitacora'].push('aprobar', 'write')
+          if (pNorm.includes('firma')) permisosAgrupados['bitacora'].push('firmar', 'write')
+          if (!pNorm.includes('crear') && !pNorm.includes('aprobar') && !pNorm.includes('firma')) permisosAgrupados['bitacora'].push('*')
+        }
+        if (pNorm.includes('foto') || pNorm.includes('evidencia')) {
+          if (!permisosAgrupados['evidencia_fotografica']) permisosAgrupados['evidencia_fotografica'] = []
+          permisosAgrupados['evidencia_fotografica'].push('read', 'write', '*')
+        }
+        if (pNorm.includes('usuario')) {
+          if (!permisosAgrupados['usuarios']) permisosAgrupados['usuarios'] = []
+          permisosAgrupados['usuarios'].push('read', 'write', 'delete', '*')
+        }
+        if (pNorm.includes('rol')) {
+          if (!permisosAgrupados['roles']) permisosAgrupados['roles'] = []
+          permisosAgrupados['roles'].push('read', 'write', 'delete', '*')
+        }
+        if (pNorm.includes('reporte') || pNorm.includes('costos')) {
+          if (!permisosAgrupados['reportes']) permisosAgrupados['reportes'] = []
+          permisosAgrupados['reportes'].push('read', 'write', 'generar', 'avanzado', '*')
+        }
+        if (pNorm.includes('mantenimiento') || pNorm.includes('tabla')) {
+          if (!permisosAgrupados['mantenimiento']) permisosAgrupados['mantenimiento'] = []
+          permisosAgrupados['mantenimiento'].push('read', 'write', '*')
+        }
+        if (pNorm.includes('configuraci')) {
+          if (!permisosAgrupados['configuracion']) permisosAgrupados['configuracion'] = []
+          permisosAgrupados['configuracion'].push('read', 'write', '*')
+        }
+        if (pNorm.includes('catálogo') || pNorm.includes('catalogo')) {
+          if (!permisosAgrupados['catalogos']) permisosAgrupados['catalogos'] = []
+          permisosAgrupados['catalogos'].push('read', 'write', '*')
+        }
+        if (pNorm.includes('hoja') || pNorm.includes('sabana') || pNorm.includes('sábana') || pNorm.includes('analítico') || pNorm.includes('analitico')) {
+          if (!permisosAgrupados['hoja_sabana']) permisosAgrupados['hoja_sabana'] = []
+          permisosAgrupados['hoja_sabana'].push('leer', 'crear', 'aprobar', 'eliminar', '*')
+        }
+        if (pNorm.includes('ticket')) {
+          if (!permisosAgrupados['tickets']) permisosAgrupados['tickets'] = []
+          permisosAgrupados['tickets'].push('read', 'write', '*')
+        }
+        if (pNorm.includes('dashboard')) {
+          if (!permisosAgrupados['dashboard']) permisosAgrupados['dashboard'] = []
+          permisosAgrupados['dashboard'].push('*')
+        }
+        if (pNorm.includes('notificaci') || pNorm.includes('alerta')) {
+          if (!permisosAgrupados['notificaciones']) permisosAgrupados['notificaciones'] = []
+          permisosAgrupados['notificaciones'].push('read', 'write', '*')
+        }
+
+        // Conservar el literal descriptivo
         if (!permisosAgrupados[p]) permisosAgrupados[p] = []
         if (!permisosAgrupados[p].includes('*')) permisosAgrupados[p].push('*')
       }
@@ -167,7 +256,8 @@ export async function crearRol(datos: DatosRol) {
     throw new Error('Ya existe un rol con ese nombre')
   }
 
-  const permisosAgrupados = agruparPermisos(datos.permisos)
+  const nivelFinal = (datos.permisos && datos.permisos.length >= 20) || datos.nivel === 100 ? 100 : (datos.nivel || 0)
+  const permisosAgrupados = agruparPermisos(datos.permisos, nivelFinal)
 
   const esActivo = datos.estado ? datos.estado === 'Activo' : datos.activo !== false
 
@@ -176,7 +266,7 @@ export async function crearRol(datos: DatosRol) {
     .insert({
       nombre_rol: datos.nombre,
       descripcion: datos.descripcion,
-      nivel_permisos: datos.nivel || 0,
+      nivel_permisos: nivelFinal,
       permisos: permisosAgrupados,
       activo: esActivo,
     })
@@ -214,7 +304,8 @@ export async function actualizarRol(id: string, datos: DatosRol) {
     throw new Error('Ya existe un rol con ese nombre')
   }
 
-  const permisosAgrupados = agruparPermisos(datos.permisos)
+  const nivelFinal = (datos.permisos && datos.permisos.length >= 20) || datos.nivel === 100 ? 100 : (datos.nivel || 0)
+  const permisosAgrupados = agruparPermisos(datos.permisos, nivelFinal)
 
   const esActivo = datos.estado ? datos.estado === 'Activo' : datos.activo !== false
   const { error } = await clienteSupabase
@@ -222,7 +313,7 @@ export async function actualizarRol(id: string, datos: DatosRol) {
     .update({
       nombre_rol: datos.nombre,
       descripcion: datos.descripcion,
-      nivel_permisos: datos.nivel || 0,
+      nivel_permisos: nivelFinal,
       permisos: permisosAgrupados,
       activo: esActivo,
     })

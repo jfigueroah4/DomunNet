@@ -23,4 +23,14 @@ export interface Fotografia {
   url: string
   urlMiniatura: string
   creadoEn: string
+  lat?: number
+  lng?: number
+  coordenadasGps?: { lat: number; lng: number }
+  estacionInicio?: string
+  estacionFin?: string
+  lado?: string
+  renglon?: string
+  departamento?: string
+  municipio?: string
+  [key: string]: any
 }

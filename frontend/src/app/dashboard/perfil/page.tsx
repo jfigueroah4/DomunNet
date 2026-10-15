@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Edit, UserCheck, User, Mail, Calendar, Pencil, X, AlertTriangle } from 'lucide-react'
+import { Settings, UserCheck, User, Mail, Calendar, Pencil, X, AlertTriangle } from 'lucide-react'
 import { api, limpiarCacheMemoria } from '@/lib/api/cliente'
 import { UsuarioFormularioDrawer } from '@/components/modules/usuarios/UsuarioFormularioDrawer'
 import { Usuario, RolUsuario, EstadoUsuario } from '@/types/usuario'
@@ -9,6 +9,7 @@ import { useCustomToast } from '@/hooks/useCustomToast'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { useAuthStore } from '@/stores/useAuthStore'
+import { formatearNombrePropio } from '@/lib/utils/formatters'
 
 
 
@@ -83,10 +84,10 @@ export default function PerfilPage() {
     try {
       if (!profile?.id) return;
       const payloadApi: Record<string, unknown> = {
-        primer_nombre: formData.primer_nombre,
-        segundo_nombre: formData.segundo_nombre || null,
-        primer_apellido: formData.primer_apellido,
-        segundo_apellido: formData.segundo_apellido || null,
+        primer_nombre: formatearNombrePropio(formData.primer_nombre?.trim()),
+        segundo_nombre: formData.segundo_nombre?.trim() ? formatearNombrePropio(formData.segundo_nombre.trim()) : null,
+        primer_apellido: formatearNombrePropio(formData.primer_apellido?.trim()),
+        segundo_apellido: formData.segundo_apellido?.trim() ? formatearNombrePropio(formData.segundo_apellido.trim()) : null,
         correo: formData.correo,
         username: formData.username || null,
         telefono: formData.telefono || '',
@@ -101,7 +102,7 @@ export default function PerfilPage() {
       if (res.status === 200 || res.data?.success) {
          showSuccessToast('Perfil actualizado correctamente');
          limpiarCacheMemoria();
-         fetchProfile();
+         fetchProfile(3, true);
       } else {
          toast.error('Error al actualizar el perfil');
       }
@@ -117,10 +118,10 @@ export default function PerfilPage() {
       try {
         if (!profile?.id) return;
         const payloadApi: Record<string, unknown> = {
-          primer_nombre: pendingData.primer_nombre,
-          segundo_nombre: pendingData.segundo_nombre || null,
-          primer_apellido: pendingData.primer_apellido,
-          segundo_apellido: pendingData.segundo_apellido || null,
+          primer_nombre: formatearNombrePropio(pendingData.primer_nombre?.trim()),
+          segundo_nombre: pendingData.segundo_nombre?.trim() ? formatearNombrePropio(pendingData.segundo_nombre.trim()) : null,
+          primer_apellido: formatearNombrePropio(pendingData.primer_apellido?.trim()),
+          segundo_apellido: pendingData.segundo_apellido?.trim() ? formatearNombrePropio(pendingData.segundo_apellido.trim()) : null,
           correo: pendingData.correo,
           username: pendingData.username || null,
           telefono: pendingData.telefono || '',
@@ -157,17 +158,17 @@ export default function PerfilPage() {
     )
   }
 
-  const nombreCompleto = `${profile.nombre} ${profile.apellido}`.trim()
+  const nombreCompleto = formatearNombrePropio(`${profile.nombre} ${profile.apellido}`.trim())
   const iniciales = `${profile.nombre[0] || ''}${profile.apellido[0] || ''}`.toUpperCase()
   const diasActivo = calcularDiasActivo()
 
   // Mapear UserProfile al formato esperado por el Drawer (Usuario)
   const usuarioMapped: Usuario = {
     id: profile.id,
-    primer_nombre: profile.primerNombre,
-    segundo_nombre: profile.segundoNombre,
-    primer_apellido: profile.primerApellido,
-    segundo_apellido: profile.segundoApellido,
+    primer_nombre: formatearNombrePropio(profile.primerNombre),
+    segundo_nombre: formatearNombrePropio(profile.segundoNombre),
+    primer_apellido: formatearNombrePropio(profile.primerApellido),
+    segundo_apellido: formatearNombrePropio(profile.segundoApellido),
     username: profile.username,
     nombre: nombreCompleto,
     correo: profile.correo,
@@ -183,18 +184,18 @@ export default function PerfilPage() {
   // Componente interno para re-usar la lógica del valor + lápiz
   const EditableField = ({ label, value, fallback, editable = true }: { label: string, value: string | null | undefined, fallback: string, editable?: boolean }) => (
     <div>
-      <label className="text-[10px] text-[#999] uppercase tracking-wide">{label}</label>
+      <label className="text-xs sm:text-[10px] font-bold text-gray-500 uppercase tracking-wide block">{label}</label>
       <div className="flex items-center gap-2 mt-1">
-        <p className="text-sm font-medium text-gray-800">
+        <p className="text-base sm:text-sm font-medium text-gray-800 break-words">
           {value || fallback}
         </p>
         {isEditing && editable && (
           <button 
             onClick={handleOpenDrawer}
-            className="text-[#9B0F06] hover:text-[#5E0006] transition-colors p-1 rounded hover:bg-red-50"
+            className="text-[#9B0F06] hover:text-[#5E0006] transition-colors p-2 sm:p-1 rounded-lg hover:bg-red-50 active:scale-95 cursor-pointer shrink-0"
             title="Editar campo"
           >
-            <Pencil size={12} />
+            <Pencil size={14} className="sm:w-3 sm:h-3" />
           </button>
         )}
       </div>
@@ -202,25 +203,27 @@ export default function PerfilPage() {
   )
 
   return (
-    <div className="space-y-2 p-2 max-w-[1200px] mx-auto">
+    <div className="profile-page space-y-3 sm:space-y-2 p-1.5 sm:p-2 max-w-[1200px] mx-auto font-[Poppins]">
       {/* Header */}
-      <div className="flex items-center justify-between mb-1">
-        <h1 className="text-xl font-bold text-gray-800">Mi Perfil</h1>
+      <div className="flex flex-wrap items-center justify-between gap-2.5 mb-1">
+        <h1 className="text-xl sm:text-lg font-extrabold text-gray-800">Mi Perfil</h1>
         {!isEditing ? (
           <button 
             onClick={handleEditClick}
-            className="flex items-center gap-2 bg-[#9B0F06] hover:bg-[#5E0006] text-white text-sm px-4 py-2 rounded-lg transition-colors"
+            className="profile-edit-button flex items-center gap-2 bg-[#9B0F06] hover:bg-[#5E0006] text-white text-base sm:text-sm font-bold px-4 py-2.5 sm:py-2 rounded-xl transition-colors shadow-xs active:scale-95 cursor-pointer"
+            aria-label="Editar perfil"
           >
-            <Edit size={14} />
-            Editar Perfil
+            <Settings size={16} className="sm:w-3.5 sm:h-3.5" />
+            <span className="profile-edit-label font-bold">Editar Perfil</span>
           </button>
         ) : (
           <button 
             onClick={handleCancelEdit}
-            className="flex items-center gap-2 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm px-4 py-2 rounded-lg transition-colors"
+            className="profile-edit-button flex items-center gap-2 bg-gray-200 hover:bg-gray-300 text-gray-700 text-base sm:text-sm font-bold px-4 py-2.5 sm:py-2 rounded-xl transition-colors shadow-xs active:scale-95 cursor-pointer"
+            aria-label="Cancelar edición"
           >
-            <X size={14} />
-            Cancelar Edición
+            <X size={16} className="sm:w-3.5 sm:h-3.5" />
+            <span className="profile-edit-label font-bold">Cancelar Edición</span>
           </button>
         )}
       </div>
@@ -247,18 +250,18 @@ export default function PerfilPage() {
       </div>
 
       {/* 4 Cards Grid - Desktop 2 Cols */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-2">
         {/* Tarjeta 1 - Información Personal */}
-        <div className="bg-white rounded-xl p-3 shadow-sm border border-[#E0E0E0]">
-          <div className="flex items-center gap-2 mb-2 pb-1.5 border-b border-gray-100">
-            <User size={14} className="text-[#9B0F06]" />
-            <h3 className="text-[13px] font-semibold text-gray-800">Información Personal</h3>
+        <div className="bg-white rounded-xl p-4 sm:p-3 shadow-sm border border-[#E0E0E0]">
+          <div className="flex items-center gap-2 mb-2.5 pb-2 border-b border-gray-100">
+            <User size={16} className="text-[#9B0F06]" />
+            <h3 className="text-sm sm:text-[13px] font-bold text-gray-800">Información Personal</h3>
           </div>
-          <div className="grid grid-cols-2 gap-x-3 gap-y-2">
-            <EditableField label="Primer Nombre" value={profile.primerNombre} fallback="-" />
-            <EditableField label="Resto del Nombre" value={profile.segundoNombre} fallback="-" />
-            <EditableField label="Primer Apellido" value={profile.primerApellido} fallback="-" />
-            <EditableField label="Resto del Apellido" value={profile.segundoApellido} fallback="-" />
+          <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
+            <EditableField label="Primer Nombre" value={formatearNombrePropio(profile.primerNombre)} fallback="-" />
+            <EditableField label="Resto del Nombre" value={formatearNombrePropio(profile.segundoNombre)} fallback="-" />
+            <EditableField label="Primer Apellido" value={formatearNombrePropio(profile.primerApellido)} fallback="-" />
+            <EditableField label="Resto del Apellido" value={formatearNombrePropio(profile.segundoApellido)} fallback="-" />
             <div className="col-span-2">
               <EditableField label="Nombre de Usuario" value={profile.username} fallback="No registrado" editable={false} />
             </div>
@@ -269,40 +272,40 @@ export default function PerfilPage() {
         </div>
 
         {/* Tarjeta 2 - Información de Contacto */}
-        <div className="bg-white rounded-xl p-3 shadow-sm border border-[#E0E0E0]">
-          <div className="flex items-center gap-2 mb-2 pb-1.5 border-b border-gray-100">
-            <Mail size={14} className="text-[#9B0F06]" />
-            <h3 className="text-[13px] font-semibold text-gray-800">Información de Contacto</h3>
+        <div className="bg-white rounded-xl p-4 sm:p-3 shadow-sm border border-[#E0E0E0]">
+          <div className="flex items-center gap-2 mb-2.5 pb-2 border-b border-gray-100">
+            <Mail size={16} className="text-[#9B0F06]" />
+            <h3 className="text-sm sm:text-[13px] font-bold text-gray-800">Información de Contacto</h3>
           </div>
-          <div className="space-y-2">
+          <div className="space-y-2.5">
             <EditableField label="Teléfono" value={profile.telefono} fallback="No registrado" />
             <EditableField label="Dirección" value={profile.direccion} fallback="No registrada" />
           </div>
         </div>
 
         {/* Tarjeta 3 - Información Adicional */}
-        <div className="bg-white rounded-xl p-3 shadow-sm border border-[#E0E0E0]">
-          <div className="flex items-center gap-2 mb-2 pb-1.5 border-b border-gray-100">
-            <Calendar size={14} className="text-[#9B0F06]" />
-            <h3 className="text-[13px] font-semibold text-gray-800">Información Adicional</h3>
+        <div className="bg-white rounded-xl p-4 sm:p-3 shadow-sm border border-[#E0E0E0]">
+          <div className="flex items-center gap-2 mb-2.5 pb-2 border-b border-gray-100">
+            <Calendar size={16} className="text-[#9B0F06]" />
+            <h3 className="text-sm sm:text-[13px] font-bold text-gray-800">Información Adicional</h3>
           </div>
-          <div className="space-y-2">
+          <div className="space-y-2.5">
             <EditableField label="Fecha de Nacimiento" value={profile.fechaNacimiento ? formatearFecha(profile.fechaNacimiento) : null} fallback="No registrada" />
             
             {/* Estos campos NO tienen lápiz, son solo lectura (según requerimiento) */}
             <div>
-              <label className="text-[10px] text-[#999] uppercase tracking-wide">Último Acceso</label>
-              <p className="text-[13px] font-medium text-gray-800 mt-0.5">
+              <label className="text-xs sm:text-[10px] font-bold text-gray-500 uppercase tracking-wide block">Último Acceso</label>
+              <p className="text-base sm:text-[13px] font-medium text-gray-800 mt-0.5">
                 {formatearFecha(profile.ultimoAcceso)}
               </p>
             </div>
             <div>
-              <label className="text-[10px] text-[#999] uppercase tracking-wide">Estado de la Cuenta</label>
+              <label className="text-xs sm:text-[10px] font-bold text-gray-500 uppercase tracking-wide block">Estado de la Cuenta</label>
               <p className="mt-1">
                 {profile.activo ? (
-                  <span className="text-sm font-medium text-[#10B981]">activo</span>
+                  <span className="text-base sm:text-sm font-semibold text-[#10B981]">activo</span>
                 ) : (
-                  <span className="text-sm font-medium text-red-600">inactivo</span>
+                  <span className="text-base sm:text-sm font-semibold text-red-600">inactivo</span>
                 )}
               </p>
             </div>
@@ -310,21 +313,21 @@ export default function PerfilPage() {
         </div>
 
         {/* Tarjeta 4 - Estadísticas */}
-        <div className="bg-white rounded-xl p-3 shadow-sm border border-[#E0E0E0]">
-          <h3 className="text-[13px] font-semibold text-gray-800 mb-2 pb-1.5 border-b border-gray-100">Estadísticas</h3>
-          <div className="grid grid-cols-2 gap-2 mb-3">
-            <div className="bg-red-50 rounded-lg p-2.5">
-              <p className="text-xl font-bold text-[#9B0F06]">0</p>
-              <p className="text-[11px] text-gray-500 mt-0.5">Proyectos activos</p>
+        <div className="bg-white rounded-xl p-4 sm:p-3 shadow-sm border border-[#E0E0E0]">
+          <h3 className="text-sm sm:text-[13px] font-bold text-gray-800 mb-2.5 pb-2 border-b border-gray-100">Estadísticas</h3>
+          <div className="grid grid-cols-2 gap-2.5 mb-3">
+            <div className="bg-red-50 rounded-xl p-3 sm:p-2.5">
+              <p className="text-2xl sm:text-xl font-bold text-[#9B0F06]">0</p>
+              <p className="text-xs sm:text-[11px] text-gray-600 mt-0.5">Proyectos activos</p>
             </div>
-            <div className="bg-orange-50 rounded-lg p-2.5">
-              <p className="text-xl font-bold text-[#E85D04]">{diasActivo}</p>
-              <p className="text-[11px] text-gray-500 mt-0.5">Días activo</p>
+            <div className="bg-orange-50 rounded-xl p-3 sm:p-2.5">
+              <p className="text-2xl sm:text-xl font-bold text-[#E85D04]">{diasActivo}</p>
+              <p className="text-xs sm:text-[11px] text-gray-600 mt-0.5">Días activo</p>
             </div>
           </div>
           <div>
-            <label className="text-[10px] text-[#999] uppercase tracking-wide">Rol</label>
-            <p className="text-[13px] font-medium text-gray-800 mt-0.5">{profile.rol}</p>
+            <label className="text-xs sm:text-[10px] font-bold text-gray-500 uppercase tracking-wide block">Rol</label>
+            <p className="text-base sm:text-[13px] font-semibold text-gray-800 mt-0.5">{profile.rol}</p>
           </div>
         </div>
       </div>
@@ -339,8 +342,14 @@ export default function PerfilPage() {
 
       {/* Modal Confirmación de Desactivación */}
       {showDeactivationModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-fadeIn">
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          onClick={() => setShowDeactivationModal(false)}
+        >
+          <div 
+            className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-fadeIn"
+            onClick={(e) => e.stopPropagation()}
+          >
             {/* Cabecera del modal */}
             <div className="p-6 bg-red-50 flex flex-col items-center border-b border-red-100 text-center">
               <div className="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center mb-4">

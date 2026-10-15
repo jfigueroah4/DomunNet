@@ -35,29 +35,29 @@ export function RoleDeleteModal({
           </button>
         </div>
 
-        <h3 className="text-[18px] font-bold text-gray-800">Eliminar Rol</h3>
-        <p className="mt-2 text-[12px] leading-relaxed text-gray-500">
+        <h3 className="text-base sm:text-[18px] font-bold text-gray-800">Eliminar Rol</h3>
+        <p className="mt-2 text-sm sm:text-[12px] leading-relaxed text-gray-500">
           ¿Estás seguro que deseas eliminar el rol <span className="font-semibold text-gray-800">{role?.name ?? 'seleccionado'}</span>?
           Esta acción no se puede deshacer.
         </p>
 
-        <div className="mt-5 rounded-2xl border border-red-100 bg-red-50 p-4">
-          <p className="text-[13px] font-semibold text-gray-800">{role?.name}</p>
-          <p className="text-[11px] text-gray-500">{role?.descripcion}</p>
+        <div className="mt-4 sm:mt-5 rounded-2xl border border-red-100 bg-red-50 p-3.5 sm:p-4">
+          <p className="text-sm sm:text-[13px] font-semibold text-gray-800">{role?.name}</p>
+          <p className="text-xs sm:text-[11px] text-gray-500">{role?.descripcion}</p>
         </div>
 
         <div className="mt-5 flex gap-3">
           <button
             onClick={onClose}
-            className="flex-1 rounded-xl border border-gray-200 py-2.5 text-[12px] font-medium text-gray-600 transition-colors hover:bg-gray-50"
+            className="flex-1 rounded-xl border border-gray-200 py-3 sm:py-2.5 text-sm sm:text-[12px] font-medium text-gray-600 transition-colors hover:bg-gray-50 cursor-pointer"
           >
             Cancelar
           </button>
           <button
             onClick={onConfirm}
-            className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#D53E0F] py-2.5 text-[12px] font-semibold text-white transition-colors hover:bg-[#B53000]"
+            className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#9B0F06] py-3 sm:py-2.5 text-sm sm:text-[12px] font-semibold text-white transition-colors hover:bg-[#5E0006] cursor-pointer"
           >
-            <Trash2 size={14} />
+            <Trash2 size={15} />
             Eliminar Rol
           </button>
         </div>

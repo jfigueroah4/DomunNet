@@ -1,16 +1,17 @@
 'use client'
 
-import { useState, useRef, useMemo } from 'react'
+import { useState, useRef, useMemo, useEffect } from 'react'
 import {
   ArrowLeft, RotateCcw, UploadCloud, FileArchive, CheckCircle2, ShieldAlert, X, Search, ChevronLeft, ChevronRight
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { toast } from 'sonner'
+import { api } from '@/lib/api/cliente'
+import { showErrorToast, showSuccessToast } from '@/hooks/useCustomToast'
 
 const POPPINS = "'Poppins', sans-serif"
 
 interface HistorialRestauracion {
-  id: number
+  id: string
   archivo: string
   tipo: 'Completo' | 'Incremental'
   fechaRaw: string // YYYY-MM-DD
@@ -39,28 +40,36 @@ export default function RestauracionDatosPage() {
   const [modalConfirmacionAbierto, setModalConfirmacionAbierto] = useState(false)
   const [confirmacionTexto, setConfirmacionTexto] = useState('')
 
-  const [historial, setHistorial] = useState<HistorialRestauracion[]>([
-    {
-      id: 1,
-      archivo: 'Backup_DomunNet_Full_20260801.sql',
-      tipo: 'Completo',
-      fechaRaw: '2026-08-10',
-      fecha: '10/08/2026 14:30',
-      usuario: 'admin@domunnet.com',
-      tamano: '221.5 MB',
-      estado: 'Exitoso'
-    },
-    {
-      id: 2,
-      archivo: 'Backup_DomunNet_Inc_20260725.sql',
-      tipo: 'Incremental',
-      fechaRaw: '2026-07-28',
-      fecha: '28/07/2026 09:15',
-      usuario: 'admin@domunnet.com',
-      tamano: '18.9 MB',
-      estado: 'Exitoso'
-    }
-  ])
+  const [historial, setHistorial] = useState<HistorialRestauracion[]>([])
+
+  useEffect(() => {
+    void api.get('/respaldo/historial-sql')
+      .then((respuesta) => {
+        const registros = Array.isArray(respuesta.data?.data) ? respuesta.data.data : []
+        setHistorial(registros.map((registro: {
+          id: string
+          nombre: string
+          tipo: 'Completo' | 'Incremental'
+          fecha: string
+          usuario: string
+          tamano: number
+          estado: string
+        }) => {
+          const fecha = new Date(registro.fecha)
+          return {
+            id: registro.id,
+            archivo: registro.nombre,
+            tipo: registro.tipo,
+            fechaRaw: registro.fecha.slice(0, 10),
+            fecha: fecha.toLocaleString('es-GT', { dateStyle: 'short', timeStyle: 'short' }),
+            usuario: registro.usuario,
+            tamano: `${(registro.tamano / (1024 * 1024)).toFixed(2)} MB`,
+            estado: registro.estado,
+          }
+        }))
+      })
+      .catch(() => showErrorToast('No fue posible cargar el historial de respaldos'))
+  }, [])
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
@@ -73,7 +82,7 @@ export default function RestauracionDatosPage() {
       if (f.name.endsWith('.sql') || f.name.endsWith('.zip')) {
         setFile(f)
       } else {
-        toast.error('Formato no soportado. Seleccione un archivo .sql o .zip')
+        showErrorToast('Formato no soportado. Seleccione un archivo .sql o .zip')
       }
     }
   }
@@ -84,7 +93,7 @@ export default function RestauracionDatosPage() {
       if (f.name.endsWith('.sql') || f.name.endsWith('.zip')) {
         setFile(f)
       } else {
-        toast.error('Formato no soportado. Seleccione un archivo .sql o .zip')
+        showErrorToast('Formato no soportado. Seleccione un archivo .sql o .zip')
       }
     }
   }
@@ -95,37 +104,26 @@ export default function RestauracionDatosPage() {
     setModalConfirmacionAbierto(true)
   }
 
-  const handleEjecutarRestauracion = () => {
+  const handleEjecutarRestauracion = async () => {
     if (confirmacionTexto.trim().toUpperCase() !== 'CONFIRMAR RESTAURACION') {
-      toast.error('El texto de confirmación no coincide')
+      showErrorToast('El texto de confirmación no coincide')
       return
     }
 
+    if (!file) return
     setRestaurando(true)
-    setTimeout(() => {
-      setRestaurando(false)
+    try {
+      await api.post('/respaldo/restaurar-sql', await file.text(), {
+        headers: { 'Content-Type': 'text/plain' },
+      })
       setModalConfirmacionAbierto(false)
-
-      const fechaHoyObj = new Date()
-      const fechaRawStr = fechaHoyObj.toISOString().slice(0, 10)
-      const fechaFormatStr = fechaHoyObj.toLocaleString('es-GT', { dateStyle: 'short', timeStyle: 'short' })
-      const esInc = file?.name.toLowerCase().includes('inc')
-
-      const nuevoRegistro: HistorialRestauracion = {
-        id: Date.now(),
-        archivo: file ? file.name : 'Backup_Cargado.sql',
-        tipo: esInc ? 'Incremental' : 'Completo',
-        fechaRaw: fechaRawStr,
-        fecha: fechaFormatStr,
-        usuario: 'Usuario Actual',
-        tamano: file ? `${(file.size / (1024 * 1024)).toFixed(2)} MB` : '150 MB',
-        estado: 'Exitoso'
-      }
-
-      setHistorial([nuevoRegistro, ...historial])
       setFile(null)
-      toast.success('La base de datos se ha restaurado con éxito')
-    }, 3500)
+      showSuccessToast('La base de datos se ha restaurado con éxito')
+    } catch {
+      showErrorToast('No fue posible restaurar el archivo SQL. No se aplicaron cambios confirmados.')
+    } finally {
+      setRestaurando(false)
+    }
   }
 
   // Filtrado de historial
@@ -328,8 +326,8 @@ export default function RestauracionDatosPage() {
 
         {/* Paginación Footer */}
         {historialFiltrado.length > 0 && (
-          <div className="p-3 border-t border-gray-100 bg-white flex items-center justify-between gap-3 text-xs text-gray-500">
-            <div className="flex items-center gap-2">
+          <div data-paginacion="true" className="paginacion-control font-[Poppins] p-2.5 sm:p-3 border-t border-gray-100 bg-white flex flex-row items-center justify-between gap-2 text-[9.5px] sm:text-xs text-gray-500">
+            <div className="flex items-center gap-1.5 sm:gap-2">
               <span>Mostrar</span>
               <select
                 value={registrosPorPagina}
@@ -337,13 +335,13 @@ export default function RestauracionDatosPage() {
                   setRegistrosPorPagina(Number(e.target.value))
                   setPaginaActual(1)
                 }}
-                className="h-7 border border-gray-200 rounded px-1.5 bg-white focus:outline-none focus:border-[#9B0F06]"
+                className="paginacion-control h-6 sm:h-7 border border-gray-200 rounded px-1.5 bg-white text-[9.5px] sm:text-xs focus:outline-none focus:border-[#9B0F06] font-normal text-gray-700 font-[Poppins]"
               >
                 {[8, 16, 24, 50].map((n) => (
-                  <option key={n} value={n}>{n}</option>
+                  <option key={n} value={n} className="text-[9.5px] font-[Poppins]">{n}</option>
                 ))}
               </select>
-              <span>registros por página</span>
+              <span className="hidden sm:inline">registros por página</span>
             </div>
 
             <div className="flex items-center gap-1">
@@ -352,9 +350,9 @@ export default function RestauracionDatosPage() {
                 disabled={paginaActual === 1}
                 className="p-1 border border-gray-200 rounded text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
-                <ChevronLeft size={14} />
+                <ChevronLeft size={13} />
               </button>
-              <span className="px-2 font-medium text-gray-700 text-[11px]">
+              <span className="px-1.5 sm:px-2 font-normal text-gray-700 text-[9.5px] sm:text-[11px]">
                 Página {paginaActual} de {totalPaginas || 1}
               </span>
               <button
@@ -362,7 +360,7 @@ export default function RestauracionDatosPage() {
                 disabled={paginaActual === totalPaginas || totalPaginas === 0}
                 className="p-1 border border-gray-200 rounded text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
-                <ChevronRight size={14} />
+                <ChevronRight size={13} />
               </button>
             </div>
           </div>
@@ -371,8 +369,14 @@ export default function RestauracionDatosPage() {
 
       {/* Modal de Confirmación de Restauración */}
       {modalConfirmacionAbierto && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl relative animate-in fade-in zoom-in duration-150">
+        <div
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => !restaurando && setModalConfirmacionAbierto(false)}
+        >
+          <div
+            className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl relative animate-in fade-in zoom-in duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
             <button
               onClick={() => setModalConfirmacionAbierto(false)}
               className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"

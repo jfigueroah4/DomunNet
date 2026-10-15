@@ -9,8 +9,9 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        poppins: ['var(--font-poppins)', 'system-ui', 'sans-serif'],
-        sans: ['var(--font-poppins)', 'system-ui', 'sans-serif'],
+        poppins: ['var(--font-poppins)', 'Poppins', 'sans-serif'],
+        sans: ['var(--font-poppins)', 'Poppins', 'sans-serif'],
+        Poppins: ['var(--font-poppins)', 'Poppins', 'sans-serif'],
       },
       colors: {
         brand: {

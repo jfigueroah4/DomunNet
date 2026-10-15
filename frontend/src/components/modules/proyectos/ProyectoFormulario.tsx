@@ -5,7 +5,6 @@ import { useRef, useState, useMemo, useEffect } from 'react'
 import { Combobox } from '@/components/ui/Combobox'
 import { DelegadoResidenteSelect } from './DelegadoResidenteSelect'
 import { IngenieroResponsableSelect } from './IngenieroResponsableSelect'
-import { EmpresaRelacionadaDrawer } from '@/components/modules/empresas/EmpresaRelacionadaDrawer'
 import { useRouter } from 'next/navigation'
 import { Portal } from '@/components/ui/Portal'
 import { api, apiGetDeduplicado, limpiarCacheMemoria } from '@/lib/api/cliente'
@@ -30,6 +29,7 @@ import {
   FileCheck,
   FileSignature,
   FileText,
+  Flag,
   HardHat,
   Info,
   Layers,
@@ -48,12 +48,19 @@ import {
   DollarSign,
   Landmark,
   Banknote,
+  FileSpreadsheet,
+  ExternalLink,
+  Paperclip,
+  Loader2,
 } from 'lucide-react'
 import { useCustomToast } from '@/hooks/useCustomToast'
 
-import { PROYECTOS_MOCK } from '@/data/proyectos.mock'
+import { CATALOGO_COMPLETO_88 } from '@/mocks/proyectoMock'
 import { useUsuariosStore } from '@/stores/useUsuariosStore'
 import { UsuarioFormularioDrawer } from '@/components/modules/usuarios/UsuarioFormularioDrawer'
+import { RenglonesBitacoraDrawer, RenglonItem } from './RenglonesBitacoraDrawer'
+import { DocumentoProyecto } from '@/types/proyecto'
+import { subirDocumentoProyecto } from '@/lib/supabase/storage'
 
 interface ProyectoFormularioProps {
   proyectoInicial?: Proyecto
@@ -64,13 +71,21 @@ interface ProyectoFormularioProps {
 }
 
 const inputClass =
-  'w-full rounded border border-gray-200 bg-white px-2.5 py-1.5 text-[11px] text-gray-800 placeholder-gray-400 focus:border-[#9B0F06] focus:outline-none focus:ring-1 focus:ring-[#9B0F06] transition-colors font-medium'
+  'project-form-control w-full rounded border border-gray-200 bg-white px-2.5 py-1.5 md:px-2.5 md:py-1.5 text-[10px] md:text-[11px] text-gray-800 placeholder-gray-400 focus:border-[#9B0F06] focus:outline-none focus:ring-1 focus:ring-[#9B0F06] disabled:bg-gray-100/90 disabled:text-gray-400 disabled:cursor-not-allowed disabled:border-gray-200 disabled:placeholder-gray-300 disabled:select-none transition-colors font-medium font-[Poppins]'
 
-const labelClass = 'mb-1 block text-[9px] font-extrabold uppercase tracking-wider text-gray-600'
+const labelClass = 'project-form-label mb-1 block text-[10px] md:text-[9px] font-extrabold uppercase tracking-wider text-gray-700 md:text-gray-600 font-[Poppins]'
 
 function errorInputClass(errors: Record<string, boolean>, field: string, errorMessages?: Record<string, string>) {
   const hasError = Boolean(errors[field] || (errorMessages && errorMessages[field]))
-  return `w-full rounded border ${hasError ? 'border-red-500 ring-1 ring-red-400 bg-red-50/20 text-red-900' : 'border-gray-200'} bg-white px-2.5 py-1.5 text-[11px] text-gray-800 placeholder-gray-400 focus:border-[#9B0F06] focus:outline-none focus:ring-1 focus:ring-[#9B0F06] transition-colors font-medium`
+  return `project-form-control w-full rounded border ${hasError ? 'border-red-500 ring-1 ring-red-400 bg-red-50/20 text-red-900' : 'border-gray-200'} bg-white px-2.5 py-1.5 md:px-2.5 md:py-1.5 text-[10px] md:text-[11px] text-gray-800 placeholder-gray-400 focus:border-[#9B0F06] focus:outline-none focus:ring-1 focus:ring-[#9B0F06] disabled:bg-gray-100/90 disabled:text-gray-400 disabled:cursor-not-allowed disabled:border-gray-200 disabled:placeholder-gray-300 disabled:select-none transition-colors font-medium font-[Poppins]`
+}
+
+function normalizarTexto(str: string) {
+  return (str || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
 }
 
 // Helpers de validación y sanitización en tiempo real
@@ -80,9 +95,26 @@ function sanitizeNombrePersona(val: string, maxLen = 150) {
 }
 
 function sanitizeTelefono(val: string, maxLen = 30) {
-  // Elimina PBX, extensiones y texto alfanumérico
-  const sinTexto = val.replace(/[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ@.]+/g, '')
-  return sinTexto.replace(/[^0-9+\s\-()\/]/g, '').trimStart().slice(0, maxLen)
+  return val.replace(/\D/g, '').slice(0, Math.min(maxLen, 8))
+}
+
+function formatearTelefonoGuatemala(val: string) {
+  const digitos = sanitizeTelefono(val, 8)
+  return digitos.length > 4 ? `${digitos.slice(0, 4)}-${digitos.slice(4)}` : digitos
+}
+
+function opcionesEmpresaConDomun(empresas: any[]) {
+  const opciones = (Array.isArray(empresas) ? empresas : [])
+    .map((empresa: any) => {
+      const nombre = String(empresa.nombre || empresa.razon_social || '').trim()
+      return nombre ? { value: nombre, label: nombre } : null
+    })
+    .filter(Boolean) as { value: string; label: string }[]
+
+  if (!opciones.some((opcion) => opcion.value.toLowerCase() === 'domun')) {
+    opciones.unshift({ value: 'Domun', label: 'Domun' })
+  }
+  return opciones
 }
 
 function parseActaString(actaStr?: string): { numero: string; fecha: string } {
@@ -146,6 +178,30 @@ function sanitizeCDP(val: string, maxLen = 40) {
   return val.replace(/[^0-9A-Za-z\-]/g, '').slice(0, maxLen)
 }
 
+function sanitizeKilometraje(val: string, maxLen = 20) {
+  if (!val) return ''
+  const sanitized = val.replace(/[^0-9+]/g, '')
+  const plusIndex = sanitized.indexOf('+')
+  if (plusIndex === -1) return sanitized.slice(0, 10)
+  const antesDelMas = sanitized.slice(0, plusIndex).slice(0, 10)
+  // Formato DGC: Solo se permiten hasta 3 dígitos después del '+' (ej: 0+000)
+  const despuesDelMas = sanitized.slice(plusIndex + 1).replace(/\+/g, '').slice(0, 3)
+  return `${antesDelMas}+${despuesDelMas}`
+}
+
+function parseKilometroNumber(val: string | number | null | undefined): number {
+  if (typeof val === 'number') return val
+  if (!val) return 0
+  const clean = String(val).replace(/km/gi, '').trim()
+  if (clean.includes('+')) {
+    const parts = clean.split('+')
+    const km = parseFloat(parts[0]) || 0
+    const m = parseFloat(parts[1]) || 0
+    return Number((km + (m / 1000)).toFixed(3))
+  }
+  return parseFloat(clean) || 0
+}
+
 function sanitizeNumeroPositivo(val: string, maxLen = 15) {
   if (!val) return ''
   const sanitized = val.replace(/[^0-9.]/g, '')
@@ -164,12 +220,49 @@ function sanitizePorcentaje(val: string) {
   return clean.slice(0, 5)
 }
 
-function siguienteCodigoVial() {
-  const max = PROYECTOS_MOCK.reduce((actual, proyecto) => {
-    const numero = Number(proyecto.codigo?.match(/DOM-VIAL-(\d+)/)?.[1] ?? 0)
-    return Math.max(actual, numero)
-  }, 0)
-  return `DOM-VIAL-${String(max + 1).padStart(3, '0')}`
+function parseMontoNumber(val: any): number {
+  if (val === null || val === undefined) return 0
+  if (typeof val === 'number') return isNaN(val) ? 0 : val
+  const clean = String(val).replace(/[^0-9.-]/g, '').trim()
+  const num = parseFloat(clean)
+  return isNaN(num) ? 0 : num
+}
+
+function sanitizeMontoMoneda(val: string, maxLen = 25) {
+  if (!val) return ''
+  const sanitized = val.replace(/[^0-9.,]/g, '')
+  const parts = sanitized.split('.')
+  if (parts.length > 2) {
+    return (parts[0] + '.' + parts.slice(1).join('')).slice(0, maxLen)
+  }
+  return sanitized.slice(0, maxLen)
+}
+
+function calcularPlazoEnMeses(fechaInicioStr: string, fechaFinStr: string): string {
+  if (!fechaInicioStr || !fechaFinStr) return ''
+  const inicio = new Date(fechaInicioStr + 'T00:00:00')
+  const fin = new Date(fechaFinStr + 'T00:00:00')
+  if (isNaN(inicio.getTime()) || isNaN(fin.getTime()) || fin <= inicio) return ''
+
+  const diffTime = fin.getTime() - inicio.getTime()
+  const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24))
+  
+  let months = (fin.getFullYear() - inicio.getFullYear()) * 12 + (fin.getMonth() - inicio.getMonth())
+  const dayDiff = fin.getDate() - inicio.getDate()
+  if (dayDiff >= 15) {
+    months += 1
+  } else if (dayDiff <= -15) {
+    months -= 1
+  }
+  const monthsByDays = Math.round(diffDays / 30.4375)
+  const finalMonths = Math.max(1, months > 0 ? months : monthsByDays)
+  return `${finalMonths} ${finalMonths === 1 ? 'mes' : 'meses'}`
+}
+
+function parseNumeroMeses(plazoStr: string): number {
+  if (!plazoStr) return 0
+  const match = String(plazoStr).match(/(\d+)/)
+  return match ? parseInt(match[1], 10) : 0
 }
 
 function SectionHeader({
@@ -184,19 +277,19 @@ function SectionHeader({
   badge?: string
 }) {
   return (
-    <div className="mb-2.5 border-b border-gray-100 pb-1.5">
+    <div className="mb-2.5 border-b border-gray-100 pb-1.5 font-[Poppins]">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
           {Icon && <Icon size={13} className="text-[#9B0F06]" />}
-          <h3 className="text-[10px] font-black uppercase tracking-wider text-gray-800">{title}</h3>
+          <h3 className="text-[10px] md:text-[10.5px] font-black uppercase tracking-wider text-gray-800 font-[Poppins]">{title}</h3>
         </div>
         {badge && (
-          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[8.5px] font-bold text-gray-600 border border-gray-200">
+          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[8.5px] font-bold text-gray-600 border border-gray-200 font-[Poppins]">
             {badge}
           </span>
         )}
       </div>
-      {subtitle && <p className="mt-0.5 text-[9px] text-gray-400">{subtitle}</p>}
+      {subtitle && <p className="mt-0.5 text-[8.5px] md:text-[9px] text-gray-400 font-[Poppins]">{subtitle}</p>}
     </div>
   )
 }
@@ -207,11 +300,15 @@ function EquipoAsignadoSelector({
   setEquipo,
   usuariosDisponibles,
   onAbrirCrearUsuario,
+  delegadoResidenteId,
+  responsableId,
 }: {
   equipo: MiembroEquipo[]
   setEquipo: React.Dispatch<React.SetStateAction<MiembroEquipo[]>>
   usuariosDisponibles: any[]
   onAbrirCrearUsuario?: () => void
+  delegadoResidenteId?: string
+  responsableId?: string
 }) {
   const [selectedUsuarioId, setSelectedUsuarioId] = useState('')
   const [paginaActual, setPaginaActual] = useState(1)
@@ -219,6 +316,15 @@ function EquipoAsignadoSelector({
   const { showSuccessToast, showErrorToast } = useCustomToast()
 
   const totalPaginas = Math.max(1, Math.ceil(equipo.length / itemsPorPagina))
+
+  // Si un usuario ya está asignado como Delegado Residente o Ingeniero Responsable, no debe figurar en el equipo adicional
+  useEffect(() => {
+    if (delegadoResidenteId || responsableId) {
+      setEquipo((prev) =>
+        prev.filter((m) => m.id !== delegadoResidenteId && m.id !== responsableId)
+      )
+    }
+  }, [delegadoResidenteId, responsableId, setEquipo])
 
   useEffect(() => {
     if (paginaActual > totalPaginas) {
@@ -236,7 +342,16 @@ function EquipoAsignadoSelector({
     const userObj = usuariosDisponibles.find((u: any) => u.id === selectedUsuarioId)
     if (!userObj) return
 
-    if (equipo.some((m) => m.nombre === userObj.nombre)) {
+    if (delegadoResidenteId && userObj.id === delegadoResidenteId) {
+      showErrorToast(`${userObj.nombre} ya está asignado como Delegado Residente`)
+      return
+    }
+    if (responsableId && userObj.id === responsableId) {
+      showErrorToast(`${userObj.nombre} ya está asignado como Ingeniero Responsable`)
+      return
+    }
+
+    if (equipo.some((m) => m.nombre === userObj.nombre || m.id === userObj.id)) {
       showErrorToast(`${userObj.nombre} ya forma parte del equipo`)
       return
     }
@@ -278,6 +393,13 @@ function EquipoAsignadoSelector({
             .filter((u: any) => u.rol?.toLowerCase() !== 'contratante')
             .filter((u: any) => u.activo !== false && u.estado !== 'Suspendido' && u.estado !== 'Desactivado')
             .filter((u: any) => {
+              // Excluir si ya fue seleccionado como Delegado Residente o Ingeniero Responsable
+              if (delegadoResidenteId && (u.id === delegadoResidenteId || u._id === delegadoResidenteId)) {
+                return false
+              }
+              if (responsableId && (u.id === responsableId || u._id === responsableId)) {
+                return false
+              }
               const nameToMatch = u.nombre || `${u.primer_nombre || ''} ${u.primer_apellido || ''}`.trim()
               return !equipo.some((m) => m.id === u.id || (m.nombre && m.nombre === nameToMatch))
             })
@@ -406,9 +528,99 @@ function SelectorMapaInteractivo({
   const marcadorRef = useRef<any>(null)
   const marcadorFinRef = useRef<any>(null)
   const lineaRutaRef = useRef<any>(null)
+  const leafletRef = useRef<any>(null)
   const [buscandoDireccion, setBuscandoDireccion] = useState(false)
+  const [buscandoDireccionFinal, setBuscandoDireccionFinal] = useState(false)
   const [errorBusqueda, setErrorBusqueda] = useState<string | null>(null)
+  const [avisoBusqueda, setAvisoBusqueda] = useState<string | null>(null)
   const [mapaListo, setMapaListo] = useState(false)
+  const ultimaDireccionFinalBuscadaRef = useRef('')
+
+  const sonDireccionesIdenticas = useMemo(() => {
+    return Boolean(
+      direccion?.trim() &&
+      direccionFin?.trim() &&
+      normalizarTexto(direccion) === normalizarTexto(direccionFin)
+    )
+  }, [direccion, direccionFin])
+
+  // Globo con silueta de pin elegante para Inicio (A, color suave) y Destino (B, color vino)
+  const crearPinIcon = (L: any, tipo: 'inicio' | 'fin') => {
+    const esInicio = tipo === 'inicio'
+    const colorPrimario = esInicio ? '#E06D53' : '#9B0F06'
+    const colorRelleno = esInicio ? '#FFF1ED' : '#FFFFFF'
+    const letra = esInicio ? 'A' : 'B'
+
+    return L.divIcon({
+      className: `custom-map-pin-${tipo}`,
+      html: `
+        <div style="position: relative; width: 32px; height: 42px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; cursor: grab;">
+          <svg width="32" height="42" viewBox="0 0 28 38" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 3px 6px rgba(0,0,0,0.38));">
+            <path d="M14 1C6.82 1 1 6.82 1 14C1 23.8 14 37 14 37C14 37 27 23.8 27 14C27 6.82 21.18 1 14 1Z" fill="${colorRelleno}" stroke="${colorPrimario}" stroke-width="2.5"/>
+            <circle cx="14" cy="14" r="8.5" fill="${colorPrimario}"/>
+            <text x="14" y="17.8" font-size="10.5" font-weight="900" font-family="'Poppins', sans-serif" fill="#FFFFFF" text-anchor="middle">${letra}</text>
+          </svg>
+        </div>
+      `,
+      iconSize: [32, 42],
+      iconAnchor: [16, 42],
+      popupAnchor: [0, -40],
+    })
+  }
+
+  const actualizarLineaRuta = (mapa: any, L: any) => {
+    if (!marcadorRef.current || !marcadorFinRef.current || !mapa || !L) return
+    const inicio = marcadorRef.current.getLatLng()
+    const fin = marcadorFinRef.current.getLatLng()
+    if (lineaRutaRef.current) {
+      lineaRutaRef.current.setLatLngs([[inicio.lat, inicio.lng], [fin.lat, fin.lng]])
+    } else {
+      lineaRutaRef.current = L.polyline(
+        [[inicio.lat, inicio.lng], [fin.lat, fin.lng]],
+        { color: '#9B0F06', weight: 3.5, dashArray: '6 6', opacity: 0.85 }
+      ).addTo(mapa)
+    }
+  }
+
+  const asegurarMarcadorInicio = (L: any, mapa: any, lat: number, lng: number, popupTexto: string) => {
+    if (!marcadorRef.current) {
+      const pinIcon = crearPinIcon(L, 'inicio')
+      const m = L.marker([lat, lng], { draggable: true, icon: pinIcon }).addTo(mapa)
+      m.bindPopup(`<b>📍 Punto A - Inicio (Origen):</b><br/>${popupTexto || 'Punto de Inicio'}<br/><span style="font-size:9.5px;color:#E06D53;font-weight:600;">Arrastra este globo para reubicar el inicio</span>`).openPopup()
+      m.on('dragend', () => {
+        const posicion = m.getLatLng()
+        void actualizarDireccionDesdeCoordenadas(
+          Number(posicion.lat.toFixed(6)),
+          Number(posicion.lng.toFixed(6))
+        )
+      })
+      marcadorRef.current = m
+    } else {
+      marcadorRef.current.setLatLng([lat, lng])
+      marcadorRef.current.setPopupContent(`<b>📍 Punto A - Inicio (Origen):</b><br/>${popupTexto || 'Punto de Inicio'}<br/><span style="font-size:9.5px;color:#E06D53;font-weight:600;">Arrastra este globo para reubicar el inicio</span>`).openPopup()
+    }
+    actualizarLineaRuta(mapa, L)
+  }
+
+  const asegurarMarcadorFin = (L: any, mapa: any, lat: number, lng: number, popupTexto: string) => {
+    if (!marcadorFinRef.current) {
+      const pinIcon = crearPinIcon(L, 'fin')
+      const m = L.marker([lat, lng], { draggable: true, icon: pinIcon }).addTo(mapa)
+      m.bindPopup(`<b>🏁 Punto B - Final (Destino):</b><br/>${popupTexto || 'Punto Final'}<br/><span style="font-size:9.5px;color:#9B0F06;font-weight:600;">Arrastra este globo para reubicar el destino</span>`).openPopup()
+      m.on('dragend', () => {
+        const posicion = m.getLatLng()
+        void actualizarDireccionFinDesdeCoordenadas(
+          Number(posicion.lat.toFixed(6)),
+          Number(posicion.lng.toFixed(6))
+        )
+      })
+      marcadorFinRef.current = m
+    } else {
+      marcadorFinRef.current.setLatLng([lat, lng])
+      marcadorFinRef.current.setPopupContent(`<b>🏁 Punto B - Final (Destino):</b><br/>${popupTexto || 'Punto Final'}<br/><span style="font-size:9.5px;color:#9B0F06;font-weight:600;">Arrastra este globo para reubicar el destino</span>`).openPopup()
+    }
+    actualizarLineaRuta(mapa, L)
+  }
 
   const limpiarDireccionNominatim = (texto: string) => {
     return texto
@@ -418,40 +630,101 @@ function SelectorMapaInteractivo({
       .trim()
   }
 
-  const autodeteccionUbicacion = (address: any) => {
-    if (!address) return
-    const stateName = (address.state || address.province || address.region || '').toLowerCase().trim()
-    const cityName = (address.city || address.town || address.village || address.municipality || address.county || '').toLowerCase().trim()
+  const autodeteccionUbicacion = (address: any, tipo: 'inicio' | 'fin' = 'inicio', textoExtra?: string) => {
+    const setDep = tipo === 'inicio' ? setDepartamentoId : setDepartamentoFinId
+    const setMun = tipo === 'inicio' ? setMunicipioId : setMunicipioFinId
+    if (!setDep || !setMun) return
 
+    const stateNorm = normalizarTexto(address?.state || address?.province || address?.region || '')
+    const textoExtraNorm = normalizarTexto(textoExtra || '')
+
+    const candidatosMun: string[] = [
+      address?.city,
+      address?.town,
+      address?.municipality,
+      address?.village,
+      address?.hamlet,
+      address?.county,
+      address?.suburb,
+      address?.city_district,
+    ]
+      .filter(Boolean)
+      .map((s: string) => normalizarTexto(s))
+
+    // 1. Detectar departamento por coincidencia directa con el departamento de Nominatim
     let depEncontrado = departamentos.find((d: any) => {
-      const dName = (d.nombre || '').toLowerCase().trim()
-      return dName && (dName === stateName || stateName.includes(dName) || dName.includes(stateName))
+      const dName = normalizarTexto(d.nombre)
+      if (!dName) return false
+      return dName === stateNorm || stateNorm.includes(dName) || dName.includes(stateNorm)
     })
 
-    if (!depEncontrado && cityName) {
+    // 2. Si no se detectó por state, buscar si alguno de los municipios coincide y nos da su departamento
+    if (!depEncontrado && candidatosMun.length > 0) {
+      for (const cand of candidatosMun) {
+        const munObj = municipios.find((m: any) => {
+          const mName = normalizarTexto(m.nombre)
+          return mName && (mName === cand || cand.includes(mName) || mName.includes(cand))
+        })
+        if (munObj && munObj.departamento_id) {
+          depEncontrado = departamentos.find((d: any) => d.id === munObj.departamento_id)
+          if (depEncontrado) {
+            setDep(depEncontrado.id)
+            setMun(munObj.id)
+            return
+          }
+        }
+      }
+    }
+
+    // 3. Buscar si el texto de la dirección menciona un departamento explícitamente
+    if (!depEncontrado && textoExtraNorm) {
+      depEncontrado = departamentos.find((d: any) => {
+        const dName = normalizarTexto(d.nombre)
+        return dName && textoExtraNorm.includes(dName)
+      })
+    }
+
+    // 4. Buscar si el texto menciona un municipio conocido
+    if (!depEncontrado && textoExtraNorm) {
       const munObj = municipios.find((m: any) => {
-        const mName = (m.nombre || '').toLowerCase().trim()
-        return mName && (mName === cityName || cityName.includes(mName) || mName.includes(cityName))
+        const mName = normalizarTexto(m.nombre)
+        return mName && textoExtraNorm.includes(mName)
       })
       if (munObj && munObj.departamento_id) {
         depEncontrado = departamentos.find((d: any) => d.id === munObj.departamento_id)
         if (depEncontrado) {
-          setDepartamentoId(depEncontrado.id)
-          setMunicipioId(munObj.id)
+          setDep(depEncontrado.id)
+          setMun(munObj.id)
           return
         }
       }
     }
 
     if (depEncontrado) {
-      setDepartamentoId(depEncontrado.id)
-      if (cityName) {
-        const munEncontrado = municipios.find((m: any) => {
+      setDep(depEncontrado.id)
+
+      // Buscar municipio dentro de este departamento
+      let munEncontrado: any = null
+      for (const cand of candidatosMun) {
+        munEncontrado = municipios.find((m: any) => {
           if (m.departamento_id !== depEncontrado.id) return false
-          const mName = (m.nombre || '').toLowerCase().trim()
-          return mName && (mName === cityName || cityName.includes(mName) || mName.includes(cityName))
+          const mName = normalizarTexto(m.nombre)
+          return mName && (mName === cand || cand.includes(mName) || mName.includes(cand))
         })
-        if (munEncontrado) setMunicipioId(munEncontrado.id)
+        if (munEncontrado) break
+      }
+
+      // Si aún no se encontró, buscar si el texto menciona algún municipio perteneciente al departamento
+      if (!munEncontrado && textoExtraNorm) {
+        munEncontrado = municipios.find((m: any) => {
+          if (m.departamento_id !== depEncontrado.id) return false
+          const mName = normalizarTexto(m.nombre)
+          return mName && textoExtraNorm.includes(mName)
+        })
+      }
+
+      if (munEncontrado) {
+        setMun(munEncontrado.id)
       }
     }
   }
@@ -459,6 +732,19 @@ function SelectorMapaInteractivo({
   const actualizarDireccionDesdeCoordenadas = async (lat: number, lng: number) => {
     try {
       setErrorBusqueda(null)
+      setAvisoBusqueda(null)
+
+      if (marcadorFinRef.current) {
+        const L = leafletRef.current
+        if (L) {
+          const dist = L.latLng(lat, lng).distanceTo(marcadorFinRef.current.getLatLng())
+          if (dist < 30) {
+            setErrorBusqueda('La ubicación inicial no puede ser idéntica a la ubicación de destino.')
+            return
+          }
+        }
+      }
+
       const res = await fetch(
         `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&addressdetails=1&accept-language=es`
       )
@@ -468,9 +754,14 @@ function SelectorMapaInteractivo({
       setDireccion(texto)
       if (setUbicacionFisica) setUbicacionFisica(texto)
       setCoordenadas({ lat, lng, puntoTexto: texto })
-      if (data.address) autodeteccionUbicacion(data.address)
+      if (data.address) autodeteccionUbicacion(data.address, 'inicio', texto)
       if (marcadorRef.current) {
-        marcadorRef.current.setPopupContent(`<b>Punto de Inicio:</b><br/>${texto}`).openPopup()
+        marcadorRef.current.setPopupContent(`<b>📍 Punto A - Inicio (Origen):</b><br/>${texto}<br/><span style="font-size:9.5px;color:#E06D53;font-weight:600;">Arrastra este globo para reubicar el inicio</span>`).openPopup()
+      }
+      const mapa = instanciaMapaRef.current
+      const L = leafletRef.current
+      if (mapa && L) {
+        actualizarLineaRuta(mapa, L)
       }
     } catch {
       const fallback = `Punto en mapa (${lat.toFixed(5)}, ${lng.toFixed(5)})`
@@ -480,51 +771,458 @@ function SelectorMapaInteractivo({
     }
   }
 
-  const buscarDireccionTexto = async () => {
-    if (!direccion.trim()) return
+  const actualizarDireccionFinDesdeCoordenadas = async (lat: number, lng: number) => {
     try {
-      setBuscandoDireccion(true)
       setErrorBusqueda(null)
-      const query = encodeURIComponent(`${direccion}, Guatemala`)
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${query}&limit=1&addressdetails=1&countrycodes=gt&accept-language=es`
-      )
-      if (!res.ok) throw new Error()
-      const resultados = await res.json()
-      const resultado = resultados[0]
-      if (!resultado) {
-        setErrorBusqueda('No se encontró la dirección especificada en el mapa')
-        return
+      setAvisoBusqueda(null)
+
+      if (marcadorRef.current) {
+        const L = leafletRef.current
+        if (L) {
+          const dist = L.latLng(lat, lng).distanceTo(marcadorRef.current.getLatLng())
+          if (dist < 30) {
+            setErrorBusqueda('La ubicación final (destino) no puede ser idéntica a la ubicación inicial.')
+            return
+          }
+        }
       }
 
-      const lat = Number.parseFloat(resultado.lat)
-      const lng = Number.parseFloat(resultado.lon)
-      const display = limpiarDireccionNominatim(resultado.display_name)
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&addressdetails=1&accept-language=es`
+      )
+      if (!res.ok) throw new Error()
+      const data = await res.json()
+      const texto = data.display_name ? limpiarDireccionNominatim(data.display_name) : `Lat: ${lat}, Lng: ${lng}`
+      setDireccionFin(texto)
+      if (data.address) autodeteccionUbicacion(data.address, 'fin', texto)
+      if (marcadorFinRef.current) {
+        marcadorFinRef.current.setPopupContent(`<b>🏁 Punto B - Final (Destino):</b><br/>${texto}<br/><span style="font-size:9.5px;color:#9B0F06;font-weight:600;">Arrastra este globo para reubicar el destino</span>`).openPopup()
+      }
+      const mapa = instanciaMapaRef.current
+      const L = leafletRef.current
+      if (mapa && L) {
+        actualizarLineaRuta(mapa, L)
+      }
+    } catch {
+      const fallback = `Punto Final (${lat.toFixed(5)}, ${lng.toFixed(5)})`
+      setDireccionFin(fallback)
+    }
+  }
+
+  // Genera variantes de búsqueda ordenadas de mayor especificidad a menor
+  // Esto resuelve búsquedas con números de casa ("1 calle 51-06") o micro-colonias no indexadas en OSM Guatemala
+  const generarVariantesBusqueda = (textoOriginal: string): string[] => {
+    const variantes: string[] = []
+    const base = textoOriginal.trim()
+    if (!base) return variantes
+
+    // 1. Texto original exacto
+    variantes.push(base)
+
+    // 2. Sin números de casa / lote / manzana / nomenclatura (ej: "51-06", "#4", "Lote 12")
+    const sinNumeros = base
+      .replace(/\b\d+\s*[-/]\s*\d+\b/g, '')
+      .replace(/#\s*\d+/gi, '')
+      .replace(/\b(no\.|num\.|número|lote|manzana|mz|sector)\s*[a-z0-9]+/gi, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim()
+    if (sinNumeros && sinNumeros !== base) {
+      variantes.push(sinNumeros)
+    }
+
+    // 3. Segmentación por comas o punto y coma
+    const partes = base.split(/[,;]+/).map(p => p.trim()).filter(Boolean)
+    if (partes.length > 1) {
+      // Omitir primer segmento (frecuentemente calle o número)
+      const sinPrimeraParte = partes.slice(1).join(', ')
+      if (sinPrimeraParte) variantes.push(sinPrimeraParte)
+
+      // Sub-sectores sin números finales (ej: "Naciones Unidas 2" -> "Naciones Unidas")
+      const partesSinNumeros = partes.slice(1).map(p => p.replace(/\b\d+\b/g, '').trim()).filter(Boolean)
+      if (partesSinNumeros.length > 0) {
+        variantes.push(partesSinNumeros.join(', '))
+      }
+
+      // Probar las últimas dos partes (ej: municipio, depto)
+      if (partes.length > 2) {
+        variantes.push(partes.slice(-2).join(', '))
+      }
+
+      // Probar únicamente el municipio / zona
+      const partesInteres = partes.filter(
+        p => !p.toLowerCase().includes('guatemala') && !p.toLowerCase().includes('república')
+      )
+      if (partesInteres.length > 0) {
+        variantes.push(partesInteres[partesInteres.length - 1])
+      }
+    }
+
+    // Deduplicar manteniendo el orden
+    const unicas: string[] = []
+    for (const v of variantes) {
+      const limpio = v.trim().replace(/^,\s*|,\s*$/g, '')
+      if (limpio && !unicas.includes(limpio)) {
+        unicas.push(limpio)
+      }
+    }
+    return unicas
+  }
+
+  const consultarNominatim = async (queryTexto: string) => {
+    const qLimpio = queryTexto.trim()
+    if (!qLimpio) return null
+    const q = qLimpio.toLowerCase().includes('guatemala') ? qLimpio : `${qLimpio}, Guatemala`
+    const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(q)}&limit=1&addressdetails=1&countrycodes=gt&accept-language=es`
+    try {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 6000)
+      const res = await fetch(url, { signal: controller.signal })
+      clearTimeout(timeoutId)
+      if (!res.ok) return null
+      const data = await res.json()
+      if (Array.isArray(data) && data.length > 0) {
+        return data[0]
+      }
+      return null
+    } catch {
+      return null
+    }
+  }
+
+  const geocodificarDireccion = async (texto: string) => {
+    const variantes = generarVariantesBusqueda(texto)
+    let resultado: any = null
+    let esAproximado = false
+
+    for (let i = 0; i < variantes.length; i++) {
+      const v = variantes[i]
+      try {
+        const r = await consultarNominatim(v)
+        if (r) {
+          resultado = r
+          esAproximado = i > 0
+          break
+        }
+      } catch {
+        // Continuar con la siguiente variante
+      }
+    }
+
+    if (!resultado) return null
+
+    const lat = Number.parseFloat(resultado.lat)
+    const lng = Number.parseFloat(resultado.lon)
+    const display = limpiarDireccionNominatim(resultado.display_name)
+
+    return {
+      resultado,
+      lat,
+      lng,
+      display,
+      esAproximado,
+    }
+  }
+
+  const aplicarResultadoInicio = (
+    geo: { resultado: any; lat: number; lng: number; display: string; esAproximado: boolean },
+    textoOriginal: string
+  ) => {
+    const { resultado, lat, lng, display, esAproximado } = geo
+    if (!esAproximado) {
       setDireccion(display)
       if (setUbicacionFisica) setUbicacionFisica(display)
       setCoordenadas({ lat, lng, puntoTexto: display })
+    } else {
+      if (setUbicacionFisica) setUbicacionFisica(textoOriginal)
+      setCoordenadas({ lat, lng, puntoTexto: textoOriginal })
+    }
 
-      if (resultado.address) autodeteccionUbicacion(resultado.address)
+    if (resultado.address) {
+      autodeteccionUbicacion(resultado.address, 'inicio', textoOriginal)
+    } else {
+      autodeteccionUbicacion(null, 'inicio', textoOriginal)
+    }
 
-      if (instanciaMapaRef.current && marcadorRef.current) {
-        instanciaMapaRef.current.setView([lat, lng], 14)
-        marcadorRef.current.setLatLng([lat, lng])
+    const mapa = instanciaMapaRef.current
+    const L = leafletRef.current
+    if (mapa && L) {
+      asegurarMarcadorInicio(L, mapa, lat, lng, esAproximado ? textoOriginal : display)
+    }
+  }
+
+  const aplicarResultadoFin = (
+    geo: { resultado: any; lat: number; lng: number; display: string; esAproximado: boolean },
+    textoOriginal: string
+  ) => {
+    const { resultado, lat, lng, display, esAproximado } = geo
+    if (!esAproximado) {
+      setDireccionFin(display)
+    }
+
+    if (resultado.address) {
+      autodeteccionUbicacion(resultado.address, 'fin', textoOriginal)
+    } else {
+      autodeteccionUbicacion(null, 'fin', textoOriginal)
+    }
+
+    const mapa = instanciaMapaRef.current
+    const L = leafletRef.current
+    if (mapa && L) {
+      asegurarMarcadorFin(L, mapa, lat, lng, esAproximado ? textoOriginal : display)
+    }
+  }
+
+  const buscarAmbasDirecciones = async () => {
+    if (!direccion.trim() || !direccionFin.trim() || sonDireccionesIdenticas) return
+
+    try {
+      setBuscandoDireccion(true)
+      setBuscandoDireccionFinal(true)
+      setErrorBusqueda(null)
+      setAvisoBusqueda(null)
+
+      // 1. Geocodificar Dirección Inicial
+      const geoIni = await geocodificarDireccion(direccion)
+      if (!geoIni) {
+        setErrorBusqueda(
+          'No se encontró la dirección inicial en el mapa. Intenta ingresar la zona, colonia o municipio, o haz clic directamente sobre el mapa para fijar el punto.'
+        )
+        return
+      }
+
+      // Pequeña pausa para no saturar Nominatim (rate limit amigable)
+      await new Promise((res) => setTimeout(res, 400))
+
+      // 2. Geocodificar Dirección Final
+      const geoFin = await geocodificarDireccion(direccionFin)
+      if (!geoFin) {
+        aplicarResultadoInicio(geoIni, direccion)
+        const mapa = instanciaMapaRef.current
+        const L = leafletRef.current
+        if (mapa && L) {
+          mapa.setView([geoIni.lat, geoIni.lng], geoIni.esAproximado ? 14 : 16)
+        }
+        setErrorBusqueda(
+          'Se localizó la dirección inicial, pero no se encontró la dirección de destino en el mapa. Intenta ingresar una zona o municipio para el destino.'
+        )
+        return
+      }
+
+      // Validar que no caigan en el mismo punto físico
+      const L = leafletRef.current
+      if (L) {
+        const dist = L.latLng(geoIni.lat, geoIni.lng).distanceTo(L.latLng(geoFin.lat, geoFin.lng))
+        if (dist < 30) {
+          setErrorBusqueda('La ubicación inicial y de destino no pueden estar en el mismo punto físico.')
+          return
+        }
+      }
+
+      // 3. Aplicar resultados a estado, inputs y marcadores A y B
+      aplicarResultadoInicio(geoIni, direccion)
+      aplicarResultadoFin(geoFin, direccionFin)
+
+      // 4. Ajustar encuadre del mapa para mostrar ambos marcadores y trazar la ruta
+      const mapa = instanciaMapaRef.current
+      if (mapa && L) {
+        mapa.fitBounds(
+          L.latLngBounds([
+            [geoIni.lat, geoIni.lng],
+            [geoFin.lat, geoFin.lng]
+          ]),
+          { padding: [50, 50] }
+        )
+        actualizarLineaRuta(mapa, L)
+      }
+
+      ultimaDireccionFinalBuscadaRef.current = direccionFin.trim()
+
+      if (!geoIni.esAproximado && !geoFin.esAproximado) {
+        setAvisoBusqueda('✓ Ubicaciones de inicio y destino localizadas con precisión en el mapa.')
+      } else {
+        setAvisoBusqueda(
+          '📍 Ubicaciones localizadas en el mapa. Puedes arrastrar los globos A (Inicio) o B (Destino) para ajustar el punto exacto.'
+        )
       }
     } catch {
-      setErrorBusqueda('No se pudo realizar la búsqueda de dirección')
+      setErrorBusqueda('No se pudo realizar la búsqueda de direcciones. Verifica la conexión a internet.')
+    } finally {
+      setBuscandoDireccion(false)
+      setBuscandoDireccionFinal(false)
+    }
+  }
+
+  const buscarDireccionTexto = async () => {
+    if (!direccion.trim()) return
+    if (sonDireccionesIdenticas) {
+      setErrorBusqueda('La ubicación de destino no puede ser idéntica a la ubicación inicial.')
+      return
+    }
+
+    // Si ambas direcciones están establecidas y falta mostrar alguna en el mapa, buscar ambas
+    if (direccion.trim() && direccionFin.trim() && (!marcadorRef.current || !marcadorFinRef.current)) {
+      await buscarAmbasDirecciones()
+      return
+    }
+
+    try {
+      setBuscandoDireccion(true)
+      setErrorBusqueda(null)
+      setAvisoBusqueda(null)
+
+      const geo = await geocodificarDireccion(direccion)
+      if (!geo) {
+        setErrorBusqueda(
+          'No se encontró la dirección en el mapa. Intenta ingresar la zona, colonia o municipio, o haz clic directamente sobre el mapa para fijar el punto.'
+        )
+        return
+      }
+
+      if (marcadorFinRef.current) {
+        const L = leafletRef.current
+        if (L) {
+          const dist = L.latLng(geo.lat, geo.lng).distanceTo(marcadorFinRef.current.getLatLng())
+          if (dist < 30) {
+            setErrorBusqueda('La ubicación inicial no puede ser idéntica a la ubicación de destino en el mapa.')
+            return
+          }
+        }
+      }
+
+      aplicarResultadoInicio(geo, direccion)
+
+      if (!geo.esAproximado) {
+        setAvisoBusqueda('✓ Ubicación de inicio localizada con precisión en el mapa.')
+      } else {
+        setAvisoBusqueda(
+          `📍 Ubicación de inicio aproximada en "${geo.display}". Haz clic en el mapa o arrastra el marcador para afinar el punto exacto.`
+        )
+      }
+
+      const mapa = instanciaMapaRef.current
+      const L = leafletRef.current
+      if (mapa && L) {
+        if (marcadorFinRef.current) {
+          mapa.fitBounds(
+            L.latLngBounds([
+              [geo.lat, geo.lng],
+              marcadorFinRef.current.getLatLng()
+            ]),
+            { padding: [50, 50] }
+          )
+        } else {
+          mapa.setView([geo.lat, geo.lng], geo.esAproximado ? 14 : 16)
+        }
+      }
+    } catch {
+      setErrorBusqueda('No se pudo realizar la búsqueda de dirección. Verifica la conexión a internet.')
     } finally {
       setBuscandoDireccion(false)
     }
   }
 
+  const buscarDireccionFinalTexto = async () => {
+    if (!direccionFin.trim()) return
+    if (sonDireccionesIdenticas) {
+      setErrorBusqueda('La ubicación de destino no puede ser idéntica a la ubicación inicial.')
+      return
+    }
+
+    // Si ambas direcciones están establecidas y falta mostrar alguna en el mapa, buscar ambas
+    if (direccion.trim() && direccionFin.trim() && (!marcadorRef.current || !marcadorFinRef.current)) {
+      await buscarAmbasDirecciones()
+      return
+    }
+
+    ultimaDireccionFinalBuscadaRef.current = direccionFin.trim()
+    try {
+      setBuscandoDireccionFinal(true)
+      setErrorBusqueda(null)
+      setAvisoBusqueda(null)
+
+      const geo = await geocodificarDireccion(direccionFin)
+      if (!geo) {
+        setErrorBusqueda('No se encontró la dirección final en el mapa. Intenta ingresar una zona o municipio.')
+        return
+      }
+
+      if (marcadorRef.current) {
+        const L = leafletRef.current
+        if (L) {
+          const dist = L.latLng(geo.lat, geo.lng).distanceTo(marcadorRef.current.getLatLng())
+          if (dist < 30) {
+            setErrorBusqueda('La ubicación final (destino) no puede ser idéntica a la ubicación inicial en el mapa.')
+            return
+          }
+        }
+      }
+
+      aplicarResultadoFin(geo, direccionFin)
+
+      if (!geo.esAproximado) {
+        setAvisoBusqueda('✓ Ubicación final (destino) localizada con precisión en el mapa.')
+      } else {
+        setAvisoBusqueda(
+          `📍 Ubicación final aproximada en "${geo.display}". Puedes arrastrar el marcador para afinar el punto exacto.`
+        )
+      }
+
+      const mapa = instanciaMapaRef.current
+      const L = leafletRef.current
+      if (mapa && L) {
+        if (marcadorRef.current) {
+          mapa.fitBounds(
+            L.latLngBounds([
+              marcadorRef.current.getLatLng(),
+              [geo.lat, geo.lng]
+            ]),
+            { padding: [50, 50] }
+          )
+        } else {
+          mapa.setView([geo.lat, geo.lng], geo.esAproximado ? 14 : 16)
+        }
+      }
+    } catch {
+      setErrorBusqueda('No se pudo realizar la búsqueda de la dirección final')
+    } finally {
+      setBuscandoDireccionFinal(false)
+    }
+  }
+
   const distanciaTramoKm = useMemo(() => {
-    const kIni = parseFloat(kilometroInicio || '0')
-    const kFin = parseFloat(kilometroFin || '0')
+    const kIni = parseKilometroNumber(kilometroInicio)
+    const kFin = parseKilometroNumber(kilometroFin)
     if (!isNaN(kIni) && !isNaN(kFin) && kFin > kIni) {
       return kFin - kIni
     }
     return 0
   }, [kilometroInicio, kilometroFin])
+
+  useEffect(() => {
+    const kIni = parseKilometroNumber(kilometroInicio)
+    const kFin = parseKilometroNumber(kilometroFin)
+    const direccionFinalActual = direccionFin.trim()
+    if (
+      !mapaListo ||
+      !direccionFinalActual ||
+      !kilometroInicio.trim() ||
+      !kilometroFin.trim() ||
+      !Number.isFinite(kIni) ||
+      !Number.isFinite(kFin) ||
+      kFin <= kIni ||
+      buscandoDireccionFinal ||
+      ultimaDireccionFinalBuscadaRef.current === direccionFinalActual ||
+      sonDireccionesIdenticas
+    ) {
+      return
+    }
+
+    const temporizador = window.setTimeout(() => {
+      void buscarDireccionFinalTexto()
+    }, 600)
+
+    return () => window.clearTimeout(temporizador)
+  }, [direccionFin, kilometroInicio, kilometroFin, mapaListo, buscandoDireccionFinal, sonDireccionesIdenticas])
 
   useEffect(() => {
     let activo = true
@@ -547,6 +1245,7 @@ function SelectorMapaInteractivo({
 
       const L = await import('leaflet')
       if (!activo || !mapaRef.current) return
+      leafletRef.current = L
 
       // Re-verify in case of race condition during async import
       if ((mapaRef.current as any)._leaflet_id) {
@@ -564,9 +1263,12 @@ function SelectorMapaInteractivo({
         [18.2, -87.8]
       ]
 
+      const centerLat = coordenadas?.lat ?? 14.6349
+      const centerLng = coordenadas?.lng ?? -90.5069
+
       const mapa = L.map(mapaRef.current, {
-        center: [coordenadas.lat, coordenadas.lng],
-        zoom: 13,
+        center: [centerLat, centerLng],
+        zoom: coordenadas ? 13 : 8,
         minZoom: 7,
         maxZoom: 19,
         maxBounds: guatemalaBounds,
@@ -578,27 +1280,16 @@ function SelectorMapaInteractivo({
         maxZoom: 19,
       }).addTo(mapa)
 
-      const outlinePinIcon = L.divIcon({
-        className: 'custom-map-pin',
-        html: `<svg width="26" height="34" viewBox="0 0 24 32" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));">
-          <path d="M12 1C5.925 1 1 5.925 1 12C1 20.25 12 31 12 31C12 31 23 20.25 23 12C23 5.925 18.075 1 12 1Z" fill="#FFFFFF" stroke="#9B0F06" stroke-width="2"/>
-          <circle cx="12" cy="11" r="4" fill="#9B0F06"/>
-        </svg>`,
-        iconSize: [26, 34],
-        iconAnchor: [13, 34],
-      })
+      if (coordenadas?.lat && coordenadas?.lng) {
+        asegurarMarcadorInicio(L, mapa, coordenadas.lat, coordenadas.lng, direccion || 'Punto de Inicio')
+      }
 
-      const marcador = L.marker([coordenadas.lat, coordenadas.lng], { draggable: true, icon: outlinePinIcon }).addTo(mapa)
-      marcador.bindPopup(`<b>Punto de Inicio:</b><br/>${direccion || 'Punto de Inicio'}`)
-      marcador.on('dragend', () => {
-        const posicion = marcador.getLatLng()
-        void actualizarDireccionDesdeCoordenadas(
-          Number(posicion.lat.toFixed(6)),
-          Number(posicion.lng.toFixed(6))
-        )
-      })
       mapa.on('click', (evento: any) => {
-        marcador.setLatLng(evento.latlng)
+        if (!marcadorRef.current) {
+          asegurarMarcadorInicio(L, mapa, Number(evento.latlng.lat.toFixed(6)), Number(evento.latlng.lng.toFixed(6)), direccion || 'Punto de Inicio')
+        } else {
+          marcadorRef.current.setLatLng(evento.latlng)
+        }
         void actualizarDireccionDesdeCoordenadas(
           Number(evento.latlng.lat.toFixed(6)),
           Number(evento.latlng.lng.toFixed(6))
@@ -606,11 +1297,13 @@ function SelectorMapaInteractivo({
       })
 
       instanciaMapaRef.current = mapa
-      marcadorRef.current = marcador
       setMapaListo(true)
       setTimeout(() => {
         try { mapa.invalidateSize() } catch (e) {}
       }, 100)
+      setTimeout(() => {
+        try { mapa.invalidateSize() } catch (e) {}
+      }, 350)
     }
 
     void inicializarMapa()
@@ -627,19 +1320,35 @@ function SelectorMapaInteractivo({
   }, [])
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2.5 font-[Poppins]">
       <div>
-        <label className={labelClass}>
-          Dirección Inicial / Origen (Texto Corto) <span className="text-[#9B0F06]">*</span>
-        </label>
+        <div className="flex items-center justify-between mb-0.5">
+          <label className={labelClass}>
+            Dirección Inicial / Origen (Texto Corto) <span className="text-[#9B0F06]">*</span>
+          </label>
+        </div>
         <div className="flex gap-1.5">
           <input
             type="text"
             value={direccion}
             onChange={(e) => {
-              setDireccion(e.target.value)
-              if (setUbicacionFisica) setUbicacionFisica(e.target.value)
+              const val = e.target.value
+              setDireccion(val)
+              if (setUbicacionFisica) setUbicacionFisica(val)
               setErrors((prev: any) => ({ ...prev, direccion: false }))
+              setErrorBusqueda(null)
+              setAvisoBusqueda(null)
+              if (val.trim() && direccionFin.trim() && normalizarTexto(val) === normalizarTexto(direccionFin)) {
+                setErrorBusqueda('La ubicación de destino no puede ser idéntica a la ubicación inicial.')
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                if (!buscandoDireccion && !buscandoDireccionFinal && direccion.trim() && !sonDireccionesIdenticas) {
+                  void buscarDireccionTexto()
+                }
+              }
             }}
             className={errorInputClass(errors, 'direccion')}
             placeholder="Ej: Km 22.5 Carretera al Pacífico CA-9 Sur, Villa Nueva"
@@ -647,48 +1356,121 @@ function SelectorMapaInteractivo({
           <button
             type="button"
             onClick={buscarDireccionTexto}
-            disabled={buscandoDireccion}
-            className="rounded bg-[#9B0F06] px-3.5 py-1 text-[11px] font-bold text-white hover:bg-[#7a0c05] transition-colors shrink-0 flex items-center gap-1 shadow-2xs cursor-pointer"
+            disabled={buscandoDireccion || buscandoDireccionFinal || !direccion.trim() || sonDireccionesIdenticas}
+            className="rounded bg-[#E06D53] px-3.5 py-1 text-[10px] md:text-[11px] font-bold text-white hover:bg-[#c95941] disabled:cursor-not-allowed disabled:opacity-50 transition-colors shrink-0 flex items-center gap-1 shadow-2xs cursor-pointer font-[Poppins]"
           >
-            {buscandoDireccion ? 'Buscando...' : 'Buscar'}
+            {buscandoDireccion ? (
+              <>
+                <Loader2 size={12} className="animate-spin" />
+                <span>Buscando...</span>
+              </>
+            ) : (
+              'Buscar'
+            )}
           </button>
         </div>
-        <p className="mt-0.5 text-[8.5px] text-gray-400">
-          Al presionar Buscar o marcar un punto en el mapa, se actualizará la ubicación y se autoseleccionará el Departamento y Municipio.
+        <p className="mt-0.5 text-[8.5px] text-gray-400 font-[Poppins]">
+          Al presionar Buscar o marcar un punto en el mapa, se ubicará el punto y se autoseleccionará el Departamento y Municipio de Origen.
         </p>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-gray-200 bg-gray-50">
-        <div className="flex items-center justify-between border-b border-gray-200 bg-gray-100/70 px-2.5 py-1 text-[9.5px]">
-          <span className="font-extrabold text-gray-700 uppercase">Mapa OpenStreetMap (Punto Exacto y Ruta)</span>
-          <div className="flex items-center gap-1">
-            <span className="text-gray-400">Ubicaciones Frecuentes:</span>
-            {['Km 22.5 CA-9 Sur', 'Blvd. Vista Hermosa', 'Calzada Roosevelt', 'Ruta a El Salvador'].map((item) => (
-              <button
-                key={item}
-                type="button"
-                onClick={() => {
-                  setDireccion(item)
-                  if (setUbicacionFisica) setUbicacionFisica(item)
-                }}
-                className="rounded bg-white px-1.5 py-0.5 text-[8.5px] font-bold text-gray-600 border border-gray-200 hover:text-[#9B0F06] hover:border-red-200 transition-colors"
-              >
-                {item}
-              </button>
-            ))}
+      <div>
+        <div className="flex items-center justify-between mb-0.5">
+          <label className={labelClass}>
+            Dirección Final / Destino (Texto Corto)
+          </label>
+        </div>
+        <div className="flex gap-1.5">
+          <input
+            type="text"
+            maxLength={250}
+            value={direccionFin}
+            onChange={(e) => {
+              const val = e.target.value.slice(0, 250)
+              setDireccionFin(val)
+              setErrorBusqueda(null)
+              setAvisoBusqueda(null)
+              if (val.trim() && direccion.trim() && normalizarTexto(val) === normalizarTexto(direccion)) {
+                setErrorBusqueda('La ubicación de destino no puede ser idéntica a la ubicación inicial.')
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                if (!buscandoDireccion && !buscandoDireccionFinal && direccionFin.trim() && !sonDireccionesIdenticas) {
+                  void buscarDireccionFinalTexto()
+                }
+              }
+            }}
+            className={inputClass}
+            placeholder="Ej: Plan Grande, Palencia, Departamento de Guatemala"
+          />
+          <button
+            type="button"
+            onClick={buscarDireccionFinalTexto}
+            disabled={buscandoDireccion || buscandoDireccionFinal || !direccionFin.trim() || sonDireccionesIdenticas}
+            className="rounded bg-[#9B0F06] px-3.5 py-1 text-[10px] md:text-[11px] font-bold text-white hover:bg-[#7a0c05] disabled:cursor-not-allowed disabled:opacity-50 transition-colors shrink-0 flex items-center gap-1 shadow-2xs cursor-pointer font-[Poppins]"
+          >
+            {buscandoDireccionFinal ? (
+              <>
+                <Loader2 size={12} className="animate-spin" />
+                <span>Buscando...</span>
+              </>
+            ) : (
+              'Buscar'
+            )}
+          </button>
+        </div>
+        <p className="mt-0.5 text-[8.5px] text-gray-400 font-[Poppins]">
+          Al presionar Buscar o arrastrar el marcador en el mapa, se actualizará el destino y se autoseleccionará el Departamento y Municipio Final.
+        </p>
+        {(errorBusqueda || (sonDireccionesIdenticas ? 'La ubicación de destino no puede ser idéntica a la ubicación inicial.' : null)) && (
+          <div className="mt-1 flex items-center gap-1.5 rounded-md border border-red-200 bg-red-50/90 px-2.5 py-1.5 text-[9.5px] font-medium text-red-700 font-[Poppins]">
+            <AlertCircle size={13} className="shrink-0 text-red-500" />
+            <span>{errorBusqueda || 'La ubicación de destino no puede ser idéntica a la ubicación inicial.'}</span>
+          </div>
+        )}
+        {avisoBusqueda && !sonDireccionesIdenticas && (
+          <div className="mt-1 flex items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50/90 px-2.5 py-1.5 text-[9.5px] font-medium text-amber-800 font-[Poppins]">
+            <Info size={13} className="shrink-0 text-amber-600" />
+            <span>{avisoBusqueda}</span>
+          </div>
+        )}
+      </div>
+
+      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xs">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 bg-gray-50/90 px-3 py-1.5 text-[9.5px] font-[Poppins]">
+          <div className="flex items-center gap-1.5 font-bold text-gray-700 uppercase tracking-wide">
+            <MapPin size={13} className="text-[#9B0F06]" />
+            <span>Mapa OpenStreetMap (Puntos de Tramo y Ruta)</span>
+          </div>
+          <div className="flex items-center gap-3 text-[9px] font-medium">
+            <span className="inline-flex items-center gap-1 text-gray-700">
+              <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-[#E06D53] text-white text-[8px] font-black">A</span>
+              <span className="font-bold text-[#E06D53]">Punto Inicio</span> (Mover/Arrastrar)
+            </span>
+            <span className="text-gray-300">|</span>
+            <span className="inline-flex items-center gap-1 text-gray-700">
+              <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-[#9B0F06] text-white text-[8px] font-black">B</span>
+              <span className="font-bold text-[#9B0F06]">Punto Destino</span> (Mover/Arrastrar)
+            </span>
           </div>
         </div>
 
-        <div ref={mapaRef} className="h-44 w-full" />
+        <div ref={mapaRef} className="h-[360px] sm:h-[420px] w-full z-0" />
 
-        <div className="flex items-center justify-between border-t border-gray-200 bg-white px-2.5 py-1 text-[9.5px] text-gray-500 font-medium">
+        <div className="flex flex-wrap items-center justify-between gap-1 border-t border-gray-200 bg-gray-50/60 px-3 py-1.5 text-[9px] md:text-[10px] text-gray-600 font-medium font-[Poppins]">
           <div className="flex items-center gap-2">
             <span>Distancia del Tramo:</span>
             <span className="font-bold text-[#9B0F06]">
               {distanciaTramoKm > 0 ? `${distanciaTramoKm.toFixed(1)} km (${(distanciaTramoKm * 1000).toLocaleString('es-GT')} m)` : 'No calculada'}
             </span>
           </div>
-          <span>Lat: {coordenadas.lat}° | Lng: {coordenadas.lng}°</span>
+          <span className="font-mono text-gray-500 text-[8.5px] md:text-[9.5px]">
+            {coordenadas?.lat != null && coordenadas?.lng != null
+              ? `Lat: ${Number(coordenadas.lat).toFixed(6)}° | Lng: ${Number(coordenadas.lng).toFixed(6)}°`
+              : 'Coordenadas: No fijadas (haz clic en el mapa)'}
+          </span>
         </div>
       </div>
     </div>
@@ -699,28 +1481,73 @@ function SelectorMapaInteractivo({
 let catalogoCacheGlobal: {
   entidades?: any[]
   contratistas?: any[]
+  supervisoras?: any[]
   departamentos?: any[]
   municipios?: any[]
-} | null = null
+} = {}
 
-let catalogoPromiseGlobal: Promise<any> | null = null
+let ubicacionPromiseGlobal: Promise<any> | null = null
+let empresasPromiseGlobal: Promise<any> | null = null
 
-function cargarCatalogosGlobal() {
-  if (catalogoCacheGlobal) return Promise.resolve(catalogoCacheGlobal)
-  if (!catalogoPromiseGlobal) {
-    catalogoPromiseGlobal = Promise.all([
-      apiGetDeduplicado('/entidades-contratantes').then((r) => r.data?.data || []).catch(() => []),
-      apiGetDeduplicado('/empresas-contratistas').then((r) => r.data?.data || []).catch(() => []),
-      apiGetDeduplicado('/mantenimiento/departamento?limite=500').then((r) => r.data?.data || []).catch(() => []),
-      apiGetDeduplicado('/mantenimiento/municipio?limite=500').then((r) => r.data?.data || []).catch(() => []),
-    ]).then(([entidades, contratistas, departamentos, municipios]) => {
-      catalogoCacheGlobal = { entidades, contratistas, departamentos, municipios }
-      return catalogoCacheGlobal
-    }).finally(() => {
-      catalogoPromiseGlobal = null
+function cargarUbicacionGlobal() {
+  if (catalogoCacheGlobal.departamentos && catalogoCacheGlobal.municipios) {
+    return Promise.resolve({
+      departamentos: catalogoCacheGlobal.departamentos,
+      municipios: catalogoCacheGlobal.municipios,
     })
   }
-  return catalogoPromiseGlobal
+  if (!ubicacionPromiseGlobal) {
+    ubicacionPromiseGlobal = Promise.all([
+      apiGetDeduplicado('/mantenimiento/departamento?limite=500').then((r) => r.data?.data || []).catch(() => []),
+      apiGetDeduplicado('/mantenimiento/municipio?limite=500').then((r) => r.data?.data || []).catch(() => []),
+    ]).then(([departamentos, municipios]) => {
+      catalogoCacheGlobal.departamentos = departamentos
+      catalogoCacheGlobal.municipios = municipios
+      return { departamentos, municipios }
+    }).finally(() => {
+      ubicacionPromiseGlobal = null
+    })
+  }
+  return ubicacionPromiseGlobal
+}
+
+function cargarEmpresasGlobal() {
+  if (catalogoCacheGlobal.entidades && catalogoCacheGlobal.contratistas && catalogoCacheGlobal.supervisoras) {
+    return Promise.resolve({
+      entidades: catalogoCacheGlobal.entidades,
+      contratistas: catalogoCacheGlobal.contratistas,
+      supervisoras: catalogoCacheGlobal.supervisoras,
+    })
+  }
+  if (!empresasPromiseGlobal) {
+    empresasPromiseGlobal = Promise.all([
+      apiGetDeduplicado('/entidades-contratantes').then((r) => r.data?.data || []).catch(() => []),
+      apiGetDeduplicado('/empresas-contratistas').then((r) => r.data?.data || []).catch(() => []),
+      apiGetDeduplicado('/empresas').then((r) => r.data?.data || []).catch(() => []),
+    ]).then(([entidades, contratistas, empresasExternas]) => {
+      const todasEmpresas = [
+        ...(Array.isArray(contratistas) ? contratistas : []),
+        ...(Array.isArray(empresasExternas) ? empresasExternas : []),
+      ]
+
+      const supMap = new Map<string, any>()
+      for (const e of todasEmpresas) {
+        const nom = (e.nombre || e.razon_social || '').trim()
+        if (nom && !supMap.has(nom.toLowerCase())) {
+          supMap.set(nom.toLowerCase(), e)
+        }
+      }
+      const supervisoras = Array.from(supMap.values())
+
+      catalogoCacheGlobal.entidades = entidades
+      catalogoCacheGlobal.contratistas = contratistas
+      catalogoCacheGlobal.supervisoras = supervisoras
+      return { entidades, contratistas, supervisoras }
+    }).finally(() => {
+      empresasPromiseGlobal = null
+    })
+  }
+  return empresasPromiseGlobal
 }
 
 export function ProyectoFormulario({
@@ -738,6 +1565,13 @@ export function ProyectoFormulario({
   const [pasoActual, setPasoActual] = useState<1 | 2 | 3 | 4 | 5 | 6>(1)
   const [errors, setErrors] = useState<Record<string, boolean>>({})
   const [errorMessages, setErrorMessages] = useState<Record<string, string>>({})
+  const contenidoScrollRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    if (contenidoScrollRef.current) {
+      contenidoScrollRef.current.scrollTop = 0
+    }
+  }, [pasoActual])
 
   const setFieldError = (field: string, message: string | null) => {
     setErrors((prev) => ({ ...prev, [field]: Boolean(message) }))
@@ -766,22 +1600,55 @@ export function ProyectoFormulario({
   const { usuarios: usuariosDisponibles, cargarUsuarios } = useUsuariosStore()
   const [entidadesContratantes, setEntidadesContratantes] = useState<any[]>(() => catalogoCacheGlobal?.entidades || [])
   const [empresasContratistas, setEmpresasContratistas] = useState<any[]>(() => catalogoCacheGlobal?.contratistas || [])
+  const [empresasSupervisoras, setEmpresasSupervisoras] = useState<any[]>(() => catalogoCacheGlobal?.supervisoras || [])
   const [departamentos, setDepartamentos] = useState<any[]>(() => catalogoCacheGlobal?.departamentos || [])
   const [municipios, setMunicipios] = useState<any[]>(() => catalogoCacheGlobal?.municipios || [])
 
   // Drawers de creación rápida
   const [openCrearUsuarioDrawer, setOpenCrearUsuarioDrawer] = useState(false)
+  const [openCrearUsuarioContratistaDrawer, setOpenCrearUsuarioContratistaDrawer] = useState(false)
+  const [openCrearUsuarioSupervisoraDrawer, setOpenCrearUsuarioSupervisoraDrawer] = useState(false)
   const [openCrearDelegadoDrawer, setOpenCrearDelegadoDrawer] = useState(false)
   const [openCrearIngenieroDrawer, setOpenCrearIngenieroDrawer] = useState(false)
   const [reloadDelegadosTrigger, setReloadDelegadosTrigger] = useState(0)
   const [reloadIngenierosTrigger, setReloadIngenierosTrigger] = useState(0)
-  const [openCrearEntidadDrawer, setOpenCrearEntidadDrawer] = useState(false)
-  const [openCrearContratistaDrawer, setOpenCrearContratistaDrawer] = useState(false)
+
+  const [drawerContextoUsuario, setDrawerContextoUsuario] = useState<
+    'contratista_propietario' | 'contratista_superintendente' | 'supervisora_propietario' | 'supervisora_responsable' | null
+  >(null)
+  const [usuariosLocalesPorEmpresa, setUsuariosLocalesPorEmpresa] = useState<
+    Array<{
+      empresaNorm: string
+      usuario: any
+      nombre: string
+      cargo: string
+    }>
+  >([])
+
+  const registrarUsuarioEnEmpresa = (nombreEmpresa: string, u: any) => {
+    const norm = (nombreEmpresa || '').toLowerCase().trim()
+    const nom = u.nombre || `${u.primer_nombre || ''} ${u.primer_apellido || ''}`.trim() || u.username || ''
+    const cargo = u.cargo || u.rol || 'Representante'
+    if (!nom || !norm) return
+
+    setUsuariosLocalesPorEmpresa((prev) => [
+      ...prev.filter(
+        (item) =>
+          !(item.empresaNorm === norm && (item.nombre.toLowerCase() === nom.toLowerCase() || (u.id && item.usuario?.id === u.id)))
+      ),
+      {
+        empresaNorm: norm,
+        usuario: u,
+        nombre: nom,
+        cargo,
+      },
+    ])
+  }
 
   // -------------------------------------------------------------
   // PASO 1: Identificación y Alcance
   // -------------------------------------------------------------
-  const [codigo, setCodigo] = useState(proyectoInicial?.codigo || siguienteCodigoVial())
+  const codigo = proyectoInicial?.codigo || ''
   const [nombreOficial, setNombreOficial] = useState(proyectoInicial?.nombreOficial || proyectoInicial?.nombre || '')
   const [nombre, setNombre] = useState(proyectoInicial?.nombre || '')
   const [descripcion, setDescripcion] = useState(proyectoInicial?.descripcion || '')
@@ -801,43 +1668,59 @@ export function ProyectoFormulario({
   const [municipioFinId, setMunicipioFinId] = useState((proyectoInicial as any)?.municipioFinId || (proyectoInicial as any)?.municipio_fin_id || '')
   const [kilometroFin, setKilometroFin] = useState(String((proyectoInicial as any)?.kilometroFin ?? (proyectoInicial as any)?.kilometro_fin ?? ''))
   const [coordenadasMapa, setCoordenadasMapa] = useState<any>(
-    proyectoInicial?.coordenadasMapa || { lat: 14.6349, lng: -90.5069, puntoTexto: 'Guatemala' }
+    proyectoInicial?.coordenadasMapa ||
+    (proyectoInicial?.latitud && proyectoInicial?.longitud
+      ? { lat: Number(proyectoInicial.latitud), lng: Number(proyectoInicial.longitud), puntoTexto: proyectoInicial.direccion || 'Ubicación' }
+      : null)
   )
 
   // -------------------------------------------------------------
   // PASO 3: Marco Legal y Empresas Participantes
   // -------------------------------------------------------------
   // 3.1 Contrato de Ejecución (Obra)
-  const [empresaContratista, setEmpresaContratista] = useState(proyectoInicial?.empresaContratista || (proyectoInicial as any)?.empresa_contratista || '')
+  const [empresaContratista, setEmpresaContratista] = useState(
+    proyectoInicial?.empresaContratista ||
+    proyectoInicial?.contratoEjecucion?.empresaNombre ||
+    (proyectoInicial as any)?.empresa_contratista ||
+    ''
+  )
   const [empresaContratistaId, setEmpresaContratistaId] = useState((proyectoInicial as any)?.empresaContratistaId || (proyectoInicial as any)?.empresa_contratista_id || '')
-  const [contratistaPropietario, setContratistaPropietario] = useState(proyectoInicial?.contratoEjecucion?.propietario || '')
-  const [contratistaRegistroMercantil, setContratistaRegistroMercantil] = useState(proyectoInicial?.contratoEjecucion?.registroMercantil || '')
-  const [contratistaDireccion, setContratistaDireccion] = useState(proyectoInicial?.contratoEjecucion?.direccion || '')
-  const [contratistaTelefono, setContratistaTelefono] = useState(sanitizeTelefono(proyectoInicial?.contratoEjecucion?.telefono || ''))
-  const [contratistaCorreo, setContratistaCorreo] = useState(proyectoInicial?.contratoEjecucion?.correo || '')
-  const [contratistaSuperintendente, setContratistaSuperintendente] = useState(proyectoInicial?.contratoEjecucion?.responsable || '')
-  const [contratistaLicitacion, setContratistaLicitacion] = useState(proyectoInicial?.contratoEjecucion?.licitacionNumero || '')
+  const [contratistaPropietario, setContratistaPropietario] = useState(proyectoInicial?.contratoEjecucion?.propietario || (proyectoInicial as any)?.propietarioContratista || '')
+  const [contratistaRegistroMercantil, setContratistaRegistroMercantil] = useState(proyectoInicial?.contratoEjecucion?.registroMercantil || (proyectoInicial as any)?.registroMercantilContratista || '')
+  const [contratistaDireccion, setContratistaDireccion] = useState(proyectoInicial?.contratoEjecucion?.direccion || (proyectoInicial as any)?.direccionContratista || '')
+  const [contratistaTelefono, setContratistaTelefono] = useState(sanitizeTelefono(proyectoInicial?.contratoEjecucion?.telefono || (proyectoInicial as any)?.telefonoContratista || '', 8))
+  const [contratistaCorreo, setContratistaCorreo] = useState(proyectoInicial?.contratoEjecucion?.correo || (proyectoInicial as any)?.correoContratista || '')
+  const [contratistaSuperintendente, setContratistaSuperintendente] = useState(proyectoInicial?.contratoEjecucion?.responsable || (proyectoInicial as any)?.superintendente || '')
+  const [contratistaLicitacion, setContratistaLicitacion] = useState(proyectoInicial?.contratoEjecucion?.licitacionNumero || (proyectoInicial as any)?.licitacionEjecutora || '')
   
   const parsedActaEjec = parseActaString(proyectoInicial?.contratoEjecucion?.actaInicioNumero || (proyectoInicial as any)?.actaInicioEjecutora || '')
   const [contratistaActaNumero, setContratistaActaNumero] = useState(parsedActaEjec.numero)
   const [contratistaActaFecha, setContratistaActaFecha] = useState(parsedActaEjec.fecha)
-  const [contratistaActaInicio, setContratistaActaInicio] = useState(proyectoInicial?.contratoEjecucion?.actaInicioNumero || '')
+  const [contratistaActaInicio, setContratistaActaInicio] = useState(proyectoInicial?.contratoEjecucion?.actaInicioNumero || (proyectoInicial as any)?.actaInicioEjecutora || '')
 
   // 3.2 Contrato de Supervisión
-  const [empresaSupervisora, setEmpresaSupervisora] = useState(proyectoInicial?.empresaSupervisora || (proyectoInicial as any)?.empresa_supervisora || '')
+  const [empresaSupervisora, setEmpresaSupervisora] = useState(
+    proyectoInicial?.empresaSupervisora ||
+    proyectoInicial?.contratoSupervision?.empresaNombre ||
+    (proyectoInicial as any)?.empresa_supervisora ||
+    ''
+  )
   const [empresaSupervisoraId, setEmpresaSupervisoraId] = useState((proyectoInicial as any)?.empresaSupervisoraId || (proyectoInicial as any)?.empresa_supervisora_id || '')
-  const [supervisoraPropietario, setSupervisoraPropietario] = useState(proyectoInicial?.contratoSupervision?.propietario || '')
-  const [supervisoraRegistroMercantil, setSupervisoraRegistroMercantil] = useState(proyectoInicial?.contratoSupervision?.registroMercantil || '')
-  const [supervisoraDireccion, setSupervisoraDireccion] = useState(proyectoInicial?.contratoSupervision?.direccion || '')
-  const [supervisoraTelefono, setSupervisoraTelefono] = useState(sanitizeTelefono(proyectoInicial?.contratoSupervision?.telefono || ''))
-  const [supervisoraCorreo, setSupervisoraCorreo] = useState(proyectoInicial?.contratoSupervision?.correo || '')
-  const [supervisoraResponsable, setSupervisoraResponsable] = useState(proyectoInicial?.contratoSupervision?.responsable || '')
-  const [supervisoraLicitacion, setSupervisoraLicitacion] = useState(proyectoInicial?.contratoSupervision?.licitacionNumero || '')
+  const [supervisoraPropietario, setSupervisoraPropietario] = useState(proyectoInicial?.contratoSupervision?.propietario || (proyectoInicial as any)?.propietarioSupervisora || '')
+  const [supervisoraRegistroMercantil, setSupervisoraRegistroMercantil] = useState(proyectoInicial?.contratoSupervision?.registroMercantil || (proyectoInicial as any)?.registroMercantilSupervisora || '')
+  const [supervisoraDireccion, setSupervisoraDireccion] = useState(proyectoInicial?.contratoSupervision?.direccion || (proyectoInicial as any)?.direccionSupervisora || '')
+  const [supervisoraTelefono, setSupervisoraTelefono] = useState(sanitizeTelefono(proyectoInicial?.contratoSupervision?.telefono || (proyectoInicial as any)?.telefonoSupervisora || '', 8))
+  const [supervisoraCorreo, setSupervisoraCorreo] = useState(proyectoInicial?.contratoSupervision?.correo || (proyectoInicial as any)?.correoSupervisora || '')
+  const [supervisoraResponsable, setSupervisoraResponsable] = useState(proyectoInicial?.contratoSupervision?.responsable || (proyectoInicial as any)?.responsableSupervisora || (proyectoInicial as any)?.delegadoResidente || '')
+  const [supervisoraLicitacion, setSupervisoraLicitacion] = useState(proyectoInicial?.contratoSupervision?.licitacionNumero || (proyectoInicial as any)?.licitacionSupervisora || '')
   
   const parsedActaSup = parseActaString(proyectoInicial?.contratoSupervision?.actaInicioNumero || (proyectoInicial as any)?.actaInicioSupervisora || '')
   const [supervisoraActaNumero, setSupervisoraActaNumero] = useState(parsedActaSup.numero)
   const [supervisoraActaFecha, setSupervisoraActaFecha] = useState(parsedActaSup.fecha)
-  const [supervisoraActaInicio, setSupervisoraActaInicio] = useState(proyectoInicial?.contratoSupervision?.actaInicioNumero || '')
+  const [supervisoraActaInicio, setSupervisoraActaInicio] = useState(proyectoInicial?.contratoSupervision?.actaInicioNumero || (proyectoInicial as any)?.actaInicioSupervisora || '')
+
+  const contratistaBloqueado = !empresaContratista?.trim()
+  const supervisoraBloqueado = !empresaSupervisora?.trim()
 
   // 3.3 Asignaciones de Personal
   const [delegadoResidenteId, setDelegadoResidenteId] = useState((proyectoInicial as any)?.delegadoResidenteId || (proyectoInicial as any)?.delegado_residente_id || '')
@@ -849,42 +1732,83 @@ export function ProyectoFormulario({
   // PASO 4: Ficha Técnica y Partidas Presupuestarias
   // -------------------------------------------------------------
   // 4.1 Ficha Técnica de Ejecución (Obra)
-  const [contratistaPrograma, setContratistaPrograma] = useState(proyectoInicial?.contratoEjecucion?.programa || 'TRANSPORTE POR CARRETERA')
-  const [contratistaSubprograma, setContratistaSubprograma] = useState(proyectoInicial?.contratoEjecucion?.subprograma || 'MEJORAMIENTO DE CARRETERAS SECUNDARIAS Y PUENTES')
-  const [contratistaFuenteFinanciamiento, setContratistaFuenteFinanciamiento] = useState(proyectoInicial?.contratoEjecucion?.fuenteFinanciamiento || 'Fondos nacionales')
-  const [contratistaPartidaFondos, setContratistaPartidaFondos] = useState(proyectoInicial?.contratoEjecucion?.partidaFondos || '')
-  const [contratistaCdp, setContratistaCdp] = useState(proyectoInicial?.contratoEjecucion?.cdp || '')
-  const [contratistaContratoNumero, setContratistaContratoNumero] = useState(proyectoInicial?.contratoEjecucion?.contratoNumero || '')
-  const [contratistaAcuerdoMinisterial, setContratistaAcuerdoMinisterial] = useState(proyectoInicial?.contratoEjecucion?.acuerdoMinisterial || '')
-  const [montoContractualOriginal, setMontoContractualOriginal] = useState(
-    proyectoInicial?.montoContractualOriginal?.toString() || proyectoInicial?.presupuesto?.toString() || (proyectoInicial as any)?.monto_original?.toString() || ''
-  )
+  const [contratistaPrograma, setContratistaPrograma] = useState(proyectoInicial?.contratoEjecucion?.programa || (proyectoInicial as any)?.programaObra || '')
+  const [contratistaSubprograma, setContratistaSubprograma] = useState(proyectoInicial?.contratoEjecucion?.subprograma || (proyectoInicial as any)?.subprogramaObra || '')
+  const [contratistaFuenteFinanciamiento, setContratistaFuenteFinanciamiento] = useState(proyectoInicial?.contratoEjecucion?.fuenteFinanciamiento || (proyectoInicial as any)?.fuenteFinanciamientoObra || '')
+  const [contratistaPartidaFondos, setContratistaPartidaFondos] = useState(proyectoInicial?.contratoEjecucion?.partidaFondos || (proyectoInicial as any)?.partidaFondosObra || '')
+  const [contratistaCdp, setContratistaCdp] = useState(proyectoInicial?.contratoEjecucion?.cdp || (proyectoInicial as any)?.cdpObra || '')
+  const [contratistaContratoNumero, setContratistaContratoNumero] = useState(proyectoInicial?.contratoEjecucion?.contratoNumero || (proyectoInicial as any)?.numeroContratoOriginal || '')
+  const [contratistaAcuerdoMinisterial, setContratistaAcuerdoMinisterial] = useState(proyectoInicial?.contratoEjecucion?.acuerdoMinisterial || (proyectoInicial as any)?.acuerdoMinisterialOriginal || '')
+  const [montoContractualOriginal, setMontoContractualOriginal] = useState(() => {
+    const raw = proyectoInicial?.montoContractualOriginal ?? proyectoInicial?.presupuesto ?? (proyectoInicial as any)?.monto_original
+    if (raw !== undefined && raw !== null && raw !== '') {
+      const num = parseMontoNumber(raw)
+      return num > 0 ? num.toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : String(raw)
+    }
+    return ''
+  })
   const [contratistaPorcentajeAnticipo, setContratistaPorcentajeAnticipo] = useState<string>(
-    proyectoInicial?.contratoEjecucion?.porcentajeAnticipo?.toString() || '15'
+    proyectoInicial?.contratoEjecucion?.porcentajeAnticipo?.toString() || (proyectoInicial as any)?.porcentajeAnticipoObra?.toString() || ''
   )
-  const [contratistaMesesPlazo, setContratistaMesesPlazo] = useState(proyectoInicial?.contratoEjecucion?.plazoMesesDetalle || '')
+  const [contratistaMesesPlazo, setContratistaMesesPlazo] = useState(proyectoInicial?.contratoEjecucion?.plazoMesesDetalle || (proyectoInicial as any)?.mesesContratadosObra || '')
   const [fechaAdjudicacion, setFechaAdjudicacion] = useState(proyectoInicial?.fechaAdjudicacion || (proyectoInicial as any)?.fecha_adjudicacion || '')
   const [numeroEscrituraPublica, setNumeroEscrituraPublica] = useState(proyectoInicial?.numeroEscrituraPublica || (proyectoInicial as any)?.numero_escritura_publica || '')
   const [fechaInicioContractual, setFechaInicioContractual] = useState(proyectoInicial?.fechaInicioContractual || proyectoInicial?.fechaInicio || (proyectoInicial as any)?.fecha_inicio || '')
   const [fechaFinContractualPlan, setFechaFinContractualPlan] = useState(proyectoInicial?.fechaFinContractualPlan || proyectoInicial?.fechaFin || (proyectoInicial as any)?.fecha_fin || '')
 
   // 4.2 Ficha Técnica de Supervisión
-  const [supervisoraPrograma, setSupervisoraPrograma] = useState(proyectoInicial?.contratoSupervision?.programa || 'TRANSPORTE POR CARRETERA')
-  const [supervisoraSubprograma, setSupervisoraSubprograma] = useState(proyectoInicial?.contratoSupervision?.subprograma || 'MEJORAMIENTO DE CARRETERAS SECUNDARIAS Y PUENTES')
-  const [supervisoraFuenteFinanciamiento, setSupervisoraFuenteFinanciamiento] = useState(proyectoInicial?.contratoSupervision?.fuenteFinanciamiento || 'Fondos nacionales')
-  const [supervisoraPartidaFondos, setSupervisoraPartidaFondos] = useState(proyectoInicial?.contratoSupervision?.partidaFondos || '')
-  const [supervisoraCdp, setSupervisoraCdp] = useState(proyectoInicial?.contratoSupervision?.cdp || '')
-  const [supervisoraContratoNumero, setSupervisoraContratoNumero] = useState(proyectoInicial?.contratoSupervision?.contratoNumero || '')
-  const [supervisoraAcuerdoMinisterial, setSupervisoraAcuerdoMinisterial] = useState(proyectoInicial?.contratoSupervision?.acuerdoMinisterial || '')
-  const [supervisoraMontoOriginal, setSupervisoraMontoOriginal] = useState<string>(
-    proyectoInicial?.contratoSupervision?.montoOriginal?.toString() || ''
-  )
+  const [supervisoraPrograma, setSupervisoraPrograma] = useState(proyectoInicial?.contratoSupervision?.programa || (proyectoInicial as any)?.programaSupervisora || '')
+  const [supervisoraSubprograma, setSupervisoraSubprograma] = useState(proyectoInicial?.contratoSupervision?.subprograma || (proyectoInicial as any)?.subprogramaSupervisora || '')
+  const [supervisoraFuenteFinanciamiento, setSupervisoraFuenteFinanciamiento] = useState(proyectoInicial?.contratoSupervision?.fuenteFinanciamiento || (proyectoInicial as any)?.fuenteFinanciamientoSupervisora || '')
+  const [supervisoraPartidaFondos, setSupervisoraPartidaFondos] = useState(proyectoInicial?.contratoSupervision?.partidaFondos || (proyectoInicial as any)?.partidaFondosSupervisora || '')
+  const [supervisoraCdp, setSupervisoraCdp] = useState(proyectoInicial?.contratoSupervision?.cdp || (proyectoInicial as any)?.cdpSupervisora || '')
+  const [supervisoraContratoNumero, setSupervisoraContratoNumero] = useState(proyectoInicial?.contratoSupervision?.contratoNumero || (proyectoInicial as any)?.contratoSupervisora || '')
+  const [supervisoraAcuerdoMinisterial, setSupervisoraAcuerdoMinisterial] = useState(proyectoInicial?.contratoSupervision?.acuerdoMinisterial || (proyectoInicial as any)?.acuerdoSupervisora || '')
+  const [supervisoraMontoOriginal, setSupervisoraMontoOriginal] = useState<string>(() => {
+    const raw = proyectoInicial?.contratoSupervision?.montoOriginal ?? (proyectoInicial as any)?.supervisoraMontoOriginal
+    if (raw !== undefined && raw !== null && raw !== '') {
+      const num = parseMontoNumber(raw)
+      return num > 0 ? num.toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : String(raw)
+    }
+    return ''
+  })
   const [supervisoraPorcentajeAnticipo, setSupervisoraPorcentajeAnticipo] = useState<string>(
-    proyectoInicial?.contratoSupervision?.porcentajeAnticipo?.toString() || '10'
+    proyectoInicial?.contratoSupervision?.porcentajeAnticipo?.toString() || (proyectoInicial as any)?.porcentajeAnticipoSupervision?.toString() || ''
   )
-  const [supervisoraFechaInicio, setSupervisoraFechaInicio] = useState(proyectoInicial?.contratoSupervision?.fechaInicio || '')
-  const [supervisoraMesesPlazo, setSupervisoraMesesPlazo] = useState(proyectoInicial?.contratoSupervision?.plazoMesesDetalle || '')
-  const [supervisoraFechaFin, setSupervisoraFechaFin] = useState(proyectoInicial?.contratoSupervision?.fechaFin || '')
+  const [supervisoraFechaInicio, setSupervisoraFechaInicio] = useState(proyectoInicial?.contratoSupervision?.fechaInicio || (proyectoInicial as any)?.fechaInicioSupervisora || '')
+  const [supervisoraMesesPlazo, setSupervisoraMesesPlazo] = useState(proyectoInicial?.contratoSupervision?.plazoMesesDetalle || (proyectoInicial as any)?.mesesContratadosSupervisora || '')
+  const [supervisoraFechaFin, setSupervisoraFechaFin] = useState(proyectoInicial?.contratoSupervision?.fechaFin || (proyectoInicial as any)?.fechaFinSupervisora || '')
+
+  // Auto-cálculo reactivo de Plazo Contractual en Meses (Obra) a partir de fechas
+  useEffect(() => {
+    if (fechaInicioContractual && fechaFinContractualPlan) {
+      const plazo = calcularPlazoEnMeses(fechaInicioContractual, fechaFinContractualPlan)
+      setContratistaMesesPlazo(plazo)
+      // Si las fechas de supervisión están vacías, sincronizarlas con las de obra para conveniencia
+      setSupervisoraFechaInicio((prev) => (!prev ? fechaInicioContractual : prev))
+      setSupervisoraFechaFin((prev) => (!prev ? fechaFinContractualPlan : prev))
+    } else if (!fechaInicioContractual || !fechaFinContractualPlan) {
+      setContratistaMesesPlazo('')
+    }
+  }, [fechaInicioContractual, fechaFinContractualPlan])
+
+  // Auto-cálculo reactivo de Plazo Contractual en Meses (Supervisión) a partir de fechas
+  useEffect(() => {
+    if (supervisoraFechaInicio && supervisoraFechaFin) {
+      const plazo = calcularPlazoEnMeses(supervisoraFechaInicio, supervisoraFechaFin)
+      setSupervisoraMesesPlazo(plazo)
+    } else if (!supervisoraFechaInicio || !supervisoraFechaFin) {
+      setSupervisoraMesesPlazo('')
+    }
+  }, [supervisoraFechaInicio, supervisoraFechaFin])
+
+  // Regla de negocio: Plazo de Supervisión y Obra similares (máximo 1 mes de diferencia)
+  const mesesObraNum = parseNumeroMeses(contratistaMesesPlazo)
+  const mesesSupervisionNum = parseNumeroMeses(supervisoraMesesPlazo)
+  const diferenciaPlazoMeses = (mesesObraNum > 0 && mesesSupervisionNum > 0)
+    ? Math.abs(mesesSupervisionNum - mesesObraNum)
+    : 0
+  const esDiferenciaPlazoInvalida = Boolean(mesesObraNum > 0 && mesesSupervisionNum > 0 && diferenciaPlazoMeses > 1)
 
   // Modalidad de Gestión Financiera: Modo Hoja Sábana vs Modo Manual
   const [modoGestionFinanciera, setModoGestionFinanciera] = useState<'sabana' | 'manual'>(
@@ -892,6 +1816,183 @@ export function ProyectoFormulario({
     (proyectoInicial as any)?.modo_gestion_financiera ||
     ((proyectoInicial as any)?.usarModoSabana === false ? 'manual' : 'sabana')
   )
+
+  // Ámbito del Plan de Trabajo (Modo Sábana): Obra (Ejecución) vs Supervisión
+  const [ambitoPlanTrabajo, setAmbitoPlanTrabajo] = useState<'obra' | 'supervision'>(
+    (proyectoInicial as any)?.ambitoPlanTrabajo ||
+    (proyectoInicial as any)?.ambito_plan_trabajo ||
+    'obra'
+  )
+
+  // Monto Calculado por el Plan de Trabajo / Hoja Sábana (Separado del Monto Original Contractual)
+  const [montoPlanTrabajo, setMontoPlanTrabajo] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const p = new URLSearchParams(window.location.search).get('monto')
+      if (p) return p
+      if (proyectoInicial?.id) {
+        const stored = localStorage.getItem('proyecto_sabana_monto_' + proyectoInicial.id)
+        if (stored) return stored
+      }
+    }
+    return (proyectoInicial as any)?.montoPlanTrabajo?.toString() ||
+           (proyectoInicial as any)?.monto_plan_trabajo?.toString() ||
+           ''
+  })
+
+  // Sincronizar pasoActual y monto desde URL (?paso=5&monto=...) para regresar directo al Paso 5
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search)
+      const pasoParam = urlParams.get('paso')
+      if (pasoParam && ['1', '2', '3', '4', '5', '6'].includes(pasoParam)) {
+        setPasoActual(Number(pasoParam) as 1 | 2 | 3 | 4 | 5 | 6)
+      }
+      const montoParam = urlParams.get('monto')
+      if (montoParam && Number(montoParam) > 0) {
+        setMontoPlanTrabajo(montoParam)
+      }
+    }
+  }, [])
+
+  // Drawer y selección de renglones habilitados para bitácora
+  const [drawerRenglonesAbierto, setDrawerRenglonesAbierto] = useState(false)
+  const [renglonesProyecto, setRenglonesProyecto] = useState<RenglonItem[]>(() => {
+    const rawR = (proyectoInicial as any)?.renglones || (proyectoInicial as any)?.planTrabajo || (proyectoInicial as any)?.renglones_sabana || []
+    if (Array.isArray(rawR) && rawR.length > 0) {
+      return rawR.map((r: any) => ({
+        id: String(r.codigoDGC || r.codigo || r.id),
+        codigoDGC: String(r.codigoDGC || r.codigo || r.id),
+        descripcion: r.descripcion || r.desc || r.nombre || 'Renglón de trabajo',
+        unidad: r.unidad || r.unidad_medida || 'm³',
+        capituloId: r.capituloId || 1,
+        capituloNombre: r.capituloNombre || '',
+        cantidadContratada: Number(r.cantidadContratada || r.cantidadContractual || 1),
+        costoUnitarioDirecto: Number(r.costoUnitarioDirecto || r.precioUnitario || 0),
+        esPersonalizado: Boolean(r.esPersonalizado),
+        seleccionado: r.seleccionado !== false,
+      }))
+    }
+    const esModoManualInicial =
+      (proyectoInicial as any)?.modoGestionFinanciera === 'manual' ||
+      (proyectoInicial as any)?.modo_gestion_financiera === 'manual' ||
+      (proyectoInicial as any)?.usarModoSabana === false
+    return CATALOGO_COMPLETO_88.map((r: any) => ({
+      id: r.id || r.codigoDGC,
+      codigoDGC: r.codigoDGC,
+      descripcion: r.descripcion,
+      unidad: r.unidad || 'm³',
+      capituloId: r.capituloId || 1,
+      capituloNombre: r.capituloNombre || '',
+      cantidadContratada: r.cantidadContratada || 1,
+      costoUnitarioDirecto: r.costoUnitarioDirecto || 0,
+      esPersonalizado: false,
+      seleccionado: esModoManualInicial ? false : false,
+    }))
+  })
+
+  // Sincronizar renglones del proyecto cuando proyectoInicial cargue o cambie
+  useEffect(() => {
+    if (!proyectoInicial) return
+    const rawR = (proyectoInicial as any)?.renglones || (proyectoInicial as any)?.planTrabajo || (proyectoInicial as any)?.renglones_sabana || []
+    if (Array.isArray(rawR) && rawR.length > 0) {
+      setRenglonesProyecto(
+        rawR.map((r: any) => ({
+          id: String(r.codigoDGC || r.codigo || r.id),
+          codigoDGC: String(r.codigoDGC || r.codigo || r.id),
+          descripcion: r.descripcion || r.desc || r.nombre || 'Renglón de trabajo',
+          unidad: r.unidad || r.unidad_medida || 'm³',
+          capituloId: Number(r.capituloId || r.capitulo_id || 1),
+          capituloNombre: r.capituloNombre || `Capítulo ${r.capituloId || r.capitulo_id || 1}`,
+          cantidadContratada: Number(r.cantidadContratada || r.cantidadContractual || 1),
+          costoUnitarioDirecto: Number(r.costoUnitarioDirecto || r.precioUnitario || 0),
+          esPersonalizado: Boolean(r.esPersonalizado),
+          seleccionado: r.seleccionado !== false,
+        }))
+      )
+    }
+  }, [proyectoInicial])
+
+  // Documentos del proyecto y adjuntos de Paso 3 (Registro Mercantil y Actas)
+  const [documentosProyecto, setDocumentosProyecto] = useState<DocumentoProyecto[]>(() => {
+    return (proyectoInicial as any)?.documentos || []
+  })
+
+  const [subiendoDocKey, setSubiendoDocKey] = useState<string | null>(null)
+
+  const [contratistaRegistroDoc, setContratistaRegistroDoc] = useState<DocumentoProyecto | null>(() => {
+    const docs = (proyectoInicial as any)?.documentos || []
+    return (
+      docs.find(
+        (d: any) =>
+          d.categoria === 'Registro Mercantil - Empresa Ejecutora' ||
+          d.categoria === 'Registro Mercantil' ||
+          d.nombre?.toLowerCase().includes('registro mercantil')
+      ) || null
+    )
+  })
+
+  const [contratistaActaDoc, setContratistaActaDoc] = useState<DocumentoProyecto | null>(() => {
+    const docs = (proyectoInicial as any)?.documentos || []
+    return (
+      docs.find(
+        (d: any) =>
+          d.categoria === 'Acta de Inicio - Empresa Ejecutora' ||
+          d.categoria === 'Acta de Inicio' ||
+          d.nombre?.toLowerCase().includes('acta de inicio')
+      ) || null
+    )
+  })
+
+  const [supervisoraRegistroDoc, setSupervisoraRegistroDoc] = useState<DocumentoProyecto | null>(() => {
+    const docs = (proyectoInicial as any)?.documentos || []
+    return (
+      docs.find((d: any) => d.categoria === 'Registro Mercantil - Empresa Supervisora') || null
+    )
+  })
+
+  const [supervisoraActaDoc, setSupervisoraActaDoc] = useState<DocumentoProyecto | null>(() => {
+    const docs = (proyectoInicial as any)?.documentos || []
+    return (
+      docs.find((d: any) => d.categoria === 'Acta de Inicio - Empresa Supervisora') || null
+    )
+  })
+
+  const fileInputContratistaRegistroRef = useRef<HTMLInputElement>(null)
+  const fileInputContratistaActaRef = useRef<HTMLInputElement>(null)
+  const fileInputSupervisoraRegistroRef = useRef<HTMLInputElement>(null)
+  const fileInputSupervisoraActaRef = useRef<HTMLInputElement>(null)
+
+  const handleUploadPaso3Doc = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    key: string,
+    categoria: string,
+    setDocState: (doc: DocumentoProyecto | null) => void
+  ) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const file = e.target.files[0]
+      try {
+        setSubiendoDocKey(key)
+        const docSubido = await subirDocumentoProyecto({
+          file,
+          categoria,
+          proyectoId: (proyectoInicial as any)?.id || 'nuevo-proyecto',
+          subidoPor: 'Usuario Administrador',
+        })
+        docSubido.origen = 'formulario'
+        setDocState(docSubido)
+        setDocumentosProyecto((prev) => {
+          const otros = prev.filter((d) => d.categoria !== categoria)
+          return [...otros, docSubido]
+        })
+        showSuccessToast(`Archivo "${file.name}" adjuntado y subido correctamente`)
+      } catch (err) {
+        console.error('Error al subir documento:', err)
+        showErrorToast('No se pudo subir el archivo')
+      } finally {
+        setSubiendoDocKey(null)
+      }
+    }
+  }
 
   // Sub-tabs internas para organización óptima en pasos complejos
   const [subTabPaso3, setSubTabPaso3] = useState<'ejecutora' | 'supervisora'>('ejecutora')
@@ -921,82 +2022,279 @@ export function ProyectoFormulario({
     activo: {
       label: 'Activo',
       activo: 'bg-emerald-600 text-white shadow-2xs',
-      inactivo: 'bg-emerald-50/70 border border-emerald-300 text-emerald-800 hover:bg-emerald-100',
+      inactivo: 'bg-gray-100/90 border border-gray-300 text-gray-700 hover:bg-gray-200',
     },
     en_revision: {
       label: 'En Revisión',
       activo: 'bg-[#9B0F06] text-white shadow-2xs',
-      inactivo: 'bg-red-50/70 border border-red-300 text-[#9B0F06] hover:bg-red-100',
+      inactivo: 'bg-gray-100/90 border border-gray-300 text-gray-700 hover:bg-gray-200',
     },
     pausado: {
       label: 'Pausado',
       activo: 'bg-amber-600 text-white shadow-2xs',
-      inactivo: 'bg-amber-50/70 border border-amber-300 text-amber-800 hover:bg-amber-100',
+      inactivo: 'bg-gray-100/90 border border-gray-300 text-gray-700 hover:bg-gray-200',
     },
     completado: {
       label: 'Completado',
       activo: 'bg-slate-700 text-white shadow-2xs',
-      inactivo: 'bg-slate-100/80 border border-slate-300 text-slate-800 hover:bg-slate-200',
+      inactivo: 'bg-gray-100/90 border border-gray-300 text-gray-700 hover:bg-gray-200',
     },
   }
 
   // Cálculos reactivos de anticipos
   const contratistaMontoAnticipoCalculado = useMemo(() => {
-    const monto = parseFloat(montoContractualOriginal) || 0
+    const monto = parseMontoNumber(montoContractualOriginal)
     const pct = parseFloat(contratistaPorcentajeAnticipo) || 0
     return (monto * pct) / 100
   }, [montoContractualOriginal, contratistaPorcentajeAnticipo])
 
   const supervisoraMontoAnticipoCalculado = useMemo(() => {
-    const monto = parseFloat(supervisoraMontoOriginal) || 0
+    const monto = parseMontoNumber(supervisoraMontoOriginal)
     const pct = parseFloat(supervisoraPorcentajeAnticipo) || 0
     return (monto * pct) / 100
   }, [supervisoraMontoOriginal, supervisoraPorcentajeAnticipo])
 
-  // Carga ultra-rápida de catálogos con deduplicación y caché en memoria
+  // Carga progresiva y optimizada de catálogos según el paso actual
   useEffect(() => {
-    if (!catalogoCacheGlobal) {
-      cargarCatalogosGlobal().then((c) => {
-        if (c) {
-          setEntidadesContratantes(c.entidades || [])
-          setEmpresasContratistas(c.contratistas || [])
-          setDepartamentos(c.departamentos || [])
-          setMunicipios(c.municipios || [])
+    // Si estamos en modo edición o en el paso 2+, cargar ubicación (departamentos y municipios)
+    const necesitaUbicacion = esEditar || pasoActual >= 2
+    if (necesitaUbicacion) {
+      cargarUbicacionGlobal().then((u) => {
+        if (u) {
+          setDepartamentos(u.departamentos || [])
+          setMunicipios(u.municipios || [])
         }
       })
     }
-    if (!usuariosDisponibles || usuariosDisponibles.length === 0) {
-      cargarUsuarios()
-    }
-  }, [cargarUsuarios, usuariosDisponibles])
 
+    // Si estamos en modo edición o en el paso 3+, cargar empresas y usuarios
+    const necesitaEmpresas = esEditar || pasoActual >= 3
+    if (necesitaEmpresas) {
+      cargarEmpresasGlobal().then((e) => {
+        if (e) {
+          setEntidadesContratantes(e.entidades || [])
+          setEmpresasContratistas(e.contratistas || [])
+          setEmpresasSupervisoras(e.supervisoras || [])
+        }
+      })
+      if (!usuariosDisponibles || usuariosDisponibles.length === 0) {
+        cargarUsuarios()
+      }
+    }
+
+    // En paso 1 de modo crear, precargar ubicación de forma no-bloqueante tras 1.5s
+    if (!esEditar && pasoActual === 1) {
+      const timer = setTimeout(() => {
+        cargarUbicacionGlobal().then((u) => {
+          if (u) {
+            setDepartamentos(u.departamentos || [])
+            setMunicipios(u.municipios || [])
+          }
+        })
+      }, 1500)
+      return () => clearTimeout(timer)
+    }
+  }, [pasoActual, esEditar, cargarUsuarios, usuariosDisponibles])
+
+  // Auto-llenar datos de Contratista al seleccionar del combobox
   // Auto-llenar datos de Contratista al seleccionar del combobox
   const handleSelectContratista = (val: string) => {
     setEmpresaContratista(val)
-    const found = empresasContratistas.find((e: any) => e.nombre === val || e.razon_social === val || e.id === val)
+    setEmpresaContratistaId('')
+    const normVal = (val || '').trim().toLowerCase()
+    const found = empresasContratistas.find((e: any) => {
+      const eNom = (e.nombre || e.razon_social || '').trim().toLowerCase()
+      return eNom === normVal || e.id === val
+    })
     if (found) {
       if (found.id) setEmpresaContratistaId(found.id)
-      if (found.direccion && !contratistaDireccion) setContratistaDireccion(found.direccion)
-      if (found.telefono && !contratistaTelefono) setContratistaTelefono(found.telefono)
-      if (found.correo && !contratistaCorreo) setContratistaCorreo(found.correo)
-      if (found.contacto_principal && !contratistaPropietario) setContratistaPropietario(found.contacto_principal)
+      if (found.direccion) setContratistaDireccion(found.direccion)
+      if (found.telefono) setContratistaTelefono(sanitizeTelefono(found.telefono, 8))
+      const emailEmp = found.correo_institucional || found.correo || found.email
+      if (emailEmp) setContratistaCorreo(sanitizeEmail(emailEmp))
+      if (found.registro_mercantil) setContratistaRegistroMercantil(sanitizeRegistro(found.registro_mercantil))
+      if (found.contacto_principal || (found.contactos && found.contactos[0]?.nombre)) {
+        const cNom = found.contacto_principal || found.contactos[0]?.nombre
+        if (cNom && !contratistaPropietario) setContratistaPropietario(cNom)
+      }
     }
   }
 
-  // Drawers handlers
-  const handleEntidadCreada = (payload: any) => {
-    setOpenCrearEntidadDrawer(false)
-    if (payload?.nombre) setEntidadContratante(payload.nombre)
-    if (payload?.id) setEmpresaContratanteId(payload.id)
+  // Auto-llenar datos de Supervisora al seleccionar del combobox
+  const handleSelectSupervisora = (val: string) => {
+    setEmpresaSupervisora(val)
+    setEmpresaSupervisoraId('')
+    const normVal = (val || '').trim().toLowerCase()
+    const found = (empresasSupervisoras || []).find((e: any) => {
+      const eNom = (e.nombre || e.razon_social || '').trim().toLowerCase()
+      return eNom === normVal || e.id === val
+    })
+    if (found) {
+      if (found.id) setEmpresaSupervisoraId(found.id)
+      if (found.direccion) setSupervisoraDireccion(found.direccion)
+      if (found.telefono) setSupervisoraTelefono(sanitizeTelefono(found.telefono, 8))
+      const emailEmp = found.correo_institucional || found.correo || found.email
+      if (emailEmp) setSupervisoraCorreo(sanitizeEmail(emailEmp))
+      if (found.registro_mercantil) setSupervisoraRegistroMercantil(sanitizeRegistro(found.registro_mercantil))
+      if (found.contacto_principal || (found.contactos && found.contactos[0]?.nombre)) {
+        const cNom = found.contacto_principal || found.contactos[0]?.nombre
+        if (cNom && !supervisoraPropietario) setSupervisoraPropietario(cNom)
+      }
+    }
   }
 
-  const handleContratistaCreado = (payload: any) => {
-    setOpenCrearContratistaDrawer(false)
-    if (payload?.nombre) setEmpresaContratista(payload.nombre)
-    if (payload?.id) setEmpresaContratistaId(payload.id)
-    if (payload?.direccion) setContratistaDireccion(payload.direccion)
-    if (payload?.telefono) setContratistaTelefono(payload.telefono)
-    if (payload?.correo) setContratistaCorreo(payload.correo)
+  // Filtro inteligente de usuarios por empresa con soporte para Domun y cargos de liderazgo
+  const getUsuariosParaEmpresa = (nombreEmpresa: string, tipo: 'propietario' | 'tecnico' = 'propietario') => {
+    const norm = (nombreEmpresa || '').toLowerCase().trim()
+    if (!norm) return []
+
+    const esDomun = norm.includes('domun')
+
+    // Helper para verificar roles operativos excluidos según requerimiento:
+    // "no deben salir los roles de topografia, usuario de campo ni labortaotiras en las ocpioens, eso igual aplicao a: 3.2 Empresa Supervisora"
+    const esRolExcluido = (rolOCargo: string) => {
+      const r = (rolOCargo || '').toLowerCase().trim()
+      return (
+        r.includes('topografo') ||
+        r.includes('topógrafo') ||
+        r.includes('topografia') ||
+        r.includes('topografía') ||
+        r.includes('laboratorista') ||
+        r.includes('laboratorio') ||
+        r.includes('auxiliar') ||
+        r.includes('peon') ||
+        r.includes('peón') ||
+        r.includes('operador') ||
+        (r.includes('campo') && !r.includes('jefe') && !r.includes('ingeniero'))
+      )
+    }
+
+    if (esDomun) {
+      // Si la empresa seleccionada es Domun, solo mostrar usuarios con roles de liderazgo/dirección/ingeniería
+      const rolesDomunPermitidos = [
+        'admin',
+        'administrador',
+        'ingenieroresidente',
+        'ingeniero residente',
+        'residente',
+        'gerencia',
+        'gerente',
+        'director',
+        'supervisor',
+        'jefe de proyecto',
+        'jefe',
+        'coordinador',
+      ]
+
+      return (usuariosDisponibles || [])
+        .filter((u: any) => u.activo !== false && u.estado !== 'Suspendido' && u.estado !== 'Desactivado')
+        .filter((u: any) => {
+          const r = `${u.rol || ''} ${u.cargo || ''}`.toLowerCase().trim()
+          const tieneRol = rolesDomunPermitidos.some((p) => r.includes(p))
+          return tieneRol && !esRolExcluido(r)
+        })
+        .map((u: any) => {
+          const nombreCompleto = u.nombre || `${u.primer_nombre || ''} ${u.primer_apellido || ''}`.trim() || u.correo
+          let rolCargo = u.cargo || (u.rol ? u.rol.charAt(0).toUpperCase() + u.rol.slice(1) : 'Administrador')
+          if (rolCargo.toLowerCase() === 'ingenieroresidente') rolCargo = 'Ingeniero Residente'
+          return {
+            value: nombreCompleto,
+            label: `${nombreCompleto} - ${rolCargo}`,
+            usuario: u,
+          }
+        })
+    }
+
+    // Para empresas externas (No Domun):
+    // Debe ser un usuario vinculado a dicha empresa (contactos de la empresa o creados para ella)
+    const matchedEmp = (empresasSupervisoras || []).concat(empresasContratistas || []).find((e: any) => {
+      const eNom = (e.nombre || e.razon_social || '').toLowerCase().trim()
+      return eNom === norm
+    })
+
+    const listaOpciones: any[] = []
+
+    // 1. Contactos registrados en la empresa (base de datos)
+    if (matchedEmp && Array.isArray(matchedEmp.contactos)) {
+      for (const c of matchedEmp.contactos) {
+        const u = c.usuario || {}
+        const du = u.dato_usuario || {}
+        const cNom = c.nombre || `${du.primer_nombre || ''} ${du.primer_apellido || ''}`.trim() || u.correo || du.username
+        const rCargo = `${c.cargo || ''} ${c.rol || ''} ${u.rol || ''} ${u.cargo || ''}`
+        if (cNom && !esRolExcluido(rCargo)) {
+          listaOpciones.push({
+            value: cNom,
+            label: `${cNom} - ${c.cargo || (tipo === 'tecnico' ? 'Superintendente' : 'Representante Legal')}`,
+            usuario: u,
+          })
+        }
+      }
+    }
+
+    // 2. Usuarios creados localmente durante esta sesión para esta empresa
+    const localesEmpresa = usuariosLocalesPorEmpresa.filter((item) => item.empresaNorm === norm)
+    for (const item of localesEmpresa) {
+      const u = item.usuario || {}
+      const rCargo = `${item.cargo || ''} ${u.rol || ''} ${u.cargo || ''}`
+      if (item.nombre && !esRolExcluido(rCargo)) {
+        listaOpciones.push({
+          value: item.nombre,
+          label: `${item.nombre} - ${item.cargo || (tipo === 'tecnico' ? 'Superintendente' : 'Representante')}`,
+          usuario: u,
+        })
+      }
+    }
+
+    // 3. Usuarios de la base de datos vinculados por ID de empresa contratista
+    if (matchedEmp?.id && Array.isArray(usuariosDisponibles)) {
+      for (const u of usuariosDisponibles) {
+        if (
+          (u.empresa_contratista_id === matchedEmp.id || u.empresa_id === matchedEmp.id) &&
+          u.activo !== false &&
+          u.estado !== 'Suspendido' &&
+          u.estado !== 'Desactivado'
+        ) {
+          const rCargo = `${u.cargo || ''} ${u.rol || ''}`
+          if (!esRolExcluido(rCargo)) {
+            const uNom = u.nombre || `${u.primer_nombre || ''} ${u.primer_apellido || ''}`.trim() || u.username
+            if (uNom) {
+              listaOpciones.push({
+                value: uNom,
+                label: `${uNom} - ${u.cargo || u.rol || (tipo === 'tecnico' ? 'Superintendente' : 'Representante')}`,
+                usuario: u,
+              })
+            }
+          }
+        }
+      }
+    }
+
+    // 4. Si el formulario ya tiene un valor establecido en este campo, garantizar que esté en las opciones
+    let valorActualCampo = ''
+    if (norm === (empresaContratista || '').toLowerCase().trim()) {
+      valorActualCampo = tipo === 'propietario' ? contratistaPropietario : contratistaSuperintendente
+    } else if (norm === (empresaSupervisora || '').toLowerCase().trim()) {
+      valorActualCampo = tipo === 'propietario' ? supervisoraPropietario : supervisoraResponsable
+    }
+
+    if (valorActualCampo && valorActualCampo.trim()) {
+      const yaExiste = listaOpciones.some((opt) => opt.value.toLowerCase() === valorActualCampo.toLowerCase().trim())
+      if (!yaExiste) {
+        listaOpciones.push({
+          value: valorActualCampo,
+          label: `${valorActualCampo} - ${tipo === 'tecnico' ? 'Responsable Técnico' : 'Representante'}`,
+        })
+      }
+    }
+
+    // Deduplicar opciones por valor (nombre)
+    const mapUnique = new Map<string, any>()
+    for (const item of listaOpciones) {
+      if (item.value && !mapUnique.has(item.value.toLowerCase())) {
+        mapUnique.set(item.value.toLowerCase(), item)
+      }
+    }
+    return Array.from(mapUnique.values())
   }
 
   // Validación de campos para estado ACTIVO
@@ -1027,6 +2325,15 @@ export function ProyectoFormulario({
       newErrors.direccion = true
       newErrorMessages.direccion = 'La dirección inicial es obligatoria.'
     }
+    if ((direccion || '').trim() && (direccionFin || '').trim()) {
+      const dIniNorm = normalizarTexto(direccion)
+      const dFinNorm = normalizarTexto(direccionFin)
+      if (dIniNorm && dFinNorm && dIniNorm === dFinNorm) {
+        faltantes.push('Ubicación Final diferente a la Inicial')
+        newErrors.direccionFin = true
+        newErrorMessages.direccionFin = 'La ubicación de destino no puede ser idéntica a la ubicación inicial.'
+      }
+    }
     if (!departamentoId) {
       faltantes.push('Departamento Inicial')
       newErrors.departamentoId = true
@@ -1054,7 +2361,8 @@ export function ProyectoFormulario({
       newErrorMessages.delegadoResidenteId = 'Debe asignar un delegado residente.'
     }
 
-    if (!montoContractualOriginal || isNaN(Number(montoContractualOriginal)) || parseFloat(montoContractualOriginal) <= 0) {
+    const montoObraVal = parseMontoNumber(montoContractualOriginal)
+    if (!montoContractualOriginal || montoObraVal <= 0) {
       faltantes.push('Monto Contractual Original de Obra')
       newErrors.montoContractualOriginal = true
       newErrorMessages.montoContractualOriginal = 'El monto de obra debe ser un valor numérico mayor a 0.'
@@ -1063,6 +2371,16 @@ export function ProyectoFormulario({
       faltantes.push('Fecha de Inicio Contractual')
       newErrors.fechaInicioContractual = true
       newErrorMessages.fechaInicioContractual = 'La fecha de inicio contractual es obligatoria.'
+    }
+    if (!fechaAdjudicacion) {
+      faltantes.push('Fecha de Adjudicación')
+      newErrors.fechaAdjudicacion = true
+      newErrorMessages.fechaAdjudicacion = 'La fecha de adjudicación es obligatoria.'
+    }
+    if (esDiferenciaPlazoInvalida) {
+      faltantes.push(`Plazo de Supervisión similar a Obra (máx. 1 mes de diferencia, diferencia actual: ${diferenciaPlazoMeses} meses)`)
+      newErrors.supervisoraMesesPlazo = true
+      newErrorMessages.supervisoraMesesPlazo = `El plazo de supervisión (${mesesSupervisionNum} meses) y de obra (${mesesObraNum} meses) no pueden diferir por más de 1 mes.`
     }
 
     setErrors(newErrors)
@@ -1083,12 +2401,183 @@ export function ProyectoFormulario({
     if (est === 'activo') {
       const check = validarCamposActivo()
       if (!check.valido) {
-        showErrorToast(`Para activar el proyecto, complete los campos obligatorios resaltados en rojo: ${check.faltantes.join(', ')}`)
+        showErrorToast(`Para activar el proyecto, complete los campos obligatorios: ${check.faltantes.join(', ')}`)
+      } else {
+        showSuccessToast('Campos verificados. Todos los requisitos para estado Activo están completos.')
       }
       setEstado('activo')
       return
     }
     setEstado(est)
+  }
+
+  // Apertura directa del Plan de Trabajo (Hoja Sábana) desde Paso 5
+  const handleAbrirPlanTrabajo = async () => {
+    try {
+      const nom = (nombreOficial || nombre || '').trim() || 'Borrador de Proyecto'
+      const tieneDireccionValida = Boolean(direccion && direccion.trim())
+      const coordsAEnviar = tieneDireccionValida && coordenadasMapa ? coordenadasMapa : (coordenadasMapa?.lat && coordenadasMapa?.lng ? coordenadasMapa : null)
+
+      const actaEjecFinal = formatActaString(contratistaActaNumero, contratistaActaFecha) || contratistaActaInicio
+      const actaSupFinal = formatActaString(supervisoraActaNumero, supervisoraActaFecha) || supervisoraActaInicio
+
+      const contratoEjecucionData: ProyectoContrato = {
+        tipo: 'EJECUCION',
+        empresaNombre: empresaContratista,
+        propietario: contratistaPropietario,
+        registroMercantil: contratistaRegistroMercantil,
+        direccion: contratistaDireccion,
+        telefono: contratistaTelefono,
+        correo: contratistaCorreo,
+        responsable: contratistaSuperintendente,
+        licitacionNumero: contratistaLicitacion,
+        actaInicioNumero: actaEjecFinal,
+        programa: contratistaPrograma,
+        subprograma: contratistaSubprograma,
+        fuenteFinanciamiento: contratistaFuenteFinanciamiento,
+        partidaFondos: contratistaPartidaFondos,
+        cdp: contratistaCdp,
+        contratoNumero: contratistaContratoNumero,
+        acuerdoMinisterial: contratistaAcuerdoMinisterial,
+        montoOriginal: parseMontoNumber(montoContractualOriginal),
+        porcentajeAnticipo: parseFloat(contratistaPorcentajeAnticipo) || 0,
+        montoAnticipo: contratistaMontoAnticipoCalculado,
+        plazoMesesDetalle: contratistaMesesPlazo,
+        fechaInicio: fechaInicioContractual || undefined,
+        fechaFin: fechaFinContractualPlan || undefined,
+      }
+
+      const contratoSupervisionData: ProyectoContrato = {
+        tipo: 'SUPERVISION',
+        empresaNombre: empresaSupervisora,
+        propietario: supervisoraPropietario,
+        registroMercantil: supervisoraRegistroMercantil,
+        direccion: supervisoraDireccion,
+        telefono: supervisoraTelefono,
+        correo: supervisoraCorreo,
+        responsable: supervisoraResponsable,
+        licitacionNumero: supervisoraLicitacion,
+        actaInicioNumero: actaSupFinal,
+        programa: supervisoraPrograma,
+        subprograma: supervisoraSubprograma,
+        fuenteFinanciamiento: supervisoraFuenteFinanciamiento,
+        partidaFondos: supervisoraPartidaFondos,
+        cdp: supervisoraCdp,
+        contratoNumero: supervisoraContratoNumero,
+        acuerdoMinisterial: supervisoraAcuerdoMinisterial,
+        montoOriginal: parseMontoNumber(supervisoraMontoOriginal),
+        porcentajeAnticipo: parseFloat(supervisoraPorcentajeAnticipo) || 0,
+        montoAnticipo: supervisoraMontoAnticipoCalculado,
+        plazoMesesDetalle: supervisoraMesesPlazo,
+        fechaInicio: supervisoraFechaInicio || undefined,
+        fechaFin: supervisoraFechaFin || undefined,
+      }
+
+      const payloadDraft: any = {
+        codigo,
+        nombreOficial: nom,
+        nombre: nom,
+        descripcion: descripcion ? descripcion.trim() : null,
+        ubicacionFisica: tieneDireccionValida ? direccion.trim() : null,
+        direccion: tieneDireccionValida ? direccion.trim() : null,
+        direccionFin: direccionFin ? direccionFin.trim() : null,
+        departamentoId: departamentoId || null,
+        municipioId: municipioId || null,
+        departamentoFinId: departamentoFinId || null,
+        municipioFinId: municipioFinId || null,
+        kilometroInicio: kilometroInicio ? parseKilometroNumber(kilometroInicio) : null,
+        kilometroFin: kilometroFin ? parseKilometroNumber(kilometroFin) : null,
+        coordenadasMapa: coordsAEnviar,
+        latitud: coordsAEnviar?.lat ?? null,
+        longitud: coordsAEnviar?.lng ?? null,
+        coordenadas: coordsAEnviar,
+        licitacionEjecutora: contratistaLicitacion || null,
+        propietarioContratista: contratistaPropietario || null,
+        registroMercantilContratista: contratistaRegistroMercantil || null,
+        direccionContratista: contratistaDireccion || null,
+        telefonoContratista: contratistaTelefono || null,
+        correoContratista: contratistaCorreo || null,
+        superintendente: contratistaSuperintendente || null,
+        actaInicioEjecutora: actaEjecFinal || null,
+        programaObra: contratistaPrograma || null,
+        subprogramaObra: contratistaSubprograma || null,
+        fuenteFinanciamientoObra: contratistaFuenteFinanciamiento || null,
+        partidaFondosObra: contratistaPartidaFondos || null,
+        cdpObra: contratistaCdp || null,
+        numeroContratoOriginal: contratistaContratoNumero || null,
+        acuerdoMinisterialOriginal: contratistaAcuerdoMinisterial || null,
+        porcentajeAnticipoObra: parseFloat(contratistaPorcentajeAnticipo) || 0,
+        montoAnticipoObra: contratistaMontoAnticipoCalculado,
+        mesesContratadosObra: contratistaMesesPlazo || null,
+        fechaTerminacionOriginalObra: fechaFinContractualPlan || null,
+        licitacionSupervisora: supervisoraLicitacion || null,
+        propietarioSupervisora: supervisoraPropietario || null,
+        registroMercantilSupervisora: supervisoraRegistroMercantil || null,
+        direccionSupervisora: supervisoraDireccion || null,
+        telefonoSupervisora: supervisoraTelefono || null,
+        correoSupervisora: supervisoraCorreo || null,
+        actaInicioSupervisora: actaSupFinal || null,
+        responsableSupervisora: supervisoraResponsable || null,
+        programaSupervisora: supervisoraPrograma || null,
+        subprogramaSupervisora: supervisoraSubprograma || null,
+        fuenteFinanciamientoSupervisora: supervisoraFuenteFinanciamiento || null,
+        partidaFondosSupervisora: supervisoraPartidaFondos || null,
+        cdpSupervisora: supervisoraCdp || null,
+        contratoSupervisora: supervisoraContratoNumero || null,
+        acuerdoSupervisora: supervisoraAcuerdoMinisterial || null,
+        supervisoraMontoOriginal: parseMontoNumber(supervisoraMontoOriginal),
+        porcentajeAnticipoSupervision: parseFloat(supervisoraPorcentajeAnticipo) || 0,
+        montoAnticipoSupervision: supervisoraMontoAnticipoCalculado,
+        fechaInicioSupervisora: supervisoraFechaInicio || null,
+        mesesContratadosSupervisora: supervisoraMesesPlazo || null,
+        fechaFinSupervisora: supervisoraFechaFin || null,
+        entidadContratante,
+        empresaContratanteId: empresaContratanteId || null,
+        empresaContratista,
+        empresaContratistaId: empresaContratistaId || null,
+        empresaSupervisora,
+        delegadoResidenteId: delegadoResidenteId || null,
+        responsable: responsable || null,
+        equipo,
+        fechaAdjudicacion: fechaAdjudicacion || null,
+        numeroEscrituraPublica: numeroEscrituraPublica || null,
+        fechaInicioContractual: fechaInicioContractual || null,
+        fechaInicio: fechaInicioContractual || null,
+        fechaFinContractualPlan: fechaFinContractualPlan || null,
+        fechaFin: fechaFinContractualPlan || null,
+        montoContractualOriginal: parseMontoNumber(montoContractualOriginal),
+        presupuesto: parseMontoNumber(montoContractualOriginal),
+        modoGestionFinanciera,
+        usarModoSabana: modoGestionFinanciera === 'sabana',
+        ambitoPlanTrabajo,
+        ambito_plan_trabajo: ambitoPlanTrabajo,
+        montoPlanTrabajo: parseFloat(montoPlanTrabajo) || 0,
+        monto_plan_trabajo: parseFloat(montoPlanTrabajo) || 0,
+        renglones: renglonesProyecto.filter((r) => r.seleccionado !== false),
+        estado: estado === 'activo' ? 'activo' : 'borrador',
+        contratoEjecucion: contratoEjecucionData,
+        contratoSupervision: contratoSupervisionData,
+        contratos: [contratoEjecucionData, contratoSupervisionData],
+        documentos: documentosProyecto.map((d) => ({ ...d, origen: d.origen || 'formulario' })),
+      }
+
+      let targetId = proyectoInicial?.id
+      if (targetId) {
+        await api.put(`/proyectos/${targetId}`, payloadDraft)
+      } else {
+        const res = await api.post('/proyectos', payloadDraft)
+        targetId = res.data?.data?.id
+      }
+
+      if (targetId) {
+        showSuccessToast('Datos registrados en borrador. Accediendo a la Hoja Sábana...')
+        router.push(`/dashboard/proyectos/${targetId}/hoja-sabana?from=paso5`)
+      } else {
+        showErrorToast('No se pudo abrir el plan de trabajo. Guarde el borrador manualmente.')
+      }
+    } catch (err: any) {
+      showErrorToast(err?.response?.data?.message || err?.message || 'Error al guardar para abrir la Hoja Sábana')
+    }
   }
 
   // Guardado principal
@@ -1111,10 +2600,11 @@ export function ProyectoFormulario({
       if (!check.valido) {
         showErrorToast(`Para crear o activar el proyecto, debe completar los campos obligatorios: ${check.faltantes.join(', ')}.`)
         // Navegar al paso correspondiente al primer error
-        if (check.newErrors.nombreOficial || check.newErrors.descripcion || check.newErrors.entidadContratante) setPasoActual(1)
-        else if (check.newErrors.direccion || check.newErrors.departamentoId || check.newErrors.municipioId) setPasoActual(2)
-        else if (check.newErrors.empresaContratista || check.newErrors.empresaSupervisora) setPasoActual(3)
-        else if (check.newErrors.montoContractualOriginal || check.newErrors.fechaInicioContractual) setPasoActual(5)
+        if (check.newErrors.nombreOficial || check.newErrors.descripcion) setPasoActual(1)
+        else if (check.newErrors.direccion || check.newErrors.departamentoId || check.newErrors.municipioId || check.newErrors.direccionFin) setPasoActual(2)
+        else if (check.newErrors.entidadContratante || check.newErrors.empresaContratista || check.newErrors.empresaSupervisora) setPasoActual(3)
+        else if (check.newErrors.fechaAdjudicacion) setPasoActual(4)
+        else if (check.newErrors.montoContractualOriginal || check.newErrors.fechaInicioContractual || check.newErrors.supervisoraMesesPlazo) setPasoActual(5)
         else if (check.newErrors.delegadoResidenteId) setPasoActual(6)
         return
       }
@@ -1157,7 +2647,8 @@ export function ProyectoFormulario({
       setPasoActual(3)
       return
     }
-    if (montoContractualOriginal && (isNaN(Number(montoContractualOriginal)) || Number(montoContractualOriginal) <= 0)) {
+    const montoObraBorrador = parseMontoNumber(montoContractualOriginal)
+    if (montoContractualOriginal && montoObraBorrador <= 0) {
       setFieldError('montoContractualOriginal', 'El monto debe ser un valor numérico mayor a 0.')
       showErrorToast('El monto contractual de obra debe ser un valor numérico mayor a 0.')
       setPasoActual(5)
@@ -1173,6 +2664,13 @@ export function ProyectoFormulario({
       setFieldError('supervisoraPorcentajeAnticipo', 'El porcentaje debe estar entre 0% y 100%.')
       showErrorToast('El porcentaje de anticipo de supervisión debe estar entre 0% y 100%.')
       setPasoActual(5)
+      return
+    }
+    if (esDiferenciaPlazoInvalida) {
+      setFieldError('supervisoraMesesPlazo', `El plazo de supervisión (${mesesSupervisionNum} meses) y obra (${mesesObraNum} meses) no pueden diferir por más de 1 mes.`)
+      showErrorToast(`El plazo de supervisión (${mesesSupervisionNum} meses) y obra (${mesesObraNum} meses) no pueden diferir por más de 1 mes (diferencia actual: ${diferenciaPlazoMeses} meses).`)
+      setPasoActual(5)
+      setSubTabPaso5('supervision')
       return
     }
 
@@ -1197,7 +2695,7 @@ export function ProyectoFormulario({
       cdp: contratistaCdp,
       contratoNumero: contratistaContratoNumero,
       acuerdoMinisterial: contratistaAcuerdoMinisterial,
-      montoOriginal: parseFloat(montoContractualOriginal) || 0,
+      montoOriginal: parseMontoNumber(montoContractualOriginal),
       porcentajeAnticipo: parseFloat(contratistaPorcentajeAnticipo) || 0,
       montoAnticipo: contratistaMontoAnticipoCalculado,
       plazoMesesDetalle: contratistaMesesPlazo,
@@ -1223,7 +2721,7 @@ export function ProyectoFormulario({
       cdp: supervisoraCdp,
       contratoNumero: supervisoraContratoNumero,
       acuerdoMinisterial: supervisoraAcuerdoMinisterial,
-      montoOriginal: parseFloat(supervisoraMontoOriginal) || 0,
+      montoOriginal: parseMontoNumber(supervisoraMontoOriginal),
       porcentajeAnticipo: parseFloat(supervisoraPorcentajeAnticipo) || 0,
       montoAnticipo: supervisoraMontoAnticipoCalculado,
       plazoMesesDetalle: supervisoraMesesPlazo,
@@ -1231,21 +2729,67 @@ export function ProyectoFormulario({
       fechaFin: supervisoraFechaFin || undefined,
     }
 
+    const tieneDireccionValida = Boolean(direccion && direccion.trim())
+    const coordsAEnviar = tieneDireccionValida && coordenadasMapa ? coordenadasMapa : (coordenadasMapa?.lat && coordenadasMapa?.lng ? coordenadasMapa : null)
+
     const payload: any = {
       codigo,
       nombreOficial: nom,
       nombre: nom,
-      descripcion,
-      ubicacionFisica: direccion,
-      direccion,
-      direccionFin,
+      descripcion: descripcion ? descripcion.trim() : null,
+      ubicacionFisica: tieneDireccionValida ? direccion.trim() : null,
+      direccion: tieneDireccionValida ? direccion.trim() : null,
+      direccionFin: direccionFin ? direccionFin.trim() : null,
       departamentoId: departamentoId || null,
       municipioId: municipioId || null,
       departamentoFinId: departamentoFinId || null,
       municipioFinId: municipioFinId || null,
-      kilometroInicio: kilometroInicio ? Number(kilometroInicio) : null,
-      kilometroFin: kilometroFin ? Number(kilometroFin) : null,
-      coordenadasMapa,
+      kilometroInicio: kilometroInicio ? parseKilometroNumber(kilometroInicio) : null,
+      kilometroFin: kilometroFin ? parseKilometroNumber(kilometroFin) : null,
+      coordenadasMapa: coordsAEnviar,
+      latitud: coordsAEnviar?.lat ?? null,
+      longitud: coordsAEnviar?.lng ?? null,
+      coordenadas: coordsAEnviar,
+      licitacionEjecutora: contratistaLicitacion || null,
+      propietarioContratista: contratistaPropietario || null,
+      registroMercantilContratista: contratistaRegistroMercantil || null,
+      direccionContratista: contratistaDireccion || null,
+      telefonoContratista: contratistaTelefono || null,
+      correoContratista: contratistaCorreo || null,
+      superintendente: contratistaSuperintendente || null,
+      actaInicioEjecutora: actaEjecFinal || null,
+      programaObra: contratistaPrograma || null,
+      subprogramaObra: contratistaSubprograma || null,
+      fuenteFinanciamientoObra: contratistaFuenteFinanciamiento || null,
+      partidaFondosObra: contratistaPartidaFondos || null,
+      cdpObra: contratistaCdp || null,
+      numeroContratoOriginal: contratistaContratoNumero || null,
+      acuerdoMinisterialOriginal: contratistaAcuerdoMinisterial || null,
+      porcentajeAnticipoObra: parseFloat(contratistaPorcentajeAnticipo) || 0,
+      montoAnticipoObra: contratistaMontoAnticipoCalculado,
+      mesesContratadosObra: contratistaMesesPlazo || null,
+      fechaTerminacionOriginalObra: fechaFinContractualPlan || null,
+      licitacionSupervisora: supervisoraLicitacion || null,
+      propietarioSupervisora: supervisoraPropietario || null,
+      registroMercantilSupervisora: supervisoraRegistroMercantil || null,
+      direccionSupervisora: supervisoraDireccion || null,
+      telefonoSupervisora: supervisoraTelefono || null,
+      correoSupervisora: supervisoraCorreo || null,
+      actaInicioSupervisora: actaSupFinal || null,
+      responsableSupervisora: supervisoraResponsable || null,
+      programaSupervisora: supervisoraPrograma || null,
+      subprogramaSupervisora: supervisoraSubprograma || null,
+      fuenteFinanciamientoSupervisora: supervisoraFuenteFinanciamiento || null,
+      partidaFondosSupervisora: supervisoraPartidaFondos || null,
+      cdpSupervisora: supervisoraCdp || null,
+      contratoSupervisora: supervisoraContratoNumero || null,
+      acuerdoSupervisora: supervisoraAcuerdoMinisterial || null,
+      supervisoraMontoOriginal: parseMontoNumber(supervisoraMontoOriginal),
+      porcentajeAnticipoSupervision: parseFloat(supervisoraPorcentajeAnticipo) || 0,
+      montoAnticipoSupervision: supervisoraMontoAnticipoCalculado,
+      fechaInicioSupervisora: supervisoraFechaInicio || null,
+      mesesContratadosSupervisora: supervisoraMesesPlazo || null,
+      fechaFinSupervisora: supervisoraFechaFin || null,
       entidadContratante,
       empresaContratanteId: empresaContratanteId || null,
       empresaContratista,
@@ -1260,10 +2804,15 @@ export function ProyectoFormulario({
       fechaInicio: fechaInicioContractual || null,
       fechaFinContractualPlan: fechaFinContractualPlan || null,
       fechaFin: fechaFinContractualPlan || null,
-      montoContractualOriginal: parseFloat(montoContractualOriginal) || 0,
-      presupuesto: parseFloat(montoContractualOriginal) || 0,
+      montoContractualOriginal: parseMontoNumber(montoContractualOriginal),
+      presupuesto: parseMontoNumber(montoContractualOriginal),
       modoGestionFinanciera,
       usarModoSabana: modoGestionFinanciera === 'sabana',
+      ambitoPlanTrabajo,
+      ambito_plan_trabajo: ambitoPlanTrabajo,
+      montoPlanTrabajo: parseFloat(montoPlanTrabajo) || 0,
+      monto_plan_trabajo: parseFloat(montoPlanTrabajo) || 0,
+      renglones: renglonesProyecto.filter((r) => r.seleccionado !== false),
       estado: estadoFinal,
       contratoEjecucion: contratoEjecucionData,
       contratoSupervision: contratoSupervisionData,
@@ -1271,6 +2820,10 @@ export function ProyectoFormulario({
       fechaFinalizacionReal: fechaFinalizacionReal || null,
       plazoEjecucionRealAmpliado: plazoEjecucionRealAmpliado || null,
       montoFinancieroFinalEjecutado: parseFloat(montoFinancieroFinalEjecutado) || null,
+      documentos: documentosProyecto.map((d) => ({
+        ...d,
+        origen: d.origen || 'formulario',
+      })),
     }
 
     if (onGuardar) {
@@ -1281,10 +2834,18 @@ export function ProyectoFormulario({
     try {
       if (esEditar && proyectoInicial?.id) {
         await api.put(`/proyectos/${proyectoInicial.id}`, payload)
+        limpiarCacheMemoria()
+        try {
+          sessionStorage.removeItem('domun_proyectos_cache')
+        } catch {}
         showSuccessToast('Proyecto actualizado exitosamente')
         router.push(`/dashboard/proyectos/${proyectoInicial.id}`)
       } else {
         const res = await api.post('/proyectos', payload)
+        limpiarCacheMemoria()
+        try {
+          sessionStorage.removeItem('domun_proyectos_cache')
+        } catch {}
         const msj = estadoFinal === 'activo' ? 'Proyecto creado y activado exitosamente' : 'Proyecto guardado en Borrador'
         showSuccessToast(msj)
         const nuevoId = res.data?.data?.id
@@ -1296,59 +2857,103 @@ export function ProyectoFormulario({
   }
 
   const pasosMeta = [
-    { num: 1, label: '1. Identificación y Alcance', icon: Building2 },
-    { num: 2, label: '2. Ubicación y Tramo DGC', icon: MapPin },
-    { num: 3, label: '3. Marco Legal y Empresas', icon: Briefcase },
-    { num: 4, label: '4. Ficha Técnica y Partidas', icon: Landmark },
-    { num: 5, label: '5. Financiero y Plazos', icon: Banknote },
-    { num: 6, label: '6. Resumen y Creación', icon: FileCheck },
+    { num: 1, label: '1. Identificación y Alcance', shortLabel: 'Identificación', icon: Building2 },
+    { num: 2, label: '2. Ubicación y Tramo DGC', shortLabel: 'Ubicación', icon: MapPin },
+    { num: 3, label: '3. Marco Legal y Empresas', shortLabel: 'Marco legal', icon: Briefcase },
+    { num: 4, label: '4. Ficha Técnica y Partidas', shortLabel: 'Ficha técnica', icon: Landmark },
+    { num: 5, label: '5. Financiero y Plazos', shortLabel: 'Financiero', icon: Banknote },
+    { num: 6, label: '6. Resumen y Creación', shortLabel: 'Resumen', icon: FileCheck },
   ]
 
-  return (
-    <div className="space-y-3 font-[Poppins] text-[11px]">
-      {/* STEPPER SUPERIOR CON NAVEGACIÓN LIBRE */}
-      <div className="sticky top-0 z-30 bg-white rounded-lg border border-gray-200 p-2 shadow-2xs">
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-1.5">
-          {pasosMeta.map((p) => {
-            const esActivo = pasoActual === p.num
-            const esCompletado = pasoActual > p.num
-            const IconComponent = p.icon
+  const isPasoCompleto = (num: number) => {
+    switch (num) {
+      case 1:
+        return Boolean((nombreOficial || nombre)?.trim() && descripcion?.trim())
+      case 2: {
+        const dIniNorm = normalizarTexto(direccion || '')
+        const dFinNorm = normalizarTexto(direccionFin || '')
+        const ubicacionesDistintas = !dFinNorm || dIniNorm !== dFinNorm
+        return Boolean(
+          direccion?.trim() &&
+          departamentoId &&
+          municipioId &&
+          ubicacionesDistintas
+        )
+      }
+      case 3:
+        return Boolean(entidadContratante?.trim() && empresaContratista?.trim() && empresaSupervisora?.trim())
+      case 4:
+        return Boolean(fechaAdjudicacion?.trim())
+      case 5:
+        return Boolean(montoContractualOriginal && parseMontoNumber(montoContractualOriginal) > 0 && fechaInicioContractual && !esDiferenciaPlazoInvalida)
+      case 6:
+        return Boolean(delegadoResidenteId)
+      default:
+        return false
+    }
+  }
 
-            return (
-              <button
-                key={p.num}
-                type="button"
-                onClick={() => setPasoActual(p.num as 1 | 2 | 3 | 4 | 5 | 6)}
-                className={`flex items-center gap-1.5 rounded-md p-1.5 text-left transition-all cursor-pointer ${
-                  esActivo
-                    ? 'bg-red-50/80 border border-red-200 text-[#9B0F06]'
-                    : esCompletado
-                    ? 'bg-gray-50 border border-gray-200 text-gray-800 hover:bg-gray-100'
-                    : 'bg-white border border-gray-100 text-gray-400 hover:bg-gray-50'
-                }`}
-              >
-                <div
-                  className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
+  return (
+    <div className="project-form-mobile flex-1 min-h-0 flex flex-col h-[calc(100vh-140px)] md:h-[calc(100vh-125px)] max-h-[calc(100vh-140px)] md:max-h-[calc(100vh-125px)] font-[Poppins] text-[10px] md:text-[11px] max-w-full overflow-hidden">
+      {/* STEPPER SUPERIOR CON NAVEGACIÓN LIBRE (FIJO ARRIBA) */}
+      <div className="shrink-0 z-20 pb-2 font-[Poppins]">
+        <div className="bg-white rounded-lg border border-gray-200 p-1.5 sm:p-2 shadow-2xs font-[Poppins]">
+          <div className="grid grid-cols-3 gap-1.5 pb-0.5 sm:grid-cols-3 sm:pb-0 lg:grid-cols-6 font-[Poppins]">
+            {pasosMeta.map((p) => {
+              const esActivo = pasoActual === p.num
+              const completo = isPasoCompleto(p.num)
+              const IconComponent = p.icon
+
+              return (
+                <button
+                  key={p.num}
+                  type="button"
+                  onClick={() => {
+                    if (pasoActual === 2 && p.num > 2) {
+                      const dIniNorm = normalizarTexto(direccion || '')
+                      const dFinNorm = normalizarTexto(direccionFin || '')
+                      if (dIniNorm && dFinNorm && dIniNorm === dFinNorm) {
+                        showErrorToast('La ubicación de destino no puede ser idéntica a la ubicación inicial.')
+                        return
+                      }
+                    }
+                    setPasoActual(p.num as 1 | 2 | 3 | 4 | 5 | 6)
+                  }}
+                  className={`flex min-w-0 items-center gap-1.5 rounded-md p-1.5 text-left transition-all cursor-pointer font-[Poppins] ${
+                    completo
+                      ? 'bg-emerald-50/80 border border-emerald-300 text-emerald-900 hover:bg-emerald-100/70'
+                      : 'bg-red-50/80 border border-red-200 text-red-800 hover:bg-red-100/70'
+                  } ${
                     esActivo
-                      ? 'bg-[#9B0F06] text-white'
-                      : esCompletado
-                      ? 'bg-emerald-600 text-white'
-                      : 'bg-gray-200 text-gray-600'
+                      ? `ring-2 ${completo ? 'ring-emerald-500 border-emerald-400' : 'ring-red-400 border-red-300'} font-black shadow-xs`
+                      : ''
                   }`}
                 >
-                  {esCompletado ? <CheckCircle2 size={11} /> : p.num}
-                </div>
-                <div className="min-w-0 font-extrabold uppercase text-[9px] leading-tight truncate">
-                  {p.label}
-                </div>
-              </button>
-            )
-          })}
+                  <div
+                    className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold font-[Poppins] ${
+                      completo
+                        ? 'bg-emerald-600 text-white'
+                          : 'bg-red-400 text-white'
+                    }`}
+                  >
+                    {completo ? <CheckCircle2 size={11} /> : p.num}
+                  </div>
+                  <div className="min-w-0 font-extrabold uppercase text-[9px] leading-tight truncate font-[Poppins]">
+                    <span className="sm:hidden">{p.shortLabel}</span>
+                    <span className="hidden sm:inline">{p.label}</span>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
         </div>
       </div>
 
-      {/* CONTENEDOR DE CONTENIDO */}
-      <div className="rounded-lg bg-white p-3.5 shadow-2xs border border-gray-200 space-y-3">
+      {/* CONTENEDOR DE CONTENIDO (ÚNICA ÁREA CON SCROLL INTERNO) */}
+      <div
+        ref={contenidoScrollRef}
+        className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden rounded-t-lg bg-white p-3.5 sm:p-4 shadow-2xs border border-gray-200 border-b-0 space-y-3"
+      >
         {/* ========================================================= */}
         {/* PASO 1: Identificación y Alcance */}
         {/* ========================================================= */}
@@ -1356,24 +2961,11 @@ export function ProyectoFormulario({
           <div className="space-y-3">
             <SectionHeader
               title="Paso 1: Identificación Oficial y Alcance del Proyecto"
-              subtitle="Nombre oficial de la obra, código correlativo, entidad propietaria y especificaciones generales"
+              subtitle="Nombre oficial de la obra y especificaciones generales"
               icon={Building2}
             />
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
-              <div>
-                <label className={labelClass}>Código del Proyecto</label>
-                <input
-                  type="text"
-                  maxLength={30}
-                  value={codigo}
-                  onChange={(e) => setCodigo(sanitizeCodigo(e.target.value))}
-                  className={`${inputClass} font-mono font-bold text-gray-700 bg-gray-50`}
-                  placeholder="DOM-VIAL-001"
-                />
-              </div>
-
-              <div className="md:col-span-2">
+            <div>
                 <label className={labelClass}>
                   Nombre Oficial del Proyecto <span className="text-[#9B0F06]">*</span>
                 </label>
@@ -1395,35 +2987,6 @@ export function ProyectoFormulario({
                   placeholder="Ej: Construcción del Paso a Desnivel e Intersección Vial CA-9 Sur Km 22.5"
                 />
                 {renderFieldError('nombreOficial')}
-              </div>
-            </div>
-
-            <div>
-              <label className={labelClass}>
-                Entidad Contratante / Propietaria <span className="text-[#9B0F06]">*</span>
-              </label>
-              <Combobox
-                options={entidadesContratantes.map((e: any) => ({ value: e.nombre, label: e.nombre }))}
-                value={entidadContratante}
-                hasError={errors.entidadContratante || !!errorMessages.entidadContratante}
-                onChange={(val) => {
-                  setEntidadContratante(val)
-                  const found = entidadesContratantes.find((e: any) => e.nombre === val || e.id === val)
-                  if (found?.id) setEmpresaContratanteId(found.id)
-                  if (!val || !val.trim()) {
-                    setFieldError('entidadContratante', 'La entidad contratante es obligatoria')
-                  } else {
-                    setFieldError('entidadContratante', null)
-                  }
-                }}
-                placeholder="Buscar o seleccionar Entidad Contratante (ej. DGC, MICIVI)..."
-                className="mt-0.5"
-                emptyAction={{
-                  label: 'Crear Nueva Entidad Contratante',
-                  onClick: () => setOpenCrearEntidadDrawer(true),
-                }}
-              />
-              {renderFieldError('entidadContratante')}
             </div>
 
             <div>
@@ -1488,10 +3051,12 @@ export function ProyectoFormulario({
 
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <div>
-                <label className={labelClass}>
-                  DEPARTAMENTO INICIAL (ORIGEN) <span className="text-[#9B0F06]">*</span>
+                <label className={labelClass + " flex items-center justify-between"}>
+                  <span>DEPARTAMENTO INICIAL (ORIGEN) <span className="text-[#9B0F06]">*</span></span>
+                  <span className="text-[8px] text-gray-400 font-normal">Autodetectado por mapa</span>
                 </label>
                 <Combobox
+                  disabled={true}
                   options={departamentos.map((d: any) => ({ value: d.id, label: d.nombre }))}
                   value={departamentoId}
                   hasError={errors.departamentoId}
@@ -1505,17 +3070,19 @@ export function ProyectoFormulario({
                       }
                     }
                   }}
-                  placeholder="Buscar o seleccionar Departamento Inicial..."
+                  placeholder="Autodetectado según la dirección en el mapa..."
+                  inputClassName="!bg-gray-100/90 !text-gray-800 !font-semibold !cursor-not-allowed select-none"
                   className="mt-0.5"
                 />
               </div>
 
               <div>
-                <label className={labelClass}>
-                  MUNICIPIO INICIAL (ORIGEN) <span className="text-[#9B0F06]">*</span>
+                <label className={labelClass + " flex items-center justify-between"}>
+                  <span>MUNICIPIO INICIAL (ORIGEN) <span className="text-[#9B0F06]">*</span></span>
+                  <span className="text-[8px] text-gray-400 font-normal">Autodetectado por mapa</span>
                 </label>
                 <Combobox
-                  disabled={!departamentoId}
+                  disabled={true}
                   options={municipios
                     .filter((m: any) => m.departamento_id === departamentoId)
                     .map((m: any) => ({ value: m.id, label: m.nombre }))}
@@ -1525,7 +3092,8 @@ export function ProyectoFormulario({
                     setMunicipioId(val)
                     setErrors((prev) => ({ ...prev, municipioId: false }))
                   }}
-                  placeholder={!departamentoId ? 'Seleccione primero un Departamento...' : 'Buscar o seleccionar Municipio Inicial...'}
+                  placeholder="Autodetectado según la dirección en el mapa..."
+                  inputClassName="!bg-gray-100/90 !text-gray-800 !font-semibold !cursor-not-allowed select-none"
                   className="mt-0.5"
                 />
               </div>
@@ -1538,18 +3106,18 @@ export function ProyectoFormulario({
                 </label>
                 <input
                   type="text"
-                  maxLength={7}
+                  maxLength={20}
                   value={kilometroInicio}
                   onChange={(e) => {
-                    setKilometroInicio(sanitizeNumeroPositivo(e.target.value, 7))
+                    setKilometroInicio(sanitizeKilometraje(e.target.value, 20))
                     setErrors((prev) => ({ ...prev, kilometroInicio: false }))
                   }}
                   className={errorInputClass(errors, 'kilometroInicio')}
-                  placeholder="Ej: 5.000 (Km 5 + 000m)"
+                  placeholder="Ej: 5+000 o 5.000 (Km 5 + 000m)"
                 />
-                {kilometroInicio !== '' && !isNaN(Number(kilometroInicio)) && (
+                {kilometroInicio !== '' && (
                   <span className="text-[8px] font-bold text-[#9B0F06] mt-0.5 block">
-                    Formato DGC: Estación Km {Math.floor(Number(kilometroInicio))} + {Math.round((Number(kilometroInicio) % 1) * 1000).toString().padStart(3, '0')}m
+                    Formato DGC: Estación Km {Math.floor(parseKilometroNumber(kilometroInicio))} + {Math.round((parseKilometroNumber(kilometroInicio) % 1) * 1000).toString().padStart(3, '0')}m
                   </span>
                 )}
               </div>
@@ -1560,57 +3128,54 @@ export function ProyectoFormulario({
                 </label>
                 <input
                   type="text"
-                  maxLength={7}
+                  maxLength={20}
                   value={kilometroFin}
                   onChange={(e) => {
-                    setKilometroFin(sanitizeNumeroPositivo(e.target.value, 7))
+                    setKilometroFin(sanitizeKilometraje(e.target.value, 20))
                     setErrors((prev) => ({ ...prev, kilometroFin: false }))
                   }}
                   className={errorInputClass(errors, 'kilometroFin')}
-                  placeholder="Ej: 10.000 (Km 10 + 000m)"
+                  placeholder="Ej: 10+000 o 10.000 (Km 10 + 000m)"
                 />
-                {kilometroFin !== '' && !isNaN(Number(kilometroFin)) && (
+                {kilometroFin !== '' && (
                   <span className="text-[8px] font-bold text-[#9B0F06] mt-0.5 block">
-                    Formato DGC: Estación Km {Math.floor(Number(kilometroFin))} + {Math.round((Number(kilometroFin) % 1) * 1000).toString().padStart(3, '0')}m
+                    Formato DGC: Estación Km {Math.floor(parseKilometroNumber(kilometroFin))} + {Math.round((parseKilometroNumber(kilometroFin) % 1) * 1000).toString().padStart(3, '0')}m
                   </span>
                 )}
               </div>
             </div>
 
             <div className="rounded-lg border border-gray-200 bg-gray-50/50 p-2.5 space-y-2">
-              <div>
-                <label className={labelClass}>Dirección Final / Destino (Texto Corto)</label>
-                <input
-                  type="text"
-                  maxLength={250}
-                  value={direccionFin}
-                  onChange={(e) => setDireccionFin(e.target.value.slice(0, 250))}
-                  className={inputClass}
-                  placeholder="Ej: Plan Grande, Palencia, Departamento de Guatemala"
-                />
-              </div>
-
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <div>
-                  <label className={labelClass}>Departamento Final (Límite Tramo)</label>
+                  <label className={labelClass + " flex items-center justify-between"}>
+                    <span>Departamento Final (Límite Tramo)</span>
+                    <span className="text-[8px] text-gray-400 font-normal">Autodetectado por mapa</span>
+                  </label>
                   <Combobox
+                    disabled={true}
                     options={departamentos.map((d: any) => ({ value: d.id, label: d.nombre }))}
                     value={departamentoFinId}
                     onChange={(val) => setDepartamentoFinId(val)}
-                    placeholder="Buscar Departamento Final..."
+                    placeholder="Autodetectado según el destino en el mapa..."
+                    inputClassName="!bg-gray-100/90 !text-gray-800 !font-semibold !cursor-not-allowed select-none"
                   />
                 </div>
 
                 <div>
-                  <label className={labelClass}>Municipio Final (Límite Tramo)</label>
+                  <label className={labelClass + " flex items-center justify-between"}>
+                    <span>Municipio Final (Límite Tramo)</span>
+                    <span className="text-[8px] text-gray-400 font-normal">Autodetectado por mapa</span>
+                  </label>
                   <Combobox
-                    disabled={!departamentoFinId}
+                    disabled={true}
                     options={municipios
                       .filter((m: any) => m.departamento_id === departamentoFinId)
                       .map((m: any) => ({ value: m.id, label: m.nombre }))}
                     value={municipioFinId}
                     onChange={(val) => setMunicipioFinId(val)}
-                    placeholder="Buscar Municipio Final..."
+                    placeholder="Autodetectado según el destino en el mapa..."
+                    inputClassName="!bg-gray-100/90 !text-gray-800 !font-semibold !cursor-not-allowed select-none"
                   />
                 </div>
               </div>
@@ -1629,6 +3194,27 @@ export function ProyectoFormulario({
               subtitle="Estatus contractual de la Empresa Ejecutora y Supervisora, nombramientos técnicos y equipo"
               icon={Briefcase}
             />
+
+            <div>
+              <label className={labelClass}>
+                Entidad Contratante / Propietaria <span className="text-[#9B0F06]">*</span>
+              </label>
+              <Combobox
+                options={entidadesContratantes.map((e: any) => ({ value: e.nombre, label: e.nombre }))}
+                value={entidadContratante}
+                allowCustomValue
+                hasError={errors.entidadContratante || !!errorMessages.entidadContratante}
+                onChange={(val) => {
+                  setEntidadContratante(val)
+                  const found = entidadesContratantes.find((e: any) => e.nombre === val || e.id === val)
+                  if (found?.id) setEmpresaContratanteId(found.id)
+                  setFieldError('entidadContratante', val?.trim() ? null : 'La entidad contratante es obligatoria')
+                }}
+                placeholder="Buscar o seleccionar entidad contratante..."
+                className="mt-0.5"
+              />
+              {renderFieldError('entidadContratante')}
+            </div>
 
             {/* Sub-tabs para Paso 3 con diseño moderno estilo underline (img3) */}
             <div className="flex items-center gap-1 border-b border-gray-200">
@@ -1660,23 +3246,26 @@ export function ProyectoFormulario({
 
             {/* 3.1 Empresa Ejecutora */}
             {subTabPaso3 === 'ejecutora' && (
-              <div className="rounded-lg border border-gray-200 bg-white p-3.5 space-y-3">
+              <div className="rounded-lg border border-gray-200 bg-white p-3.5 space-y-3 overflow-visible">
                 <div className="flex items-center justify-between border-b border-gray-100 pb-1.5 font-bold text-gray-800 text-[10.5px]">
                   <div className="flex items-center gap-1.5">
                     <HardHat size={13} className="text-[#9B0F06]" />
                     <span>ESTATUS CONTRACTUAL DE LA EMPRESA EJECUTORA (CONSTRUCCIÓN)</span>
                   </div>
-                  <span className="rounded-full bg-red-50 text-[#9B0F06] px-2 py-0.5 text-[8.5px] font-bold border border-red-200">
-                    EJECUTORA
-                  </span>
+                  {contratistaBloqueado && (
+                    <span className="text-[9px] sm:text-[9.5px] font-semibold text-amber-700 bg-amber-50/80 border border-amber-200/60 rounded px-2 py-0.5">
+                      Seleccione la Empresa Ejecutora para habilitar los campos
+                    </span>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
                   <div>
                     <label className={labelClass}>Empresa Contratista Ejecutora <span className="text-[#9B0F06]">*</span></label>
                     <Combobox
-                      options={empresasContratistas.map((e: any) => ({ value: e.nombre || e.razon_social, label: e.nombre || e.razon_social }))}
+                      options={opcionesEmpresaConDomun(empresasContratistas)}
                       value={empresaContratista}
+                      allowCustomValue
                       hasError={errors.empresaContratista || !!errorMessages.empresaContratista}
                       onChange={(val) => {
                         handleSelectContratista(val)
@@ -1687,45 +3276,125 @@ export function ProyectoFormulario({
                         }
                       }}
                       placeholder="Buscar Empresa Ejecutora..."
-                      emptyAction={{
-                        label: 'Crear Nueva Empresa',
-                        onClick: () => setOpenCrearContratistaDrawer(true),
-                      }}
                     />
                     {renderFieldError('empresaContratista')}
                   </div>
 
                   <div>
-                    <label className={labelClass}>Nombre del Propietario / Representante</label>
-                    <input
-                      type="text"
-                      maxLength={150}
+                    <div className="flex items-center justify-between mb-1">
+                      <label className={labelClass}>Nombre del Propietario / Representante</label>
+                      <button
+                        type="button"
+                        disabled={contratistaBloqueado}
+                        onClick={() => {
+                          setDrawerContextoUsuario('contratista_propietario')
+                          setOpenCrearUsuarioContratistaDrawer(true)
+                        }}
+                        className={`text-[9px] font-bold ${
+                          contratistaBloqueado
+                            ? 'text-gray-400 cursor-not-allowed pointer-events-none'
+                            : 'text-[#9B0F06] hover:text-[#7a0c05] cursor-pointer'
+                        } flex items-center gap-0.5`}
+                      >
+                        <Plus size={10} />
+                        <span>Crear Usuario</span>
+                      </button>
+                    </div>
+                    <Combobox
+                      disabled={contratistaBloqueado}
+                      options={getUsuariosParaEmpresa(empresaContratista, 'propietario')}
                       value={contratistaPropietario}
-                      onChange={(e) => {
-                        const raw = e.target.value
-                        if (/[0-9]/.test(raw)) {
+                      allowCustomValue={true}
+                      hasError={errors.contratistaPropietario || !!errorMessages.contratistaPropietario}
+                      onChange={(val) => {
+                        setContratistaPropietario(val)
+                        if (/[0-9]/.test(val)) {
                           setFieldError('contratistaPropietario', 'No se permiten números en nombres de personas')
                         } else {
                           setFieldError('contratistaPropietario', null)
                         }
-                        setContratistaPropietario(sanitizeNombrePersona(raw))
                       }}
-                      className={errorInputClass(errors, 'contratistaPropietario', errorMessages)}
-                      placeholder="Ej: Ing. William Ramón Godínez"
+                      placeholder="Seleccionar o escribir Propietario / Representante..."
+                      emptyAction={{
+                        label: 'Crear Nuevo Usuario',
+                        onClick: () => {
+                          setDrawerContextoUsuario('contratista_propietario')
+                          setOpenCrearUsuarioContratistaDrawer(true)
+                        },
+                      }}
                     />
                     {renderFieldError('contratistaPropietario')}
                   </div>
 
                   <div>
                     <label className={labelClass}>Registro Mercantil No.</label>
-                    <input
-                      type="text"
-                      maxLength={40}
-                      value={contratistaRegistroMercantil}
-                      onChange={(e) => setContratistaRegistroMercantil(sanitizeRegistro(e.target.value))}
-                      className={`${inputClass} font-mono`}
-                      placeholder="Ej: 177228A"
-                    />
+                    <div className="relative flex items-center">
+                      <input
+                        type="text"
+                        disabled={contratistaBloqueado}
+                        maxLength={40}
+                        value={contratistaRegistroMercantil}
+                        onChange={(e) => setContratistaRegistroMercantil(sanitizeRegistro(e.target.value))}
+                        className={`${inputClass} ${contratistaRegistroDoc ? 'pr-20' : 'pr-10'}`}
+                        placeholder="Ej: 177228A"
+                      />
+                      <input
+                        type="file"
+                        ref={fileInputContratistaRegistroRef}
+                        onChange={(e) =>
+                          handleUploadPaso3Doc(
+                            e,
+                            'contratista-registro',
+                            'Registro Mercantil - Empresa Ejecutora',
+                            setContratistaRegistroDoc
+                          )
+                        }
+                        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"
+                        className="hidden"
+                      />
+                      <button
+                        type="button"
+                        disabled={contratistaBloqueado || subiendoDocKey === 'contratista-registro'}
+                        onClick={() => fileInputContratistaRegistroRef.current?.click()}
+                        className={`absolute right-1 top-1/2 -translate-y-1/2 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold transition-all ${
+                          contratistaBloqueado
+                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed pointer-events-none'
+                            : contratistaRegistroDoc
+                            ? 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300 cursor-pointer'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 cursor-pointer'
+                        }`}
+                        title={
+                          contratistaRegistroDoc
+                            ? `Archivo adjunto: ${contratistaRegistroDoc.nombre}. Haz clic para cambiar.`
+                            : 'Adjuntar documento de Registro Mercantil'
+                        }
+                      >
+                        {subiendoDocKey === 'contratista-registro' ? (
+                          <Loader2 size={11} className="animate-spin text-gray-500" />
+                        ) : (
+                          <Paperclip
+                            size={11}
+                            className="text-gray-600"
+                          />
+                        )}
+                        <span>{contratistaRegistroDoc ? 'Cambiar' : 'Adjuntar'}</span>
+                      </button>
+                    </div>
+                    {contratistaRegistroDoc && (
+                      <div className="mt-1 flex items-center justify-between rounded-md bg-gray-50 border border-gray-200 px-2 py-0.5 text-[9.5px] text-gray-700 font-medium">
+                        <span className="truncate max-w-[220px]" title={contratistaRegistroDoc.nombre}>
+                          📎 {contratistaRegistroDoc.nombre} ({contratistaRegistroDoc.tamanio})
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setContratistaRegistroDoc(null)}
+                          className="text-gray-400 hover:text-red-600 p-0.5 cursor-pointer"
+                          title="Quitar archivo adjunto"
+                        >
+                          <X size={11} />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1734,6 +3403,7 @@ export function ProyectoFormulario({
                     <label className={labelClass}>Dirección de la Empresa</label>
                     <input
                       type="text"
+                      disabled={contratistaBloqueado}
                       maxLength={250}
                       value={contratistaDireccion}
                       onChange={(e) => setContratistaDireccion(e.target.value.slice(0, 250))}
@@ -1743,30 +3413,46 @@ export function ProyectoFormulario({
                   </div>
 
                   <div>
-                    <label className={labelClass}>Teléfono de Contacto</label>
-                    <input
-                      type="text"
-                      maxLength={30}
-                      value={contratistaTelefono}
-                      onChange={(e) => {
-                        const raw = e.target.value
-                        if (/[a-zA-Z]/.test(raw)) {
-                          setFieldError('contratistaTelefono', 'Solo se permiten números, guiones y signos +')
-                        } else {
+                    <label className={labelClass}>Teléfono de Contacto (Empresa)</label>
+                    <div className="flex items-center">
+                      <span
+                        className={`inline-flex h-[29px] items-center gap-1.5 rounded-l border border-r-0 border-gray-200 px-2 text-[10px] font-bold transition-colors ${
+                          contratistaBloqueado
+                            ? 'bg-gray-100/90 text-gray-400'
+                            : 'bg-slate-50/90 text-gray-700'
+                        }`}
+                      >
+                        <img
+                          src="/images/bandera-guatemala.png"
+                          alt="Bandera de Guatemala"
+                          className={`h-3 w-4.5 object-contain rounded-[1px] shadow-2xs ${
+                            contratistaBloqueado ? 'opacity-40 grayscale' : ''
+                          }`}
+                        />
+                        <span>+502</span>
+                      </span>
+                      <input
+                        type="text"
+                        disabled={contratistaBloqueado}
+                        inputMode="numeric"
+                        maxLength={9}
+                        value={formatearTelefonoGuatemala(contratistaTelefono)}
+                        onChange={(e) => {
                           setFieldError('contratistaTelefono', null)
-                        }
-                        setContratistaTelefono(sanitizeTelefono(raw))
-                      }}
-                      className={errorInputClass(errors, 'contratistaTelefono', errorMessages)}
-                      placeholder="2212-9675 / 5525-1537"
-                    />
+                          setContratistaTelefono(sanitizeTelefono(e.target.value, 8))
+                        }}
+                        className={`${errorInputClass(errors, 'contratistaTelefono', errorMessages)} rounded-l-none`}
+                        placeholder="####-####"
+                      />
+                    </div>
                     {renderFieldError('contratistaTelefono')}
                   </div>
 
                   <div>
-                    <label className={labelClass}>Correo Electrónico</label>
+                    <label className={labelClass}>Correo Electrónico de la Empresa</label>
                     <input
                       type="email"
+                      disabled={contratistaBloqueado}
                       maxLength={100}
                       value={contratistaCorreo}
                       onChange={(e) => {
@@ -1785,36 +3471,45 @@ export function ProyectoFormulario({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 pt-2 border-t border-gray-100">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 pt-2 border-t border-gray-100 relative z-20">
                   <div>
                     <div className="flex items-center justify-between mb-1">
                       <label className={labelClass}>Superintendente / Responsable de Obra</label>
                       <button
                         type="button"
-                        onClick={() => setOpenCrearUsuarioDrawer(true)}
-                        className="text-[9px] font-bold text-[#9B0F06] hover:text-[#7a0c05] flex items-center gap-0.5 cursor-pointer"
+                        disabled={contratistaBloqueado}
+                        onClick={() => {
+                          setDrawerContextoUsuario('contratista_superintendente')
+                          setOpenCrearUsuarioContratistaDrawer(true)
+                        }}
+                        className={`text-[9px] font-bold ${
+                          contratistaBloqueado
+                            ? 'text-gray-400 cursor-not-allowed pointer-events-none'
+                            : 'text-[#9B0F06] hover:text-[#7a0c05] cursor-pointer'
+                        } flex items-center gap-0.5`}
                       >
                         <Plus size={10} />
                         <span>Crear Usuario</span>
                       </button>
                     </div>
                     <Combobox
-                      options={usuariosDisponibles
-                        .filter((u: any) => u.activo !== false && u.estado !== 'Suspendido' && u.estado !== 'Desactivado')
-                        .map((u: any) => {
-                          const nombreCompleto = u.nombre || `${u.primer_nombre || ''} ${u.primer_apellido || ''}`.trim() || u.correo
-                          const rolCargo = u.cargo || u.rol || 'Profesional'
-                          return {
-                            value: nombreCompleto,
-                            label: `${nombreCompleto} - ${rolCargo}`,
-                          }
-                        })}
+                      disabled={contratistaBloqueado}
+                      options={getUsuariosParaEmpresa(empresaContratista, 'tecnico')}
                       value={contratistaSuperintendente}
-                      onChange={(val) => setContratistaSuperintendente(val)}
+                      allowCustomValue={true}
+                      onChange={(val) => {
+                        setContratistaSuperintendente(val)
+                        if (!contratistaPropietario) {
+                          setContratistaPropietario(val)
+                        }
+                      }}
                       placeholder="Buscar profesional o escribir Superintendente..."
                       emptyAction={{
                         label: 'Crear Nuevo Usuario',
-                        onClick: () => setOpenCrearUsuarioDrawer(true),
+                        onClick: () => {
+                          setDrawerContextoUsuario('contratista_superintendente')
+                          setOpenCrearUsuarioContratistaDrawer(true)
+                        },
                       }}
                     />
                   </div>
@@ -1823,34 +3518,95 @@ export function ProyectoFormulario({
                     <label className={labelClass}>Licitación Pública Nacional No.</label>
                     <input
                       type="text"
+                      disabled={contratistaBloqueado}
                       maxLength={50}
                       value={contratistaLicitacion}
                       onChange={(e) => setContratistaLicitacion(sanitizeLicitacion(e.target.value))}
-                      className={`${inputClass} font-mono`}
+                      className={inputClass}
                       placeholder="Ej: DGC-053-2025-C"
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <div>
                       <label className={labelClass}>Número de Acta de Inicio</label>
-                      <input
-                        type="text"
-                        maxLength={40}
-                        value={contratistaActaNumero}
-                        onChange={(e) => {
-                          const val = e.target.value.slice(0, 40)
-                          setContratistaActaNumero(val)
-                          setContratistaActaInicio(formatActaString(val, contratistaActaFecha))
-                        }}
-                        className={`${inputClass} font-mono`}
-                        placeholder="Ej: 26-2026"
-                      />
+                      <div className="relative flex items-center">
+                        <input
+                          type="text"
+                          disabled={contratistaBloqueado}
+                          maxLength={40}
+                          value={contratistaActaNumero}
+                          onChange={(e) => {
+                            const val = e.target.value.slice(0, 40)
+                            setContratistaActaNumero(val)
+                            setContratistaActaInicio(formatActaString(val, contratistaActaFecha))
+                          }}
+                          className={`${inputClass} ${contratistaActaDoc ? 'pr-20' : 'pr-10'}`}
+                          placeholder="Ej: 26-2026"
+                        />
+                        <input
+                          type="file"
+                          ref={fileInputContratistaActaRef}
+                          onChange={(e) =>
+                            handleUploadPaso3Doc(
+                              e,
+                              'contratista-acta',
+                              'Acta de Inicio - Empresa Ejecutora',
+                              setContratistaActaDoc
+                            )
+                          }
+                          accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"
+                          className="hidden"
+                        />
+                        <button
+                          type="button"
+                          disabled={contratistaBloqueado || subiendoDocKey === 'contratista-acta'}
+                          onClick={() => fileInputContratistaActaRef.current?.click()}
+                          className={`absolute right-1 top-1/2 -translate-y-1/2 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold transition-all ${
+                            contratistaBloqueado
+                              ? 'bg-gray-100 text-gray-400 cursor-not-allowed pointer-events-none'
+                              : contratistaActaDoc
+                              ? 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300 cursor-pointer'
+                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 cursor-pointer'
+                          }`}
+                          title={
+                            contratistaActaDoc
+                              ? `Archivo adjunto: ${contratistaActaDoc.nombre}. Haz clic para cambiar.`
+                              : 'Adjuntar documento de Acta de Inicio'
+                          }
+                        >
+                          {subiendoDocKey === 'contratista-acta' ? (
+                            <Loader2 size={11} className="animate-spin text-gray-500" />
+                          ) : (
+                            <Paperclip
+                              size={11}
+                              className="text-gray-600"
+                            />
+                          )}
+                          <span>{contratistaActaDoc ? 'Cambiar' : 'Adjuntar'}</span>
+                        </button>
+                      </div>
+                      {contratistaActaDoc && (
+                        <div className="mt-1 flex items-center justify-between rounded-md bg-gray-50 border border-gray-200 px-2 py-0.5 text-[9.5px] text-gray-700 font-medium">
+                          <span className="truncate max-w-[140px]" title={contratistaActaDoc.nombre}>
+                            📎 {contratistaActaDoc.nombre} ({contratistaActaDoc.tamanio})
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setContratistaActaDoc(null)}
+                            className="text-gray-400 hover:text-red-600 p-0.5 cursor-pointer"
+                            title="Quitar archivo adjunto"
+                          >
+                            <X size={11} />
+                          </button>
+                        </div>
+                      )}
                     </div>
                     <div>
                       <label className={labelClass}>Fecha de Acta</label>
                       <input
                         type="date"
+                        disabled={contratistaBloqueado}
                         value={contratistaActaFecha}
                         onChange={(e) => {
                           const val = e.target.value
@@ -1867,70 +3623,155 @@ export function ProyectoFormulario({
 
             {/* 3.2 Empresa Supervisora */}
             {subTabPaso3 === 'supervisora' && (
-              <div className="rounded-lg border border-gray-200 bg-white p-3.5 space-y-3">
+              <div className="rounded-lg border border-gray-200 bg-white p-3.5 space-y-3 overflow-visible">
                 <div className="flex items-center justify-between border-b border-gray-100 pb-1.5 font-bold text-gray-800 text-[10.5px]">
                   <div className="flex items-center gap-1.5">
                     <ShieldCheck size={13} className="text-orange-700" />
                     <span>ESTATUS CONTRACTUAL DE LA EMPRESA SUPERVISORA</span>
                   </div>
-                  <span className="rounded-full bg-orange-50 text-orange-700 px-2 py-0.5 text-[8.5px] font-bold border border-orange-200">
-                    SUPERVISIÓN
-                  </span>
+                  {supervisoraBloqueado && (
+                    <span className="text-[9px] sm:text-[9.5px] font-semibold text-amber-700 bg-amber-50/80 border border-amber-200/60 rounded px-2 py-0.5">
+                      Seleccione la Empresa Supervisora para habilitar los campos
+                    </span>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
                   <div>
                     <label className={labelClass}>Empresa Supervisora <span className="text-[#9B0F06]">*</span></label>
-                    <input
-                      type="text"
-                      maxLength={200}
+                    <Combobox
+                      options={opcionesEmpresaConDomun(empresasSupervisoras)}
                       value={empresaSupervisora}
-                      onChange={(e) => {
-                        const val = e.target.value.slice(0, 200)
-                        setEmpresaSupervisora(val)
-                        if (!val.trim()) {
+                      allowCustomValue
+                      hasError={errors.empresaSupervisora || !!errorMessages.empresaSupervisora}
+                      onChange={(val) => {
+                        handleSelectSupervisora(val)
+                        if (!val || !val.trim()) {
                           setFieldError('empresaSupervisora', 'La empresa supervisora es obligatoria')
                         } else {
                           setFieldError('empresaSupervisora', null)
                         }
                       }}
-                      className={errorInputClass(errors, 'empresaSupervisora', errorMessages)}
-                      placeholder="Ej: SERVICIOS DE INGENIERIA - SERINGE"
+                      placeholder="Seleccionar o escribir Empresa Supervisora (ej. Domun, SERINGE)..."
                     />
                     {renderFieldError('empresaSupervisora')}
                   </div>
 
                   <div>
-                    <label className={labelClass}>Propietario / Representante Legal</label>
-                    <input
-                      type="text"
-                      maxLength={150}
+                    <div className="flex items-center justify-between mb-1">
+                      <label className={labelClass}>Propietario / Representante Legal</label>
+                      <button
+                        type="button"
+                        disabled={supervisoraBloqueado}
+                        onClick={() => {
+                          setDrawerContextoUsuario('supervisora_propietario')
+                          setOpenCrearUsuarioSupervisoraDrawer(true)
+                        }}
+                        className={`text-[9px] font-bold ${
+                          supervisoraBloqueado
+                            ? 'text-gray-400 cursor-not-allowed pointer-events-none'
+                            : 'text-[#9B0F06] hover:text-[#7a0c05] cursor-pointer'
+                        } flex items-center gap-0.5`}
+                      >
+                        <Plus size={10} />
+                        <span>Crear Usuario</span>
+                      </button>
+                    </div>
+                    <Combobox
+                      disabled={supervisoraBloqueado}
+                      options={getUsuariosParaEmpresa(empresaSupervisora, 'propietario')}
                       value={supervisoraPropietario}
-                      onChange={(e) => {
-                        const raw = e.target.value
-                        if (/[0-9]/.test(raw)) {
+                      allowCustomValue={true}
+                      hasError={errors.supervisoraPropietario || !!errorMessages.supervisoraPropietario}
+                      onChange={(val) => {
+                        setSupervisoraPropietario(val)
+                        if (/[0-9]/.test(val)) {
                           setFieldError('supervisoraPropietario', 'No se permiten números en nombres de personas')
                         } else {
                           setFieldError('supervisoraPropietario', null)
                         }
-                        setSupervisoraPropietario(sanitizeNombrePersona(raw))
                       }}
-                      className={errorInputClass(errors, 'supervisoraPropietario', errorMessages)}
-                      placeholder="Ej: William Ramón Godínez Mansilla"
+                      placeholder="Seleccionar o escribir Propietario / Representante..."
+                      emptyAction={{
+                        label: 'Crear Nuevo Usuario',
+                        onClick: () => {
+                          setDrawerContextoUsuario('supervisora_propietario')
+                          setOpenCrearUsuarioSupervisoraDrawer(true)
+                        },
+                      }}
                     />
                     {renderFieldError('supervisoraPropietario')}
                   </div>
 
                   <div>
                     <label className={labelClass}>Registro Mercantil</label>
-                    <input
-                      type="text"
-                      maxLength={40}
-                      value={supervisoraRegistroMercantil}
-                      onChange={(e) => setSupervisoraRegistroMercantil(sanitizeRegistro(e.target.value))}
-                      className={`${inputClass} font-mono`}
-                      placeholder="Ej: 177228A"
-                    />
+                    <div className="relative flex items-center">
+                      <input
+                        type="text"
+                        disabled={supervisoraBloqueado}
+                        maxLength={40}
+                        value={supervisoraRegistroMercantil}
+                        onChange={(e) => setSupervisoraRegistroMercantil(sanitizeRegistro(e.target.value))}
+                        className={`${inputClass} ${supervisoraRegistroDoc ? 'pr-20' : 'pr-10'}`}
+                        placeholder="Ej: 177228A"
+                      />
+                      <input
+                        type="file"
+                        ref={fileInputSupervisoraRegistroRef}
+                        onChange={(e) =>
+                          handleUploadPaso3Doc(
+                            e,
+                            'supervisora-registro',
+                            'Registro Mercantil - Empresa Supervisora',
+                            setSupervisoraRegistroDoc
+                          )
+                        }
+                        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"
+                        className="hidden"
+                      />
+                      <button
+                        type="button"
+                        disabled={supervisoraBloqueado || subiendoDocKey === 'supervisora-registro'}
+                        onClick={() => fileInputSupervisoraRegistroRef.current?.click()}
+                        className={`absolute right-1 top-1/2 -translate-y-1/2 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold transition-all ${
+                          supervisoraBloqueado
+                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed pointer-events-none'
+                            : supervisoraRegistroDoc
+                            ? 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300 cursor-pointer'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 cursor-pointer'
+                        }`}
+                        title={
+                          supervisoraRegistroDoc
+                            ? `Archivo adjunto: ${supervisoraRegistroDoc.nombre}. Haz clic para cambiar.`
+                            : 'Adjuntar documento de Registro Mercantil'
+                        }
+                      >
+                        {subiendoDocKey === 'supervisora-registro' ? (
+                          <Loader2 size={11} className="animate-spin text-gray-500" />
+                        ) : (
+                          <Paperclip
+                            size={11}
+                            className="text-gray-600"
+                          />
+                        )}
+                        <span>{supervisoraRegistroDoc ? 'Cambiar' : 'Adjuntar'}</span>
+                      </button>
+                    </div>
+                    {supervisoraRegistroDoc && (
+                      <div className="mt-1 flex items-center justify-between rounded-md bg-gray-50 border border-gray-200 px-2 py-0.5 text-[9.5px] text-gray-700 font-medium">
+                        <span className="truncate max-w-[220px]" title={supervisoraRegistroDoc.nombre}>
+                          📎 {supervisoraRegistroDoc.nombre} ({supervisoraRegistroDoc.tamanio})
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setSupervisoraRegistroDoc(null)}
+                          className="text-gray-400 hover:text-red-600 p-0.5 cursor-pointer"
+                          title="Quitar archivo adjunto"
+                        >
+                          <X size={11} />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1939,6 +3780,7 @@ export function ProyectoFormulario({
                     <label className={labelClass}>Dirección de Supervisión</label>
                     <input
                       type="text"
+                      disabled={supervisoraBloqueado}
                       maxLength={250}
                       value={supervisoraDireccion}
                       onChange={(e) => setSupervisoraDireccion(e.target.value.slice(0, 250))}
@@ -1948,30 +3790,46 @@ export function ProyectoFormulario({
                   </div>
 
                   <div>
-                    <label className={labelClass}>Teléfono de Supervisión</label>
-                    <input
-                      type="text"
-                      maxLength={30}
-                      value={supervisoraTelefono}
-                      onChange={(e) => {
-                        const raw = e.target.value
-                        if (/[a-zA-Z]/.test(raw)) {
-                          setFieldError('supervisoraTelefono', 'Solo se permiten números, guiones y signos +')
-                        } else {
+                    <label className={labelClass}>Teléfono de Contacto (Empresa Supervisora)</label>
+                    <div className="flex items-center">
+                      <span
+                        className={`inline-flex h-[29px] items-center gap-1.5 rounded-l border border-r-0 border-gray-200 px-2 text-[10px] font-bold transition-colors ${
+                          supervisoraBloqueado
+                            ? 'bg-gray-100/90 text-gray-400'
+                            : 'bg-slate-50/90 text-gray-700'
+                        }`}
+                      >
+                        <img
+                          src="/images/bandera-guatemala.png"
+                          alt="Bandera de Guatemala"
+                          className={`h-3 w-4.5 object-contain rounded-[1px] shadow-2xs ${
+                            supervisoraBloqueado ? 'opacity-40 grayscale' : ''
+                          }`}
+                        />
+                        <span>+502</span>
+                      </span>
+                      <input
+                        type="text"
+                        disabled={supervisoraBloqueado}
+                        inputMode="numeric"
+                        maxLength={9}
+                        value={formatearTelefonoGuatemala(supervisoraTelefono)}
+                        onChange={(e) => {
                           setFieldError('supervisoraTelefono', null)
-                        }
-                        setSupervisoraTelefono(sanitizeTelefono(raw))
-                      }}
-                      className={errorInputClass(errors, 'supervisoraTelefono', errorMessages)}
-                      placeholder="2212-9675"
-                    />
+                          setSupervisoraTelefono(sanitizeTelefono(e.target.value, 8))
+                        }}
+                        className={`${errorInputClass(errors, 'supervisoraTelefono', errorMessages)} rounded-l-none`}
+                        placeholder="####-####"
+                      />
+                    </div>
                     {renderFieldError('supervisoraTelefono')}
                   </div>
 
                   <div>
-                    <label className={labelClass}>Correo de Supervisión</label>
+                    <label className={labelClass}>Correo Electrónico de la Empresa Supervisora</label>
                     <input
                       type="email"
+                      disabled={supervisoraBloqueado}
                       maxLength={100}
                       value={supervisoraCorreo}
                       onChange={(e) => {
@@ -1990,36 +3848,40 @@ export function ProyectoFormulario({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 pt-2 border-t border-gray-100">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 pt-2 border-t border-gray-100 relative z-20">
                   <div>
                     <div className="flex items-center justify-between mb-1">
                       <label className={labelClass}>Responsable Técnico de Supervisión</label>
                       <button
                         type="button"
-                        onClick={() => setOpenCrearUsuarioDrawer(true)}
-                        className="text-[9px] font-bold text-[#9B0F06] hover:text-[#7a0c05] flex items-center gap-0.5 cursor-pointer"
+                        disabled={supervisoraBloqueado}
+                        onClick={() => {
+                          setDrawerContextoUsuario('supervisora_responsable')
+                          setOpenCrearUsuarioSupervisoraDrawer(true)
+                        }}
+                        className={`text-[9px] font-bold ${
+                          supervisoraBloqueado
+                            ? 'text-gray-400 cursor-not-allowed pointer-events-none'
+                            : 'text-[#9B0F06] hover:text-[#7a0c05] cursor-pointer'
+                        } flex items-center gap-0.5`}
                       >
                         <Plus size={10} />
                         <span>Crear Usuario</span>
                       </button>
                     </div>
                     <Combobox
-                      options={usuariosDisponibles
-                        .filter((u: any) => u.activo !== false && u.estado !== 'Suspendido' && u.estado !== 'Desactivado')
-                        .map((u: any) => {
-                          const nombreCompleto = u.nombre || `${u.primer_nombre || ''} ${u.primer_apellido || ''}`.trim() || u.correo
-                          const rolCargo = u.cargo || u.rol || 'Supervisor'
-                          return {
-                            value: nombreCompleto,
-                            label: `${nombreCompleto} - ${rolCargo}`,
-                          }
-                        })}
+                      disabled={supervisoraBloqueado}
+                      options={getUsuariosParaEmpresa(empresaSupervisora, 'tecnico')}
                       value={supervisoraResponsable}
+                      allowCustomValue={true}
                       onChange={(val) => setSupervisoraResponsable(val)}
                       placeholder="Buscar profesional o escribir Responsable..."
                       emptyAction={{
                         label: 'Crear Nuevo Usuario',
-                        onClick: () => setOpenCrearUsuarioDrawer(true),
+                        onClick: () => {
+                          setDrawerContextoUsuario('supervisora_responsable')
+                          setOpenCrearUsuarioSupervisoraDrawer(true)
+                        },
                       }}
                     />
                   </div>
@@ -2028,34 +3890,95 @@ export function ProyectoFormulario({
                     <label className={labelClass}>Licitación Pública de Supervisión</label>
                     <input
                       type="text"
+                      disabled={supervisoraBloqueado}
                       maxLength={50}
                       value={supervisoraLicitacion}
                       onChange={(e) => setSupervisoraLicitacion(sanitizeLicitacion(e.target.value))}
-                      className={`${inputClass} font-mono`}
+                      className={inputClass}
                       placeholder="DGC-054-2025-S"
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <div>
                       <label className={labelClass}>Número de Acta</label>
-                      <input
-                        type="text"
-                        maxLength={40}
-                        value={supervisoraActaNumero}
-                        onChange={(e) => {
-                          const val = e.target.value.slice(0, 40)
-                          setSupervisoraActaNumero(val)
-                          setSupervisoraActaInicio(formatActaString(val, supervisoraActaFecha))
-                        }}
-                        className={`${inputClass} font-mono`}
-                        placeholder="Ej: 52-2026"
-                      />
+                      <div className="relative flex items-center">
+                        <input
+                          type="text"
+                          disabled={supervisoraBloqueado}
+                          maxLength={40}
+                          value={supervisoraActaNumero}
+                          onChange={(e) => {
+                            const val = e.target.value.slice(0, 40)
+                            setSupervisoraActaNumero(val)
+                            setSupervisoraActaInicio(formatActaString(val, supervisoraActaFecha))
+                          }}
+                          className={`${inputClass} ${supervisoraActaDoc ? 'pr-20' : 'pr-10'}`}
+                          placeholder="Ej: 52-2026"
+                        />
+                        <input
+                          type="file"
+                          ref={fileInputSupervisoraActaRef}
+                          onChange={(e) =>
+                            handleUploadPaso3Doc(
+                              e,
+                              'supervisora-acta',
+                              'Acta de Inicio - Empresa Supervisora',
+                              setSupervisoraActaDoc
+                            )
+                          }
+                          accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"
+                          className="hidden"
+                        />
+                        <button
+                          type="button"
+                          disabled={supervisoraBloqueado || subiendoDocKey === 'supervisora-acta'}
+                          onClick={() => fileInputSupervisoraActaRef.current?.click()}
+                          className={`absolute right-1 top-1/2 -translate-y-1/2 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold transition-all ${
+                            supervisoraBloqueado
+                              ? 'bg-gray-100 text-gray-400 cursor-not-allowed pointer-events-none'
+                              : supervisoraActaDoc
+                              ? 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300 cursor-pointer'
+                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 cursor-pointer'
+                          }`}
+                          title={
+                            supervisoraActaDoc
+                              ? `Archivo adjunto: ${supervisoraActaDoc.nombre}. Haz clic para cambiar.`
+                              : 'Adjuntar documento de Acta'
+                          }
+                        >
+                          {subiendoDocKey === 'supervisora-acta' ? (
+                            <Loader2 size={11} className="animate-spin text-gray-500" />
+                          ) : (
+                            <Paperclip
+                              size={11}
+                              className="text-gray-600"
+                            />
+                          )}
+                          <span>{supervisoraActaDoc ? 'Cambiar' : 'Adjuntar'}</span>
+                        </button>
+                      </div>
+                      {supervisoraActaDoc && (
+                        <div className="mt-1 flex items-center justify-between rounded-md bg-gray-50 border border-gray-200 px-2 py-0.5 text-[9.5px] text-gray-700 font-medium">
+                          <span className="truncate max-w-[140px]" title={supervisoraActaDoc.nombre}>
+                            📎 {supervisoraActaDoc.nombre} ({supervisoraActaDoc.tamanio})
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setSupervisoraActaDoc(null)}
+                            className="text-gray-400 hover:text-red-600 p-0.5 cursor-pointer"
+                            title="Quitar archivo adjunto"
+                          >
+                            <X size={11} />
+                          </button>
+                        </div>
+                      )}
                     </div>
                     <div>
                       <label className={labelClass}>Fecha de Acta</label>
                       <input
                         type="date"
+                        disabled={supervisoraBloqueado}
                         value={supervisoraActaFecha}
                         onChange={(e) => {
                           const val = e.target.value
@@ -2359,23 +4282,14 @@ export function ProyectoFormulario({
             />
 
             {/* Selector de Modalidad de Presupuesto / Estimaciones: Modo Hoja Sábana vs Modo Manual */}
-            <div className="rounded-xl border border-gray-200 bg-gray-50/70 p-3.5 space-y-2.5">
-              <div className="flex flex-wrap items-center justify-between gap-1.5">
-                <div>
-                  <h4 className="text-[11px] font-bold text-gray-800">
-                    Modalidad de Gestión de Presupuesto y Estimaciones
-                  </h4>
-                  <p className="text-[9.5px] text-gray-500">
-                    Define cómo se calcularán y registrarán los montos de estimaciones y avances en este proyecto.
-                  </p>
-                </div>
-                <span className={`rounded-full px-2 py-0.5 text-[8.5px] font-extrabold uppercase border ${
-                  modoGestionFinanciera === 'sabana'
-                    ? 'bg-red-50 text-[#9B0F06] border-red-200'
-                    : 'bg-amber-50 text-amber-800 border-amber-300'
-                }`}>
-                  {modoGestionFinanciera === 'sabana' ? 'Modo Sábana Activo' : 'Modo Manual Activo'}
-                </span>
+            <div className="rounded-xl border border-gray-200 bg-white p-3.5 space-y-2.5">
+              <div>
+                <h4 className="text-[11px] font-bold text-gray-800">
+                  Modalidad de Gestión de Presupuesto y Estimaciones
+                </h4>
+                <p className="text-[9.5px] text-gray-500">
+                  Define cómo se calcularán y registrarán los montos de estimaciones y avances en este proyecto.
+                </p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -2397,12 +4311,9 @@ export function ProyectoFormulario({
                   <div className="space-y-0.5 min-w-0">
                     <div className="flex items-center gap-1.5">
                       <span className="text-[11px] font-bold text-gray-900">Modo Hoja Sábana</span>
-                      <span className="text-[7.5px] font-extrabold px-1.5 py-0.2 rounded bg-red-100 text-[#9B0F06]">
-                        RECOMENDADO
-                      </span>
                     </div>
                     <p className="text-[9.5px] text-gray-500 leading-snug">
-                      Cálculo automatizado desde los 88 renglones DGC, mediciones analíticas en campo, amortización y liquidación por período.
+                      Cálculo automatizado desde los renglones DGC, mediciones analíticas en campo, amortización y liquidación por período. Al seleccionar <strong>Ver</strong> se puede desglosar el plan de trabajo.
                     </p>
                   </div>
                 </button>
@@ -2410,24 +4321,31 @@ export function ProyectoFormulario({
                 {/* Opción 2: Modo Manual */}
                 <button
                   type="button"
-                  onClick={() => setModoGestionFinanciera('manual')}
+                  onClick={() => {
+                    setModoGestionFinanciera('manual')
+                    // Al seleccionar el modo manual no deben salir seleccionados los renglones todos por defecto
+                    setRenglonesProyecto((prev) => {
+                      const todosEstabanSeleccionados = prev.every((r) => r.seleccionado !== false)
+                      if (todosEstabanSeleccionados) {
+                        return prev.map((r) => ({ ...r, seleccionado: false }))
+                      }
+                      return prev
+                    })
+                  }}
                   className={`flex items-start gap-3 p-3 rounded-xl border text-left transition-all cursor-pointer ${
                     modoGestionFinanciera === 'manual'
-                      ? 'border-amber-600 bg-white shadow-xs ring-1 ring-amber-600/30'
+                      ? 'border-gray-800 bg-white shadow-xs ring-1 ring-gray-800/30'
                       : 'border-gray-200 bg-white/60 hover:bg-white hover:border-gray-300'
                   }`}
                 >
                   <div className={`p-2 rounded-lg shrink-0 ${
-                    modoGestionFinanciera === 'manual' ? 'bg-amber-600 text-white' : 'bg-gray-100 text-gray-500'
+                    modoGestionFinanciera === 'manual' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-500'
                   }`}>
                     <Banknote size={16} />
                   </div>
                   <div className="space-y-0.5 min-w-0">
                     <div className="flex items-center gap-1.5">
                       <span className="text-[11px] font-bold text-gray-900">Modo Manual</span>
-                      <span className="text-[7.5px] font-extrabold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800">
-                        DIRECTO
-                      </span>
                     </div>
                     <p className="text-[9.5px] text-gray-500 leading-snug">
                       Ingreso manual y libre de montos finales, anticipos y saldos en las estimaciones de ejecutora y supervisora sin obligar a usar la sábana.
@@ -2435,6 +4353,98 @@ export function ProyectoFormulario({
                   </div>
                 </button>
               </div>
+
+              {/* Modo Manual: Configuración y Selección de Renglones para Bitácora */}
+              {modoGestionFinanciera === 'manual' && (
+                <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl border border-gray-200 bg-white mt-1">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs font-bold text-gray-900">Renglones Habilitados para Bitácora</p>
+                      <span className="rounded-full bg-gray-100 border border-gray-200 px-2 py-0.5 text-[9.5px] font-bold text-gray-700">
+                        {renglonesProyecto.filter((r) => r.seleccionado !== false).length} seleccionados
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-gray-500 mt-0.5">
+                      Configura qué renglones estarán disponibles para registrar anotaciones y avances en la bitácora de este proyecto.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setDrawerRenglonesAbierto(true)}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3.5 py-1.5 text-xs font-bold text-gray-800 hover:bg-gray-50 active:scale-95 transition-all shadow-2xs cursor-pointer"
+                  >
+                    <span>Gestionar Renglones ({renglonesProyecto.filter((r) => r.seleccionado !== false).length})</span>
+                  </button>
+                </div>
+              )}
+              {/* Modo Sábana: Asignación de Ámbito del Plan de Trabajo (Obra vs Supervisión) */}
+              {modoGestionFinanciera === 'sabana' && (
+                <div className="rounded-xl border border-gray-200 bg-gray-50/70 p-3 space-y-2 mt-1 font-[Poppins]">
+                  <div className="flex flex-wrap items-center justify-between gap-1">
+                    <div>
+                      <p className="text-[10.5px] font-bold text-gray-900">
+                        Implementación del Plan de Trabajo (Hoja Sábana)
+                      </p>
+                      <p className="text-[9px] text-gray-500">
+                        Indica en qué contrato se implementará la Hoja Sábana con cálculo analítico de renglones DGC. El contrato complementario se ingresará manualmente en la vista de estimaciones.
+                      </p>
+                    </div>
+                    <span className="text-[8.5px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-[#9B0F06] border border-red-200">
+                      Modo Sábana Activo
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setAmbitoPlanTrabajo('obra')}
+                      className={`flex items-start gap-2.5 p-2.5 rounded-lg border text-left transition-all cursor-pointer ${
+                        ambitoPlanTrabajo === 'obra'
+                          ? 'border-[#9B0F06] bg-white ring-1 ring-[#9B0F06]/30 shadow-2xs'
+                          : 'border-gray-200 bg-white/70 hover:bg-white'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="ambitoPlanTrabajo"
+                        checked={ambitoPlanTrabajo === 'obra'}
+                        onChange={() => setAmbitoPlanTrabajo('obra')}
+                        className="mt-0.5 text-[#9B0F06] focus:ring-[#9B0F06] cursor-pointer"
+                      />
+                      <div className="min-w-0">
+                        <div className="text-[10.5px] font-bold text-gray-900">Contrato de Obra (Ejecución)</div>
+                        <p className="text-[9px] text-gray-500">
+                          El plan de trabajo analítico se aplica a la <strong>Obra</strong>. La estimación de Supervisión se ingresará de forma manual.
+                        </p>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setAmbitoPlanTrabajo('supervision')}
+                      className={`flex items-start gap-2.5 p-2.5 rounded-lg border text-left transition-all cursor-pointer ${
+                        ambitoPlanTrabajo === 'supervision'
+                          ? 'border-orange-700 bg-white ring-1 ring-orange-700/30 shadow-2xs'
+                          : 'border-gray-200 bg-white/70 hover:bg-white'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="ambitoPlanTrabajo"
+                        checked={ambitoPlanTrabajo === 'supervision'}
+                        onChange={() => setAmbitoPlanTrabajo('supervision')}
+                        className="mt-0.5 text-orange-700 focus:ring-orange-700 cursor-pointer"
+                      />
+                      <div className="min-w-0">
+                        <div className="text-[10.5px] font-bold text-gray-900">Contrato de Supervisión</div>
+                        <p className="text-[9px] text-gray-500">
+                          El plan de trabajo analítico se aplica a la <strong>Supervisión</strong>. La estimación de Obra se ingresará de forma manual.
+                        </p>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Sub-tabs para Paso 5 con diseño moderno estilo underline (img3) */}
@@ -2480,27 +4490,39 @@ export function ProyectoFormulario({
             {/* 5.1 Financiero de Ejecución (Obra) */}
             {subTabPaso5 === 'ejecucion' && (
               <div className="rounded-lg border border-gray-200 bg-white p-3.5 space-y-3">
+                {modoGestionFinanciera === 'sabana' && ambitoPlanTrabajo === 'supervision' && (
+                  <p className="text-[10px] text-gray-500 font-[Poppins] flex items-center gap-1.5 pb-0.5">
+                    <Info size={12} className="shrink-0 text-amber-600" />
+                    <span>
+                      <strong className="text-gray-700">Estimación Manual:</strong> El Plan de Trabajo de la Hoja Sábana está asignado a <strong>Supervisión</strong>. Las estimaciones de Obra se registrarán de forma manual.
+                    </span>
+                  </p>
+                )}
                 <div className="flex items-center justify-between border-b border-gray-100 pb-1.5">
                   <div className="flex items-center gap-1.5 font-bold text-gray-800 text-[10.5px]">
                     <Banknote size={13} className="text-[#9B0F06]" />
                     <span>VALORES FINANCIEROS Y PLAZOS DEL CONTRATO DE OBRA</span>
                   </div>
-                  <span className="rounded bg-red-50 text-[#9B0F06] font-bold px-2 py-0.5 text-[8.5px] border border-red-200">
-                    EJECUCIÓN
-                  </span>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+                <div className={`grid grid-cols-1 ${modoGestionFinanciera === 'sabana' && ambitoPlanTrabajo === 'obra' ? 'md:grid-cols-4' : 'md:grid-cols-3'} gap-2.5`}>
+                  {/* Monto Original del Contrato de Obra (Q) * (Aparte y siempre editable) */}
                   <div>
                     <label className={labelClass}>
-                      Monto Original del Contrato de Obra (Q) <span className="text-[#9B0F06]">*</span>
+                      <span>Monto Original del Contrato de Obra (Q) <span className="text-[#9B0F06]">*</span></span>
                     </label>
-                    <div className="relative">
-                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-xs">Q</span>
+                    <div className="flex rounded border border-gray-300 shadow-2xs overflow-hidden focus-within:ring-1 focus-within:ring-[#9B0F06] focus-within:border-[#9B0F06] bg-white">
+                      <span className="inline-flex items-center px-3 bg-gray-100 text-gray-700 font-bold text-xs select-none border-r border-gray-200">
+                        Q
+                      </span>
                       <input
                         type="text"
-                        maxLength={15}
+                        maxLength={25}
                         value={montoContractualOriginal}
+                        onFocus={() => {
+                          const clean = montoContractualOriginal.replace(/,/g, '')
+                          setMontoContractualOriginal(clean)
+                        }}
                         onChange={(e) => {
                           const raw = e.target.value
                           if (/[a-zA-Z]/.test(raw)) {
@@ -2510,14 +4532,58 @@ export function ProyectoFormulario({
                           } else {
                             setFieldError('montoContractualOriginal', null)
                           }
-                          setMontoContractualOriginal(sanitizeNumeroPositivo(raw, 15))
+                          setMontoContractualOriginal(sanitizeMontoMoneda(raw))
                         }}
-                        className={`${errorInputClass(errors, 'montoContractualOriginal', errorMessages)} pl-7 font-mono font-bold text-gray-900`}
-                        placeholder="369834297.14"
+                        onBlur={() => {
+                          const num = parseMontoNumber(montoContractualOriginal)
+                          if (num > 0) {
+                            setMontoContractualOriginal(num.toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }))
+                          }
+                        }}
+                        className="w-full px-2.5 py-1.5 text-[11px] font-mono font-bold text-gray-900 border-0 outline-none focus:ring-0 bg-transparent"
+                        placeholder="0.00"
                       />
                     </div>
                     {renderFieldError('montoContractualOriginal')}
                   </div>
+
+                  {/* Monto Calculado por el Plan de Trabajo (Aparte en Modo Sábana si aplica a Obra) */}
+                  {modoGestionFinanciera === 'sabana' && ambitoPlanTrabajo === 'obra' && (
+                    <div>
+                      <label className={labelClass}>
+                        <span>Monto Calculado Plan de Trabajo <span className="text-gray-400 font-normal">(Hoja Sábana)</span></span>
+                      </label>
+                      <div className="flex items-center gap-1.5">
+                        <div className="flex flex-1 rounded border border-gray-200 bg-gray-50/90 overflow-hidden">
+                          <span className="inline-flex items-center px-2.5 bg-gray-200/60 text-gray-600 font-bold text-xs select-none border-r border-gray-200">
+                            Q
+                          </span>
+                          <input
+                            type="text"
+                            readOnly
+                            value={montoPlanTrabajo ? parseMontoNumber(montoPlanTrabajo).toLocaleString('es-GT', { minimumFractionDigits: 2 }) : '0.00'}
+                            className="w-full px-2.5 py-1.5 text-[10px] md:text-[11px] font-mono font-bold text-gray-800 bg-transparent border-0 outline-none cursor-not-allowed select-none"
+                            placeholder="0.00"
+                          />
+                        </div>
+
+                        {/* Botón Ver Hoja Sábana */}
+                        <button
+                          type="button"
+                          onClick={handleAbrirPlanTrabajo}
+                          title="Ver y desglosar el plan de trabajo en la Hoja Sábana"
+                          className="inline-flex items-center gap-1.5 rounded bg-[#9B0F06] px-3 py-1.5 text-xs font-bold text-white hover:bg-[#7D0C05] active:scale-95 transition-all shadow-2xs shrink-0 cursor-pointer font-[Poppins]"
+                        >
+                          <Calendar size={13} />
+                          <span>Ver</span>
+                        </button>
+                      </div>
+                      <p className="mt-1 text-[8.5px] text-[#9B0F06] font-medium font-[Poppins] flex items-center gap-1">
+                        <Info size={11} className="shrink-0 text-[#9B0F06]" />
+                        <span>Al seleccionar <strong>Ver</strong> se puede desglosar el plan de trabajo.</span>
+                      </p>
+                    </div>
+                  )}
 
                   <div>
                     <label className={labelClass}>Porcentaje de Anticipo (%)</label>
@@ -2554,12 +4620,15 @@ export function ProyectoFormulario({
                     <label className={labelClass}>Plazo Contractual en Meses</label>
                     <input
                       type="text"
-                      maxLength={50}
+                      readOnly
+                      tabIndex={-1}
                       value={contratistaMesesPlazo}
-                      onChange={(e) => setContratistaMesesPlazo(e.target.value.slice(0, 50))}
-                      className={inputClass}
-                      placeholder="18 meses (Etapa de Construcción)"
+                      className={`${inputClass} bg-gray-50/90 cursor-not-allowed select-none font-mono font-bold text-gray-800 ${
+                        esDiferenciaPlazoInvalida ? 'border-red-500 ring-1 ring-red-400 bg-red-50/30 text-red-900' : ''
+                      }`}
+                      placeholder="Calculado automáticamente..."
                     />
+                    <span className="block mt-0.5 text-[8.5px] text-gray-500 font-normal">Calculado automáticamente desde las fechas (No editable)</span>
                   </div>
                 </div>
 
@@ -2595,31 +4664,56 @@ export function ProyectoFormulario({
                     />
                   </div>
                 </div>
+
+                {esDiferenciaPlazoInvalida && (
+                  <div className="rounded-lg border border-red-300 bg-red-50/90 p-2.5 text-red-900 shadow-2xs">
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 text-red-600 mt-0.5 shrink-0" />
+                      <div className="text-[10.5px]">
+                        <p className="font-bold text-red-800">Diferencia de plazo no permitida</p>
+                        <p className="mt-0.5 text-red-700">
+                          El plazo de Obra ({mesesObraNum} {mesesObraNum === 1 ? 'mes' : 'meses'}) y el de Supervisión ({mesesSupervisionNum} {mesesSupervisionNum === 1 ? 'mes' : 'meses'}) deben ser similares con como máximo <strong>1 mes de diferencia</strong> (diferencia actual: {diferenciaPlazoMeses} {diferenciaPlazoMeses === 1 ? 'mes' : 'meses'}).
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
             {/* 5.2 Financiero de Supervisión */}
             {subTabPaso5 === 'supervision' && (
               <div className="rounded-lg border border-gray-200 bg-white p-3.5 space-y-3">
+                {modoGestionFinanciera === 'sabana' && ambitoPlanTrabajo === 'obra' && (
+                  <p className="text-[10px] text-gray-500 font-[Poppins] flex items-center gap-1.5 pb-0.5">
+                    <Info size={12} className="shrink-0 text-amber-600" />
+                    <span>
+                      <strong className="text-gray-700">Estimación Manual:</strong> El Plan de Trabajo de la Hoja Sábana está asignado a <strong>Obra</strong>. Las estimaciones de Supervisión se registrarán de forma manual.
+                    </span>
+                  </p>
+                )}
                 <div className="flex items-center justify-between border-b border-gray-100 pb-1.5">
                   <div className="flex items-center gap-1.5 font-bold text-gray-800 text-[10.5px]">
                     <Banknote size={13} className="text-orange-700" />
                     <span>VALORES FINANCIEROS Y PLAZOS DEL CONTRATO DE SUPERVISIÓN</span>
                   </div>
-                  <span className="rounded bg-orange-50 text-orange-700 font-bold px-2 py-0.5 text-[8.5px] border border-orange-200">
-                    SUPERVISIÓN
-                  </span>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+                <div className={`grid grid-cols-1 ${modoGestionFinanciera === 'sabana' && ambitoPlanTrabajo === 'supervision' ? 'md:grid-cols-4' : 'md:grid-cols-3'} gap-2.5`}>
                   <div>
                     <label className={labelClass}>Monto Original de Supervisión (Q)</label>
-                    <div className="relative">
-                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-xs">Q</span>
+                    <div className="flex rounded border border-gray-300 shadow-2xs overflow-hidden focus-within:ring-1 focus-within:ring-orange-600 focus-within:border-orange-600 bg-white">
+                      <span className="inline-flex items-center px-3 bg-gray-100 text-gray-700 font-bold text-xs select-none border-r border-gray-200">
+                        Q
+                      </span>
                       <input
                         type="text"
-                        maxLength={15}
+                        maxLength={25}
                         value={supervisoraMontoOriginal}
+                        onFocus={() => {
+                          const clean = supervisoraMontoOriginal.replace(/,/g, '')
+                          setSupervisoraMontoOriginal(clean)
+                        }}
                         onChange={(e) => {
                           const raw = e.target.value
                           if (/[a-zA-Z]/.test(raw)) {
@@ -2627,14 +4721,58 @@ export function ProyectoFormulario({
                           } else {
                             setFieldError('supervisoraMontoOriginal', null)
                           }
-                          setSupervisoraMontoOriginal(sanitizeNumeroPositivo(raw, 15))
+                          setSupervisoraMontoOriginal(sanitizeMontoMoneda(raw))
                         }}
-                        className={`${errorInputClass(errors, 'supervisoraMontoOriginal', errorMessages)} pl-7 font-mono font-bold text-gray-900`}
-                        placeholder="13351095.20"
+                        onBlur={() => {
+                          const num = parseMontoNumber(supervisoraMontoOriginal)
+                          if (num > 0) {
+                            setSupervisoraMontoOriginal(num.toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }))
+                          }
+                        }}
+                        className="w-full px-2.5 py-1.5 text-[11px] font-mono font-bold text-gray-900 border-0 outline-none focus:ring-0 bg-transparent"
+                        placeholder="0.00"
                       />
                     </div>
                     {renderFieldError('supervisoraMontoOriginal')}
                   </div>
+
+                  {/* Monto Calculado por el Plan de Trabajo (Aparte en Modo Sábana si aplica a Supervisión) */}
+                  {modoGestionFinanciera === 'sabana' && ambitoPlanTrabajo === 'supervision' && (
+                    <div>
+                      <label className={labelClass}>
+                        <span>Monto Calculado Plan de Trabajo <span className="text-gray-400 font-normal">(Hoja Sábana)</span></span>
+                      </label>
+                      <div className="flex items-center gap-1.5">
+                        <div className="flex flex-1 rounded border border-gray-200 bg-gray-50/90 overflow-hidden">
+                          <span className="inline-flex items-center px-2.5 bg-gray-200/60 text-gray-600 font-bold text-xs select-none border-r border-gray-200">
+                            Q
+                          </span>
+                          <input
+                            type="text"
+                            readOnly
+                            value={montoPlanTrabajo ? parseMontoNumber(montoPlanTrabajo).toLocaleString('es-GT', { minimumFractionDigits: 2 }) : '0.00'}
+                            className="w-full px-2.5 py-1.5 text-[10px] md:text-[11px] font-mono font-bold text-gray-800 bg-transparent border-0 outline-none cursor-not-allowed select-none"
+                            placeholder="0.00"
+                          />
+                        </div>
+
+                        {/* Botón Ver Hoja Sábana */}
+                        <button
+                          type="button"
+                          onClick={handleAbrirPlanTrabajo}
+                          title="Ver y desglosar el plan de trabajo en la Hoja Sábana"
+                          className="inline-flex items-center gap-1.5 rounded bg-orange-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-orange-800 active:scale-95 transition-all shadow-2xs shrink-0 cursor-pointer font-[Poppins]"
+                        >
+                          <Calendar size={13} />
+                          <span>Ver</span>
+                        </button>
+                      </div>
+                      <p className="mt-1 text-[8.5px] text-orange-700 font-medium font-[Poppins] flex items-center gap-1">
+                        <Info size={11} className="shrink-0 text-orange-700" />
+                        <span>Al seleccionar <strong>Ver</strong> se puede desglosar el plan de trabajo de supervisión.</span>
+                      </p>
+                    </div>
+                  )}
 
                   <div>
                     <label className={labelClass}>Porcentaje de Anticipo (%)</label>
@@ -2671,12 +4809,15 @@ export function ProyectoFormulario({
                     <label className={labelClass}>Plazo Desglosado de Supervisión</label>
                     <input
                       type="text"
-                      maxLength={50}
+                      readOnly
+                      tabIndex={-1}
                       value={supervisoraMesesPlazo}
-                      onChange={(e) => setSupervisoraMesesPlazo(e.target.value.slice(0, 50))}
-                      className={inputClass}
-                      placeholder="22 MESES (2 Pre, 18 Ejecución, 2 Post)"
+                      className={`${inputClass} bg-gray-50/90 cursor-not-allowed select-none font-mono font-bold text-gray-800 ${
+                        esDiferenciaPlazoInvalida ? 'border-red-500 ring-1 ring-red-400 bg-red-50/30 text-red-900' : ''
+                      }`}
+                      placeholder="Calculado automáticamente..."
                     />
+                    <span className="block mt-0.5 text-[8.5px] text-gray-500 font-normal">Calculado automáticamente desde las fechas (No editable)</span>
                   </div>
                 </div>
 
@@ -2701,6 +4842,20 @@ export function ProyectoFormulario({
                     />
                   </div>
                 </div>
+
+                {esDiferenciaPlazoInvalida && (
+                  <div className="rounded-lg border border-red-300 bg-red-50/90 p-2.5 text-red-900 shadow-2xs">
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 text-red-600 mt-0.5 shrink-0" />
+                      <div className="text-[10.5px]">
+                        <p className="font-bold text-red-800">Diferencia de plazo no permitida</p>
+                        <p className="mt-0.5 text-red-700">
+                          El plazo de Supervisión ({mesesSupervisionNum} {mesesSupervisionNum === 1 ? 'mes' : 'meses'}) y el de Ejecución de Obra ({mesesObraNum} {mesesObraNum === 1 ? 'mes' : 'meses'}) deben ser similares con como máximo <strong>1 mes de diferencia</strong> (diferencia actual: {diferenciaPlazoMeses} {diferenciaPlazoMeses === 1 ? 'mes' : 'meses'}). Ajuste las fechas para que no exceda 1 mes respecto a la obra.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -2719,11 +4874,11 @@ export function ProyectoFormulario({
                         Presupuesto Total Consolidado
                       </span>
                       <div className="text-lg font-black text-gray-900 font-mono mt-0.5">
-                        Q {(parseFloat(montoContractualOriginal || '0') + parseFloat(supervisoraMontoOriginal || '0')).toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                        Q {(parseMontoNumber(montoContractualOriginal) + parseMontoNumber(supervisoraMontoOriginal)).toLocaleString('es-GT', { minimumFractionDigits: 2 })}
                       </div>
                       <div className="text-[9.5px] text-gray-500 mt-1 font-mono">
-                        • Obra: Q {parseFloat(montoContractualOriginal || '0').toLocaleString('es-GT', { minimumFractionDigits: 2 })}<br/>
-                        • Supervisión: Q {parseFloat(supervisoraMontoOriginal || '0').toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                        • Obra: Q {parseMontoNumber(montoContractualOriginal).toLocaleString('es-GT', { minimumFractionDigits: 2 })}<br/>
+                        • Supervisión: Q {parseMontoNumber(supervisoraMontoOriginal).toLocaleString('es-GT', { minimumFractionDigits: 2 })}
                       </div>
                     </div>
 
@@ -2775,6 +4930,7 @@ export function ProyectoFormulario({
                   labelClass={labelClass}
                   onAbrirCrearDelegado={() => setOpenCrearDelegadoDrawer(true)}
                   reloadTrigger={reloadDelegadosTrigger}
+                  excluirUsuarioId={responsable}
                 />
 
                 <IngenieroResponsableSelect
@@ -2787,6 +4943,7 @@ export function ProyectoFormulario({
                   labelClass={labelClass}
                   onAbrirCrearIngeniero={() => setOpenCrearIngenieroDrawer(true)}
                   reloadTrigger={reloadIngenierosTrigger}
+                  excluirUsuarioId={delegadoResidenteId}
                 />
               </div>
 
@@ -2795,6 +4952,8 @@ export function ProyectoFormulario({
                 setEquipo={setEquipo}
                 usuariosDisponibles={usuariosDisponibles}
                 onAbrirCrearUsuario={() => setOpenCrearUsuarioDrawer(true)}
+                delegadoResidenteId={delegadoResidenteId}
+                responsableId={responsable}
               />
             </div>
 
@@ -2806,7 +4965,6 @@ export function ProyectoFormulario({
                   <span>IDENTIFICACIÓN Y UBICACIÓN</span>
                 </div>
                 <div className="text-[10px] space-y-1 text-gray-700">
-                  <p><strong className="text-gray-900">Código:</strong> {codigo}</p>
                   <p><strong className="text-gray-900">Nombre Oficial:</strong> {nombreOficial || 'No especificado'}</p>
                   <p><strong className="text-gray-900">Entidad Contratante:</strong> {entidadContratante || 'No asignada'}</p>
                   <p><strong className="text-gray-900">Dirección:</strong> {direccion || 'No especificada'}</p>
@@ -2821,10 +4979,10 @@ export function ProyectoFormulario({
                 </div>
                 <div className="text-[10px] space-y-1 text-gray-700">
                   <p><strong className="text-gray-900">Empresa Ejecutora:</strong> {empresaContratista || 'No asignada'}</p>
-                  <p><strong className="text-gray-900">Monto Obra:</strong> Q {parseFloat(montoContractualOriginal || '0').toLocaleString('es-GT', { minimumFractionDigits: 2 })}</p>
+                  <p><strong className="text-gray-900">Monto Obra:</strong> Q {parseMontoNumber(montoContractualOriginal).toLocaleString('es-GT', { minimumFractionDigits: 2 })}</p>
                   <p><strong className="text-gray-900">Anticipo Obra:</strong> {contratistaPorcentajeAnticipo}% (Q {contratistaMontoAnticipoCalculado.toLocaleString('es-GT', { minimumFractionDigits: 2 })})</p>
                   <p><strong className="text-gray-900">Empresa Supervisora:</strong> {empresaSupervisora || 'No asignada'}</p>
-                  <p><strong className="text-gray-900">Monto Supervisión:</strong> Q {parseFloat(supervisoraMontoOriginal || '0').toLocaleString('es-GT', { minimumFractionDigits: 2 })}</p>
+                  <p><strong className="text-gray-900">Monto Supervisión:</strong> Q {parseMontoNumber(supervisoraMontoOriginal).toLocaleString('es-GT', { minimumFractionDigits: 2 })}</p>
                 </div>
               </div>
             </div>
@@ -2867,60 +5025,98 @@ export function ProyectoFormulario({
             </div>
           </div>
         )}
+      </div>
 
-        {/* ========================================================= */}
-        {/* BARRA DE NAVEGACIÓN INFERIOR Y ACCIONES */}
-        {/* ========================================================= */}
-        <div className="flex items-center justify-between border-t border-gray-100 pt-3">
+      {/* ========================================================= */}
+      {/* BARRA DE NAVEGACIÓN INFERIOR Y ACCIONES (FIJA AL FINAL) */}
+      {/* ========================================================= */}
+      <div className="shrink-0 z-20 bg-white rounded-b-lg border border-gray-200 border-t border-t-gray-100 px-3.5 sm:px-4 py-2.5 sm:py-3 shadow-xs font-[Poppins]">
+        <div className="flex items-center justify-between">
           <div>
             {pasoActual > 1 ? (
               <button
                 type="button"
                 onClick={() => setPasoActual((prev) => (prev - 1) as 1 | 2 | 3 | 4 | 5 | 6)}
-                className="inline-flex items-center gap-1 rounded-md border border-gray-300 px-3.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1 rounded-md border border-gray-300 px-3.5 py-1.5 text-[10px] md:text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer font-[Poppins]"
               >
                 <ArrowLeft size={12} />
-                <span>Paso Anterior</span>
+                <span><span className="sm:hidden">Atrás</span><span className="hidden sm:inline">Paso Anterior</span></span>
               </button>
             ) : (
               <button
                 type="button"
                 onClick={onCancelar}
-                className="rounded-md border border-gray-300 px-3.5 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer"
+                className="rounded-md border border-gray-300 px-3.5 py-1.5 text-[10px] md:text-xs font-semibold text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer font-[Poppins]"
               >
                 Cancelar
               </button>
             )}
           </div>
 
-          <div className="flex items-center gap-2">
-            {/* Botón rápido Guardar como Borrador */}
+          <div className="flex items-center gap-2 font-[Poppins]">
+            {/* Botón Guardar como Borrador */}
             <button
               type="button"
               onClick={() => handleGuardarProyecto('borrador')}
-              className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3.5 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-50 transition-colors shadow-2xs cursor-pointer"
+              className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-[10px] md:text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors shadow-2xs cursor-pointer font-[Poppins]"
+              title="Guardar como borrador preliminar"
             >
               <Save size={12} className="text-gray-500" />
-              <span>Guardar como Borrador</span>
+              <span><span className="sm:hidden">Borrador</span><span className="hidden sm:inline">Guardar como Borrador</span></span>
+            </button>
+
+            {/* Botón directo Guardar y Activar */}
+            <button
+              type="button"
+              onClick={() => handleGuardarProyecto('activo')}
+              className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 text-[10px] md:text-xs font-bold shadow-2xs transition-colors cursor-pointer font-[Poppins]"
+              title="Guardar y activar inmediatamente el proyecto"
+            >
+              <CheckCircle2 size={12} />
+              <span><span className="sm:hidden">Activar</span><span className="hidden sm:inline">Guardar y Activar</span></span>
             </button>
 
             {pasoActual < 6 ? (
               <button
                 type="button"
-                onClick={() => setPasoActual((prev) => (prev + 1) as 1 | 2 | 3 | 4 | 5 | 6)}
-                className="inline-flex items-center gap-1.5 rounded-md bg-[#9B0F06] px-4 py-1.5 text-xs font-bold text-white hover:bg-[#5E0006] transition-colors shadow-2xs cursor-pointer"
+                onClick={() => {
+                  if (pasoActual === 2) {
+                    const dIniNorm = normalizarTexto(direccion || '')
+                    const dFinNorm = normalizarTexto(direccionFin || '')
+                    if (dIniNorm && dFinNorm && dIniNorm === dFinNorm) {
+                      showErrorToast('La ubicación de destino no puede ser idéntica a la ubicación inicial.')
+                      return
+                    }
+                  }
+                  if (pasoActual === 5) {
+                    if (esDiferenciaPlazoInvalida) {
+                      showErrorToast(`El plazo de supervisión (${mesesSupervisionNum} meses) y obra (${mesesObraNum} meses) no pueden diferir por más de 1 mes (diferencia actual: ${diferenciaPlazoMeses} meses).`)
+                      return
+                    }
+                  }
+                  setPasoActual((prev) => (prev + 1) as 1 | 2 | 3 | 4 | 5 | 6)
+                }}
+                className="inline-flex items-center gap-1.5 rounded-md bg-[#9B0F06] px-4 py-1.5 text-[10px] md:text-xs font-bold text-white hover:bg-[#5E0006] transition-colors shadow-2xs cursor-pointer font-[Poppins]"
               >
-                <span>Continuar al Paso {pasoActual + 1}</span>
+                <span><span className="sm:hidden">Paso {pasoActual + 1}</span><span className="hidden sm:inline">Continuar al Paso {pasoActual + 1}</span></span>
                 <ArrowRight size={12} />
               </button>
             ) : (
               <button
                 type="button"
-                onClick={() => handleGuardarProyecto()}
-                className="inline-flex items-center gap-1.5 rounded-md bg-[#9B0F06] px-4 py-1.5 text-xs font-bold text-white hover:bg-[#5E0006] transition-colors shadow-2xs cursor-pointer"
+                onClick={() => handleGuardarProyecto(estado)}
+                className="inline-flex items-center gap-1.5 rounded-md bg-[#9B0F06] px-4 py-1.5 text-[10px] md:text-xs font-bold text-white hover:bg-[#5E0006] transition-colors shadow-2xs cursor-pointer font-[Poppins]"
               >
                 <CheckCircle2 size={13} />
-                <span>{esEditar ? 'Guardar Cambios' : 'Crear y Finalizar Proyecto'}</span>
+                <span>
+                  {esEditar
+                    ? estado === 'activo'
+                      ? 'Guardar Proyecto (Activo)'
+                      : 'Guardar Cambios'
+                    : estado === 'activo'
+                    ? 'Crear y Activar Proyecto'
+                    : 'Crear y Finalizar Proyecto'}
+                </span>
               </button>
             )}
           </div>
@@ -2930,8 +5126,14 @@ export function ProyectoFormulario({
       {/* Modal de Confirmación: Pausar Proyecto */}
       {modalPausarAbierto && (
         <Portal>
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
-            <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-2xl border border-amber-200 space-y-4 font-[Poppins]">
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150"
+            onClick={() => setModalPausarAbierto(false)}
+          >
+            <div
+              className="w-full max-w-md rounded-xl bg-white p-5 shadow-2xl border border-amber-200 space-y-4 font-[Poppins]"
+              onClick={(e) => e.stopPropagation()}
+            >
               <div className="flex items-start gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700">
                   <AlertCircle size={22} />
@@ -2976,8 +5178,14 @@ export function ProyectoFormulario({
       {/* Modal de Confirmación: Completar Proyecto */}
       {modalCompletadoAbierto && (
         <Portal>
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
-            <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-2xl border border-slate-200 space-y-4 font-[Poppins]">
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150"
+            onClick={() => setModalCompletadoAbierto(false)}
+          >
+            <div
+              className="w-full max-w-md rounded-xl bg-white p-5 shadow-2xl border border-slate-200 space-y-4 font-[Poppins]"
+              onClick={(e) => e.stopPropagation()}
+            >
               <div className="flex items-start gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-800">
                   <CheckCircle2 size={22} />
@@ -3022,33 +5230,83 @@ export function ProyectoFormulario({
       <UsuarioFormularioDrawer
         isOpen={openCrearUsuarioDrawer}
         onClose={() => setOpenCrearUsuarioDrawer(false)}
+        ocultarEmpresaContratista={true}
         onSave={() => { setOpenCrearUsuarioDrawer(false); cargarUsuarios() }}
+      />
+      <UsuarioFormularioDrawer
+        isOpen={openCrearUsuarioContratistaDrawer}
+        onClose={() => setOpenCrearUsuarioContratistaDrawer(false)}
+        rolInicial="Contratante"
+        rolesPermitidos={['Contratante', 'IngenieroResidente', 'Supervisor']}
+        bloquearRol={true}
+        bloquearEstado={true}
+        empresaContratistaIdInicial={empresaContratistaId}
+        ocultarEmpresaContratista={true}
+        onSave={(u) => {
+          setOpenCrearUsuarioContratistaDrawer(false)
+          cargarUsuarios()
+          if (u) {
+            const nom = `${u.primer_nombre || ''} ${u.primer_apellido || ''}`.trim() || u.nombre || u.username
+            if (nom) {
+              registrarUsuarioEnEmpresa(empresaContratista, u)
+              if (drawerContextoUsuario === 'contratista_superintendente') {
+                setContratistaSuperintendente(nom)
+                if (!contratistaPropietario) setContratistaPropietario(nom)
+              } else {
+                setContratistaPropietario(nom)
+                if (!contratistaSuperintendente) setContratistaSuperintendente(nom)
+              }
+              showSuccessToast(`Usuario "${nom}" creado y asignado a Empresa Ejecutora`)
+            }
+          }
+        }}
+      />
+      <UsuarioFormularioDrawer
+        isOpen={openCrearUsuarioSupervisoraDrawer}
+        onClose={() => setOpenCrearUsuarioSupervisoraDrawer(false)}
+        rolInicial="Supervisor"
+        rolesPermitidos={['Supervisor', 'IngenieroResidente', 'Ingeniero Residente', 'Director', 'Administrador']}
+        bloquearRol={true}
+        bloquearEstado={true}
+        ocultarEmpresaContratista={true}
+        onSave={(u) => {
+          setOpenCrearUsuarioSupervisoraDrawer(false)
+          cargarUsuarios()
+          if (u) {
+            const nom = `${u.primer_nombre || ''} ${u.primer_apellido || ''}`.trim() || u.nombre || u.username
+            if (nom) {
+              registrarUsuarioEnEmpresa(empresaSupervisora, u)
+              if (drawerContextoUsuario === 'supervisora_responsable') {
+                setSupervisoraResponsable(nom)
+                if (!supervisoraPropietario) setSupervisoraPropietario(nom)
+              } else {
+                setSupervisoraPropietario(nom)
+                if (!supervisoraResponsable) setSupervisoraResponsable(nom)
+              }
+              showSuccessToast(`Usuario "${nom}" creado y asignado a Empresa Supervisora`)
+            }
+          }
+        }}
       />
       <UsuarioFormularioDrawer
         isOpen={openCrearDelegadoDrawer}
         onClose={() => setOpenCrearDelegadoDrawer(false)}
+        ocultarEmpresaContratista={true}
         onSave={() => { setOpenCrearDelegadoDrawer(false); cargarUsuarios(); setReloadDelegadosTrigger(p => p + 1) }}
         rolesPermitidos={['Administrador', 'IngenieroResidente', 'Ingeniero Residente']}
       />
       <UsuarioFormularioDrawer
         isOpen={openCrearIngenieroDrawer}
         onClose={() => setOpenCrearIngenieroDrawer(false)}
+        ocultarEmpresaContratista={true}
         onSave={() => { setOpenCrearIngenieroDrawer(false); cargarUsuarios(); setReloadIngenierosTrigger(p => p + 1) }}
         rolesPermitidos={['Administrador', 'IngenieroResidente', 'Ingeniero Residente', 'Director']}
       />
-      <EmpresaRelacionadaDrawer
-        isOpen={openCrearEntidadDrawer}
-        onClose={() => setOpenCrearEntidadDrawer(false)}
-        onSave={handleEntidadCreada}
-        tipo="entidad"
-        mode="create"
-      />
-      <EmpresaRelacionadaDrawer
-        isOpen={openCrearContratistaDrawer}
-        onClose={() => setOpenCrearContratistaDrawer(false)}
-        onSave={handleContratistaCreado}
-        tipo="contratista"
-        mode="create"
+      <RenglonesBitacoraDrawer
+        isOpen={drawerRenglonesAbierto}
+        onClose={() => setDrawerRenglonesAbierto(false)}
+        renglonesActuales={renglonesProyecto}
+        onGuardar={(seleccionados) => setRenglonesProyecto(seleccionados)}
       />
     </div>
   )

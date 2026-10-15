@@ -110,12 +110,18 @@ PORT=3001
 NODE_ENV=development
 SUPABASE_URL=
 SUPABASE_SERVICE_ROLE_KEY=
+DATABASE_URL=
 GCS_PROJECT_ID=
 GCS_BUCKET_NAME=
 GCS_KEY_FILE=
 ANTHROPIC_API_KEY=
 CORS_ORIGIN=
 ```
+
+`DATABASE_URL` debe ser la cadena de conexión PostgreSQL de Supabase (directa o del
+pooler), no la `SUPABASE_SERVICE_ROLE_KEY`. El módulo de respaldos usa esta conexión
+privada desde el backend para extraer el esquema, datos, índices, funciones y triggers
+sin exponer credenciales de base de datos al navegador.
 
 ## Docker
 

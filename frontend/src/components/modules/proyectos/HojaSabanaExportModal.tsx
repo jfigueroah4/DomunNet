@@ -1,9 +1,21 @@
 'use client'
 
 import { useState } from 'react'
-import { FileText, FileSpreadsheet, X, CheckSquare, Square, Layers, Calculator, Banknote } from 'lucide-react'
+import {
+  FileText,
+  FileSpreadsheet,
+  X,
+  CheckSquare,
+  Square,
+  Layers,
+  Calculator,
+  Banknote,
+  FileCheck2,
+  TrendingUp,
+} from 'lucide-react'
 import { exportarSabanaPDF, exportarSabanaExcel, SabanaExportOptions } from '@/lib/export/sabanaExportEngine'
 import { RenglonDetalladoSabana, MedicionAnaliticaCampo } from './HojaSabanaView'
+import { showSuccessToast } from '@/components/ui/Toast'
 
 interface HojaSabanaExportModalProps {
   isOpen: boolean
@@ -11,6 +23,7 @@ interface HojaSabanaExportModalProps {
   proyecto: any
   renglones: RenglonDetalladoSabana[]
   medicionesAnaliticas?: MedicionAnaliticaCampo[]
+  trabajosPendientes?: any[]
   modoVistaSabana: 'planificacion' | 'actual'
   estimacionActiva?: any
 }
@@ -21,24 +34,34 @@ export function HojaSabanaExportModal({
   proyecto,
   renglones,
   medicionesAnaliticas = [],
+  trabajosPendientes = [],
   modoVistaSabana,
   estimacionActiva,
 }: HojaSabanaExportModalProps) {
+  const isPlan = modoVistaSabana === 'planificacion'
+
   const [incluirSabana, setIncluirSabana] = useState(true)
-  const [incluirAnalitico, setIncluirAnalitico] = useState(modoVistaSabana === 'actual')
+  const [incluirAnalitico, setIncluirAnalitico] = useState(!isPlan)
   const [incluirResumen, setIncluirResumen] = useState(true)
+  const [incluirPendientes, setIncluirPendientes] = useState(!isPlan)
+  const [incluirPlanificadoReal, setIncluirPlanificadoReal] = useState(!isPlan)
 
   if (!isOpen) return null
 
-  const ningunSeleccionado = !incluirSabana && !incluirAnalitico && !incluirResumen
+  const ningunSeleccionado = isPlan
+    ? !incluirSabana && !incluirResumen
+    : !incluirSabana && !incluirAnalitico && !incluirResumen && !incluirPendientes && !incluirPlanificadoReal
 
   const getExportOptions = (): SabanaExportOptions => ({
     incluirSabana,
-    incluirAnalitico: modoVistaSabana === 'actual' ? incluirAnalitico : false,
+    incluirAnalitico: !isPlan ? incluirAnalitico : false,
     incluirResumen,
+    incluirPendientes: !isPlan ? incluirPendientes : false,
+    incluirPlanificadoReal: !isPlan ? incluirPlanificadoReal : false,
     proyecto,
     renglones,
     medicionesAnaliticas,
+    trabajosPendientes,
     modoVistaSabana,
     estimacionActiva,
   })
@@ -46,18 +69,26 @@ export function HojaSabanaExportModal({
   const handleExportarPDF = () => {
     if (ningunSeleccionado) return
     exportarSabanaPDF(getExportOptions())
+    showSuccessToast('Generando reporte PDF para imprimir o guardar...')
     onClose()
   }
 
   const handleExportarExcel = () => {
     if (ningunSeleccionado) return
     exportarSabanaExcel(getExportOptions())
+    showSuccessToast('Descargando archivo Excel (.xls)...')
     onClose()
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs font-[Poppins]">
-      <div className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl border border-gray-100 animate-in fade-in zoom-in-95 duration-150 space-y-4">
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs font-[Poppins]"
+      onClick={onClose}
+    >
+      <div 
+        className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl border border-gray-100 animate-in fade-in zoom-in-95 duration-150 space-y-4"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Encabezado */}
         <div className="flex items-center justify-between border-b border-gray-100 pb-3">
           <div>
@@ -66,7 +97,7 @@ export function HojaSabanaExportModal({
               <span>Exportar Plan de Trabajo de Proyecto</span>
             </h3>
             <p className="text-[11px] text-gray-500 mt-0.5">
-              Seleccione los componentes a incluir en el reporte ({modoVistaSabana.toUpperCase()})
+              Seleccione los componentes a incluir en el reporte ({isPlan ? 'PLANIFICACIÓN / INICIAL' : 'EJECUCIÓN / ACTUAL'})
             </p>
           </div>
           <button
@@ -84,18 +115,14 @@ export function HojaSabanaExportModal({
             Panel de Selección de Secciones
           </label>
 
-          <div className="space-y-2 rounded-xl border border-gray-200 bg-gray-50/60 p-3">
+          <div className="space-y-2 rounded-xl border border-gray-200 bg-gray-50/60 p-3 max-h-[60vh] overflow-y-auto">
             {/* Check 1: Hoja Sábana */}
             <div
               onClick={() => setIncluirSabana(!incluirSabana)}
-              className={`flex items-center justify-between rounded-lg border p-2.5 cursor-pointer transition-all ${
-                incluirSabana
-                  ? 'border-[#9B0F06] bg-red-50/40 text-gray-900 shadow-2xs'
-                  : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
-              }`}
+              className="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-2.5 cursor-pointer hover:border-gray-300 hover:bg-gray-50/70 transition-all text-gray-900"
             >
               <div className="flex items-center gap-2.5">
-                <Layers className={incluirSabana ? 'text-[#9B0F06]' : 'text-gray-400'} size={16} />
+                <Layers className="text-gray-500 shrink-0" size={16} />
                 <div>
                   <span className="text-xs font-bold block">Hoja Sábana Digital</span>
                   <span className="text-[10px] text-gray-500">
@@ -103,34 +130,23 @@ export function HojaSabanaExportModal({
                   </span>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setIncluirSabana(!incluirSabana)
-                }}
-                className="p-1 rounded hover:bg-black/5 transition-colors cursor-pointer"
-              >
+              <div className="p-1 shrink-0">
                 {incluirSabana ? (
                   <CheckSquare size={18} className="text-[#9B0F06]" />
                 ) : (
                   <Square size={18} className="text-gray-300" />
                 )}
-              </button>
+              </div>
             </div>
 
-            {/* Check 2: Analítico (Memoria de Cálculo) */}
-            {modoVistaSabana === 'actual' && (
+            {/* Check 2: Analítico (Memoria de Cálculo) - Solo en modo actual */}
+            {!isPlan && (
               <div
                 onClick={() => setIncluirAnalitico(!incluirAnalitico)}
-                className={`flex items-center justify-between rounded-lg border p-2.5 cursor-pointer transition-all ${
-                  incluirAnalitico
-                    ? 'border-[#9B0F06] bg-red-50/40 text-gray-900 shadow-2xs'
-                    : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
-                }`}
+                className="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-2.5 cursor-pointer hover:border-gray-300 hover:bg-gray-50/70 transition-all text-gray-900"
               >
                 <div className="flex items-center gap-2.5">
-                  <Calculator className={incluirAnalitico ? 'text-[#9B0F06]' : 'text-gray-400'} size={16} />
+                  <Calculator className="text-gray-500 shrink-0" size={16} />
                   <div>
                     <span className="text-xs font-bold block">Analítico (Memoria de Cálculo)</span>
                     <span className="text-[10px] text-gray-500">
@@ -138,34 +154,23 @@ export function HojaSabanaExportModal({
                     </span>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setIncluirAnalitico(!incluirAnalitico)
-                  }}
-                  className="p-1 rounded hover:bg-black/5 transition-colors cursor-pointer"
-                >
+                <div className="p-1 shrink-0">
                   {incluirAnalitico ? (
                     <CheckSquare size={18} className="text-[#9B0F06]" />
                   ) : (
                     <Square size={18} className="text-gray-300" />
                   )}
-                </button>
+                </div>
               </div>
             )}
 
             {/* Check 3: Resumen Financiero */}
             <div
               onClick={() => setIncluirResumen(!incluirResumen)}
-              className={`flex items-center justify-between rounded-lg border p-2.5 cursor-pointer transition-all ${
-                incluirResumen
-                  ? 'border-[#9B0F06] bg-red-50/40 text-gray-900 shadow-2xs'
-                  : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
-              }`}
+              className="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-2.5 cursor-pointer hover:border-gray-300 hover:bg-gray-50/70 transition-all text-gray-900"
             >
               <div className="flex items-center gap-2.5">
-                <Banknote className={incluirResumen ? 'text-[#9B0F06]' : 'text-gray-400'} size={16} />
+                <Banknote className="text-gray-500 shrink-0" size={16} />
                 <div>
                   <span className="text-xs font-bold block">Resumen Financiero y Liquidación</span>
                   <span className="text-[10px] text-gray-500">
@@ -173,21 +178,64 @@ export function HojaSabanaExportModal({
                   </span>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setIncluirResumen(!incluirResumen)
-                }}
-                className="p-1 rounded hover:bg-black/5 transition-colors cursor-pointer"
-              >
+              <div className="p-1 shrink-0">
                 {incluirResumen ? (
                   <CheckSquare size={18} className="text-[#9B0F06]" />
                 ) : (
                   <Square size={18} className="text-gray-300" />
                 )}
-              </button>
+              </div>
             </div>
+
+            {/* Check 4: Bolsa de Trabajos Pendientes - Solo en modo actual */}
+            {!isPlan && (
+              <div
+                onClick={() => setIncluirPendientes(!incluirPendientes)}
+                className="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-2.5 cursor-pointer hover:border-gray-300 hover:bg-gray-50/70 transition-all text-gray-900"
+              >
+                <div className="flex items-center gap-2.5">
+                  <FileCheck2 className="text-gray-500 shrink-0" size={16} />
+                  <div>
+                    <span className="text-xs font-bold block">Bolsa de Trabajos Pendientes</span>
+                    <span className="text-[10px] text-gray-500">
+                      Control de partidas y volúmenes no conciliados de bitácora ({trabajosPendientes.length} registros)
+                    </span>
+                  </div>
+                </div>
+                <div className="p-1 shrink-0">
+                  {incluirPendientes ? (
+                    <CheckSquare size={18} className="text-[#9B0F06]" />
+                  ) : (
+                    <Square size={18} className="text-gray-300" />
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Check 5: Planificado vs Real - Solo en modo actual */}
+            {!isPlan && (
+              <div
+                onClick={() => setIncluirPlanificadoReal(!incluirPlanificadoReal)}
+                className="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-2.5 cursor-pointer hover:border-gray-300 hover:bg-gray-50/70 transition-all text-gray-900"
+              >
+                <div className="flex items-center gap-2.5">
+                  <TrendingUp className="text-gray-500 shrink-0" size={16} />
+                  <div>
+                    <span className="text-xs font-bold block">Planificado vs Real</span>
+                    <span className="text-[10px] text-gray-500">
+                      Comparativa física y financiera de avance cronograma vs ejecución
+                    </span>
+                  </div>
+                </div>
+                <div className="p-1 shrink-0">
+                  {incluirPlanificadoReal ? (
+                    <CheckSquare size={18} className="text-[#9B0F06]" />
+                  ) : (
+                    <Square size={18} className="text-gray-300" />
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {ningunSeleccionado && (
@@ -207,7 +255,7 @@ export function HojaSabanaExportModal({
             Cancelar
           </button>
 
-          {/* Botón Exportar PDF (Rojo con icono de PDF) */}
+          {/* Botón Exportar PDF */}
           <button
             type="button"
             disabled={ningunSeleccionado}
@@ -218,7 +266,7 @@ export function HojaSabanaExportModal({
             <span>Exportar como PDF</span>
           </button>
 
-          {/* Botón Exportar Excel (Verde con icono de Excel) */}
+          {/* Botón Exportar Excel */}
           <button
             type="button"
             disabled={ningunSeleccionado}

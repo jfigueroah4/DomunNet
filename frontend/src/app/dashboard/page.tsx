@@ -95,11 +95,11 @@ export default function DashboardPage() {
       `}</style>
 
       <div className="mb-2">
-        <h1 className="text-[24px] font-bold tracking-tight text-gray-900">Panel Principal</h1>
-        <p className="mt-1 text-[11px] text-gray-500">Acceso rápido y estado general del sistema DomunNet</p>
+        <h1 className="text-[23px] sm:text-[24px] font-bold tracking-tight text-gray-900">Panel Principal</h1>
+        <p className="mt-0.5 sm:mt-1 text-[10px] sm:text-[11px] text-gray-500">Acceso rápido y estado general del sistema DomunNet</p>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-2.5 sm:gap-3 md:grid-cols-2 xl:grid-cols-3">
         {modules.map((module) => {
           const Icon = module.icon
 
@@ -107,23 +107,23 @@ export default function DashboardPage() {
             <Link
               key={module.name}
               href={module.href}
-              className={`${module.bgColor} dashboard-module-card relative flex min-h-[164px] flex-col justify-between overflow-hidden rounded-[20px] p-5 text-white`}
+              className={`${module.bgColor} dashboard-module-card relative flex min-h-[148px] sm:min-h-[164px] flex-col justify-between overflow-hidden rounded-[18px] sm:rounded-[20px] p-4 sm:p-5 text-white`}
             >
               <div className="dashboard-module-icon absolute -bottom-2 -right-2 opacity-20 transition-transform duration-300">
-                <Icon size={104} color="white" />
+                <Icon size={96} color="white" className="sm:w-[104px] sm:h-[104px]" />
               </div>
 
               <div className="relative z-10 flex items-center justify-between">
-                <Icon size={24} color="white" className="drop-shadow-[0_2px_4px_rgba(0,0,0,0.15)]" />
-                <div className="dashboard-module-link flex items-center gap-1 text-[11px] font-bold tracking-wide opacity-90 transition-all duration-200">
+                <Icon size={22} color="white" className="sm:w-[24px] sm:h-[24px] drop-shadow-[0_2px_4px_rgba(0,0,0,0.15)]" />
+                <div className="dashboard-module-link flex items-center gap-1 text-[10px] sm:text-[11px] font-bold tracking-wide opacity-90 transition-all duration-200">
                   <span>Ir a módulo</span>
-                  <ChevronRight size={12} className="opacity-80" />
+                  <ChevronRight size={11} className="opacity-80 sm:w-[12px] sm:h-[12px]" />
                 </div>
               </div>
 
               <div className="relative z-10">
-                <h3 className="text-[20px] font-bold leading-tight">{module.name}</h3>
-                <p className="mt-1 text-[13px] leading-snug text-white/90">{module.description}</p>
+                <h3 className="text-[19px] sm:text-[20px] font-bold leading-tight">{module.name}</h3>
+                <p className="mt-1 text-[12px] sm:text-[13px] leading-snug text-white/90">{module.description}</p>
               </div>
             </Link>
           )

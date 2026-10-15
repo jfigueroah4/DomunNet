@@ -22,7 +22,7 @@ export const renglonTrabajoCatalogoConfig: TablaConfig = {
         "columna": "capitulo_id",
         "tipo": "foreign_key",
         "tablaReferencia": "capitulo_sabana",
-        "columnaLabel": "descripcion",
+        "columnaLabel": "nombre_capitulo",
         "renderizado": "select"
     },
     {

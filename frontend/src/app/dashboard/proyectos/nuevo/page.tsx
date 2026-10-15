@@ -24,25 +24,27 @@ export default function NuevoProyectoPage() {
   if (esResidente) return null
 
   return (
-    <div className="space-y-4 text-[#07152B]">
-      {/* Header */}
-      <div className="flex items-start gap-2">
+    <div className="flex flex-col h-[calc(100vh-140px)] md:h-[calc(100vh-115px)] text-[#07152B] overflow-hidden">
+      {/* Header Fijo */}
+      <div className="flex items-start gap-2 shrink-0 pb-2">
         <button
           onClick={() => router.back()}
-          className="mt-0.5 rounded-lg p-1.5 transition-colors hover:bg-gray-100"
+          className="mt-0.5 rounded-lg p-1.5 transition-colors hover:bg-gray-100 cursor-pointer"
         >
           <ArrowLeft size={15} className="text-gray-600" />
         </button>
         <div>
           <h1 className="text-[16px] font-extrabold leading-none text-[#07152B]">Nuevo Proyecto</h1>
-          <p className="mt-1 text-[11px] font-normal text-gray-500">
+          <p className="mt-1 text-[9px] sm:text-[11px] font-normal text-gray-500">
             Complete la información técnica, ubicación geográfica y equipo responsable para registrar el nuevo proyecto vial.
           </p>
         </div>
       </div>
 
       {/* Formulario */}
-      <ProyectoFormulario modo="crear" />
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+        <ProyectoFormulario modo="crear" />
+      </div>
     </div>
   )
 }

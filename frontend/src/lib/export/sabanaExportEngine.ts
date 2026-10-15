@@ -4,9 +4,12 @@ export interface SabanaExportOptions {
   incluirSabana: boolean
   incluirAnalitico: boolean
   incluirResumen: boolean
+  incluirPendientes?: boolean
+  incluirPlanificadoReal?: boolean
   proyecto: any
   renglones: RenglonDetalladoSabana[]
   medicionesAnaliticas?: MedicionAnaliticaCampo[]
+  trabajosPendientes?: any[]
   modoVistaSabana: 'planificacion' | 'actual'
   estimacionActiva?: any
 }
@@ -41,9 +44,12 @@ export function exportarSabanaPDF(options: SabanaExportOptions) {
     incluirSabana,
     incluirAnalitico,
     incluirResumen,
+    incluirPendientes,
+    incluirPlanificadoReal,
     proyecto,
     renglones,
     medicionesAnaliticas = [],
+    trabajosPendientes = [],
     modoVistaSabana,
     estimacionActiva,
   } = options
@@ -217,6 +223,115 @@ export function exportarSabanaPDF(options: SabanaExportOptions) {
     `
   }
 
+  // 4. SECCIÓN: BOLSA DE TRABAJOS PENDIENTES
+  if (incluirPendientes && modoVistaSabana === 'actual' && trabajosPendientes.length > 0) {
+    const pendientesRows = trabajosPendientes
+      .map(
+        (t: any, idx: number) => `
+        <tr class="${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}">
+          <td class="center font-mono bold">${escapeXml(t.codigoDGC)}</td>
+          <td class="left">${escapeXml(t.descripcion)}</td>
+          <td class="center">${escapeXml(t.estado || 'Pendiente')}</td>
+          <td class="center font-mono">${escapeXml(t.estacionInicio || '-')}</td>
+          <td class="center font-mono">${escapeXml(t.estacionFin || '-')}</td>
+          <td class="right font-mono">${(t.longitudL || 0).toFixed(2)} m</td>
+          <td class="right font-mono">${(t.anchoA || 0).toFixed(2)} m</td>
+          <td class="right font-mono">${(t.alturaH || 0).toFixed(2)} m</td>
+          <td class="right font-mono bold">${(t.volumenAreaBruto || t.cantidadBruta || 0).toLocaleString('es-GT', { minimumFractionDigits: 2 })}</td>
+          <td class="right font-mono text-red">${(t.descuentoMonto || 0).toLocaleString('es-GT', { minimumFractionDigits: 2 })}</td>
+          <td class="right font-mono bold text-green">${(t.cantidadNetaCobrar || 0).toLocaleString('es-GT', { minimumFractionDigits: 2 })}</td>
+        </tr>
+      `
+      )
+      .join('')
+
+    htmlSections += `
+      <section class="page-section">
+        <h2 class="section-title">4. BOLSA DE TRABAJOS PENDIENTES Y NO CONCILIADOS</h2>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>CÓDIGO</th>
+              <th>DESCRIPCIÓN / PARTIDA</th>
+              <th>ESTADO</th>
+              <th>EST. INICIO</th>
+              <th>EST. FIN</th>
+              <th>LONG. L (M)</th>
+              <th>ANCHO A (M)</th>
+              <th>ESPESOR H (M)</th>
+              <th>VOLUMEN BRUTO</th>
+              <th>DESC. TÉCNICO</th>
+              <th>CANT. NETA A COBRAR</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${pendientesRows}
+          </tbody>
+        </table>
+      </section>
+    `
+  }
+
+  // 5. SECCIÓN: COMPARATIVA PLANIFICADO VS REAL
+  if (incluirPlanificadoReal && modoVistaSabana === 'actual' && renglones.length > 0) {
+    const pvrRows = renglones
+      .map((r, idx) => {
+        const cantPlanTotal = r.cantidadAjustadaPlan || r.cantidadAjustada || 0
+        const ejecReal = (r.cantidadEstePeriodo || 0) + (r.cantidadAcumuladaAnterior || 0)
+        const planMap = (r.avancesMensualesPlan && Object.keys(r.avancesMensualesPlan).length > 0)
+          ? r.avancesMensualesPlan
+          : r.avancesMensuales
+
+        let sumaPlanAcum = 0
+        if (planMap && Object.keys(planMap).length > 0) {
+          sumaPlanAcum = Object.values(planMap).reduce((acc: number, val: any) => acc + (Number(val) || 0), 0)
+        } else {
+          sumaPlanAcum = cantPlanTotal * 0.5
+        }
+
+        const pctPlan = cantPlanTotal > 0 ? (sumaPlanAcum / cantPlanTotal) * 100 : 0
+        const pctReal = (r.cantidadAjustada || 0) > 0 ? (ejecReal / (r.cantidadAjustada || 1)) * 100 : 0
+        const diff = pctReal - pctPlan
+        const diffText = `${diff >= 0 ? '+' : ''}${diff.toFixed(1)}%`
+        const diffColor = diff >= 0 ? 'text-green' : 'text-red'
+
+        return `
+          <tr class="${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}">
+            <td class="center font-mono bold">${escapeXml(r.codigoDGC)}</td>
+            <td class="left">${escapeXml(r.descripcion)}</td>
+            <td class="right font-mono">${cantPlanTotal.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</td>
+            <td class="right font-mono bold">${ejecReal.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</td>
+            <td class="right font-mono">${pctPlan.toFixed(1)}%</td>
+            <td class="right font-mono">${pctReal.toFixed(1)}%</td>
+            <td class="center font-mono bold ${diffColor}">${diffText}</td>
+          </tr>
+        `
+      })
+      .join('')
+
+    htmlSections += `
+      <section class="page-section">
+        <h2 class="section-title">5. COMPARATIVA DE AVANCE: PLANIFICADO VS REAL</h2>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>CÓDIGO</th>
+              <th>DESCRIPCIÓN</th>
+              <th>CANT. AJUSTADA (PLAN)</th>
+              <th>CANT. EJECUTADA (REAL)</th>
+              <th>% PLANIFICADO</th>
+              <th>% REAL</th>
+              <th>VARIACIÓN</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${pvrRows}
+          </tbody>
+        </table>
+      </section>
+    `
+  }
+
   const printDocument = `
     <!DOCTYPE html>
     <html lang="es">
@@ -352,9 +467,12 @@ export function exportarSabanaExcel(options: SabanaExportOptions) {
     incluirSabana,
     incluirAnalitico,
     incluirResumen,
+    incluirPendientes,
+    incluirPlanificadoReal,
     proyecto,
     renglones,
     medicionesAnaliticas = [],
+    trabajosPendientes = [],
     modoVistaSabana,
   } = options
 
@@ -564,6 +682,145 @@ export function exportarSabanaExcel(options: SabanaExportOptions) {
     `
   }
 
+  // HOJA 4: BOLSA DE TRABAJOS PENDIENTES
+  if (incluirPendientes && modoVistaSabana === 'actual' && trabajosPendientes.length > 0) {
+    let pendientesRowsXml = ''
+    trabajosPendientes.forEach((t: any) => {
+      pendientesRowsXml += `
+        <Row>
+          <Cell><Data ss:Type="String">${escapeXml(t.codigoDGC)}</Data></Cell>
+          <Cell><Data ss:Type="String">${escapeXml(t.descripcion)}</Data></Cell>
+          <Cell><Data ss:Type="String">${escapeXml(t.estado || 'Pendiente')}</Data></Cell>
+          <Cell><Data ss:Type="String">${escapeXml(t.estacionInicio || '-')}</Data></Cell>
+          <Cell><Data ss:Type="String">${escapeXml(t.estacionFin || '-')}</Data></Cell>
+          <Cell><Data ss:Type="Number">${t.longitudL || 0}</Data></Cell>
+          <Cell><Data ss:Type="Number">${t.anchoA || 0}</Data></Cell>
+          <Cell><Data ss:Type="Number">${t.alturaH || 0}</Data></Cell>
+          <Cell><Data ss:Type="Number">${t.volumenAreaBruto || t.cantidadBruta || 0}</Data></Cell>
+          <Cell><Data ss:Type="Number">${t.descuentoMonto || 0}</Data></Cell>
+          <Cell><Data ss:Type="Number">${t.cantidadNetaCobrar || 0}</Data></Cell>
+        </Row>
+      `
+    })
+
+    xmlWorksheets += `
+      <Worksheet ss:Name="Trabajos Pendientes">
+        <Table>
+          <Column ss:Width="80"/>
+          <Column ss:Width="250"/>
+          <Column ss:Width="80"/>
+          <Column ss:Width="80"/>
+          <Column ss:Width="80"/>
+          <Column ss:Width="70"/>
+          <Column ss:Width="70"/>
+          <Column ss:Width="70"/>
+          <Column ss:Width="90"/>
+          <Column ss:Width="90"/>
+          <Column ss:Width="110"/>
+          <Row ss:StyleID="TitleStyle">
+            <Cell><Data ss:Type="String">BOLSA DE TRABAJOS PENDIENTES Y NO CONCILIADOS</Data></Cell>
+          </Row>
+          <Row>
+            <Cell><Data ss:Type="String">Proyecto: ${escapeXml(codigoProyecto)} - ${escapeXml(nombreProyecto)}</Data></Cell>
+          </Row>
+          <Row/>
+          <Row ss:StyleID="HeaderStyle">
+            <Cell><Data ss:Type="String">Código</Data></Cell>
+            <Cell><Data ss:Type="String">Descripción / Partida</Data></Cell>
+            <Cell><Data ss:Type="String">Estado</Data></Cell>
+            <Cell><Data ss:Type="String">Est. Inicio</Data></Cell>
+            <Cell><Data ss:Type="String">Est. Fin</Data></Cell>
+            <Cell><Data ss:Type="String">Longitud (m)</Data></Cell>
+            <Cell><Data ss:Type="String">Ancho (m)</Data></Cell>
+            <Cell><Data ss:Type="String">Espesor (m)</Data></Cell>
+            <Cell><Data ss:Type="String">Volumen Bruto</Data></Cell>
+            <Cell><Data ss:Type="String">Descuento Técnico</Data></Cell>
+            <Cell><Data ss:Type="String">Cant. Neta a Cobrar</Data></Cell>
+          </Row>
+          ${pendientesRowsXml}
+        </Table>
+      </Worksheet>
+    `
+  }
+
+  // HOJA 5: COMPARATIVA PLANIFICADO VS REAL
+  if (incluirPlanificadoReal && modoVistaSabana === 'actual' && renglones.length > 0) {
+    let pvrRowsXml = ''
+    renglones.forEach((r) => {
+      const cantPlanTotal = r.cantidadAjustadaPlan || r.cantidadAjustada || 0
+      const ejecReal = (r.cantidadEstePeriodo || 0) + (r.cantidadAcumuladaAnterior || 0)
+      const planMap = (r.avancesMensualesPlan && Object.keys(r.avancesMensualesPlan).length > 0)
+        ? r.avancesMensualesPlan
+        : r.avancesMensuales
+
+      let sumaPlanAcum = 0
+      if (planMap && Object.keys(planMap).length > 0) {
+        sumaPlanAcum = Object.values(planMap).reduce((acc: number, val: any) => acc + (Number(val) || 0), 0)
+      } else {
+        sumaPlanAcum = cantPlanTotal * 0.5
+      }
+
+      const pctPlan = cantPlanTotal > 0 ? (sumaPlanAcum / cantPlanTotal) * 100 : 0
+      const pctReal = (r.cantidadAjustada || 0) > 0 ? (ejecReal / (r.cantidadAjustada || 1)) * 100 : 0
+      const diff = pctReal - pctPlan
+
+      pvrRowsXml += `
+        <Row>
+          <Cell><Data ss:Type="String">${escapeXml(r.codigoDGC)}</Data></Cell>
+          <Cell><Data ss:Type="String">${escapeXml(r.descripcion)}</Data></Cell>
+          <Cell><Data ss:Type="Number">${cantPlanTotal}</Data></Cell>
+          <Cell><Data ss:Type="Number">${ejecReal}</Data></Cell>
+          <Cell><Data ss:Type="Number">${parseFloat(pctPlan.toFixed(2))}</Data></Cell>
+          <Cell><Data ss:Type="Number">${parseFloat(pctReal.toFixed(2))}</Data></Cell>
+          <Cell><Data ss:Type="Number">${parseFloat(diff.toFixed(2))}</Data></Cell>
+        </Row>
+      `
+    })
+
+    xmlWorksheets += `
+      <Worksheet ss:Name="Planificado vs Real">
+        <Table>
+          <Column ss:Width="80"/>
+          <Column ss:Width="250"/>
+          <Column ss:Width="110"/>
+          <Column ss:Width="110"/>
+          <Column ss:Width="90"/>
+          <Column ss:Width="90"/>
+          <Column ss:Width="90"/>
+          <Row ss:StyleID="TitleStyle">
+            <Cell><Data ss:Type="String">COMPARATIVA DE AVANCE: PLANIFICADO VS REAL</Data></Cell>
+          </Row>
+          <Row>
+            <Cell><Data ss:Type="String">Proyecto: ${escapeXml(codigoProyecto)} - ${escapeXml(nombreProyecto)}</Data></Cell>
+          </Row>
+          <Row/>
+          <Row ss:StyleID="HeaderStyle">
+            <Cell><Data ss:Type="String">Código DGC</Data></Cell>
+            <Cell><Data ss:Type="String">Descripción</Data></Cell>
+            <Cell><Data ss:Type="String">Cant. Planificada</Data></Cell>
+            <Cell><Data ss:Type="String">Cant. Real Ejecutada</Data></Cell>
+            <Cell><Data ss:Type="String">% Planificado</Data></Cell>
+            <Cell><Data ss:Type="String">% Real</Data></Cell>
+            <Cell><Data ss:Type="String">Variación (%)</Data></Cell>
+          </Row>
+          ${pvrRowsXml}
+        </Table>
+      </Worksheet>
+    `
+  }
+
+  if (!xmlWorksheets) {
+    xmlWorksheets = `
+      <Worksheet ss:Name="Reporte">
+        <Table>
+          <Row>
+            <Cell><Data ss:Type="String">No se seleccionó ninguna sección para exportar.</Data></Cell>
+          </Row>
+        </Table>
+      </Worksheet>
+    `
+  }
+
   const excelXmlContent = `<?xml version="1.0" encoding="UTF-8"?>
     <?mso-application progid="Excel.Sheet"?>
     <Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
@@ -590,7 +847,7 @@ export function exportarSabanaExcel(options: SabanaExportOptions) {
   `
 
   downloadFile(
-    excelXmlContent,
+    '\uFEFF' + excelXmlContent,
     `Libro_Oficial_${codigoProyecto}_${modoVistaSabana.toUpperCase()}.xls`,
     'application/vnd.ms-excel;charset=utf-8'
   )

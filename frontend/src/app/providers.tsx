@@ -87,11 +87,43 @@ export default function Providers({ children }: { children: React.ReactNode }) {
           opacity: 0 !important;
           transform: translateY(-8px) scale(0.96) !important;
         }
+
+        @media (max-width: 768px) {
+          [data-sonner-toaster] {
+            left: 0 !important;
+            right: 0 !important;
+            top: max(12px, env(safe-area-inset-top, 0px)) !important;
+            transform: none !important;
+            width: 100vw !important;
+            max-width: 100vw !important;
+            padding: 0 12px !important;
+            box-sizing: border-box !important;
+          }
+
+          [data-sonner-toaster] ol,
+          [data-sonner-toaster] li,
+          [data-sonner-toast] {
+            width: 100% !important;
+            max-width: 100% !important;
+          }
+
+          .custom-toast {
+            width: fit-content !important;
+            max-width: 100% !important;
+            box-sizing: border-box !important;
+            white-space: normal !important;
+          }
+
+          .custom-toast > span {
+            white-space: normal !important;
+            overflow-wrap: anywhere !important;
+          }
+        }
       `}} />
       <Toaster
         position="top-center"
         toastOptions={{
-          duration: 3500,
+          duration: 5000,
           style: {
             background: "transparent",
             boxShadow: "none",
@@ -104,4 +136,3 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     </QueryClientProvider>
   )
 }
-

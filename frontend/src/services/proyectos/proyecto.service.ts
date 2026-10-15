@@ -18,13 +18,13 @@ export const USE_MOCK = false
 
 export const proyectoService = {
   getProyectoReal: async (slug: string) => {
-    const res = await apiGetDeduplicado(`/proyectos/${slug}`)
+    const res = await apiGetDeduplicado(`/proyectos/${slug}`, { bypassCache: true })
     return res?.data?.data
   },
 
   getProyectoBySlug: async (slug: string): Promise<ProyectoType | undefined> => {
     try {
-      const res = await apiGetDeduplicado(`/proyectos/${slug}`)
+      const res = await apiGetDeduplicado(`/proyectos/${slug}`, { bypassCache: true })
       const data = res?.data
       if (data && data.success && data.data) {
         const raw = data.data
@@ -99,6 +99,11 @@ export const proyectoService = {
       return { ...payload, id: slug } as ProyectoType
     }
     const { data } = await api.put(`/proyectos/${slug}`, payload)
+    return data
+  },
+
+  cambiarEstado: async (id: string, estado_codigo: string) => {
+    const { data } = await api.patch(`/proyectos/${id}/estado`, { estado_codigo })
     return data
   },
 

@@ -9,6 +9,7 @@ import { useAuthStore } from '@/stores/useAuthStore'
 import { Loader2 } from 'lucide-react'
 import { tienePermiso, RUTAS_PERMISOS } from '@/lib/rutas-permisos'
 import AccessDenied from '@/components/layout/AccessDenied'
+import { useUIStore } from '@/stores/useUIStore'
 
 function getSectionTitle(pathname: string) {
   if (pathname === '/dashboard') return 'INICIO'
@@ -26,18 +27,55 @@ function getSectionTitle(pathname: string) {
   return 'INICIO'
 }
 
+function getSectionDisplayTitle(pathname: string): string {
+  if (pathname === '/dashboard') return 'Inicio'
+  if (pathname.startsWith('/dashboard/proyectos/') && pathname.includes('/hoja-sabana')) return 'Hoja Sábana'
+  if (pathname.startsWith('/dashboard/proyectos/') && pathname.includes('/editar')) return 'Editar Proyecto'
+  if (pathname.startsWith('/dashboard/proyectos/nuevo')) return 'Nuevo Proyecto'
+  if (pathname.startsWith('/dashboard/proyectos/empresas')) return 'Empresas'
+  if (pathname.startsWith('/dashboard/proyectos/renglones')) return 'Renglones'
+  if (pathname.startsWith('/dashboard/proyectos/supervision')) return 'Supervisión'
+  if (pathname.startsWith('/dashboard/proyectos/recursos')) return 'Recursos'
+  if (pathname.startsWith('/dashboard/proyectos/detalles') || (pathname.startsWith('/dashboard/proyectos/') && !pathname.endsWith('/proyectos'))) return 'Detalle de Proyecto'
+  if (pathname.startsWith('/dashboard/proyectos')) return 'Proyectos'
+  if (pathname.startsWith('/dashboard/bitacora')) return 'Bitácora'
+  if (pathname.startsWith('/dashboard/fotografias/nueva')) return 'Nueva Fotografía'
+  if (pathname.startsWith('/dashboard/fotografias')) return 'Fotografías'
+  if (pathname.startsWith('/dashboard/reportes/nuevo')) return 'Nuevo Reporte'
+  if (pathname.startsWith('/dashboard/reportes')) return 'Reportes'
+  if (pathname.startsWith('/dashboard/estadisticas')) return 'Estadísticas'
+  if (pathname.startsWith('/dashboard/usuarios')) return 'Usuarios'
+  if (pathname.startsWith('/dashboard/roles')) return 'Roles'
+  if (pathname.startsWith('/dashboard/configuracion/mantenimiento-tablas')) return 'Mantenimiento de Tablas'
+  if (pathname.startsWith('/dashboard/configuracion/backup')) return 'Respaldos'
+  if (pathname.startsWith('/dashboard/configuracion/restauracion')) return 'Restauración'
+  if (pathname.startsWith('/dashboard/configuracion/reinicio')) return 'Reinicio'
+  if (pathname.startsWith('/dashboard/configuracion/notificaciones')) return 'Notificaciones'
+  if (pathname.startsWith('/dashboard/configuracion/general')) return 'Configuración General'
+  if (pathname.startsWith('/dashboard/configuracion/tablas')) return 'Tablas'
+  if (pathname.startsWith('/dashboard/configuracion')) return 'Configuración'
+  if (pathname.startsWith('/dashboard/perfil')) return 'Perfil'
+  if (pathname.startsWith('/dashboard/tickets')) return 'Tickets'
+  if (pathname.startsWith('/dashboard/soporte')) return 'Soporte'
+  if (pathname.startsWith('/dashboard/renglones')) return 'Renglones DGC'
+  return 'Inicio'
+}
+
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  const [mounted, setMounted] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
   
   const { profile, loading, fetchProfile } = useAuthStore()
+  const ocultarBottomNav = useUIStore((s) => s.ocultarBottomNav)
 
   useEffect(() => {
+    setMounted(true)
     fetchProfile()
   }, [fetchProfile])
 
@@ -46,6 +84,11 @@ export default function DashboardLayout({
       router.replace('/login')
     }
   }, [loading, profile, router])
+
+  useEffect(() => {
+    const sectionName = getSectionDisplayTitle(pathname)
+    document.title = `${sectionName} - DOMUN`
+  }, [pathname])
 
   
   const autorizado = useMemo(() => {
@@ -63,7 +106,7 @@ export default function DashboardLayout({
 
   const section = useMemo(() => getSectionTitle(pathname), [pathname])
 
-  if (loading) {
+  if (!mounted || loading) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-[#F3F4F7]">
         <div className="flex flex-col items-center gap-3">
@@ -76,22 +119,22 @@ export default function DashboardLayout({
     )
   }
 
-  if (!loading && profile === null) {
+  if (profile === null) {
     return null
   }
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#F3F4F7]">
       <Sidebar collapsed={collapsed} />
-      <main className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden bg-[#F3F4F7]">
+      <div className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden bg-[#F3F4F7]">
         <TopBar section={section} onToggle={() => setCollapsed(!collapsed)} />
-        <div className="flex-1 overflow-y-auto px-4 pt-4 pb-20 md:pb-4 xl:px-5">
-          <div className="mx-auto w-full max-w-[1600px]">
+        <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-3.5 sm:px-4 pt-3.5 sm:pt-4 pb-20 sm:pb-24 md:pb-6 xl:px-5 overscroll-y-contain">
+          <div className="mx-auto w-full max-w-[1600px] min-w-0">
             {autorizado ? children : <AccessDenied />}
           </div>
-        </div>
-      </main>
-      <BottomNavbar />
+        </main>
+        {!ocultarBottomNav && <BottomNavbar />}
+      </div>
     </div>
   )
 }

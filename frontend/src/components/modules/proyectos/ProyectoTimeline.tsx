@@ -59,15 +59,15 @@ export interface RenglonOficialDGC {
 }
 
 const CAPITULOS_LIBRO_AZUL = [
-  { id: 1, nombre: 'Capítulo I: Estudios, Mantenimiento y Trabajos Preliminares' },
-  { id: 2, nombre: 'Capítulo II: Movimiento de Tierras y Excavación' },
-  { id: 3, nombre: 'Capítulo III: Terraplenes Estructurales y Capas de Soporte' },
-  { id: 4, nombre: 'Capítulo IV: Subbases y Bases Granulares' },
-  { id: 5, nombre: 'Capítulo V: Pavimentos Asfálticos y Concreto' },
-  { id: 6, nombre: 'Capítulo VI: Estructuras de Drenaje Pluvial' },
-  { id: 7, nombre: 'Capítulo VII: Bóvedas Metálicas y Obras de Arte' },
-  { id: 8, nombre: 'Capítulo VIII: Construcciones Complementarias y Señalización' },
-  { id: 9, nombre: 'Capítulo IX: Aspectos Ambientales y Gestión de Riesgo' },
+  { id: 1, nombre: 'Capítulo 1: CONTROL DEL TRABAJO' },
+  { id: 2, nombre: 'Capítulo 2: MOVIMIENTO DE TIERRAS' },
+  { id: 3, nombre: 'Capítulo 3: TERRAPLENES Y ESTRUCTURAS' },
+  { id: 4, nombre: 'Capítulo 4: ESTRUCTURAS PUENTES' },
+  { id: 5, nombre: 'Capítulo 5: SUB-BASES Y BASES' },
+  { id: 6, nombre: 'Capítulo 6: PAVIMENTOS ASFALTICOS' },
+  { id: 7, nombre: 'Capítulo 7: PAVIMENTOS RÍGIDOS' },
+  { id: 8, nombre: 'Capítulo 8: ESTRUCTURAS DE DRENAJE' },
+  { id: 9, nombre: 'Capítulo 9: CONSTRUCCIONES COMPLEMENTARIAS' },
 ]
 
 // CATÁLOGO TÉCNICO OFICIAL DGC (88 RENGLONES - LIBRO AZUL CAMINOS CIV)
@@ -873,8 +873,14 @@ export function ProyectoTimeline({
 
       {/* MODAL "CREAR NUEVO RENGLÓN" */}
       {modalCrearRenglonOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-md rounded-xl bg-white p-4 shadow-xl space-y-3 border border-gray-200">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs"
+          onClick={() => setModalCrearRenglonOpen(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-xl bg-white p-4 shadow-xl space-y-3 border border-gray-200"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between border-b border-gray-100 pb-2">
               <div className="flex items-center gap-2">
                 <FilePlus size={16} className="text-[#9B0F06]" />
@@ -1008,8 +1014,14 @@ export function ProyectoTimeline({
 
       {/* REQUERIMIENTO 2: MODAL "RESUMEN FINANCIERO" CON PANEL DE ALERTAS ROJAS Y BOTÓN "AUTORIZAR PAGO" */}
       {modalKpiFinancieroOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-lg rounded-xl bg-white p-4 shadow-xl space-y-3 border-2 border-[#9B0F06]">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs"
+          onClick={() => setModalKpiFinancieroOpen(false)}
+        >
+          <div
+            className="w-full max-w-lg rounded-xl bg-white p-4 shadow-xl space-y-3 border-2 border-[#9B0F06]"
+            onClick={(e) => e.stopPropagation()}
+          >
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-gray-100 pb-2">
               <div className="flex items-center gap-2">
@@ -1099,8 +1111,14 @@ export function ProyectoTimeline({
 
       {/* MODAL CONTROL DE ANTICIPO */}
       {modalKpiAnticipoOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-md rounded-xl bg-white p-4 shadow-xl space-y-3 border border-gray-200">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs"
+          onClick={() => setModalKpiAnticipoOpen(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-xl bg-white p-4 shadow-xl space-y-3 border border-gray-200"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between border-b border-gray-100 pb-2">
               <div className="flex items-center gap-2">
                 <Banknote size={16} className="text-gray-700" />
@@ -1158,8 +1176,14 @@ export function ProyectoTimeline({
 
       {/* MODAL CONTROL DE PLAZO */}
       {modalKpiPlazoOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-md rounded-xl bg-white p-4 shadow-xl space-y-3 border border-gray-200">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs"
+          onClick={() => setModalKpiPlazoOpen(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-xl bg-white p-4 shadow-xl space-y-3 border border-gray-200"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between border-b border-gray-100 pb-2">
               <div className="flex items-center gap-2">
                 <Clock size={16} className="text-gray-700" />
@@ -1225,8 +1249,14 @@ export function ProyectoTimeline({
 
       {/* MODAL ANALÍTICO DE BITÁCORA */}
       {modalBitacoraRenglon && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-lg rounded-xl bg-white p-4 shadow-xl space-y-3 border border-gray-200">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs"
+          onClick={() => setModalBitacoraRenglon(null)}
+        >
+          <div
+            className="w-full max-w-lg rounded-xl bg-white p-4 shadow-xl space-y-3 border border-gray-200"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between border-b border-gray-100 pb-2">
               <div className="flex items-center gap-2">
                 <Eye size={16} className="text-[#9B0F06]" />

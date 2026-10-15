@@ -73,7 +73,6 @@ export async function cambiarEstadoControlador(req: Request, res: Response) {
       return sendError(res, 400, 'Error de validación', error.errors)
     }
     if (error instanceof ValidationError) {
-      // Devolvemos el campo exacto que falla usando el formato de errores estándar
       return sendError(res, 400, error.message, { campo: error.field })
     }
     
@@ -279,6 +278,7 @@ export async function eliminarProyectoControlador(req: Request, res: Response) {
     return sendResponse(res, 200, { success: true }, 'Proyecto eliminado exitosamente')
   } catch (error: any) {
     console.error('Error en eliminarProyectoControlador:', error)
-    return sendError(res, 500, error.message || 'Error al eliminar el proyecto')
+    const status = error instanceof ValidationError || error.name === 'ValidationError' ? 400 : 500
+    return sendError(res, status, error.message || 'Error al eliminar el proyecto')
   }
 }

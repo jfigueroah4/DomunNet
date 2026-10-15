@@ -710,26 +710,25 @@ export default function MantenimientoTablas() {
               onChange={(val) => handleTableChange({ target: { value: val } } as any)}
               placeholder="Buscar tabla..."
             />
-            <div className="text-[9px] text-gray-500 flex gap-2 items-center mt-0.5 flex-wrap">
-              <span className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded font-mono text-[9px]">
-                {selectedTable.id}
-              </span>
-              {tableRestrictions.soloLectura && (
-                <span className="font-semibold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 flex items-center gap-1">
-                  <Lock size={9} /> Solo lectura
-                </span>
-              )}
-              {relatedTables.length > 0 && (
-                <div className="text-[10px] text-gray-600 flex items-center gap-1 flex-wrap">
-                  <span className="font-semibold text-gray-700">Relación de tablas con:</span>
-                  {relatedTables.map((ref) => (
-                    <span key={ref} className="bg-white text-gray-700 font-mono text-[9px] px-1.5 py-0.5 rounded border border-gray-200">
-                      {ref}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
+            {(tableRestrictions.soloLectura || relatedTables.length > 0) && (
+              <div className="text-[9px] text-gray-500 flex gap-2 items-center mt-0.5 flex-wrap">
+                {tableRestrictions.soloLectura && (
+                  <span className="font-semibold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 flex items-center gap-1">
+                    <Lock size={9} /> Solo lectura
+                  </span>
+                )}
+                {relatedTables.length > 0 && (
+                  <div className="text-[10px] text-gray-600 flex items-center gap-1 flex-wrap">
+                    <span className="font-semibold text-gray-700">Relación de tablas con:</span>
+                    {relatedTables.map((ref) => (
+                      <span key={ref} className="bg-white text-gray-700 font-mono text-[9px] px-1.5 py-0.5 rounded border border-gray-200">
+                        {ref}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           
           {!tableRestrictions.bloquearCreacion && (
@@ -988,20 +987,20 @@ export default function MantenimientoTablas() {
 
         {/* Paginación Footer */}
         {data.length > 0 && (
-          <div className="p-3 border-t border-gray-100 bg-white flex flex-col sm:flex-row items-center justify-between gap-4 flex-shrink-0 z-20">
-            <div className="flex items-center gap-2 text-[10px] text-gray-500 font-medium">
+          <div data-paginacion="true" className="paginacion-control font-[Poppins] p-2 sm:p-3 border-t border-gray-100 bg-white flex flex-row items-center justify-between gap-2 sm:gap-4 flex-shrink-0 z-20 text-[9.5px]">
+            <div className="flex items-center gap-1.5 sm:gap-2 text-[9.5px] text-gray-500 font-normal">
               <span>Mostrar</span>
               <select 
                 value={itemsPerPage} 
                 onChange={(e) => setItemsPerPage(Number(e.target.value))}
-                className="border border-gray-200 rounded-md px-1.5 py-0.5 focus:outline-none focus:border-[#9B0F06] bg-white text-gray-700 cursor-pointer"
+                className="paginacion-control h-6 border border-gray-200 rounded-md px-1 py-0.5 text-[9.5px] focus:outline-none focus:border-[#9B0F06] bg-white text-gray-700 cursor-pointer font-normal font-[Poppins]"
               >
-                <option value={8}>8</option>
-                <option value={16}>16</option>
-                <option value={24}>24</option>
-                <option value={50}>50</option>
+                <option value={8} className="text-[9.5px] font-[Poppins]">8</option>
+                <option value={16} className="text-[9.5px] font-[Poppins]">16</option>
+                <option value={24} className="text-[9.5px] font-[Poppins]">24</option>
+                <option value={50} className="text-[9.5px] font-[Poppins]">50</option>
               </select>
-              <span>registros por página</span>
+              <span className="hidden sm:inline">registros por página</span>
             </div>
 
             <div className="flex items-center gap-1">
@@ -1010,10 +1009,10 @@ export default function MantenimientoTablas() {
                 disabled={currentPage === 1}
                 className="p-1 rounded-md border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                <ChevronLeft size={14} />
+                <ChevronLeft size={13} />
               </button>
               
-              <div className="text-[10px] text-gray-600 font-medium px-2">
+              <div className="text-[9.5px] text-gray-600 font-normal px-1.5 sm:px-2">
                 Página {currentPage} de {totalPages || 1}
               </div>
               
@@ -1022,7 +1021,7 @@ export default function MantenimientoTablas() {
                 disabled={currentPage === totalPages || totalPages === 0}
                 className="p-1 rounded-md border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                <ChevronRight size={14} />
+                <ChevronRight size={13} />
               </button>
             </div>
           </div>

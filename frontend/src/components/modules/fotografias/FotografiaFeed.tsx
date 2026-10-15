@@ -3,13 +3,11 @@
 import React, { memo, useState } from 'react'
 import {
   FolderOpen,
-  ClipboardList,
   MapPin,
   ChevronRight,
   Image as ImageIcon,
 } from 'lucide-react'
 import { Fotografia } from '@/types/fotografia'
-import { FotografiaTipoBadge } from './FotografiaTipoBadge'
 
 interface FotografiaFeedProps {
   fotos: Fotografia[]
@@ -25,16 +23,23 @@ const FotografiaFeedItem = memo(function FotografiaFeedItem({
 }) {
   const [imgError, setImgError] = useState(false)
 
+  const renglonTexto =
+    (foto as any).renglonNombre ||
+    (foto as any).renglon_nombre ||
+    (foto as any).renglon ||
+    (foto.etiquetas && foto.etiquetas.find((e: string) => e !== 'Campo' && e !== 'Bitácora' && e !== 'Avance Físico')) ||
+    (foto.tipo ? (foto.tipo.charAt(0).toUpperCase() + foto.tipo.slice(1)) : 'Renglón de Obra')
+
   return (
     <div
-      className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 flex gap-3 cursor-pointer hover:shadow-md transition-all focus:outline-none"
+      className="bg-white rounded-xl shadow-2xs border border-gray-200/90 p-2 px-3 flex items-center gap-3 cursor-pointer hover:shadow-xs hover:border-gray-300 transition-all focus:outline-none"
       onClick={onClick}
     >
-      {/* Imagen */}
-      <div className="w-24 h-20 rounded-lg bg-slate-100 flex items-center justify-center overflow-hidden shrink-0">
-        {!imgError && foto.urlMiniatura ? (
+      {/* Imagen compacta */}
+      <div className="w-16 h-12 sm:w-20 sm:h-14 rounded-lg bg-slate-100 flex items-center justify-center overflow-hidden shrink-0">
+        {!imgError && (foto.urlMiniatura || foto.url) ? (
           <img
-            src={foto.urlMiniatura}
+            src={foto.urlMiniatura || foto.url}
             alt={foto.titulo || 'Fotografía'}
             loading="lazy"
             decoding="async"
@@ -42,60 +47,54 @@ const FotografiaFeedItem = memo(function FotografiaFeedItem({
             className="w-full h-full object-cover"
           />
         ) : (
-          <ImageIcon size={20} className="text-gray-300" />
+          <ImageIcon size={18} className="text-gray-300" />
         )}
       </div>
 
       {/* Centro */}
-      <div className="flex-1 min-w-0">
-        {/* Tipo y etiquetas */}
-        <div className="flex items-center gap-1.5 flex-wrap mb-1">
-          <FotografiaTipoBadge tipo={foto.tipo} />
-          {(foto.etiquetas ?? []).map((tag) => (
-            <span
-              key={tag}
-              className="bg-gray-100 text-gray-500 text-[9px] px-1.5 py-0.5 rounded-full whitespace-nowrap"
-            >
-              {tag}
+      <div className="flex-1 min-w-0 space-y-0.5">
+        {/* Renglón y Etiquetas sin fondos pesados */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-[9px] font-bold text-gray-900 truncate max-w-[200px] sm:max-w-[320px]">
+            {renglonTexto}
+          </span>
+          {foto.tipo && foto.tipo !== 'general' && (
+            <span className="text-[8.5px] font-semibold text-gray-400 capitalize">
+              • {foto.tipo}
             </span>
-          ))}
+          )}
         </div>
 
         {/* Título */}
-        <h3 className="text-xs font-semibold text-gray-800 line-clamp-1">
-          {foto.titulo}
+        <h3 className="text-[11px] font-bold text-gray-800 truncate">
+          {foto.titulo || renglonTexto}
         </h3>
 
         {/* Descripción */}
-        <p className="text-[10px] text-gray-400 line-clamp-2 mt-0.5">
-          {foto.descripcion}
+        <p className="text-[9.5px] text-gray-500 truncate">
+          {foto.descripcion || 'Sin descripción adicional'}
         </p>
 
         {/* Metadata */}
-        <div className="flex items-center gap-3 mt-2 text-[9px] text-gray-400 flex-wrap">
+        <div className="flex items-center gap-3 text-[8.5px] text-gray-400 flex-wrap pt-0.5">
           <div className="flex items-center gap-1 min-w-0">
-            <FolderOpen size={11} className="shrink-0" />
-            <span className="truncate">{foto.proyectoNombre}</span>
+            <FolderOpen size={10} className="shrink-0 text-[#9B0F06]" />
+            <span className="truncate max-w-[150px]">{foto.proyectoNombre}</span>
           </div>
           <div className="flex items-center gap-1 min-w-0">
-            <ClipboardList size={11} className="shrink-0" />
-            <span className="truncate">{foto.bitacoraTitulo}</span>
-          </div>
-          <div className="flex items-center gap-1 min-w-0">
-            <MapPin size={11} className="shrink-0" />
-            <span className="truncate">{foto.ubicacionObra}</span>
+            <MapPin size={10} className="shrink-0" />
+            <span className="truncate max-w-[180px]">{foto.ubicacionObra}</span>
           </div>
         </div>
       </div>
 
       {/* Derecha */}
-      <div className="flex flex-col items-end justify-between shrink-0">
+      <div className="flex flex-col items-end justify-between shrink-0 pl-2">
         <div className="text-right">
-          <p className="text-[9px] text-gray-400">{foto.fecha}</p>
-          <p className="text-[10px] font-medium text-gray-600">{foto.hora}</p>
-          <p className="text-[9px] text-gray-400 mt-1">{foto.autor}</p>
+          <p className="text-[9px] font-mono text-gray-400">{foto.fecha}</p>
+          <p className="text-[9px] font-semibold text-gray-600 truncate max-w-[90px]">{foto.autor}</p>
         </div>
-        <ChevronRight size={12} className="text-gray-400" />
+        <ChevronRight size={13} className="text-gray-300 mt-1" />
       </div>
     </div>
   )
@@ -106,7 +105,7 @@ export const FotografiaFeed = memo(function FotografiaFeed({
   onFotoClick,
 }: FotografiaFeedProps) {
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-1.5">
       {(fotos ?? []).map((foto, index) => (
         <FotografiaFeedItem
           key={foto.id || index}

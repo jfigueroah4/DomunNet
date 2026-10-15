@@ -1,6 +1,8 @@
 import { ProyectoEditorView } from '@/components/modules/proyectos/ProyectoEditorView'
 import { proyectoService } from '@/services/proyectos/proyecto.service'
 import { redirect } from 'next/navigation'
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
 export default async function ProyectoEditarPage({
   searchParams,

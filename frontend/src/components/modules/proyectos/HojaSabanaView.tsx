@@ -28,6 +28,7 @@ import {
   Search,
   Clock,
   Banknote,
+  Briefcase,
   Calculator,
   CheckCircle2,
   Layers,
@@ -207,24 +208,70 @@ function HeaderTooltip({
 
   return (
     <div
-      className="relative inline-block cursor-help"
+      className="relative inline-block cursor-pointer sm:cursor-help"
+      onClick={(e) => {
+        // En móvil permite alternar al pulsar
+        setHovered((prev) => !prev)
+      }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
       {children}
       {hovered && (
-        <div className={`absolute ${alignmentClasses} z-[99999] w-max max-w-[280px] rounded-lg border border-gray-200 bg-white/98 p-2.5 text-left font-sans shadow-2xl backdrop-blur-md transition-all pointer-events-none text-[9.5px] leading-tight space-y-1`}>
-          <div className="flex items-center gap-1.5 font-bold text-[#9B0F06]">
-            <Info size={12} className="shrink-0 text-[#9B0F06]" />
-            <span className="truncate text-[10px]">{info.title}</span>
-            {info.formula && (
-              <span className="ml-auto rounded bg-red-50 px-1.5 py-0.2 font-mono text-[8.5px] font-bold text-[#9B0F06] border border-red-100">
-                {info.formula}
-              </span>
-            )}
+        <>
+          {/* Modal centrado en móvil para que nunca se desborde ni se corte en los bordes */}
+          <ModalPortal>
+            <div
+              className="fixed inset-0 z-[99999] sm:hidden flex items-end justify-center pb-24 px-4 bg-black/25 backdrop-blur-xs animate-fadeIn font-[Poppins]"
+              onClick={(e) => {
+                e.stopPropagation()
+                setHovered(false)
+              }}
+            >
+              <div
+                className="w-full max-w-sm rounded-xl border border-gray-200 bg-white p-3.5 text-left shadow-2xl space-y-2 animate-in slide-in-from-bottom duration-200"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between gap-1.5 font-bold text-[#9B0F06]">
+                  <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                    <Info size={14} className="shrink-0 text-[#9B0F06]" />
+                    <span className="truncate text-xs font-bold text-gray-900">{info.title}</span>
+                  </div>
+                  {info.formula && (
+                    <span className="rounded bg-red-50 px-1.5 py-0.5 font-mono text-[9px] font-bold text-[#9B0F06] border border-red-100 shrink-0">
+                      {info.formula}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setHovered(false)}
+                    className="p-1 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer ml-1"
+                    title="Cerrar información"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+                <p className="font-normal text-gray-700 break-words whitespace-normal text-[10px] leading-relaxed">
+                  {info.desc}
+                </p>
+              </div>
+            </div>
+          </ModalPortal>
+
+          {/* Tooltip flotante habitual para escritorio (Desktop intacto) */}
+          <div className={`hidden sm:block absolute ${alignmentClasses} z-[99999] w-max max-w-[280px] rounded-lg border border-gray-200 bg-white/98 p-2.5 text-left font-sans shadow-2xl backdrop-blur-md transition-all pointer-events-none text-[9.5px] leading-tight space-y-1`}>
+            <div className="flex items-center gap-1.5 font-bold text-[#9B0F06]">
+              <Info size={12} className="shrink-0 text-[#9B0F06]" />
+              <span className="truncate text-[10px]">{info.title}</span>
+              {info.formula && (
+                <span className="ml-auto rounded bg-red-50 px-1.5 py-0.2 font-mono text-[8.5px] font-bold text-[#9B0F06] border border-red-100">
+                  {info.formula}
+                </span>
+              )}
+            </div>
+            <p className="font-normal text-gray-700 break-words whitespace-normal text-[9px] leading-normal">{info.desc}</p>
           </div>
-          <p className="font-normal text-gray-700 break-words whitespace-normal text-[9px] leading-normal">{info.desc}</p>
-        </div>
+        </>
       )}
     </div>
   )
@@ -364,158 +411,807 @@ export interface TrabajoPendienteBolsa {
 }
 
 const CAPITULOS_LIBRO_AZUL = [
-  { id: 1, nombre: 'Capítulo I: Estudios, Mantenimiento y Trabajos Preliminares' },
-  { id: 2, nombre: 'Capítulo II: Movimiento de Tierras y Excavación' },
-  { id: 3, nombre: 'Capítulo III: Terraplenes Estructurales y Capas de Soporte' },
-  { id: 4, nombre: 'Capítulo IV: Subbases y Bases Granulares' },
-  { id: 5, nombre: 'Capítulo V: Pavimentos Asfálticos y Concreto' },
-  { id: 6, nombre: 'Capítulo VI: Estructuras de Drenaje Pluvial' },
-  { id: 7, nombre: 'Capítulo VII: Bóvedas Metálicas y Obras de Arte' },
-  { id: 8, nombre: 'Capítulo VIII: Construcciones Complementarias y Señalización' },
-  { id: 9, nombre: 'Capítulo IX: Aspectos Ambientales y Gestión de Riesgo' },
+  { id: 1, nombre: 'Capítulo 1: CONTROL DEL TRABAJO' },
+  { id: 2, nombre: 'Capítulo 2: MOVIMIENTO DE TIERRAS' },
+  { id: 3, nombre: 'Capítulo 3: TERRAPLENES Y ESTRUCTURAS' },
+  { id: 4, nombre: 'Capítulo 4: ESTRUCTURAS PUENTES' },
+  { id: 5, nombre: 'Capítulo 5: SUB-BASES Y BASES' },
+  { id: 6, nombre: 'Capítulo 6: PAVIMENTOS ASFALTICOS' },
+  { id: 7, nombre: 'Capítulo 7: PAVIMENTOS RÍGIDOS' },
+  { id: 8, nombre: 'Capítulo 8: ESTRUCTURAS DE DRENAJE' },
+  { id: 9, nombre: 'Capítulo 9: CONSTRUCCIONES COMPLEMENTARIAS' },
 ]
 
-// 88 RENGLONES OFICIALES
+// CATÁLOGO OFICIAL DE RENGLONES (VAS - GIPSA)
 const CATALOGO_DETALLADO_88_RENGLONES: RenglonDetalladoSabana[] = [
   {
-    id: 'sab-1',
+    id: "9ea7717d-c98c-4449-a4eb-a71066ee21ec",
     capituloId: 1,
-    capituloNombre: 'Capítulo I: Estudios, Mantenimiento y Trabajos Preliminares',
-    codigoDGC: '101.01',
-    descripcion: 'Mantenimiento del tránsito y construcción de desvíos provisionales',
-    unidad: 'Glb',
-    cantidadContratada: 1,
-    cantidadAjustada: 1,
-    costoUnitarioDirecto: 250000,
-    cantidadEstePeriodo: 0.1,
-    cantidadAcumuladaAnterior: 0.6,
+    capituloNombre: "CONTROL DEL TRABAJO",
+    codigoDGC: "105.06",
+    descripcion: "Planos finales de la obra construida",
+    unidad: "u",
+    cantidadContratada: 0,
+    cantidadAjustada: 0,
+    costoUnitarioDirecto: 0,
+    cantidadEstePeriodo: 0,
+    cantidadAcumuladaAnterior: 0,
     tipoRenglon: 'Original',
-    estadoEjecucion: 'En proceso',
-    avancesMensuales: { 'Mes 1': 0.1, 'Mes 2': 0.1, 'Mes 3': 0.1, 'Mes 4': 0.1, 'Mes 5': 0.1, 'Mes 6': 0.1, 'Mes 7': 0.1 },
+    estadoEjecucion: 'No iniciado',
+    avancesMensuales: {},
   },
   {
-    id: 'sab-2',
-    capituloId: 1,
-    capituloNombre: 'Capítulo I: Estudios, Mantenimiento y Trabajos Preliminares',
-    codigoDGC: '102.03',
-    descripcion: 'Clechado, chapeo, destronque y limpieza del derecho de vía',
-    unidad: 'Ha',
-    cantidadContratada: 18.5,
-    cantidadAjustada: 18.5,
-    costoUnitarioDirecto: 18500,
-    cantidadEstePeriodo: 1.5,
-    cantidadAcumuladaAnterior: 16.0,
-    tipoRenglon: 'Original',
-    estadoEjecucion: 'En proceso',
-    avancesMensuales: { 'Mes 1': 4.0, 'Mes 2': 4.0, 'Mes 3': 4.0, 'Mes 4': 2.0, 'Mes 5': 2.0, 'Mes 6': 1.5 },
-  },
-  {
-    id: 'sab-3',
-    capituloId: 1,
-    capituloNombre: 'Capítulo I: Estudios, Mantenimiento y Trabajos Preliminares',
-    codigoDGC: '103.01',
-    descripcion: 'Demolición de estructuras existentes de concreto y mampostería',
-    unidad: 'm³',
-    cantidadContratada: 1200,
-    cantidadAjustada: 1200,
-    costoUnitarioDirecto: 280,
-    cantidadEstePeriodo: 100,
-    cantidadAcumuladaAnterior: 1100,
-    tipoRenglon: 'Original',
-    estadoEjecucion: 'Completado',
-    avancesMensuales: { 'Mes 1': 300, 'Mes 2': 400, 'Mes 3': 200, 'Mes 4': 100, 'Mes 5': 100, 'Mes 6': 100 },
-  },
-  {
-    id: 'sab-11',
+    id: "127e0692-b6f5-42b9-9838-3f360a4af36f",
     capituloId: 2,
-    capituloNombre: 'Capítulo II: Movimiento de Tierras y Excavación',
-    codigoDGC: '201.01',
-    descripcion: 'Excavación no clasificada para corte en vía',
-    unidad: 'm³',
-    cantidadContratada: 45000,
-    cantidadAjustada: 48000,
-    costoUnitarioDirecto: 68,
-    cantidadEstePeriodo: 3500,
-    cantidadAcumuladaAnterior: 41000,
-    tipoRenglon: 'Aumento',
-    estadoEjecucion: 'En proceso',
-    avancesMensuales: { 'Mes 1': 8000, 'Mes 2': 10000, 'Mes 3': 11000, 'Mes 4': 7000, 'Mes 5': 5000, 'Mes 6': 3500 },
+    capituloNombre: "MOVIMIENTO DE TIERRAS",
+    codigoDGC: "201.03 (i)",
+    descripcion: "Retiro de estructuras existentes de drenaje",
+    unidad: "m3",
+    cantidadContratada: 0,
+    cantidadAjustada: 0,
+    costoUnitarioDirecto: 0,
+    cantidadEstePeriodo: 0,
+    cantidadAcumuladaAnterior: 0,
+    tipoRenglon: 'Original',
+    estadoEjecucion: 'No iniciado',
+    avancesMensuales: {},
   },
   {
-    id: 'sab-12',
+    id: "e1913fc0-81e0-4ee1-ab3a-f029f544fdf0",
     capituloId: 2,
-    capituloNombre: 'Capítulo II: Movimiento de Tierras y Excavación',
-    codigoDGC: '201.03(b)',
-    descripcion: 'Excavación en roca mediante perforación y voladura controlada',
-    unidad: 'm³',
-    cantidadContratada: 12500,
-    cantidadAjustada: 14000,
-    costoUnitarioDirecto: 210,
-    cantidadEstePeriodo: 1200,
-    cantidadAcumuladaAnterior: 11800,
-    tipoRenglon: 'Aumento',
-    estadoEjecucion: 'Con excedente',
-    avancesMensuales: { 'Mes 1': 2000, 'Mes 2': 3000, 'Mes 3': 3500, 'Mes 4': 2000, 'Mes 5': 1300, 'Mes 6': 1200 },
+    capituloNombre: "MOVIMIENTO DE TIERRAS",
+    codigoDGC: "201.03 (ii)",
+    descripcion: "Retiro de estructuras existentes de pavimento",
+    unidad: "m3",
+    cantidadContratada: 0,
+    cantidadAjustada: 0,
+    costoUnitarioDirecto: 0,
+    cantidadEstePeriodo: 0,
+    cantidadAcumuladaAnterior: 0,
+    tipoRenglon: 'Original',
+    estadoEjecucion: 'No iniciado',
+    avancesMensuales: {},
   },
   {
-    id: 'sab-38',
+    id: "8faf97cc-2883-4169-8f26-20e721025b22",
+    capituloId: 2,
+    capituloNombre: "MOVIMIENTO DE TIERRAS",
+    codigoDGC: "201.03 (iv)",
+    descripcion: "Retiro de estructuras (muros de anclajes)",
+    unidad: "m2",
+    cantidadContratada: 0,
+    cantidadAjustada: 0,
+    costoUnitarioDirecto: 0,
+    cantidadEstePeriodo: 0,
+    cantidadAcumuladaAnterior: 0,
+    tipoRenglon: 'Original',
+    estadoEjecucion: 'No iniciado',
+    avancesMensuales: {},
+  },
+  {
+    id: "e7a3adf3-b886-4db3-a590-6f7d9a8df3cb",
+    capituloId: 2,
+    capituloNombre: "MOVIMIENTO DE TIERRAS",
+    codigoDGC: "201.03 (v)",
+    descripcion: "Retiro de alcantarillas existente 48\" HDPE",
+    unidad: "m",
+    cantidadContratada: 0,
+    cantidadAjustada: 0,
+    costoUnitarioDirecto: 0,
+    cantidadEstePeriodo: 0,
+    cantidadAcumuladaAnterior: 0,
+    tipoRenglon: 'Original',
+    estadoEjecucion: 'No iniciado',
+    avancesMensuales: {},
+  },
+  {
+    id: "fc999f49-c455-4cc0-9a1d-ab6bf6632f00",
+    capituloId: 2,
+    capituloNombre: "MOVIMIENTO DE TIERRAS",
+    codigoDGC: "201.03 (vi)",
+    descripcion: "Retiro de alcantarillas existentes 72\" calibre 16",
+    unidad: "m",
+    cantidadContratada: 0,
+    cantidadAjustada: 0,
+    costoUnitarioDirecto: 0,
+    cantidadEstePeriodo: 0,
+    cantidadAcumuladaAnterior: 0,
+    tipoRenglon: 'Original',
+    estadoEjecucion: 'No iniciado',
+    avancesMensuales: {},
+  },
+  {
+    id: "d46565b7-9e41-4b81-b1ea-28213a7c5b02",
+    capituloId: 2,
+    capituloNombre: "MOVIMIENTO DE TIERRAS",
+    codigoDGC: "202.03",
+    descripcion: "Limpia, chapeo y destronque",
+    unidad: "Ha",
+    cantidadContratada: 0,
+    cantidadAjustada: 0,
+    costoUnitarioDirecto: 0,
+    cantidadEstePeriodo: 0,
+    cantidadAcumuladaAnterior: 0,
+    tipoRenglon: 'Original',
+    estadoEjecucion: 'No iniciado',
+    avancesMensuales: {},
+  },
+  {
+    id: "33833c36-413a-46ce-b0d5-547d0187ac3a",
+    capituloId: 2,
+    capituloNombre: "MOVIMIENTO DE TIERRAS",
+    codigoDGC: "203.04 (c)",
+    descripcion: "Excavación No Clasificada de Material de Desperdicio",
+    unidad: "m3",
+    cantidadContratada: 0,
+    cantidadAjustada: 0,
+    costoUnitarioDirecto: 0,
+    cantidadEstePeriodo: 0,
+    cantidadAcumuladaAnterior: 0,
+    tipoRenglon: 'Original',
+    estadoEjecucion: 'No iniciado',
+    avancesMensuales: {},
+  },
+  {
+    id: "7c91898d-4f95-4ce3-9f5a-515f7d3c99dd",
+    capituloId: 2,
+    capituloNombre: "MOVIMIENTO DE TIERRAS",
+    codigoDGC: "203.04 (b)",
+    descripcion: "Excavación No Clasificada",
+    unidad: "m3",
+    cantidadContratada: 0,
+    cantidadAjustada: 0,
+    costoUnitarioDirecto: 0,
+    cantidadEstePeriodo: 0,
+    cantidadAcumuladaAnterior: 0,
+    tipoRenglon: 'Original',
+    estadoEjecucion: 'No iniciado',
+    avancesMensuales: {},
+  },
+  {
+    id: "c5473c31-df0f-4275-9e66-8c7ed1dfda28",
+    capituloId: 2,
+    capituloNombre: "MOVIMIENTO DE TIERRAS",
+    codigoDGC: "204",
+    descripcion: "Excavación de canales",
+    unidad: "m3",
+    cantidadContratada: 0,
+    cantidadAjustada: 0,
+    costoUnitarioDirecto: 0,
+    cantidadEstePeriodo: 0,
+    cantidadAcumuladaAnterior: 0,
+    tipoRenglon: 'Original',
+    estadoEjecucion: 'No iniciado',
+    avancesMensuales: {},
+  },
+  {
+    id: "a52180f7-8409-4e2b-b601-cb37ed3114bf",
+    capituloId: 2,
+    capituloNombre: "MOVIMIENTO DE TIERRAS",
+    codigoDGC: "203.04 (b)-sub",
+    descripcion: "Excavación estructural para subdrenajes",
+    unidad: "m3",
+    cantidadContratada: 0,
+    cantidadAjustada: 0,
+    costoUnitarioDirecto: 0,
+    cantidadEstePeriodo: 0,
+    cantidadAcumuladaAnterior: 0,
+    tipoRenglon: 'Original',
+    estadoEjecucion: 'No iniciado',
+    avancesMensuales: {},
+  },
+  {
+    id: "d78b4c62-929d-4456-b661-1beb2ffce322",
+    capituloId: 2,
+    capituloNombre: "MOVIMIENTO DE TIERRAS",
+    codigoDGC: "205.05",
+    descripcion: "Excavación Estructural para cimentaciones de Estructuras (cajas, cabezales y muros)",
+    unidad: "m3",
+    cantidadContratada: 0,
+    cantidadAjustada: 0,
+    costoUnitarioDirecto: 0,
+    cantidadEstePeriodo: 0,
+    cantidadAcumuladaAnterior: 0,
+    tipoRenglon: 'Original',
+    estadoEjecucion: 'No iniciado',
+    avancesMensuales: {},
+  },
+  {
+    id: "b612ca7e-73c3-4f39-8fb2-8d00aab32928",
+    capituloId: 2,
+    capituloNombre: "MOVIMIENTO DE TIERRAS",
+    codigoDGC: "205.06",
+    descripcion: "Excavación Estructural para Alcantarillas",
+    unidad: "m3",
+    cantidadContratada: 0,
+    cantidadAjustada: 0,
+    costoUnitarioDirecto: 0,
+    cantidadEstePeriodo: 0,
+    cantidadAcumuladaAnterior: 0,
+    tipoRenglon: 'Original',
+    estadoEjecucion: 'No iniciado',
+    avancesMensuales: {},
+  },
+  {
+    id: "44bfab0d-f5bf-4d9d-95c7-edfcf61cd066",
+    capituloId: 2,
+    capituloNombre: "MOVIMIENTO DE TIERRAS",
+    codigoDGC: "208.01",
+    descripcion: "Acarreo",
+    unidad: "m3-km",
+    cantidadContratada: 0,
+    cantidadAjustada: 0,
+    costoUnitarioDirecto: 0,
+    cantidadEstePeriodo: 0,
+    cantidadAcumuladaAnterior: 0,
+    tipoRenglon: 'Original',
+    estadoEjecucion: 'No iniciado',
+    avancesMensuales: {},
+  },
+  {
+    id: "951b9655-bfae-42e1-89f1-b97664030a2a",
+    capituloId: 3,
+    capituloNombre: "TERRAPLENES Y ESTRUCTURAS",
+    codigoDGC: "255",
+    descripcion: "Muro de Tierra Mecánicamente Estabilizada",
+    unidad: "m2",
+    cantidadContratada: 0,
+    cantidadAjustada: 0,
+    costoUnitarioDirecto: 0,
+    cantidadEstePeriodo: 0,
+    cantidadAcumuladaAnterior: 0,
+    tipoRenglon: 'Original',
+    estadoEjecucion: 'No iniciado',
+    avancesMensuales: {},
+  },
+  {
+    id: "8d3208e3-9937-4fec-a340-57ef4c10d768",
+    capituloId: 3,
+    capituloNombre: "TERRAPLENES Y ESTRUCTURAS",
+    codigoDGC: "256 (a)",
+    descripcion: "Muro de Anclajes Activos",
+    unidad: "m2",
+    cantidadContratada: 0,
+    cantidadAjustada: 0,
+    costoUnitarioDirecto: 0,
+    cantidadEstePeriodo: 0,
+    cantidadAcumuladaAnterior: 0,
+    tipoRenglon: 'Original',
+    estadoEjecucion: 'No iniciado',
+    avancesMensuales: {},
+  },
+  {
+    id: "5f82b59a-8f9c-425b-b074-2e029fc84b5f",
+    capituloId: 3,
+    capituloNombre: "TERRAPLENES Y ESTRUCTURAS",
+    codigoDGC: "256 (b)",
+    descripcion: "Anclajes Activos en Pantalla de Pilotes",
+    unidad: "u",
+    cantidadContratada: 0,
+    cantidadAjustada: 0,
+    costoUnitarioDirecto: 0,
+    cantidadEstePeriodo: 0,
+    cantidadAcumuladaAnterior: 0,
+    tipoRenglon: 'Original',
+    estadoEjecucion: 'No iniciado',
+    avancesMensuales: {},
+  },
+  {
+    id: "bead419e-f52f-4891-ace1-f08214ba88f6",
+    capituloId: 3,
+    capituloNombre: "TERRAPLENES Y ESTRUCTURAS",
+    codigoDGC: "258",
+    descripcion: "Muros de Suelo Enclavado",
+    unidad: "m2",
+    cantidadContratada: 0,
+    cantidadAjustada: 0,
+    costoUnitarioDirecto: 0,
+    cantidadEstePeriodo: 0,
+    cantidadAcumuladaAnterior: 0,
+    tipoRenglon: 'Original',
+    estadoEjecucion: 'No iniciado',
+    avancesMensuales: {},
+  },
+  {
+    id: "f9a6eefd-118f-455f-aa68-bce057cfb3f1",
+    capituloId: 3,
+    capituloNombre: "TERRAPLENES Y ESTRUCTURAS",
+    codigoDGC: "558 (a)",
+    descripcion: "Pilotes Ø 800",
+    unidad: "m",
+    cantidadContratada: 0,
+    cantidadAjustada: 0,
+    costoUnitarioDirecto: 0,
+    cantidadEstePeriodo: 0,
+    cantidadAcumuladaAnterior: 0,
+    tipoRenglon: 'Original',
+    estadoEjecucion: 'No iniciado',
+    avancesMensuales: {},
+  },
+  {
+    id: "6bebdaf3-032b-44e6-8003-c25d0039c95e",
+    capituloId: 3,
+    capituloNombre: "TERRAPLENES Y ESTRUCTURAS",
+    codigoDGC: "551.02 (a)",
+    descripcion: "Concreto Clase 3000",
+    unidad: "m3",
+    cantidadContratada: 0,
+    cantidadAjustada: 0,
+    costoUnitarioDirecto: 0,
+    cantidadEstePeriodo: 0,
+    cantidadAcumuladaAnterior: 0,
+    tipoRenglon: 'Original',
+    estadoEjecucion: 'No iniciado',
+    avancesMensuales: {},
+  },
+  {
+    id: "09d803c2-67e6-494f-91ed-ebb42c65a51e",
+    capituloId: 3,
+    capituloNombre: "TERRAPLENES Y ESTRUCTURAS",
+    codigoDGC: "551.02 (b)",
+    descripcion: "Concreto Clase 4000",
+    unidad: "m3",
+    cantidadContratada: 0,
+    cantidadAjustada: 0,
+    costoUnitarioDirecto: 0,
+    cantidadEstePeriodo: 0,
+    cantidadAcumuladaAnterior: 0,
+    tipoRenglon: 'Original',
+    estadoEjecucion: 'No iniciado',
+    avancesMensuales: {},
+  },
+  {
+    id: "f182fbd9-5a18-4db6-a07a-343d5be1ddba",
+    capituloId: 3,
+    capituloNombre: "TERRAPLENES Y ESTRUCTURAS",
+    codigoDGC: "552.03",
+    descripcion: "Acero de refuerzo A706",
+    unidad: "kg",
+    cantidadContratada: 0,
+    cantidadAjustada: 0,
+    costoUnitarioDirecto: 0,
+    cantidadEstePeriodo: 0,
+    cantidadAcumuladaAnterior: 0,
+    tipoRenglon: 'Original',
+    estadoEjecucion: 'No iniciado',
+    avancesMensuales: {},
+  },
+  {
+    id: "907d1e53-6408-4497-8cb8-dbe4b91a7eae",
+    capituloId: 3,
+    capituloNombre: "TERRAPLENES Y ESTRUCTURAS",
+    codigoDGC: "606.02",
+    descripcion: "Drenes horizontales Ø 3\"",
+    unidad: "m",
+    cantidadContratada: 0,
+    cantidadAjustada: 0,
+    costoUnitarioDirecto: 0,
+    cantidadEstePeriodo: 0,
+    cantidadAcumuladaAnterior: 0,
+    tipoRenglon: 'Original',
+    estadoEjecucion: 'No iniciado',
+    avancesMensuales: {},
+  },
+  {
+    id: "772c4402-f68f-4687-ae79-511b21b9b8ea",
+    capituloId: 4,
+    capituloNombre: "ESTRUCTURAS PUENTES",
+    codigoDGC: "551 (a)",
+    descripcion: "Concreto Clase 4000",
+    unidad: "m3",
+    cantidadContratada: 0,
+    cantidadAjustada: 0,
+    costoUnitarioDirecto: 0,
+    cantidadEstePeriodo: 0,
+    cantidadAcumuladaAnterior: 0,
+    tipoRenglon: 'Original',
+    estadoEjecucion: 'No iniciado',
+    avancesMensuales: {},
+  },
+  {
+    id: "5a931ad0-5728-44cc-85f4-380765819335",
+    capituloId: 4,
+    capituloNombre: "ESTRUCTURAS PUENTES",
+    codigoDGC: "551 (b)",
+    descripcion: "Concreto Clase 6000 (Vigas Postensadas)",
+    unidad: "m3",
+    cantidadContratada: 0,
+    cantidadAjustada: 0,
+    costoUnitarioDirecto: 0,
+    cantidadEstePeriodo: 0,
+    cantidadAcumuladaAnterior: 0,
+    tipoRenglon: 'Original',
+    estadoEjecucion: 'No iniciado',
+    avancesMensuales: {},
+  },
+  {
+    id: "947eb7e8-4f2f-4710-9e63-ed86bfe3806a",
+    capituloId: 4,
+    capituloNombre: "ESTRUCTURAS PUENTES",
+    codigoDGC: "552",
+    descripcion: "Acero de refuerzo A706",
+    unidad: "kg",
+    cantidadContratada: 0,
+    cantidadAjustada: 0,
+    costoUnitarioDirecto: 0,
+    cantidadEstePeriodo: 0,
+    cantidadAcumuladaAnterior: 0,
+    tipoRenglon: 'Original',
+    estadoEjecucion: 'No iniciado',
+    avancesMensuales: {},
+  },
+  {
+    id: "11dbfab0-2399-4564-8a0e-a13a114facbb",
+    capituloId: 4,
+    capituloNombre: "ESTRUCTURAS PUENTES",
+    codigoDGC: "554",
+    descripcion: "Cable A416 Para Tendones de Postensado",
+    unidad: "kg",
+    cantidadContratada: 0,
+    cantidadAjustada: 0,
+    costoUnitarioDirecto: 0,
+    cantidadEstePeriodo: 0,
+    cantidadAcumuladaAnterior: 0,
+    tipoRenglon: 'Original',
+    estadoEjecucion: 'No iniciado',
+    avancesMensuales: {},
+  },
+  {
+    id: "906c0a80-0a9e-4723-95e5-b8b1d1eba65f",
+    capituloId: 4,
+    capituloNombre: "ESTRUCTURAS PUENTES",
+    codigoDGC: "558 (b)",
+    descripcion: "Pilotes Ø 1,100 (Solo longitud enterrada)",
+    unidad: "m",
+    cantidadContratada: 0,
+    cantidadAjustada: 0,
+    costoUnitarioDirecto: 0,
+    cantidadEstePeriodo: 0,
+    cantidadAcumuladaAnterior: 0,
+    tipoRenglon: 'Original',
+    estadoEjecucion: 'No iniciado',
+    avancesMensuales: {},
+  },
+  {
+    id: "2a25eac3-ced8-459e-a483-93f78915a520",
+    capituloId: 4,
+    capituloNombre: "ESTRUCTURAS PUENTES",
+    codigoDGC: "560",
+    descripcion: "Junta de Dilatación",
+    unidad: "m",
+    cantidadContratada: 0,
+    cantidadAjustada: 0,
+    costoUnitarioDirecto: 0,
+    cantidadEstePeriodo: 0,
+    cantidadAcumuladaAnterior: 0,
+    tipoRenglon: 'Original',
+    estadoEjecucion: 'No iniciado',
+    avancesMensuales: {},
+  },
+  {
+    id: "2b0abdf9-0d93-4b8c-bb32-dd46c6a12727",
+    capituloId: 4,
+    capituloNombre: "ESTRUCTURAS PUENTES",
+    codigoDGC: "561.03 (c)",
+    descripcion: "Apoyos elastoméricos reforzados",
+    unidad: "u",
+    cantidadContratada: 0,
+    cantidadAjustada: 0,
+    costoUnitarioDirecto: 0,
+    cantidadEstePeriodo: 0,
+    cantidadAcumuladaAnterior: 0,
+    tipoRenglon: 'Original',
+    estadoEjecucion: 'No iniciado',
+    avancesMensuales: {},
+  },
+  {
+    id: "3a77d98b-eff6-4b83-b04c-ca00cdde38e9",
+    capituloId: 4,
+    capituloNombre: "ESTRUCTURAS PUENTES",
+    codigoDGC: "562.01",
+    descripcion: "Tubería de HG de 4\"",
+    unidad: "m",
+    cantidadContratada: 0,
+    cantidadAjustada: 0,
+    costoUnitarioDirecto: 0,
+    cantidadEstePeriodo: 0,
+    cantidadAcumuladaAnterior: 0,
+    tipoRenglon: 'Original',
+    estadoEjecucion: 'No iniciado',
+    avancesMensuales: {},
+  },
+  {
+    id: "0f27369f-88c1-4001-95db-64d0380e9e0b",
+    capituloId: 4,
+    capituloNombre: "ESTRUCTURAS PUENTES",
+    codigoDGC: "562.02",
+    descripcion: "Tubería de HG de 6\"",
+    unidad: "m",
+    cantidadContratada: 0,
+    cantidadAjustada: 0,
+    costoUnitarioDirecto: 0,
+    cantidadEstePeriodo: 0,
+    cantidadAcumuladaAnterior: 0,
+    tipoRenglon: 'Original',
+    estadoEjecucion: 'No iniciado',
+    avancesMensuales: {},
+  },
+  {
+    id: "ba5ba945-f009-494d-b240-fd7649c24a91",
     capituloId: 5,
-    capituloNombre: 'Capítulo V: Pavimentos Asfálticos y Concreto',
-    codigoDGC: '551.03',
-    descripcion: 'Pavimento de concreto hidráulico MR=48 e=25cm para tramos de carga pesada',
-    unidad: 'm²',
-    cantidadContratada: 18000,
-    cantidadAjustada: 18000,
-    costoUnitarioDirecto: 460,
-    cantidadEstePeriodo: 1600,
-    cantidadAcumuladaAnterior: 14800,
-    tipoRenglon: 'Nuevo',
-    estadoEjecucion: 'En proceso',
-    avancesMensuales: { 'Mes 3': 3000, 'Mes 4': 5000, 'Mes 5': 6800, 'Mes 6': 1600 },
+    capituloNombre: "SUB-BASES Y BASES",
+    codigoDGC: "305.01 (b)",
+    descripcion: "Base Triturada",
+    unidad: "m3",
+    cantidadContratada: 0,
+    cantidadAjustada: 0,
+    costoUnitarioDirecto: 0,
+    cantidadEstePeriodo: 0,
+    cantidadAcumuladaAnterior: 0,
+    tipoRenglon: 'Original',
+    estadoEjecucion: 'No iniciado',
+    avancesMensuales: {},
+  },
+  {
+    id: "581acbdc-76b9-4ba9-aa2c-e38aa491f619",
+    capituloId: 5,
+    capituloNombre: "SUB-BASES Y BASES",
+    codigoDGC: "307.01 (b)",
+    descripcion: "Base Triturada de Alta Densidad Estabilizada con Cemento Hidráulico",
+    unidad: "m3",
+    cantidadContratada: 0,
+    cantidadAjustada: 0,
+    costoUnitarioDirecto: 0,
+    cantidadEstePeriodo: 0,
+    cantidadAcumuladaAnterior: 0,
+    tipoRenglon: 'Original',
+    estadoEjecucion: 'No iniciado',
+    avancesMensuales: {},
+  },
+  {
+    id: "257ce8a2-d07c-485f-8c88-2b51ba134562",
+    capituloId: 5,
+    capituloNombre: "SUB-BASES Y BASES",
+    codigoDGC: "307.04 (c)",
+    descripcion: "Cemento Hidráulico para Estabilización",
+    unidad: "kg",
+    cantidadContratada: 0,
+    cantidadAjustada: 0,
+    costoUnitarioDirecto: 0,
+    cantidadEstePeriodo: 0,
+    cantidadAcumuladaAnterior: 0,
+    tipoRenglon: 'Original',
+    estadoEjecucion: 'No iniciado',
+    avancesMensuales: {},
+  },
+  {
+    id: "1c14a940-e0e5-4139-8db5-629fc22c69a9",
+    capituloId: 6,
+    capituloNombre: "PAVIMENTOS ASFALTICOS",
+    codigoDGC: "401.01",
+    descripcion: "Concreto Asfáltico en Caliente (incluye cemento asfáltico y riego de liga)",
+    unidad: "Ton",
+    cantidadContratada: 0,
+    cantidadAjustada: 0,
+    costoUnitarioDirecto: 0,
+    cantidadEstePeriodo: 0,
+    cantidadAcumuladaAnterior: 0,
+    tipoRenglon: 'Original',
+    estadoEjecucion: 'No iniciado',
+    avancesMensuales: {},
+  },
+  {
+    id: "ad25abb9-e83b-4da2-8e4f-95d5a8076ddb",
+    capituloId: 6,
+    capituloNombre: "PAVIMENTOS ASFALTICOS",
+    codigoDGC: "407",
+    descripcion: "Riego de Imprimación",
+    unidad: "gls",
+    cantidadContratada: 0,
+    cantidadAjustada: 0,
+    costoUnitarioDirecto: 0,
+    cantidadEstePeriodo: 0,
+    cantidadAcumuladaAnterior: 0,
+    tipoRenglon: 'Original',
+    estadoEjecucion: 'No iniciado',
+    avancesMensuales: {},
+  },
+  {
+    id: "62273b45-b2e0-42fe-973e-b2bc2f783257",
+    capituloId: 7,
+    capituloNombre: "PAVIMENTOS RÍGIDOS",
+    codigoDGC: "501",
+    descripcion: "Pavimento de Concreto de Cemento Hidráulico",
+    unidad: "m3",
+    cantidadContratada: 0,
+    cantidadAjustada: 0,
+    costoUnitarioDirecto: 0,
+    cantidadEstePeriodo: 0,
+    cantidadAcumuladaAnterior: 0,
+    tipoRenglon: 'Original',
+    estadoEjecucion: 'No iniciado',
+    avancesMensuales: {},
+  },
+  {
+    id: "7da16433-9561-406e-8fbf-094350b34ab2",
+    capituloId: 7,
+    capituloNombre: "PAVIMENTOS RÍGIDOS",
+    codigoDGC: "501.03 (j)",
+    descripcion: "Geotextil especial (Ha Te 500) para pavimentos",
+    unidad: "m2",
+    cantidadContratada: 0,
+    cantidadAjustada: 0,
+    costoUnitarioDirecto: 0,
+    cantidadEstePeriodo: 0,
+    cantidadAcumuladaAnterior: 0,
+    tipoRenglon: 'Original',
+    estadoEjecucion: 'No iniciado',
+    avancesMensuales: {},
+  },
+  {
+    id: "8c8890de-2b1f-48a7-9146-81ef1f05a7b1",
+    capituloId: 8,
+    capituloNombre: "ESTRUCTURAS DE DRENAJE",
+    codigoDGC: "601.01",
+    descripcion: "Material fluido de baja resistencia controlada fc=75 psi, para restitución de material y relleno de alcantarilla y estructuras.",
+    unidad: "m3",
+    cantidadContratada: 0,
+    cantidadAjustada: 0,
+    costoUnitarioDirecto: 0,
+    cantidadEstePeriodo: 0,
+    cantidadAcumuladaAnterior: 0,
+    tipoRenglon: 'Original',
+    estadoEjecucion: 'No iniciado',
+    avancesMensuales: {},
+  },
+  {
+    id: "a309cadb-baf1-413f-94c7-8b25e5826ffd",
+    capituloId: 8,
+    capituloNombre: "ESTRUCTURAS DE DRENAJE",
+    codigoDGC: "605.03 (i)",
+    descripcion: "Agregado para subdrenaje",
+    unidad: "m3",
+    cantidadContratada: 0,
+    cantidadAjustada: 0,
+    costoUnitarioDirecto: 0,
+    cantidadEstePeriodo: 0,
+    cantidadAcumuladaAnterior: 0,
+    tipoRenglon: 'Original',
+    estadoEjecucion: 'No iniciado',
+    avancesMensuales: {},
+  },
+  {
+    id: "5bd17fbb-0982-4a57-96fc-a9de6be1a9f0",
+    capituloId: 8,
+    capituloNombre: "ESTRUCTURAS DE DRENAJE",
+    codigoDGC: "605.03 (j)",
+    descripcion: "Geotextil no tejido clase 2 tipo I-B para subdrenaje",
+    unidad: "m2",
+    cantidadContratada: 0,
+    cantidadAjustada: 0,
+    costoUnitarioDirecto: 0,
+    cantidadEstePeriodo: 0,
+    cantidadAcumuladaAnterior: 0,
+    tipoRenglon: 'Original',
+    estadoEjecucion: 'No iniciado',
+    avancesMensuales: {},
+  },
+  {
+    id: "a3407726-86f7-4421-965e-a79f74954063",
+    capituloId: 8,
+    capituloNombre: "ESTRUCTURAS DE DRENAJE",
+    codigoDGC: "605.03 (e)",
+    descripcion: "Subdrenaje, tubería de PVC perforada de 6\"",
+    unidad: "m",
+    cantidadContratada: 0,
+    cantidadAjustada: 0,
+    costoUnitarioDirecto: 0,
+    cantidadEstePeriodo: 0,
+    cantidadAcumuladaAnterior: 0,
+    tipoRenglon: 'Original',
+    estadoEjecucion: 'No iniciado',
+    avancesMensuales: {},
+  },
+  {
+    id: "18ee784d-02a6-474d-a0a1-6a08617af03b",
+    capituloId: 8,
+    capituloNombre: "ESTRUCTURAS DE DRENAJE",
+    codigoDGC: "604.03 (e)",
+    descripcion: "Alcantarilla de Plástico Compuesto de Polietileno de Alta Densidad (HDPE) de 36 pulgadas",
+    unidad: "m",
+    cantidadContratada: 0,
+    cantidadAjustada: 0,
+    costoUnitarioDirecto: 0,
+    cantidadEstePeriodo: 0,
+    cantidadAcumuladaAnterior: 0,
+    tipoRenglon: 'Original',
+    estadoEjecucion: 'No iniciado',
+    avancesMensuales: {},
+  },
+  {
+    id: "7a03c82a-462a-4358-a600-afb98ac35f8f",
+    capituloId: 8,
+    capituloNombre: "ESTRUCTURAS DE DRENAJE",
+    codigoDGC: "603.03 (e)",
+    descripcion: "Alcantarilla de Plástico Compuesto de Polietileno de Alta Densidad (HDPE) de 48 pulgadas",
+    unidad: "m",
+    cantidadContratada: 0,
+    cantidadAjustada: 0,
+    costoUnitarioDirecto: 0,
+    cantidadEstePeriodo: 0,
+    cantidadAcumuladaAnterior: 0,
+    tipoRenglon: 'Original',
+    estadoEjecucion: 'No iniciado',
+    avancesMensuales: {},
+  },
+  {
+    id: "5f23f1c4-199a-43b3-8399-544c89fb5711",
+    capituloId: 8,
+    capituloNombre: "ESTRUCTURAS DE DRENAJE",
+    codigoDGC: "603.03 (a)",
+    descripcion: "Alcantarilla de metal corrugado de 72\" de diámetro calibre 16",
+    unidad: "m",
+    cantidadContratada: 0,
+    cantidadAjustada: 0,
+    costoUnitarioDirecto: 0,
+    cantidadEstePeriodo: 0,
+    cantidadAcumuladaAnterior: 0,
+    tipoRenglon: 'Original',
+    estadoEjecucion: 'No iniciado',
+    avancesMensuales: {},
+  },
+  {
+    id: "79ff48df-edce-4525-adcb-43e2ba0cefcd",
+    capituloId: 9,
+    capituloNombre: "CONSTRUCCIONES COMPLEMENTARIAS",
+    codigoDGC: "709.04",
+    descripcion: "Barricadas de Concreto Especial (Base 40 cm)",
+    unidad: "m",
+    cantidadContratada: 0,
+    cantidadAjustada: 0,
+    costoUnitarioDirecto: 0,
+    cantidadEstePeriodo: 0,
+    cantidadAcumuladaAnterior: 0,
+    tipoRenglon: 'Original',
+    estadoEjecucion: 'No iniciado',
+    avancesMensuales: {},
+  },
+  {
+    id: "f5a6bed0-2ede-4be6-8335-36fe896fb8df",
+    capituloId: 9,
+    capituloNombre: "CONSTRUCCIONES COMPLEMENTARIAS",
+    codigoDGC: "708.01",
+    descripcion: "Desvíos temporales",
+    unidad: "Glb",
+    cantidadContratada: 0,
+    cantidadAjustada: 0,
+    costoUnitarioDirecto: 0,
+    cantidadEstePeriodo: 0,
+    cantidadAcumuladaAnterior: 0,
+    tipoRenglon: 'Original',
+    estadoEjecucion: 'No iniciado',
+    avancesMensuales: {},
+  },
+  {
+    id: "f0c9d2d0-5413-4e18-a808-87f11c005a10",
+    capituloId: 9,
+    capituloNombre: "CONSTRUCCIONES COMPLEMENTARIAS",
+    codigoDGC: "708.02",
+    descripcion: "Insumos y dispositivos para el control temporal del tránsito",
+    unidad: "mes",
+    cantidadContratada: 0,
+    cantidadAjustada: 0,
+    costoUnitarioDirecto: 0,
+    cantidadEstePeriodo: 0,
+    cantidadAcumuladaAnterior: 0,
+    tipoRenglon: 'Original',
+    estadoEjecucion: 'No iniciado',
+    avancesMensuales: {},
   },
 ]
 
-// Generar 88 renglones
 const GENERAR_88_RENGLONES = (): RenglonDetalladoSabana[] => {
-  const lista = [...CATALOGO_DETALLADO_88_RENGLONES]
-  let currentId = 50
-
-  CAPITULOS_LIBRO_AZUL.forEach((cap) => {
-    const existentesCap = lista.filter((r) => (r as any).capituloId === cap.id)
-    const faltantes = 10 - existentesCap.length
-
-    for (let i = 1; i <= faltantes; i++) {
-      currentId++
-      const codSub = `${cap.id}0${i}.${i < 10 ? '0' + i : i}-C${i}`
-      lista.push({
-        id: `sab-gen-${currentId}`,
-        capituloId: cap.id,
-        capituloNombre: cap.nombre,
-        codigoDGC: codSub,
-        descripcion: `Renglón complementario de ${cap.nombre.split(':')[1]?.trim() || 'Obra Vial'} No. ${i}`,
-        unidad: i % 2 === 0 ? 'm³' : i % 3 === 0 ? 'ml' : 'm²',
-        cantidadContratada: 1000 + i * 250,
-        cantidadAjustada: 1000 + i * 250,
-        costoUnitarioDirecto: 120 + i * 15,
-        cantidadEstePeriodo: i % 4 === 0 ? 0 : 100 + i * 10,
-        cantidadAcumuladaAnterior: 500 + i * 50,
-        tipoRenglon: i % 5 === 0 ? 'Nuevo' : i % 3 === 0 ? 'Aumento' : 'Original',
-        estadoEjecucion: i % 4 === 0 ? 'No iniciado' : i % 6 === 0 ? 'Completado' : 'En proceso',
-        avancesMensuales: {
-          'Mes 1': 100,
-          'Mes 2': 150,
-          'Mes 3': 150,
-          'Mes 4': 100,
-          'Mes 5': 100,
-          'Mes 6': 100 + i * 10,
-        },
-        fechaInicioPlan: '2025-01-20',
-        fechaFinPlan: '2026-06-30',
-      })
-    }
-  })
-
-  return lista
+  return [...CATALOGO_DETALLADO_88_RENGLONES]
 }
 
 const CATALOGO_COMPLETO_88 = GENERAR_88_RENGLONES()
@@ -623,6 +1319,16 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
     }
   }, [proyectoReal, esPlantillaVacia, proyectosLista, proyectoIdSeleccionado])
 
+  const ambitoSabanaActual = useMemo<'obra' | 'supervision'>(() => {
+    const fromProj = (proyecto as any)?.ambitoPlanTrabajo || (proyecto as any)?.ambito_plan_trabajo
+    if (fromProj === 'supervision' || fromProj === 'obra') return fromProj
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('proyecto_form_ambitoPlanTrabajo_' + (proyecto?.id || id))
+      if (stored === 'supervision' || stored === 'obra') return stored
+    }
+    return 'obra'
+  }, [proyecto, id])
+
   
   
 
@@ -689,6 +1395,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
   const [modalCancelarEstimacionOpen, setModalCancelarEstimacionOpen] = useState(false)
   const [modalExportarEstimacionOpen, setModalExportarEstimacionOpen] = useState(false)
   const [modalExportarSabanaOpen, setModalExportarSabanaOpen] = useState(false)
+  const [formatoExportacionInicial, setFormatoExportacionInicial] = useState<'pdf' | 'excel'>('pdf')
   const [modalConfirmarRegresoForm, setModalConfirmarRegresoForm] = useState(false)
   const [comentarioCierreEstimacion, setComentarioCierreEstimacion] = useState('')
   const [hasAutoOpenedModal, setHasAutoOpenedModal] = useState(false)
@@ -750,6 +1457,14 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
   const [numEstimacionFiltro, setNumEstimacionFiltro] = useState<string | 'todos'>('todos')
 
   const [busqueda, setBusqueda] = useState('')
+  const [sheetFiltrosSabanaAbierto, setSheetFiltrosSabanaAbierto] = useState(false)
+  const cantidadFiltrosSabanaActivos = useMemo(() => {
+    let cant = 0
+    if (capituloFiltro !== 'todos') cant++
+    if (mesFiltro !== 'todos') cant++
+    if (numEstimacionFiltro !== 'todos') cant++
+    return cant
+  }, [capituloFiltro, mesFiltro, numEstimacionFiltro])
   const [capitulosColapsados, setCapitulosColapsados] = useState<Record<number, boolean>>({})
 
   const [itemsPorPagina, setItemsPorPagina] = useState<number>(12)
@@ -787,6 +1502,8 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
       await api.put(`/proyectos/${targetId}`, {
         planTrabajo: renglones,
         renglones: renglones,
+        montoPlanTrabajo: montoContractualOriginalTotal,
+        monto_plan_trabajo: montoContractualOriginalTotal,
       })
 
       // 2. Guardar renglones individualmente en /mantenimiento/renglon_trabajo
@@ -810,11 +1527,13 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
 
       // 3. Respaldar localmente en localStorage
       localStorage.setItem(`sabana_renglones_${targetId}`, JSON.stringify(renglones))
+      localStorage.setItem(`proyecto_sabana_monto_${targetId}`, String(montoContractualOriginalTotal))
 
       showSuccessToast('Planificación del proyecto guardada correctamente en la base de datos')
     } catch (e: any) {
       console.error('Error al guardar planificación en BD:', e)
       localStorage.setItem(`sabana_renglones_${targetId}`, JSON.stringify(renglones))
+      localStorage.setItem(`proyecto_sabana_monto_${targetId}`, String(montoContractualOriginalTotal))
       showSuccessToast('Planificación guardada correctamente')
     }
   }
@@ -869,14 +1588,41 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
           }
         }
 
-        if (resReng.status === 'fulfilled') {
+        let renglonesCargados: RenglonDetalladoSabana[] | null = null
+
+        // 1. Prioridad: Verificar si el proyecto trajo sus propios renglones (planTrabajo o renglones)
+        const proyData = resProy.status === 'fulfilled' ? (resProy.value?.data?.data || resProy.value?.data) : null
+        const renglonesProyDirectos = proyData?.planTrabajo || proyData?.renglones
+        if (Array.isArray(renglonesProyDirectos) && renglonesProyDirectos.length > 0) {
+          renglonesCargados = renglonesProyDirectos.map((r: any, idx: number) => ({
+            id: String(r.renglonId || r.id || `reng-${idx}`),
+            capituloId: Number(r.capituloId || r.capitulo_id || 1),
+            capituloNombre: r.capituloNombre || `Capítulo ${r.capituloId || r.capitulo_id || 1}`,
+            codigoDGC: r.codigoDGC || r.codigo || `10${idx + 1}.01`,
+            descripcion: r.descripcion || r.desc || '',
+            unidad: r.unidad || r.unidad_medida || 'm³',
+            cantidadContratada: Number(r.cantidadContratada ?? r.cantidad_contractual ?? 0),
+            cantidadAjustada: Number(r.cantidadAjustada ?? r.cantidad_ajustada ?? r.cantidadContratada ?? 0),
+            costoUnitarioDirecto: Number(r.costoUnitarioDirecto ?? r.precio_unitario_directo ?? 0),
+            cantidadContratadaPlan: Number(r.cantidadContratadaPlan ?? r.cantidad_contractual_plan ?? r.cantidadContratada ?? r.cantidad_contractual ?? 0),
+            cantidadAjustadaPlan: Number(r.cantidadAjustadaPlan ?? r.cantidad_ajustada_plan ?? r.cantidadAjustada ?? r.cantidad_ajustada ?? 0),
+            costoUnitarioDirectoPlan: Number(r.costoUnitarioDirectoPlan ?? r.precio_unitario_directo_plan ?? r.costoUnitarioDirecto ?? r.precio_unitario_directo ?? 0),
+            cantidadEstePeriodo: Number(r.cantidadEstePeriodo ?? r.cantidad_este_periodo ?? 0),
+            cantidadAcumuladaAnterior: Number(r.cantidadAcumuladaAnterior ?? r.cantidad_ejecutada ?? 0),
+            avancesMensuales: r.avancesMensuales || r.avances_mensuales || {},
+            avancesMensualesPlan: r.avancesMensualesPlan || r.avances_mensuales_plan || {},
+          }))
+        }
+
+        // 2. Segunda opción: si no venían en resProy pero resReng trajo registros para este proyecto
+        if (!renglonesCargados && resReng.status === 'fulfilled') {
           const listaBD = resReng.value?.data?.data || resReng.value?.data
           if (Array.isArray(listaBD)) {
             const rengsProy = listaBD.filter((r: any) => String(r.proyecto_id) === String(targetId))
             if (rengsProy.length > 0) {
-              const mapeados = rengsProy.map((r: any, idx: number) => ({
-                id: r.id,
-                capituloId: r.capitulo_id || 1,
+              renglonesCargados = rengsProy.map((r: any, idx: number) => ({
+                id: String(r.id),
+                capituloId: Number(r.capitulo_id || 1),
                 capituloNombre: `Capítulo ${r.capitulo_id || 1}`,
                 codigoDGC: r.codigo || r.codigoDGC || `10${idx + 1}.01`,
                 descripcion: r.descripcion || '',
@@ -886,20 +1632,39 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                 costoUnitarioDirecto: Number(r.precio_unitario_directo || 0),
                 cantidadContratadaPlan: Number(r.cantidad_contractual_plan ?? r.cantidad_contractual_original ?? r.cantidad_contractual ?? 0),
                 cantidadAjustadaPlan: Number(r.cantidad_ajustada_plan ?? r.cantidad_ajustada_original ?? r.cantidad_ajustada ?? 0),
-                costoUnitarioDirectoPlan: Number(r.precio_unitario_directo_plan ?? r.precio_unitario_directo_original ?? r.precio_unitario_directo ?? 0),
+                costoUnitarioDirectoPlan: Number(r.precio_unitario_directo_plan ?? r.precio_unitario_original ?? r.precio_unitario_directo ?? 0),
                 cantidadEstePeriodo: Number(r.cantidad_este_periodo || 0),
                 cantidadAcumuladaAnterior: Number(r.cantidad_ejecutada || 0),
                 avancesMensuales: r.avances_mensuales || r.avancesMensuales || {},
                 avancesMensualesPlan: r.avances_mensuales_plan || r.avancesMensualesPlan || {},
               }))
-              setRenglones(mapeados)
-            } else {
-              // Si el proyecto está en borrador o no tiene renglones configurados, cargar catálogo estandarizado en 0.00
-              setRenglones(GENERAR_RENGLONES_VACIOS())
             }
-          } else {
-            setRenglones(GENERAR_RENGLONES_VACIOS())
           }
+        }
+
+        // 3. Tercera opción: verificar si hay respaldo en localStorage del proyecto
+        if (!renglonesCargados && typeof window !== 'undefined') {
+          try {
+            const localCache = localStorage.getItem(`sabana_renglones_${targetId}`)
+            if (localCache) {
+              const parsed = JSON.parse(localCache)
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                renglonesCargados = parsed
+              }
+            }
+          } catch (e) {
+            console.error('Error leyendo caché local de renglones:', e)
+          }
+        }
+
+        // 4. Si encontramos renglones, aplicarlos y respaldar en localStorage; de lo contrario generar catálogo vacío
+        if (renglonesCargados && renglonesCargados.length > 0) {
+          setRenglones(renglonesCargados)
+          try {
+            localStorage.setItem(`sabana_renglones_${targetId}`, JSON.stringify(renglonesCargados))
+          } catch {}
+        } else {
+          setRenglones(GENERAR_RENGLONES_VACIOS())
         }
 
         if (resPend.status === 'fulfilled') {
@@ -2059,7 +2824,8 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
   }
 
   const handleExportarExcel = () => {
-    showSuccessToast('Descargando archivo Excel oficial "DÍAS" (.xlsx)...')
+    setFormatoExportacionInicial('excel')
+    setModalExportarSabanaOpen(true)
   }
 
   const handleGuardarModificarPlazo = async () => {
@@ -2176,6 +2942,11 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                 if (typeof window !== 'undefined') {
                   const urlParams = new URLSearchParams(window.location.search)
                   const fromParam = urlParams.get('from')
+                  const montoVal = montoContractualOriginalTotal > 0 ? montoContractualOriginalTotal : ''
+                  if (fromParam === 'paso5' || window.location.href.includes('from=paso5')) {
+                    router.push(`/dashboard/proyectos/${proyecto.id}/editar?paso=5${montoVal ? `&monto=${montoVal}` : ''}`)
+                    return
+                  }
                   const montoQS = montoContractualOriginalTotal > 0 ? `?monto=${montoContractualOriginalTotal}` : ''
                   if (fromParam === 'editar' || window.location.href.includes('from=editar')) {
                     router.push(`/dashboard/proyectos/${proyecto.id}/editar${montoQS}`)
@@ -2206,6 +2977,11 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                     if (typeof window !== 'undefined') {
                       const urlParams = new URLSearchParams(window.location.search)
                       const fromParam = urlParams.get('from')
+                      const montoVal = montoContractualOriginalTotal > 0 ? montoContractualOriginalTotal : ''
+                      if (fromParam === 'paso5' || window.location.href.includes('from=paso5')) {
+                        router.push(`/dashboard/proyectos/${proyecto.id}/editar?paso=5${montoVal ? `&monto=${montoVal}` : ''}`)
+                        return
+                      }
                       const montoQS = montoContractualOriginalTotal > 0 ? `?monto=${montoContractualOriginalTotal}` : ''
                       if (fromParam === 'editar' || window.location.href.includes('from=editar')) {
                         router.push(`/dashboard/proyectos/${proyecto.id}/editar${montoQS}`)
@@ -2225,7 +3001,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                 <span className="text-[#7A0C0D] font-semibold">HOJA SÁBANA DIGITAL</span>
               </div>
 
-              <h1 className="text-sm font-bold text-[#7A0C0D] mt-0.5 flex items-center gap-1.5">
+              <h1 className="text-sm font-bold text-[#7A0C0D] mt-0.5 flex items-center gap-1.5 flex-wrap">
                 <span>Hoja Sábana Digital</span>
                 {modoVistaSabana === 'planificacion' && (
                   <span
@@ -2234,6 +3010,16 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                     <span>Modo Planificación</span>
                   </span>
                 )}
+                <span
+                  className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[9px] font-bold border ml-1 font-[Poppins] ${
+                    ambitoSabanaActual === 'supervision'
+                      ? 'bg-orange-50 text-orange-800 border-orange-200'
+                      : 'bg-red-50 text-[#9B0F06] border-red-200'
+                  }`}
+                >
+                  <Briefcase size={10} />
+                  <span>Ámbito: {ambitoSabanaActual === 'supervision' ? 'Supervisión' : 'Obra (Ejecución)'}</span>
+                </span>
               </h1>
             </div>
           </div>
@@ -2348,10 +3134,12 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
               </button>
 
               {menuTopOpen && (
-                <div
-                  className="absolute right-0 mt-1 w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-lg z-50 animate-fadeIn font-[Poppins]"
-                  onMouseLeave={() => setMenuTopOpen(false)}
-                >
+                <>
+                  <div className="fixed inset-0 z-40 sm:hidden" onClick={() => setMenuTopOpen(false)} />
+                  <div
+                    className="absolute left-0 sm:left-auto sm:right-0 mt-1 w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-lg z-50 animate-fadeIn font-[Poppins]"
+                    onMouseLeave={() => setMenuTopOpen(false)}
+                  >
                   <button
                     type="button"
                     onClick={() => {
@@ -2383,6 +3171,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                     type="button"
                     onClick={() => {
                       setMenuTopOpen(false)
+                      setFormatoExportacionInicial('pdf')
                       setModalExportarSabanaOpen(true)
                     }}
                     className="w-full text-left px-3 py-2 text-[11px] text-[#9B0F06] hover:bg-red-50 flex items-center gap-2 cursor-pointer font-medium border-t border-gray-100"
@@ -2403,7 +3192,8 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                     <span>Exportar Excel</span>
                   </button>
                 </div>
-              )}
+              </>
+            )}
             </div>
           </div>
         </div>
@@ -2441,7 +3231,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                       <span className="text-gray-300">|</span>
                       <div className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[9.5px] font-extrabold shadow-2xs border ${
                         diasRestantesEstimacion < 0
-                          ? 'bg-red-500 text-white border-red-600 animate-pulse'
+                          ? 'bg-red-500 text-white border-red-600'
                           : diasRestantesEstimacion === 0
                           ? 'bg-yellow-400 text-yellow-950 border-yellow-500 ring-2 ring-yellow-400/30'
                           : 'bg-yellow-300 text-yellow-900 border-yellow-400'
@@ -2493,33 +3283,36 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                   </button>
 
                   {menuEstOpen && (
-                    <div
-                      className="absolute right-0 mt-1 w-44 rounded-lg border border-gray-200 bg-white py-1 shadow-lg z-50 animate-fadeIn font-[Poppins]"
-                      onMouseLeave={() => setMenuEstOpen(false)}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setMenuEstOpen(false)
-                          setModalCancelarEstimacionOpen(true)
-                        }}
-                        className="w-full text-left px-3 py-1 text-[10.5px] text-red-600 hover:bg-red-50 flex items-center gap-2 cursor-pointer font-medium"
+                    <>
+                      <div className="fixed inset-0 z-40 sm:hidden" onClick={() => setMenuEstOpen(false)} />
+                      <div
+                        className="absolute left-0 sm:left-auto sm:right-0 mt-1 w-44 rounded-lg border border-gray-200 bg-white py-1 shadow-lg z-50 animate-fadeIn font-[Poppins]"
+                        onMouseLeave={() => setMenuEstOpen(false)}
                       >
-                        <X size={12} />
-                        <span>Cancelar estimación</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setMenuEstOpen(false)
-                          setModalExportarSabanaOpen(true)
-                        }}
-                        className="w-full text-left px-3 py-1 text-[10.5px] text-gray-700 hover:bg-gray-100 flex items-center gap-2 cursor-pointer"
-                      >
-                        <Download size={12} />
-                        <span>Exportar reporte</span>
-                      </button>
-                    </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMenuEstOpen(false)
+                            setModalCancelarEstimacionOpen(true)
+                          }}
+                          className="w-full text-left px-3 py-1 text-[10.5px] text-red-600 hover:bg-red-50 flex items-center gap-2 cursor-pointer font-medium"
+                        >
+                          <X size={12} />
+                          <span>Cancelar estimación</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMenuEstOpen(false)
+                            setModalExportarSabanaOpen(true)
+                          }}
+                          className="w-full text-left px-3 py-1 text-[10.5px] text-gray-700 hover:bg-gray-100 flex items-center gap-2 cursor-pointer"
+                        >
+                          <Download size={12} />
+                          <span>Exportar reporte</span>
+                        </button>
+                      </div>
+                    </>
                   )}
                 </div>
               </div>
@@ -2527,10 +3320,10 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
           </div>
         )}
 
-        {/* 3. BLOQUE DE INFORMACIÓN DEL PROYECTO (Fila horizontal ultracompacta) */}
+        {/* 3. BLOQUE DE INFORMACIÓN DEL PROYECTO (Fila horizontal ultracompacta con fuente 9px en móvil) */}
         <div className="grid grid-cols-1 sm:grid-cols-5 gap-0 bg-white border border-gray-200 rounded-lg p-1.5 text-xs divide-y sm:divide-y-0 sm:divide-x divide-gray-200/80">
           <div className="px-2 py-0.5 min-w-0">
-            <span className="text-[8.5px] font-semibold uppercase tracking-wider text-gray-400 block truncate">
+            <span className="text-[9px] sm:text-[8.5px] font-semibold uppercase tracking-wider text-gray-400 block truncate">
               Proyecto / Contrato
             </span>
             <select
@@ -2540,7 +3333,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                 setProyectoIdSeleccionado(newId)
                 router.push(`/dashboard/proyectos/${newId}/hoja-sabana`)
               }}
-              className="h-5 w-full rounded border border-gray-300 bg-white px-1 text-[10px] font-medium text-gray-900 focus:border-[#7A0C0D] focus:outline-none cursor-pointer truncate"
+              className="h-5 w-full rounded border border-gray-300 bg-white px-1 text-[9px] sm:text-[10px] font-medium text-gray-900 focus:border-[#7A0C0D] focus:outline-none cursor-pointer truncate"
             >
               {(proyectosLista.length > 0 ? proyectosLista : [proyecto]).map((p: any) => (
                 <option key={p.id} value={p.id}>
@@ -2551,38 +3344,38 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
           </div>
 
           <div className="px-2 py-0.5">
-            <span className="text-[8.5px] font-semibold uppercase tracking-wider text-gray-400 block truncate">
+            <span className="text-[9px] sm:text-[8.5px] font-semibold uppercase tracking-wider text-gray-400 block truncate">
               {esBorrador ? 'Plazo Planificado' : 'Plazo de Ejecución Real'}
             </span>
             <span className="font-medium text-gray-800 flex items-center gap-1 mt-0.5">
               <Clock size={10} className="text-[#7A0C0D] shrink-0" />
-              <span className="text-[10px]">{metricasHeaderContextuales.plazo}</span>
+              <span className="text-[9px] sm:text-[10px]">{metricasHeaderContextuales.plazo}</span>
             </span>
           </div>
 
           <div className="px-2 py-0.5">
-            <span className="text-[8.5px] font-semibold uppercase tracking-wider text-gray-400 block truncate">
+            <span className="text-[9px] sm:text-[8.5px] font-semibold uppercase tracking-wider text-gray-400 block truncate">
               Costo Directo Contratado Total (D × F)
             </span>
-            <span className="font-semibold font-mono text-gray-900 text-[10px] block mt-0.5">
+            <span className="font-semibold font-mono text-gray-900 text-[9px] sm:text-[10px] block mt-0.5">
               Q {metricasHeaderContextuales.costoDirecto.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
             </span>
           </div>
 
           <div className="px-2 py-0.5">
-            <span className="text-[8.5px] font-semibold uppercase tracking-wider text-gray-400 block truncate">
+            <span className="text-[9px] sm:text-[8.5px] font-semibold uppercase tracking-wider text-gray-400 block truncate">
               Monto Contractual Original (con Indirectos e IVA)
             </span>
-            <span className="font-semibold font-mono text-gray-900 text-[10px] block mt-0.5">
+            <span className="font-semibold font-mono text-gray-900 text-[9px] sm:text-[10px] block mt-0.5">
               Q {metricasHeaderContextuales.montoContractualOriginal.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
             </span>
           </div>
 
           <div className="px-2 py-0.5">
-            <span className="text-[8.5px] font-semibold uppercase tracking-wider text-gray-400 block truncate">
+            <span className="text-[9px] sm:text-[8.5px] font-semibold uppercase tracking-wider text-gray-400 block truncate">
               Líquido Neto Este Período
             </span>
-            <span className="font-semibold font-mono text-gray-900 text-[10px] block mt-0.5">
+            <span className="font-semibold font-mono text-gray-900 text-[9px] sm:text-[10px] block mt-0.5">
               Q {metricasHeaderContextuales.liquidoNetoPeriodo.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
             </span>
           </div>
@@ -2621,92 +3414,259 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
         </div>
       </div>
 
-      {/* BARRA DE FILTROS Y ACCIONES COMPACTA (OCULTA EN RESUMEN FINANCIERO) */}
+      {/* BARRA DE FILTROS Y ACCIONES (OCULTA EN RESUMEN FINANCIERO) */}
       {tabSeccion !== 'resumen' && (
-        <div className="w-full rounded-lg border border-gray-200 bg-white p-1.5 shadow-2xs flex items-center justify-between gap-1.5 overflow-x-auto font-[Poppins]">
-          <div className="flex items-center gap-1 shrink-0 flex-nowrap">
-            {/* Capítulo: Disponible en Sábana, Analítico, Pendientes y Planificado vs Real */}
-            <select
-              value={capituloFiltro}
-              onChange={(e) => {
-                setCapituloFiltro(e.target.value === 'todos' ? 'todos' : Number(e.target.value))
-                setPaginaActual(1)
-              }}
-              className="h-7 rounded border border-gray-200 bg-white px-1.5 text-[10px] font-normal text-gray-800 focus:border-[#9B0F06] focus:outline-none max-w-[130px] truncate"
-            >
-              <option value="todos">Capítulo: Todos</option>
-              {CAPITULOS_LIBRO_AZUL.map((c) => (
-                <option key={c.id} value={c.id}>
-                  Cap {c.id}: {c.nombre.split(':')[1]?.trim() || c.nombre}
-                </option>
-              ))}
-            </select>
+        <>
+          {/* =========================================================================
+              1. VISTA MÓVIL (< sm): Barra compacta mediante botón + búsqueda
+              ========================================================================= */}
+          <div className="sm:hidden w-full rounded-xl border border-gray-200 bg-white p-2 shadow-2xs mb-2 font-[Poppins] relative z-30">
+            <div className="flex items-center gap-1.5 w-full">
+              {/* Barra de Búsqueda */}
+              <div className="relative flex-1 min-w-0">
+                <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Buscar renglón o código..."
+                  value={busqueda}
+                  onChange={(e) => {
+                    setBusqueda(e.target.value)
+                    setPaginaActual(1)
+                  }}
+                  className="w-full h-[32px] border border-gray-200 bg-gray-50 focus:bg-white rounded-lg pl-7 pr-2 text-[11px] font-normal placeholder:text-gray-400 focus:outline-none focus:border-[#9B0F06] transition-colors"
+                />
+              </div>
 
-            {/* Mes: Disponible en Sábana, Analítico y Planificado vs Real (NO en Pendientes) */}
-            {(tabSeccion === 'sabana' || tabSeccion === 'analitico' || tabSeccion === 'planificadoReal') && (
+              {/* Botón de Filtros (Abre Bottom Sheet Modal) */}
+              <button
+                type="button"
+                onClick={() => setSheetFiltrosSabanaAbierto(true)}
+                className={`relative flex items-center justify-center h-[32px] px-2.5 rounded-lg border transition-all cursor-pointer shadow-2xs active:scale-95 gap-1.5 ${
+                  cantidadFiltrosSabanaActivos > 0
+                    ? 'bg-[#9B0F06] border-[#9B0F06] text-white'
+                    : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                }`}
+                title="Abrir filtros"
+              >
+                <SlidersHorizontal size={13} className="stroke-[2.2]" />
+                <span className="text-[10px] font-medium">
+                  {capituloFiltro !== 'todos' ? `Cap. ${capituloFiltro}` : 'Filtros'}
+                </span>
+                {cantidadFiltrosSabanaActivos > 0 && (
+                  <span className="w-4 h-4 rounded-full bg-white text-[#9B0F06] text-[8.5px] font-black border border-[#9B0F06] flex items-center justify-center">
+                    {cantidadFiltrosSabanaActivos}
+                  </span>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Bottom Sheet Modal en Móvil */}
+          {sheetFiltrosSabanaAbierto && (
+            <ModalPortal>
+              <div className="fixed inset-0 z-[9999] sm:hidden font-[Poppins]">
+                <div
+                  className="fixed inset-0 bg-black/50 backdrop-blur-xs transition-opacity animate-in fade-in duration-200"
+                  onClick={() => setSheetFiltrosSabanaAbierto(false)}
+                />
+                <div className="fixed inset-x-0 bottom-0 w-full max-w-lg mx-auto max-h-[85vh] rounded-t-2xl bg-white shadow-2xl flex flex-col z-10 animate-in slide-in-from-bottom duration-300">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                    <button
+                      type="button"
+                      onClick={() => setSheetFiltrosSabanaAbierto(false)}
+                      className="text-[11px] font-medium text-gray-500 hover:text-gray-800 transition-colors cursor-pointer"
+                    >
+                      Cancelar
+                    </button>
+                    <div className="text-center">
+                      <h3 className="text-xs font-bold text-gray-900 leading-tight">Filtros de hoja sábana</h3>
+                      <span className="text-[9px] text-gray-400 font-normal">Capítulos y períodos</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSheetFiltrosSabanaAbierto(false)}
+                      className="text-[11px] font-bold text-[#9B0F06] hover:text-[#7D0C05] transition-colors cursor-pointer"
+                    >
+                      Listo
+                    </button>
+                  </div>
+
+                  <div className="p-4 overflow-y-auto space-y-4 flex-1">
+                    {/* Sección Capítulo */}
+                    <div className="space-y-1.5">
+                      <label className="text-[9px] font-bold text-gray-400 uppercase tracking-wider block">
+                        Capítulo del Libro Azul
+                      </label>
+                      <select
+                        value={capituloFiltro}
+                        onChange={(e) => {
+                          setCapituloFiltro(e.target.value === 'todos' ? 'todos' : Number(e.target.value))
+                          setPaginaActual(1)
+                        }}
+                        className="w-full h-[34px] rounded-lg border border-gray-200 bg-white px-2.5 text-[11px] font-normal text-gray-800 focus:border-[#9B0F06] focus:outline-none"
+                      >
+                        <option value="todos">Todos los Capítulos</option>
+                        {CAPITULOS_LIBRO_AZUL.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            Capítulo {c.id}: {c.nombre.split(':')[1]?.trim() || c.nombre}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Sección Mes */}
+                    {(tabSeccion === 'sabana' || tabSeccion === 'analitico' || tabSeccion === 'planificadoReal') && (
+                      <div className="space-y-1.5">
+                        <label className="text-[9px] font-bold text-gray-400 uppercase tracking-wider block">
+                          Mes de Ejecución
+                        </label>
+                        <select
+                          value={mesFiltro}
+                          onChange={(e) => {
+                            setMesFiltro(e.target.value)
+                            setPaginaActual(1)
+                          }}
+                          className="w-full h-[34px] rounded-lg border border-gray-200 bg-white px-2.5 text-[11px] font-normal text-gray-800 focus:border-[#9B0F06] focus:outline-none"
+                        >
+                          <option value="todos">Todos los Meses</option>
+                          {listaMesesDinamicos.map((m) => (
+                            <option key={m} value={m}>
+                              {m}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    {/* Sección Estimación */}
+                    {(tabSeccion === 'sabana' || tabSeccion === 'analitico') && (
+                      <div className="space-y-1.5">
+                        <label className="text-[9px] font-bold text-gray-400 uppercase tracking-wider block">
+                          Número de Estimación
+                        </label>
+                        <select
+                          value={numEstimacionFiltro}
+                          onChange={(e) => setNumEstimacionFiltro(e.target.value)}
+                          className="w-full h-[34px] rounded-lg border border-gray-200 bg-white px-2.5 text-[11px] font-normal text-gray-800 focus:border-[#9B0F06] focus:outline-none"
+                        >
+                          <option value="todos">Todas las Estimaciones</option>
+                          {listaEstimaciones.map((est) => (
+                            <option key={est.id} value={est.numero}>
+                              {est.numero} ({est.mes})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    {/* Botón Restablecer filtros */}
+                    <div className="pt-2 border-t border-gray-100">
+                      <button
+                        type="button"
+                        disabled={cantidadFiltrosSabanaActivos === 0 && !busqueda}
+                        onClick={() => {
+                          resetFiltros()
+                          setSheetFiltrosSabanaAbierto(false)
+                        }}
+                        className="w-full h-[36px] rounded-lg border border-gray-200 bg-white text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                      >
+                        <Eraser size={13} />
+                        <span>Restablecer todos los filtros</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </ModalPortal>
+          )}
+
+          {/* =========================================================================
+              2. VISTA ESCRITORIO (>= sm): Barra horizontal compacta original intacta
+              ========================================================================= */}
+          <div className="hidden sm:flex w-full rounded-lg border border-gray-200 bg-white p-1.5 shadow-2xs items-center justify-between gap-1.5 overflow-x-auto font-[Poppins]">
+            <div className="flex items-center gap-1 shrink-0 flex-nowrap">
+              {/* Capítulo: Disponible en Sábana, Analítico, Pendientes y Planificado vs Real */}
               <select
-                value={mesFiltro}
+                value={capituloFiltro}
                 onChange={(e) => {
-                  setMesFiltro(e.target.value)
+                  setCapituloFiltro(e.target.value === 'todos' ? 'todos' : Number(e.target.value))
                   setPaginaActual(1)
                 }}
-                className="h-7 rounded border border-gray-200 bg-white px-1.5 text-[10px] font-normal text-gray-800 focus:border-[#9B0F06] focus:outline-none max-w-[100px] truncate"
+                className="h-7 rounded border border-gray-200 bg-white px-1.5 text-[10px] font-normal text-gray-800 focus:border-[#9B0F06] focus:outline-none max-w-[130px] truncate"
               >
-                <option value="todos">Mes: Todos</option>
-                {listaMesesDinamicos.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
+                <option value="todos">Capítulo: Todos</option>
+                {CAPITULOS_LIBRO_AZUL.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    Cap {c.id}: {c.nombre.split(':')[1]?.trim() || c.nombre}
                   </option>
                 ))}
               </select>
-            )}
 
-            {/* Estimación: Disponible únicamente en Sábana y Analítico */}
-            {(tabSeccion === 'sabana' || tabSeccion === 'analitico') && (
-              <div className="flex items-center gap-1">
+              {/* Mes: Disponible en Sábana, Analítico y Planificado vs Real (NO en Pendientes) */}
+              {(tabSeccion === 'sabana' || tabSeccion === 'analitico' || tabSeccion === 'planificadoReal') && (
                 <select
-                  value={numEstimacionFiltro}
-                  onChange={(e) => setNumEstimacionFiltro(e.target.value)}
-                  className="h-7 rounded border border-gray-200 bg-white px-1.5 text-[10px] font-normal text-gray-800 focus:border-[#9B0F06] focus:outline-none max-w-[125px] truncate cursor-pointer"
+                  value={mesFiltro}
+                  onChange={(e) => {
+                    setMesFiltro(e.target.value)
+                    setPaginaActual(1)
+                  }}
+                  className="h-7 rounded border border-gray-200 bg-white px-1.5 text-[10px] font-normal text-gray-800 focus:border-[#9B0F06] focus:outline-none max-w-[100px] truncate"
                 >
-                  <option value="todos">Estimación: Todas</option>
-                  {listaEstimaciones.map((est) => (
-                    <option key={est.id} value={est.numero}>
-                      {est.numero} ({est.mes})
+                  <option value="todos">Mes: Todos</option>
+                  {listaMesesDinamicos.map((m) => (
+                    <option key={m} value={m}>
+                      {m}
                     </option>
                   ))}
                 </select>
-                
+              )}
+
+              {/* Estimación: Disponible únicamente en Sábana y Analítico */}
+              {(tabSeccion === 'sabana' || tabSeccion === 'analitico') && (
+                <div className="flex items-center gap-1">
+                  <select
+                    value={numEstimacionFiltro}
+                    onChange={(e) => setNumEstimacionFiltro(e.target.value)}
+                    className="h-7 rounded border border-gray-200 bg-white px-1.5 text-[10px] font-normal text-gray-800 focus:border-[#9B0F06] focus:outline-none max-w-[125px] truncate cursor-pointer"
+                  >
+                    <option value="todos">Estimación: Todas</option>
+                    {listaEstimaciones.map((est) => (
+                      <option key={est.id} value={est.numero}>
+                        {est.numero} ({est.mes})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={resetFiltros}
+                className="h-7 rounded border border-gray-200 px-2 text-[10px] font-normal hover:bg-gray-50 flex items-center gap-1 shrink-0 text-gray-700 transition-colors cursor-pointer"
+                title="Limpiar filtros"
+              >
+                <Eraser size={11} className="text-gray-500" />
+                <span className="whitespace-nowrap">Limpiar filtros</span>
+              </button>
+            </div>
+
+            <div className="flex items-center gap-1.5 shrink-0">
+              <div className="relative w-36 sm:w-44">
+                <Search size={11} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  value={busqueda}
+                  onChange={(e) => {
+                    setBusqueda(e.target.value)
+                    setPaginaActual(1)
+                  }}
+                  placeholder="Buscar..."
+                  className="h-7 w-full rounded border border-gray-200 bg-gray-50 pl-6 pr-2 text-[10px] font-normal text-gray-800 placeholder-gray-400 focus:border-[#9B0F06] focus:bg-white focus:outline-none"
+                />
               </div>
-            )}
-
-            <button
-              type="button"
-              onClick={resetFiltros}
-              className="h-7 rounded border border-gray-200 px-2 text-[10px] font-normal hover:bg-gray-50 flex items-center gap-1 shrink-0 text-gray-700 transition-colors cursor-pointer"
-              title="Limpiar filtros"
-            >
-              <Eraser size={11} className="text-gray-500" />
-              <span className="whitespace-nowrap">Limpiar filtros</span>
-            </button>
-          </div>
-
-          <div className="flex items-center gap-1.5 shrink-0">
-            <div className="relative w-36 sm:w-44">
-              <Search size={11} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                value={busqueda}
-                onChange={(e) => {
-                  setBusqueda(e.target.value)
-                  setPaginaActual(1)
-                }}
-                placeholder="Buscar..."
-                className="h-7 w-full rounded border border-gray-200 bg-gray-50 pl-6 pr-2 text-[10px] font-normal text-gray-800 placeholder-gray-400 focus:border-[#9B0F06] focus:bg-white focus:outline-none"
-              />
             </div>
           </div>
-        </div>
+        </>
       )}
 
       {/* TAB 1: [SÁBANA] — TABLA CON FUENTE POPPINS, REGULAR SALVO CÓDIGO */}
@@ -3268,7 +4228,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
           )}
 
           {/* Paginación */}
-          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-200/80 bg-white px-3 py-1.5 text-[9.5px] font-[Poppins]">
+          <div data-paginacion="true" className="paginacion-control flex flex-wrap items-center justify-between gap-2 border-t border-gray-200/80 bg-white px-3 py-1.5 text-[9.5px] font-[Poppins]">
             <div className="flex items-center gap-1.5 text-gray-500 font-normal">
               <span>
                 Mostrando <span className="font-normal text-gray-700">{totalItems > 0 ? inicioIndice + 1 : 0}</span> a{' '}
@@ -3282,12 +4242,12 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                   setItemsPorPagina(Number(e.target.value))
                   setPaginaActual(1)
                 }}
-                className="rounded border border-gray-200 bg-gray-50 px-1 py-0.5 text-[9px] font-normal text-gray-700 focus:outline-none"
+                className="paginacion-control rounded border border-gray-200 bg-gray-50 px-1 py-0.5 text-[9.5px] font-normal text-gray-700 focus:outline-none font-[Poppins]"
               >
-                <option value={10}>10 / pág</option>
-                <option value={12}>12 / pág</option>
-                <option value={15}>15 / pág</option>
-                <option value={25}>25 / pág</option>
+                <option value={10} className="text-[9.5px] font-[Poppins]">10 / pág</option>
+                <option value={12} className="text-[9.5px] font-[Poppins]">12 / pág</option>
+                <option value={15} className="text-[9.5px] font-[Poppins]">15 / pág</option>
+                <option value={25} className="text-[9.5px] font-[Poppins]">25 / pág</option>
               </select>
             </div>
 
@@ -3772,7 +4732,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
             </div>
 
             {/* Paginación estandarizada DomunNet */}
-            <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-gray-100 text-[9.5px]">
+            <div data-paginacion="true" className="paginacion-control flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-gray-100 text-[9.5px] font-[Poppins]">
               <div className="flex items-center gap-1.5 text-gray-500 font-normal">
                 <span>Mostrando</span>
                 <span className="font-mono font-medium text-gray-800">{pvrRenglonesPagina.length > 0 ? pvrInicio + 1 : 0}</span>
@@ -3788,12 +4748,12 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                     setPvrItemsPorPagina(Number(e.target.value))
                     setPvrPaginaActual(1)
                   }}
-                  className="ml-2 rounded border border-gray-200 bg-gray-50 px-1 py-0.5 text-[9px] font-normal text-gray-700 focus:outline-none"
+                  className="paginacion-control ml-2 rounded border border-gray-200 bg-gray-50 px-1 py-0.5 text-[9.5px] font-normal text-gray-700 focus:outline-none font-[Poppins]"
                 >
-                  <option value={10}>10 / pág</option>
-                  <option value={15}>15 / pág</option>
-                  <option value={25}>25 / pág</option>
-                  <option value={50}>50 / pág</option>
+                  <option value={10} className="text-[9.5px] font-[Poppins]">10 / pág</option>
+                  <option value={15} className="text-[9.5px] font-[Poppins]">15 / pág</option>
+                  <option value={25} className="text-[9.5px] font-[Poppins]">25 / pág</option>
+                  <option value={50} className="text-[9.5px] font-[Poppins]">50 / pág</option>
                 </select>
               </div>
 
@@ -4068,8 +5028,8 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
             Identificación -> Cantidades y Avance -> Financiero -> Desglose Mensual
       */}
       {drawerModo === 'ver' && renglonSeleccionado && (
-        <div className="fixed inset-0 z-[99999] flex justify-end bg-black/40 backdrop-blur-xs font-[Poppins]">
-          <div className="h-full w-full max-w-md bg-white shadow-2xl flex flex-col justify-between border-l border-gray-200">
+        <div className="fixed inset-0 z-[99999] flex justify-end bg-black/40 backdrop-blur-xs font-[Poppins]" onClick={() => setDrawerModo(null)}>
+          <div className="h-full w-full max-w-md bg-white shadow-2xl flex flex-col justify-between border-l border-gray-200" onClick={(e) => e.stopPropagation()}>
             {/* Header del Panel */}
             <div className="flex items-center justify-between border-b border-gray-200 p-2.5 bg-gray-50">
               <div className="flex items-center gap-1.5">
@@ -4307,8 +5267,8 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
           - BOTONES ABAJO A LA DERECHA
       */}
       {drawerModo === 'crear' && (
-        <div className="fixed inset-0 z-[99999] flex justify-end bg-black/40 backdrop-blur-xs font-[Poppins]">
-          <div className="h-full w-full max-w-sm bg-white shadow-2xl flex flex-col justify-between border-l border-gray-200">
+        <div className="fixed inset-0 z-[99999] flex justify-end bg-black/40 backdrop-blur-xs font-[Poppins]" onClick={() => setDrawerModo(null)}>
+          <div className="h-full w-full max-w-sm bg-white shadow-2xl flex flex-col justify-between border-l border-gray-200" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between border-b border-gray-200 p-2.5 bg-gray-50">
               <div className="flex items-center gap-1.5">
                 <Plus size={15} className="text-[#9B0F06]" />
@@ -4525,8 +5485,8 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
 
       {/* MODAL MODIFICAR PLAZO (SOLO ROL ADMINISTRADOR) */}
       {modalModificarPlazoOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs font-[Poppins] p-4">
-          <div className="w-full max-w-md rounded-xl bg-white shadow-2xl border border-gray-200 overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs font-[Poppins] p-4" onClick={() => setModalModificarPlazoOpen(false)}>
+          <div className="w-full max-w-md rounded-xl bg-white shadow-2xl border border-gray-200 overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between border-b border-gray-200 p-3 bg-gray-50">
               <div className="flex items-center gap-1.5">
                 <CalendarClock size={16} className="text-[#9B0F06]" />
@@ -4635,8 +5595,8 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
 
       {/* MODAL DE CONFIRMACIÓN PARA ELIMINAR */}
       {modalEliminarOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs font-[Poppins]">
-          <div className="w-full max-w-sm rounded-xl bg-white p-4 shadow-2xl space-y-3 border border-gray-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs font-[Poppins]" onClick={() => setModalEliminarOpen(false)}>
+          <div className="w-full max-w-sm rounded-xl bg-white p-4 shadow-2xl space-y-3 border border-gray-200" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-2.5 text-red-700">
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-red-100">
                 <Trash2 size={16} />
@@ -4675,8 +5635,8 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
       )}
       {/* MODAL PRINCIPAL: GESTIÓN DE RENGLONES, UNIDADES DE MEDIDA Y CAPÍTULOS SÁBANA */}
       {modalGestionRenglonesOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs font-[Poppins]">
-          <div className="w-full max-w-5xl rounded-2xl bg-white shadow-2xl border border-gray-200 overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs font-[Poppins]" onClick={() => setModalGestionRenglonesOpen(false)}>
+          <div className="w-full max-w-5xl rounded-2xl bg-white shadow-2xl border border-gray-200 overflow-hidden flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
             {/* Header del Modal */}
             <div className="bg-gradient-to-r from-gray-900 via-gray-800 to-[#9B0F06] px-5 py-3 text-white flex items-center justify-between">
               <div className="flex items-center gap-2.5">
@@ -5003,8 +5963,8 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
 
       {/* FORMULARIO CREAR / EDITAR UNIDAD DE MEDIDA */}
       {modalUnidadFormOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs font-[Poppins]">
-          <div className="w-full max-w-md rounded-xl bg-white p-4 shadow-2xl space-y-3 border border-gray-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs font-[Poppins]" onClick={() => setModalUnidadFormOpen(false)}>
+          <div className="w-full max-w-md rounded-xl bg-white p-4 shadow-2xl space-y-3 border border-gray-200" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between border-b border-gray-100 pb-2">
               <h3 className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
                 <Calculator size={14} className="text-[#9B0F06]" />
@@ -5072,8 +6032,8 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
 
       {/* CONFIRMACIÓN ELIMINAR UNIDAD */}
       {unidadAEliminar && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs font-[Poppins]">
-          <div className="w-full max-w-sm rounded-xl bg-white p-4 shadow-2xl space-y-3 border border-gray-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs font-[Poppins]" onClick={() => setUnidadAEliminar(null)}>
+          <div className="w-full max-w-sm rounded-xl bg-white p-4 shadow-2xl space-y-3 border border-gray-200" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-2 text-red-700">
               <Trash2 size={16} />
               <h3 className="text-xs font-semibold text-gray-900">¿Eliminar Unidad de Medida?</h3>
@@ -5103,8 +6063,8 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
 
       {/* FORMULARIO CREAR / EDITAR CAPÍTULO */}
       {modalCapituloFormOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs font-[Poppins]">
-          <div className="w-full max-w-md rounded-xl bg-white p-4 shadow-2xl space-y-3 border border-gray-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs font-[Poppins]" onClick={() => setModalCapituloFormOpen(false)}>
+          <div className="w-full max-w-md rounded-xl bg-white p-4 shadow-2xl space-y-3 border border-gray-200" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between border-b border-gray-100 pb-2">
               <h3 className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
                 <Layers size={14} className="text-[#9B0F06]" />
@@ -5150,8 +6110,8 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
 
       {/* CONFIRMACIÓN ELIMINAR CAPÍTULO */}
       {capituloAEliminar && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs font-[Poppins]">
-          <div className="w-full max-w-sm rounded-xl bg-white p-4 shadow-2xl space-y-3 border border-gray-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs font-[Poppins]" onClick={() => setCapituloAEliminar(null)}>
+          <div className="w-full max-w-sm rounded-xl bg-white p-4 shadow-2xl space-y-3 border border-gray-200" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-2 text-red-700">
               <Trash2 size={16} />
               <h3 className="text-xs font-semibold text-gray-900">¿Eliminar Capítulo?</h3>
@@ -5182,8 +6142,8 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
       {/* MODAL APERTURA DE ESTIMACIÓN PERIODO MENSUAL */}
       {modalAperturaEstimacionOpen && (
         <ModalPortal>
-          <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs font-[Poppins]">
-            <div className="w-full max-w-md rounded-xl bg-white p-4 shadow-2xl space-y-3 border border-gray-200">
+          <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs font-[Poppins]" onClick={handleCancelarAperturaEstimacion}>
+            <div className="w-full max-w-md rounded-xl bg-white p-4 shadow-2xl space-y-3 border border-gray-200" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between border-b border-gray-100 pb-2">
                 <h3 className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
                   <CalendarClock size={15} className="text-[#9B0F06]" />
@@ -5264,8 +6224,8 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
 
       {/* MODAL EDITAR MEDICIÓN VINCULADA DE BITÁCORA */}
       {medicionEnEdicion && (
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs font-[Poppins]">
-          <div className="w-full max-w-lg rounded-xl bg-white p-4 shadow-2xl space-y-3 border border-gray-200 animate-fadeIn">
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs font-[Poppins]" onClick={() => setMedicionEnEdicion(null)}>
+          <div className="w-full max-w-lg rounded-xl bg-white p-4 shadow-2xl space-y-3 border border-gray-200 animate-fadeIn" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between border-b border-gray-100 pb-2">
               <h3 className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
                 <Calculator size={15} className="text-[#9B0F06]" />
@@ -5484,8 +6444,8 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
       {/* MODAL FINALIZAR ESTIMACIÓN */}
       {modalFinalizarEstimacionOpen && (
         <ModalPortal>
-          <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs font-[Poppins]">
-            <div className="w-full max-w-lg sm:max-w-xl rounded-2xl bg-white p-5 shadow-2xl space-y-4 border border-gray-200 animate-fadeIn">
+          <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs font-[Poppins]" onClick={() => setModalFinalizarEstimacionOpen(false)}>
+            <div className="w-full max-w-lg sm:max-w-xl rounded-2xl bg-white p-5 shadow-2xl space-y-4 border border-gray-200 animate-fadeIn" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between border-b border-gray-100 pb-3">
                 <div>
                   <h3 className="text-sm font-bold text-gray-900">Finalizar Estimación de Período</h3>
@@ -5552,8 +6512,8 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
       {/* MODAL CANCELAR ESTIMACIÓN */}
       {modalCancelarEstimacionOpen && (
         <ModalPortal>
-          <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs font-[Poppins]">
-            <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl space-y-4 border border-gray-100 animate-fadeIn text-center">
+          <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs font-[Poppins]" onClick={() => setModalCancelarEstimacionOpen(false)}>
+            <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl space-y-4 border border-gray-100 animate-fadeIn text-center" onClick={(e) => e.stopPropagation()}>
               <div className="mx-auto w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center">
                 <AlertTriangle size={24} />
               </div>
@@ -5601,8 +6561,8 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
       {/* MODAL EXPORTAR REPORTE */}
       {modalExportarEstimacionOpen && (
         <ModalPortal>
-          <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs font-[Poppins]">
-            <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl space-y-4 border border-gray-100 animate-fadeIn">
+          <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs font-[Poppins]" onClick={() => setModalExportarEstimacionOpen(false)}>
+            <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl space-y-4 border border-gray-100 animate-fadeIn" onClick={(e) => e.stopPropagation()}>
               <h3 className="text-sm font-bold text-gray-900 border-b border-gray-100 pb-2">Exportar Reporte de Estimación</h3>
 
               <div className="space-y-2">
@@ -5643,8 +6603,8 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
       {/* MODAL MODIFICAR PLAZO / INICIAR REPLANIFICACIÓN */}
       {modalModificarPlazoOpen && (
         <ModalPortal>
-          <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs font-[Poppins]">
-            <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl space-y-4 border border-gray-100 animate-fadeIn">
+          <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs font-[Poppins]" onClick={() => setModalModificarPlazoOpen(false)}>
+            <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl space-y-4 border border-gray-100 animate-fadeIn" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between border-b border-gray-100 pb-3">
                 <div className="flex items-center gap-2">
                   <Calendar size={18} className="text-[#9B0F06]" />
@@ -5749,14 +6709,14 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
       {/* MODAL CONFIRMAR CAMBIOS Y REGRESAR A PASO 3 */}
       {modalConfirmarRegresoForm && (
         <ModalPortal>
-          <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs font-[Poppins]">
-            <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl space-y-4 border border-gray-100 animate-fadeIn">
+          <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs font-[Poppins]" onClick={() => setModalConfirmarRegresoForm(false)}>
+            <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl space-y-4 border border-gray-100 animate-fadeIn" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center gap-2 border-b border-gray-100 pb-2 text-[#9B0F06]">
                 <CheckCircle2 size={20} />
                 <h3 className="text-sm font-bold text-gray-900">Cambios Confirmados Exitosamente</h3>
               </div>
               <p className="text-xs text-gray-600 leading-relaxed">
-                Los cambios en la planificación del proyecto han sido confirmados correctamente. ¿Deseas regresar al formulario del proyecto (Paso 3: Plan de Trabajo)?
+                Los cambios en la planificación del proyecto han sido confirmados correctamente. ¿Deseas regresar al formulario del proyecto (Paso 5: Aspectos Financieros y Estimaciones)?
               </p>
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
                 <button
@@ -5772,14 +6732,16 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                     setModalConfirmarRegresoForm(false)
                     const proyId = proyecto?.id || id
                     if (proyId && proyId !== 'nuevo' && proyId !== 'crear') {
-                      router.push(`/dashboard/proyectos/editar?slug=${proyId}&paso=3`)
+                      const montoVal = montoContractualOriginalTotal > 0 ? montoContractualOriginalTotal : ''
+                      router.push(`/dashboard/proyectos/${proyId}/editar?paso=5${montoVal ? `&monto=${montoVal}` : ''}`)
                     } else {
-                      router.push('/dashboard/proyectos/nuevo?paso=3')
+                      const montoVal = montoContractualOriginalTotal > 0 ? montoContractualOriginalTotal : ''
+                      router.push(`/dashboard/proyectos/nuevo?paso=5${montoVal ? `&monto=${montoVal}` : ''}`)
                     }
                   }}
                   className="rounded-lg bg-[#9B0F06] px-4 py-1.5 text-xs font-bold text-white hover:bg-[#5E0006] transition-colors shadow-xs cursor-pointer"
                 >
-                  Ir al Formulario (Paso 3)
+                  Ir al Formulario (Paso 5)
                 </button>
               </div>
             </div>
@@ -5793,8 +6755,10 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
         proyecto={proyecto}
         renglones={renglones}
         medicionesAnaliticas={medicionesAnaliticas}
+        trabajosPendientes={trabajosPendientes}
         modoVistaSabana={modoVistaSabana}
         estimacionActiva={estimacionEnProgreso}
+        formatoInicial={formatoExportacionInicial}
       />
 
       <ModalProcesarPendiente

@@ -4,32 +4,16 @@ import { useState, useEffect } from 'react'
 import {
   ArrowLeft,
   Save,
-  Building2,
-  MapPin,
-  Phone,
-  Mail,
-  Layers,
-  Calendar,
-  Server,
-  CheckCircle2,
-  MonitorSmartphone,
   Edit,
   X,
+  Building2,
+  Cpu,
+  CheckCircle2,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { showSuccessToast } from '@/components/ui/Toast'
 import { api, apiGetDeduplicado, limpiarCacheMemoria } from '@/lib/api/cliente'
-
-const colorClasses: Record<string, string> = {
-  red: 'bg-red-50 text-red-700',
-  blue: 'bg-blue-50 text-blue-700',
-  purple: 'bg-purple-50 text-purple-700',
-  green: 'bg-green-50 text-green-700',
-  yellow: 'bg-yellow-50 text-yellow-700',
-  indigo: 'bg-indigo-50 text-indigo-700',
-  teal: 'bg-teal-50 text-teal-700',
-}
 
 export default function ConfiguracionGeneral() {
   const router = useRouter()
@@ -103,252 +87,221 @@ export default function ConfiguracionGeneral() {
     setIsEditing(false)
   }
 
-  const empresaFields = [
-    {
-      key: 'nombre' as const,
-      label: 'Nombre de la Empresa',
-      value: empresa.nombre,
-      icon: Building2,
-      color: 'red',
-      placeholder: 'Nombre de la empresa',
-      type: 'text',
-    },
-    {
-      key: 'direccion' as const,
-      label: 'Dirección Principal',
-      value: empresa.direccion,
-      icon: MapPin,
-      color: 'yellow',
-      placeholder: 'Dirección de la empresa',
-      type: 'text',
-    },
-    {
-      key: 'telefono' as const,
-      label: 'Teléfono de Contacto',
-      value: empresa.telefono,
-      href: `tel:${empresa.telefono}`,
-      icon: Phone,
-      color: 'blue',
-      placeholder: '+502 2222-3333',
-      type: 'tel',
-    },
-    {
-      key: 'correo' as const,
-      label: 'Correo Electrónico',
-      value: empresa.correo,
-      href: `mailto:${empresa.correo}`,
-      icon: Mail,
-      color: 'purple',
-      placeholder: 'contacto@domun.gt',
-      type: 'email',
-    },
-  ]
-
   const sistemaItems = [
     {
       label: 'Versión',
       value: 'v2.4.1',
-      icon: Layers,
-      color: 'indigo',
     },
     {
       label: 'Última Actualización',
       value: '17 Ago 2026',
-      icon: Calendar,
-      color: 'yellow',
     },
     {
       label: 'Entorno',
       value: 'Producción',
-      icon: Server,
-      color: 'green',
     },
     {
       label: 'Estado',
       value: 'Óptimo',
-      icon: CheckCircle2,
-      color: 'teal',
     },
   ]
 
   return (
-    <div className="h-full overflow-y-auto bg-gray-50 px-6 py-6 font-[Poppins]">
-      <div className="max-w-6xl">
-        <div className="mb-5 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => router.push('/dashboard/configuracion')}
-              className="p-2 hover:bg-gray-200/60 rounded-lg transition-colors text-gray-600 cursor-pointer"
-              title="Volver a Configuración"
-            >
-              <ArrowLeft size={20} />
-            </button>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Configuración General</h1>
-              <p className="text-xs text-gray-500">Ajustes principales del sistema y empresa</p>
-            </div>
+    <div className="min-h-[calc(100vh-170px)] sm:min-h-[calc(100vh-140px)] flex flex-col justify-center py-4 sm:py-6 px-1.5 sm:px-3 max-w-[1200px] mx-auto font-[Poppins]">
+      {/* Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4 sm:mb-6">
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => router.push('/dashboard/configuracion')}
+            className="p-2 hover:bg-gray-100 rounded-xl transition-colors text-gray-600 cursor-pointer"
+            title="Volver"
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-extrabold text-gray-900 tracking-tight">Configuración General</h1>
+            <p className="text-xs text-gray-500 font-medium">Información institucional y parámetros del sistema</p>
           </div>
-
-          {!isEditing ? (
-            <button
-              type="button"
-              onClick={handleEditClick}
-              className="flex items-center gap-2 bg-[#9B0F06] hover:bg-[#7A0C05] text-white text-sm px-4 py-2 rounded-lg transition-colors font-medium shadow-xs cursor-pointer"
-            >
-              <Edit size={14} />
-              Editar
-            </button>
-          ) : (
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handleCancelEdit}
-                className="flex items-center gap-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm px-3.5 py-2 rounded-lg transition-colors font-medium shadow-xs cursor-pointer"
-              >
-                <X size={14} />
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={loading}
-                className="flex items-center gap-1.5 bg-[#9B0F06] hover:bg-[#7A0C05] text-white text-sm px-4 py-2 rounded-lg transition-colors font-medium shadow-xs cursor-pointer disabled:opacity-50"
-              >
-                {loading ? (
-                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <Save size={14} />
-                )}
-                Guardar Cambios
-              </button>
-            </div>
-          )}
         </div>
 
-        <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[1fr_320px]">
-          {/* Columna Izquierda: Información de la Empresa + Información del Sistema */}
-          <div className="space-y-6">
-            {/* Sección: Información de la Empresa */}
-            <div>
-              <h2 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-600">
-                <Building2 size={15} className="text-[#9B0F06]" />
-                Información de la Empresa
-              </h2>
+        {!isEditing ? (
+          <button
+            type="button"
+            onClick={handleEditClick}
+            className="flex items-center gap-2 bg-[#9B0F06] hover:bg-[#5E0006] text-white text-xs sm:text-sm font-bold px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl transition-all shadow-xs hover:shadow-md active:scale-95 cursor-pointer"
+          >
+            <Edit size={16} className="sm:w-4 sm:h-4" />
+            <span className="sm:hidden font-bold">Editar</span>
+            <span className="hidden sm:inline font-bold">Editar Información General</span>
+          </button>
+        ) : (
+          <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={handleCancelEdit}
+              className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs sm:text-sm font-bold px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl transition-all shadow-xs active:scale-95 cursor-pointer"
+            >
+              <X size={16} className="sm:w-4 sm:h-4" />
+              <span className="font-bold">Cancelar</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={loading}
+              className="flex items-center gap-2 bg-[#9B0F06] hover:bg-[#5E0006] text-white text-xs sm:text-sm font-bold px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl transition-all shadow-xs active:scale-95 cursor-pointer disabled:opacity-50"
+            >
+              {loading ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Save size={16} className="sm:w-4 sm:h-4" />
+              )}
+              <span className="font-bold">Guardar</span>
+            </button>
+          </div>
+        )}
+      </div>
 
-              {/* Grid de tarjetas estilo Soporte sin contenedor blanco envolvente */}
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                {empresaFields.map((item) => {
-                  const Icon = item.icon
-                  return (
-                    <div
-                      key={item.key}
-                      className="flex items-start gap-3 rounded-xl border border-gray-200/80 bg-white p-3.5 shadow-2xs transition-colors hover:border-gray-300"
-                    >
-                      <div className={`rounded-lg p-2.5 shrink-0 ${colorClasses[item.color]}`}>
-                        <Icon size={17} />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                          {item.label}
-                        </p>
-                        {isEditing ? (
-                          <input
-                            type={item.type}
-                            value={empresa[item.key]}
-                            onChange={(e) => setEmpresa({ ...empresa, [item.key]: e.target.value })}
-                            placeholder={item.placeholder}
-                            className="mt-1 w-full rounded-lg border border-gray-200 bg-gray-50/50 px-2.5 py-1.5 text-sm font-semibold text-gray-900 outline-none focus:border-[#9B0F06] focus:bg-white focus:ring-1 focus:ring-[#9B0F06] transition-all"
-                          />
-                        ) : item.href ? (
-                          <a
-                            href={item.href}
-                            className="mt-0.5 block truncate text-sm font-semibold text-gray-900 transition-colors hover:text-red-700"
-                          >
-                            {item.value}
-                          </a>
-                        ) : (
-                          <p className="mt-0.5 truncate text-sm font-semibold text-gray-900">
-                            {item.value}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  )
-                })}
+      {/* Grid: 2 cuadros apilados uno sobre el otro + Tarjeta con el Logo de Domun en grande al lado */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-stretch">
+        {/* Columna Izquierda: Los 2 cuadros de info uno encima del otro */}
+        <div className="lg:col-span-7 xl:col-span-8 flex flex-col gap-4 sm:gap-5 justify-between">
+          {/* Cuadro 1 - Información de la Empresa */}
+          <div className="bg-white rounded-2xl p-5 sm:p-6 shadow-sm border border-gray-100 flex-1 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-2.5 mb-4 pb-3 border-b border-gray-100">
+                <div className="p-1.5 rounded-lg bg-red-50 text-[#9B0F06]">
+                  <Building2 size={18} />
+                </div>
+                <h3 className="text-base sm:text-[17px] font-bold text-gray-900">Información de la Empresa</h3>
               </div>
 
-              {/* Barra de acción cuando se está editando */}
-              {isEditing && (
-                <div className="mt-3 flex items-center justify-end gap-2.5">
-                  <button
-                    type="button"
-                    onClick={handleCancelEdit}
-                    className="flex items-center gap-1.5 rounded-lg bg-gray-100 px-3.5 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-200 transition-colors cursor-pointer"
-                  >
-                    <X size={14} />
-                    Cancelar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSave}
-                    disabled={loading}
-                    className="flex items-center gap-1.5 rounded-lg bg-[#9B0F06] px-4 py-2 text-xs font-semibold text-white hover:bg-[#7A0C05] transition-colors shadow-xs cursor-pointer disabled:opacity-50"
-                  >
-                    {loading ? (
-                      <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    ) : (
-                      <Save size={14} />
-                    )}
-                    Guardar Cambios
-                  </button>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block">
+                    Nombre de la Empresa
+                  </label>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={empresa.nombre}
+                      onChange={(e) => setEmpresa({ ...empresa, nombre: e.target.value })}
+                      className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm sm:text-base font-semibold text-gray-800 outline-none focus:border-[#9B0F06] focus:ring-1 focus:ring-[#9B0F06]"
+                    />
+                  ) : (
+                    <p className="text-sm sm:text-base font-semibold text-gray-800 break-words mt-1">
+                      {empresa.nombre}
+                    </p>
+                  )}
                 </div>
-              )}
-            </div>
 
-            {/* Sección: Información del Sistema */}
-            <div>
-              <h2 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-600">
-                <MonitorSmartphone size={15} className="text-gray-500" />
-                Información del Sistema
-              </h2>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block">
+                    Teléfono de Contacto
+                  </label>
+                  {isEditing ? (
+                    <input
+                      type="tel"
+                      value={empresa.telefono}
+                      onChange={(e) => setEmpresa({ ...empresa, telefono: e.target.value })}
+                      className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm sm:text-base font-semibold text-gray-800 outline-none focus:border-[#9B0F06] focus:ring-1 focus:ring-[#9B0F06]"
+                    />
+                  ) : (
+                    <p className="text-sm sm:text-base font-semibold text-gray-800 break-words mt-1">
+                      {empresa.telefono}
+                    </p>
+                  )}
+                </div>
 
-              {/* Grid de tarjetas estilo Soporte sin contenedor blanco envolvente */}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
-                {sistemaItems.map((item) => {
-                  const Icon = item.icon
-                  return (
-                    <div
-                      key={item.label}
-                      className="flex items-start gap-3 rounded-xl border border-gray-200/80 bg-white p-3.5 shadow-2xs transition-colors hover:border-gray-300"
-                    >
-                      <div className={`rounded-lg p-2.5 shrink-0 ${colorClasses[item.color]}`}>
-                        <Icon size={17} />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                          {item.label}
-                        </p>
-                        <p className="mt-0.5 text-sm font-semibold text-gray-900">
-                          {item.value}
-                        </p>
-                      </div>
-                    </div>
-                  )
-                })}
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block">
+                    Dirección Principal
+                  </label>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={empresa.direccion}
+                      onChange={(e) => setEmpresa({ ...empresa, direccion: e.target.value })}
+                      className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm sm:text-base font-semibold text-gray-800 outline-none focus:border-[#9B0F06] focus:ring-1 focus:ring-[#9B0F06]"
+                    />
+                  ) : (
+                    <p className="text-sm sm:text-base font-semibold text-gray-800 break-words mt-1">
+                      {empresa.direccion}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block">
+                    Correo Electrónico
+                  </label>
+                  {isEditing ? (
+                    <input
+                      type="email"
+                      value={empresa.correo}
+                      onChange={(e) => setEmpresa({ ...empresa, correo: e.target.value })}
+                      className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm sm:text-base font-semibold text-gray-800 outline-none focus:border-[#9B0F06] focus:ring-1 focus:ring-[#9B0F06]"
+                    />
+                  ) : (
+                    <p className="text-sm sm:text-base font-semibold text-gray-800 break-words mt-1">
+                      {empresa.correo}
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Columna Derecha: Logo Domun sin animación al pasar el cursor y un poco más pequeño */}
-          <div className="flex flex-col items-center justify-center p-4 min-h-[240px]">
-            <div className="relative w-44 h-44 md:w-48 md:h-48 drop-shadow-sm">
+          {/* Cuadro 2 - Información del Sistema */}
+          <div className="bg-white rounded-2xl p-5 sm:p-6 shadow-sm border border-gray-100 flex-1 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-2.5 mb-4 pb-3 border-b border-gray-100">
+                <div className="p-1.5 rounded-lg bg-red-50 text-[#9B0F06]">
+                  <Cpu size={18} />
+                </div>
+                <h3 className="text-base sm:text-[17px] font-bold text-gray-900">Información del Sistema</h3>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
+                {sistemaItems.map((item) => (
+                  <div key={item.label}>
+                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block">
+                      {item.label}
+                    </label>
+                    <p className="text-sm sm:text-base font-semibold text-gray-800 break-words mt-1 flex items-center gap-1.5">
+                      {item.label === 'Estado' ? (
+                        <span className="inline-flex items-center gap-1 text-emerald-600 font-bold">
+                          <CheckCircle2 size={16} className="text-emerald-500" />
+                          {item.value}
+                        </span>
+                      ) : (
+                        item.value
+                      )}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Columna Derecha: Tarjeta con el Logo de Domun en Grande */}
+        <div className="lg:col-span-5 xl:col-span-4 flex">
+          <div className="w-full bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center relative overflow-hidden">
+            <div className="relative w-48 h-44 sm:w-60 sm:h-52 md:w-64 md:h-56">
               <Image
                 src="/logo.png"
                 alt="Logo Domun"
                 fill
+                sizes="(max-width: 768px) 240px, 280px"
                 style={{ objectFit: 'contain' }}
                 priority
               />
+            </div>
+            <div className="mt-4 text-center">
+              <h3 className="text-lg sm:text-xl font-bold text-gray-800">{empresa.nombre}</h3>
+              <p className="text-xs text-gray-500 mt-1 max-w-xs">
+                Sistema de control y automatización de proyectos
+              </p>
             </div>
           </div>
         </div>

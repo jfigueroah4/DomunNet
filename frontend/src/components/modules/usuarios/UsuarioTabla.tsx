@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/useAuthStore';
 import { useRolesStore } from '@/stores/useRolesStore';
 import { UsuarioEstadoBadge } from './UsuarioEstadoBadge'
 import { UsuarioRolBadge } from './UsuarioRolBadge'
+import { formatearNombrePropio } from '@/lib/utils/formatters'
 
 interface UsuarioTablaProps {
   usuarios: Usuario[]
@@ -82,12 +83,141 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
   }, [usuarios, sortColumn, sortDirection]);
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-2xs font-[Poppins]">
-      <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse min-w-[900px]">
-          <thead className="bg-gray-50 border-b border-gray-100">
-            <tr>
-              <th className="px-4 py-3 text-[10px] text-gray-400 uppercase tracking-wide font-semibold cursor-pointer hover:text-gray-600 select-none" onClick={() => handleSort('nombre')}>
+    <div className="font-[Poppins]">
+      {/* VISTA MOBILE: Tarjetas táctiles y legibles */}
+      <div className="md:hidden space-y-3">
+        {sortedUsuarios.map((usuario) => {
+          const proyectosCount = (usuario as any).proyectosAsignados ? (usuario as any).proyectosAsignados.length : ((usuario as any).proyectos_activos_count ?? (usuario.rol === 'Administrador' ? 2 : 1));
+          const fechaAcceso = usuario.ultimoAcceso ? usuario.ultimoAcceso.split(' ')[0] : 'Sin registro';
+          const nombreCompleto = formatearNombrePropio(`${usuario.primer_nombre} ${usuario.segundo_nombre || ''} ${usuario.primer_apellido} ${usuario.segundo_apellido || ''}`.replace(/\s+/g, ' ').trim());
+          const iniciales = (usuario.primer_nombre[0] || '') + (usuario.primer_apellido[0] || '');
+
+          const miRolNombre = profile?.rol;
+          const isSelf = (usuario.id && usuario.id === profile?.id) || (usuario.correo && profile?.correo && usuario.correo.toLowerCase() === profile?.correo.toLowerCase());
+          const miRolNorm = String(miRolNombre || '').toLowerCase().trim();
+          const targetRolNorm = String(usuario.rol || '').toLowerCase().trim();
+
+          let canDelete = true;
+          if (isSelf) canDelete = false;
+          else if (miRolNorm === 'administrador') canDelete = targetRolNorm !== 'administrador';
+          else if (miRolNorm === 'gerencia') canDelete = targetRolNorm !== 'gerencia' && targetRolNorm !== 'administrador';
+
+          const canEdit = canDelete;
+          const canCloseSession = !isSelf && (miRolNorm === 'administrador' || miRolNorm === 'gerencia');
+          const esSuspendido = usuario.estado === 'Suspendido' || (usuario as any).activo === false;
+
+          return (
+            <div key={`mob-${usuario.id}`} className="mobile-user-card rounded-2xl border border-gray-100 bg-white p-3.5 shadow-sm space-y-2.5 text-[9.5px]">
+              <div className="flex items-start justify-between gap-2.5">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-8 h-8 rounded-full bg-[#9B0F06] flex items-center justify-center text-white font-bold text-[10px] shrink-0">
+                    {iniciales.toUpperCase()}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-bold text-gray-900 truncate leading-tight">{nombreCompleto}</p>
+                    <p className="text-[9.5px] text-gray-500 truncate mt-0.5">{usuario.correo}</p>
+                  </div>
+                </div>
+                <UsuarioEstadoBadge estado={usuario.estado} />
+              </div>
+
+              <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-gray-50 text-[9.5px]">
+                <UsuarioRolBadge rol={usuario.rol} />
+                <span className="text-[9.5px] text-gray-500 font-medium">
+                  {proyectosCount} {proyectosCount === 1 ? 'proyecto' : 'proyectos'}
+                </span>
+                <span className="text-[9.5px] text-gray-400">· Acceso: {fechaAcceso}</span>
+              </div>
+
+              <div className="flex items-center justify-end gap-1.5 pt-2 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => onVer(usuario)}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-gray-200 bg-white text-gray-700 text-[9.5px] font-semibold hover:bg-gray-50 active:scale-95 cursor-pointer shadow-2xs"
+                  title="Ver detalle"
+                >
+                  <Eye size={12} className="text-gray-500" />
+                  <span>Ver</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => canEdit && onEditar(usuario)}
+                  disabled={!canEdit}
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[9.5px] font-semibold active:scale-95 cursor-pointer shadow-2xs ${
+                    canEdit ? 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50' : 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed'
+                  }`}
+                  title={canEdit ? 'Editar usuario' : 'No puedes editar un Administrador'}
+                >
+                  <Edit2 size={12} className={canEdit ? 'text-gray-600' : 'text-gray-300'} />
+                  <span>Editar</span>
+                </button>
+
+                {usuario.estado === 'Activo' && esGerenciaOAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => canCloseSession && onCerrarSesion?.(usuario)}
+                    disabled={!canCloseSession}
+                    className={`p-1.5 rounded-lg border text-[9.5px] font-semibold active:scale-95 cursor-pointer shadow-2xs ${
+                      canCloseSession ? 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50' : 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed'
+                    }`}
+                    title="Cerrar sesión activa"
+                  >
+                    <LogOut size={12} className={canCloseSession ? 'text-gray-600' : 'text-gray-300'} />
+                  </button>
+                )}
+
+                {esSuspendido ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => canDelete && onEliminar(usuario.id, 'activar')}
+                      disabled={!canDelete}
+                      className={`p-1.5 rounded-lg border text-[9.5px] font-semibold active:scale-95 cursor-pointer shadow-2xs ${
+                        canDelete ? 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50' : 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed'
+                      }`}
+                      title="Activar usuario"
+                    >
+                      <CheckCircle size={12} className={canDelete ? 'text-emerald-600' : 'text-gray-300'} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => canDelete && onEliminar(usuario.id, 'eliminar')}
+                      disabled={!canDelete}
+                      className={`p-1.5 rounded-lg border text-[9.5px] font-semibold active:scale-95 cursor-pointer shadow-2xs ${
+                        canDelete ? 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50' : 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed'
+                      }`}
+                      title="Eliminar usuario"
+                    >
+                      <Trash2 size={12} className={canDelete ? 'text-red-600' : 'text-gray-300'} />
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => canDelete && onEliminar(usuario.id, 'suspender')}
+                    disabled={!canDelete}
+                    className={`p-1.5 rounded-lg border text-[9.5px] font-semibold active:scale-95 cursor-pointer shadow-2xs ${
+                      canDelete ? 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50' : 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed'
+                    }`}
+                    title="Suspender usuario"
+                  >
+                    <UserX size={12} className={canDelete ? 'text-gray-600' : 'text-gray-300'} />
+                  </button>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* VISTA DESKTOP: Tabla completa original */}
+      <div className="hidden md:block overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-2xs">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse min-w-[900px]">
+            <thead className="bg-gray-50 border-b border-gray-100">
+              <tr>
+                <th className="px-4 py-3 text-[10px] text-gray-400 uppercase tracking-wide font-semibold cursor-pointer hover:text-gray-600 select-none" onClick={() => handleSort('nombre')}>
                 Usuario{sortIndicator('nombre')}
               </th>
               <th className="px-4 py-3 text-[10px] text-gray-400 uppercase tracking-wide font-semibold cursor-pointer hover:text-gray-600 select-none" onClick={() => handleSort('correo')}>
@@ -115,7 +245,7 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
               const proyectosCount = (usuario as any).proyectosAsignados ? (usuario as any).proyectosAsignados.length : ((usuario as any).proyectos_activos_count ?? (usuario.rol === 'Administrador' ? 2 : 1));
               const fechaAcceso = usuario.ultimoAcceso ? usuario.ultimoAcceso.split(' ')[0] : '';
               
-              const nombreCompleto = `${usuario.primer_nombre} ${usuario.segundo_nombre || ''} ${usuario.primer_apellido} ${usuario.segundo_apellido || ''}`.replace(/\s+/g, ' ').trim();
+              const nombreCompleto = formatearNombrePropio(`${usuario.primer_nombre} ${usuario.segundo_nombre || ''} ${usuario.primer_apellido} ${usuario.segundo_apellido || ''}`.replace(/\s+/g, ' ').trim());
               const iniciales = (usuario.primer_nombre[0] || '') + (usuario.primer_apellido[0] || '');
 
               let subtitle = '';
@@ -250,6 +380,7 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
           </tbody>
         </table>
       </div>
+    </div>
     </div>
   )
 })

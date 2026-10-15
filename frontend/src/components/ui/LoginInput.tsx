@@ -50,11 +50,12 @@ export default function LoginInput({
           paddingRight: rightIcon ? '36px' : '8px',
         }}
         className={`
+          login-field
           w-full h-[38px]
           bg-transparent
           text-white
           placeholder-white/40
-          font-poppins text-[12px]
+          font-poppins text-[11.5px] placeholder:text-[11px]
           outline-none
         `}
       />

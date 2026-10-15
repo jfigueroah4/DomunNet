@@ -16,6 +16,7 @@ import {
   Eye,
   FileSpreadsheet,
   Layers,
+  Info,
   Lock,
   Plus,
   Receipt,
@@ -29,7 +30,6 @@ import {
 import type { ProyectoType } from '@/validations/proyecto.schema'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { showErrorToast, showSuccessToast } from '@/hooks/useCustomToast'
-import { CATALOGO_COMPLETO_88 } from '@/mocks/proyectoMock'
 
 export interface RenglonItemFinanciero {
   id: string
@@ -82,192 +82,6 @@ export const CAPITULOS_LIBRO_AZUL_DGC = [
   { id: 9, nombre: 'Capítulo IX: Aspectos Ambientales y Gestión de Riesgo', icon: Layers },
 ]
 
-// Catálogo base de renglones DGC para el proyecto
-export const CATALOGO_BASE_RENGLONES: RenglonItemFinanciero[] = [
-  {
-    id: 'dgc-101',
-    capituloId: 1,
-    capituloNombre: 'Capítulo I: Estudios, Mantenimiento y Trabajos Preliminares',
-    codigoDGC: '101.01',
-    descripcion: 'Mantenimiento del tránsito y construcción de desvíos provisionales',
-    unidad: 'Glb',
-    cantidadContratada: 1,
-    cantidadAjustada: 1,
-    costoUnitarioDirecto: 250000,
-    cantidadEstePeriodo: 0.1,
-    cantidadAcumuladaAnterior: 0.6,
-  },
-  {
-    id: 'dgc-102',
-    capituloId: 1,
-    capituloNombre: 'Capítulo I: Estudios, Mantenimiento y Trabajos Preliminares',
-    codigoDGC: '102.03',
-    descripcion: 'Clechado, chapeo, destronque y limpieza del derecho de vía',
-    unidad: 'Ha',
-    cantidadContratada: 18.5,
-    cantidadAjustada: 18.5,
-    costoUnitarioDirecto: 18500,
-    cantidadEstePeriodo: 1.5,
-    cantidadAcumuladaAnterior: 16.0,
-  },
-  {
-    id: 'dgc-103',
-    capituloId: 1,
-    capituloNombre: 'Capítulo I: Estudios, Mantenimiento y Trabajos Preliminares',
-    codigoDGC: '103.01',
-    descripcion: 'Demolición de estructuras existentes de concreto y mampostería',
-    unidad: 'm³',
-    cantidadContratada: 1200,
-    cantidadAjustada: 1200,
-    costoUnitarioDirecto: 280,
-    cantidadEstePeriodo: 100,
-    cantidadAcumuladaAnterior: 1100,
-  },
-  {
-    id: 'dgc-105',
-    capituloId: 1,
-    capituloNombre: 'Capítulo I: Estudios, Mantenimiento y Trabajos Preliminares',
-    codigoDGC: '105.06',
-    descripcion: 'Replanteo topográfico, nivelación y trazado de precisión DGC',
-    unidad: 'km',
-    cantidadContratada: 12.5,
-    cantidadAjustada: 12.5,
-    costoUnitarioDirecto: 14500,
-    cantidadEstePeriodo: 0.5,
-    cantidadAcumuladaAnterior: 11.5,
-  },
-  {
-    id: 'dgc-201',
-    capituloId: 2,
-    capituloNombre: 'Capítulo II: Movimiento de Tierras y Excavación',
-    codigoDGC: '201.01',
-    descripcion: 'Excavación no clasificada para corte en vía',
-    unidad: 'm³',
-    cantidadContratada: 45000,
-    cantidadAjustada: 48000,
-    costoUnitarioDirecto: 68,
-    cantidadEstePeriodo: 3500,
-    cantidadAcumuladaAnterior: 41000,
-  },
-  {
-    id: 'dgc-202',
-    capituloId: 2,
-    capituloNombre: 'Capítulo II: Movimiento de Tierras y Excavación',
-    codigoDGC: '201.03(b)',
-    descripcion: 'Excavación en roca mediante perforación y voladura controlada',
-    unidad: 'm³',
-    cantidadContratada: 12500,
-    cantidadAjustada: 14000,
-    costoUnitarioDirecto: 210,
-    cantidadEstePeriodo: 1200,
-    cantidadAcumuladaAnterior: 11800,
-  },
-  {
-    id: 'dgc-203',
-    capituloId: 2,
-    capituloNombre: 'Capítulo II: Movimiento de Tierras y Excavación',
-    codigoDGC: '202.01',
-    descripcion: 'Excavación no clasificada para estructuras y cimentaciones',
-    unidad: 'm³',
-    cantidadContratada: 8200,
-    cantidadAjustada: 8200,
-    costoUnitarioDirecto: 98,
-    cantidadEstePeriodo: 600,
-    cantidadAcumuladaAnterior: 7400,
-  },
-  {
-    id: 'dgc-301',
-    capituloId: 3,
-    capituloNombre: 'Capítulo III: Terraplenes Estructurales y Capas de Soporte',
-    codigoDGC: '301.01',
-    descripcion: 'Compactación de terraplenes con material propio de corte',
-    unidad: 'm³',
-    cantidadContratada: 32000,
-    cantidadAjustada: 32000,
-    costoUnitarioDirecto: 48,
-    cantidadEstePeriodo: 2400,
-    cantidadAcumuladaAnterior: 28500,
-  },
-  {
-    id: 'dgc-302',
-    capituloId: 3,
-    capituloNombre: 'Capítulo III: Terraplenes Estructurales y Capas de Soporte',
-    codigoDGC: '302.02',
-    descripcion: 'Terraplén con material de préstamo seleccionado (95% AASHTO T-180)',
-    unidad: 'm³',
-    cantidadContratada: 24000,
-    cantidadAjustada: 24000,
-    costoUnitarioDirecto: 125,
-    cantidadEstePeriodo: 1800,
-    cantidadAcumuladaAnterior: 21200,
-  },
-  {
-    id: 'dgc-401',
-    capituloId: 4,
-    capituloNombre: 'Capítulo IV: Subbases y Bases Granulares',
-    codigoDGC: '401.01',
-    descripcion: 'Subbase granular graduada e=20cm compactada al 100% AASHTO T-180',
-    unidad: 'm³',
-    cantidadContratada: 18500,
-    cantidadAjustada: 18500,
-    costoUnitarioDirecto: 175,
-    cantidadEstePeriodo: 1400,
-    cantidadAcumuladaAnterior: 16200,
-  },
-  {
-    id: 'dgc-402',
-    capituloId: 4,
-    capituloNombre: 'Capítulo IV: Subbases y Bases Granulares',
-    codigoDGC: '402.02',
-    descripcion: 'Base granular graduada clase A e=25cm 100% de trituración',
-    unidad: 'm³',
-    cantidadContratada: 18500,
-    cantidadAjustada: 18500,
-    costoUnitarioDirecto: 220,
-    cantidadEstePeriodo: 1800,
-    cantidadAcumuladaAnterior: 15800,
-  },
-  {
-    id: 'dgc-501',
-    capituloId: 5,
-    capituloNombre: 'Capítulo V: Pavimentos Asfálticos y Concreto',
-    codigoDGC: '501.01',
-    descripcion: 'Mezcla asfáltica en caliente graduación densa e=7.5cm',
-    unidad: 'm²',
-    cantidadContratada: 12000,
-    cantidadAjustada: 12000,
-    costoUnitarioDirecto: 195,
-    cantidadEstePeriodo: 1500,
-    cantidadAcumuladaAnterior: 9800,
-  },
-  {
-    id: 'dgc-504',
-    capituloId: 5,
-    capituloNombre: 'Capítulo V: Pavimentos Asfálticos y Concreto',
-    codigoDGC: '504.01',
-    descripcion: 'Pavimento rígido de concreto hidráulico MR=45 e=20cm con pasadores',
-    unidad: 'm²',
-    cantidadContratada: 28000,
-    cantidadAjustada: 26000,
-    costoUnitarioDirecto: 380,
-    cantidadEstePeriodo: 2400,
-    cantidadAcumuladaAnterior: 24200,
-  },
-  {
-    id: 'dgc-601',
-    capituloId: 6,
-    capituloNombre: 'Capítulo VI: Estructuras de Drenaje Pluvial',
-    codigoDGC: '601.01',
-    descripcion: 'Tubería de concreto reforzado Ø24" clase III para alcantarillado',
-    unidad: 'ml',
-    cantidadContratada: 3200,
-    cantidadAjustada: 3200,
-    costoUnitarioDirecto: 310,
-    cantidadEstePeriodo: 250,
-    cantidadAcumuladaAnterior: 2800,
-  },
-]
-
 type SubTabFinanciera = 'resumen' | 'estimaciones' | 'curva'
 
 export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: ProyectoType | undefined }) {
@@ -304,14 +118,13 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
   const [tooltipCurva, setTooltipCurva] = useState<any>(null)
 
   const pAny = (proyecto as any) || {}
-  const esBorrador = (proyecto?.estado || 'activo') === 'borrador'
 
   // Nombres de las empresas para los tabs de Control de Estimaciones
-  const nombreEmpresaEjecutora = pAny.empresaContratista || pAny.empresa_contratista || 'Constructora Vial S.A.'
-  const nombreEmpresaSupervisora = pAny.empresaSupervisora || pAny.empresa_supervisora || 'Supervisión Técnica DGC'
+  const nombreEmpresaEjecutora = pAny.empresaContratista || pAny.empresa_contratista || '-'
+  const nombreEmpresaSupervisora = pAny.empresaSupervisora || pAny.empresa_supervisora || '-'
 
   // Delegado Residente del Proyecto
-  const nombreDelegadoProyecto = pAny.delegadoResidente || pAny.delegado_residente || 'Ing. Fernando Álvarez'
+  const nombreDelegadoProyecto = pAny.delegadoResidente || pAny.delegado_residente || '-'
 
   // Validación estricta de permisos: Solo el Delegado Residente o Administrador tiene acceso a la Hoja Sábana y generación de estimaciones
   const esAdminOGerente = useMemo(() => {
@@ -351,27 +164,30 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
   }
 
   // Cálculos Financieros Generales con Porcentaje de Anticipo Dinámico por Contrato
-  const pctAnticipoEjecucionNum = Number(pAny.contratoEjecucion?.porcentajeAnticipo ?? pAny.porcentajeAnticipo ?? 20)
-  const pctAnticipoSupervisionNum = Number(pAny.contratoSupervision?.porcentajeAnticipo ?? pAny.porcentajeAnticipoSupervision ?? pAny.porcentajeAnticipo ?? 20)
+  const pctAnticipoEjecucionNum = Number(pAny.contratoEjecucion?.porcentajeAnticipo ?? pAny.porcentajeAnticipo ?? 15)
+  const pctAnticipoSupervisionNum = Number(pAny.contratoSupervision?.porcentajeAnticipo ?? pAny.porcentajeAnticipoSupervision ?? pAny.porcentajeAnticipo ?? 10)
   const pctAnticipoEjec = pctAnticipoEjecucionNum / 100
-  const pctAnticipoSup = pctAnticipoSupervisionNum / 100
 
-  const montoContractualOriginal = Number(proyecto?.montoContractualOriginal || proyecto?.presupuesto || 48500000)
-  const montoSupervisionOriginal = Number(pAny.contratoSupervision?.montoOriginal || pAny.supervisoraMontoOriginal || pAny.monto_supervision || 13351095.20)
-  const montoAjustadoVigente = Number(proyecto?.montoFinancieroFinalEjecutado || montoContractualOriginal)
+  const montoContractualOriginal = Number(proyecto?.montoContractualOriginal || proyecto?.presupuesto || pAny.monto_original || 0)
+  const montoSupervisionOriginal = Number(pAny.contratoSupervision?.montoOriginal || pAny.supervisoraMontoOriginal || pAny.monto_supervision || 0)
+  const montoAjustadoVigente = Number(proyecto?.montoFinancieroFinalEjecutado || pAny.monto_final || montoContractualOriginal || 0)
   const montoBaseCurva = perspectivaCurva === 'ejecutora' ? montoAjustadoVigente : montoSupervisionOriginal
   const anticipoOtorgado = montoContractualOriginal * pctAnticipoEjec
-  const avanceFisico = esBorrador ? 0 : Number(proyecto?.avance || 68.5)
-  const pctAmortizadoAnticipo = esBorrador ? 0 : Math.min(100, Math.max(0, avanceFisico * 0.95))
-  const anticipoAmortizado = anticipoOtorgado * (pctAmortizadoAnticipo / 100)
-  const saldoAnticipoPendiente = Math.max(0, anticipoOtorgado - anticipoAmortizado)
 
   // Soporte de Modalidad Manual de Presupuesto y Estimaciones
   const modoManual =
     pAny.modoGestionFinanciera === 'manual' || pAny.usarModoSabana === false
+  const ambitoPlanTrabajo = pAny.ambitoPlanTrabajo || pAny.ambito_plan_trabajo || 'obra'
+  const esModoSabana = pAny.modoGestionFinanciera === 'sabana' || pAny.usarModoSabana === true
+  const perspectivaTieneSabana = esModoSabana && (
+    (ambitoPlanTrabajo === 'obra' && perspectivaEstimacion === 'ejecutora') ||
+    (ambitoPlanTrabajo === 'supervision' && perspectivaEstimacion === 'supervisora')
+  )
+  const perspectivaEsManual = !perspectivaTieneSabana
   const [estimacionesManuales, setEstimacionesManuales] = useState<EstimacionFinancieraItem[]>([])
   const [modalEstimacionManualOpen, setModalEstimacionManualOpen] = useState(false)
   const [estimacionEnEdicion, setEstimacionEnEdicion] = useState<EstimacionFinancieraItem | null>(null)
+  const [estimacionParaEliminar, setEstimacionParaEliminar] = useState<EstimacionFinancieraItem | null>(null)
 
   // Formulario modal de estimación manual
   const [formEstNumero, setFormEstNumero] = useState('')
@@ -384,7 +200,7 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
   const [formEstPctAmortizacion, setFormEstPctAmortizacion] = useState('20')
   const [formEstMontoLiquido, setFormEstMontoLiquido] = useState('')
   const [formEstSaldoRestante, setFormEstSaldoRestante] = useState('')
-  const [formEstEstado, setFormEstEstado] = useState<'aprobada' | 'en_revision' | 'pagada' | 'borrador'>('aprobada')
+  const [formEstEstado, setFormEstEstado] = useState<'aprobada' | 'en_revision' | 'pagada' | 'borrador'>('borrador')
   const [formEstObservaciones, setFormEstObservaciones] = useState('')
   const [formEstDiasRetraso, setFormEstDiasRetraso] = useState('0')
   const [formEstRendimiento, setFormEstRendimiento] = useState('100')
@@ -395,34 +211,125 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
       const stored = localStorage.getItem(`domun_estimaciones_manuales_${proyecto.id}`)
       if (stored) {
         const parsed = JSON.parse(stored)
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setEstimacionesManuales(parsed)
+        if (Array.isArray(parsed)) {
+          // Filtrar dummies de versiones anteriores para no mostrar estimaciones falsas
+          const limpios = parsed.filter(
+            (item: any) => !item.id?.startsWith('est-ejec-1-') && !item.id?.startsWith('est-sup-1-')
+          )
+          setEstimacionesManuales(limpios)
           return
         }
       }
       if (Array.isArray(pAny.estimacionesManuales) && pAny.estimacionesManuales.length > 0) {
         setEstimacionesManuales(pAny.estimacionesManuales)
+      } else if (Array.isArray(pAny.estimaciones) && pAny.estimaciones.length > 0) {
+        setEstimacionesManuales(pAny.estimaciones)
+      } else {
+        setEstimacionesManuales([])
       }
     } catch (e) {
       console.warn('Error cargando estimaciones manuales:', e)
     }
-  }, [proyecto?.id, pAny.estimacionesManuales])
+  }, [proyecto?.id, pAny.estimacionesManuales, pAny.estimaciones])
+
+  // Estimaciones Finales (Cargadas de la base de datos o registradas por el usuario; no genera datos falsos por defecto)
+  const estimacionesGeneradas = useMemo<EstimacionFinancieraItem[]>(() => {
+    if (estimacionesManuales.length > 0) {
+      return estimacionesManuales
+    }
+    if (Array.isArray(pAny.estimaciones) && pAny.estimaciones.length > 0) {
+      return pAny.estimaciones
+    }
+    return []
+  }, [estimacionesManuales, pAny.estimaciones])
+
+  // Métricas financieras reactivas basadas en las estimaciones
+  const totalValorBrutoAprobado = useMemo(() => {
+    return estimacionesGeneradas
+      .filter((e) => e.perspectiva === 'ejecutora' && (e.estado === 'aprobada' || e.estado === 'pagada'))
+      .reduce((acc, curr) => acc + (Number(curr.valorBrutoTrabajado) || 0), 0)
+  }, [estimacionesGeneradas])
+
+  const totalAmortizadoAnticipo = useMemo(() => {
+    return estimacionesGeneradas
+      .filter((e) => e.perspectiva === 'ejecutora' && (e.estado === 'aprobada' || e.estado === 'pagada'))
+      .reduce((acc, curr) => acc + (Number(curr.montoAmortizacion) || 0), 0)
+  }, [estimacionesGeneradas])
+
+  const totalLiquidoAPagar = useMemo(() => {
+    return estimacionesGeneradas
+      .filter((e) => e.perspectiva === 'ejecutora' && (e.estado === 'aprobada' || e.estado === 'pagada'))
+      .reduce((acc, curr) => acc + (Number(curr.montoLiquidoAPagar) || 0), 0)
+  }, [estimacionesGeneradas])
+
+  const pctAmortizadoAnticipo = useMemo(() => {
+    if (anticipoOtorgado <= 0) return 0
+    return Math.min(100, Math.max(0, (totalAmortizadoAnticipo / anticipoOtorgado) * 100))
+  }, [totalAmortizadoAnticipo, anticipoOtorgado])
+
+  const saldoAnticipoPendiente = useMemo(() => {
+    return Math.max(0, anticipoOtorgado - totalAmortizadoAnticipo)
+  }, [anticipoOtorgado, totalAmortizadoAnticipo])
+
+  const saldoContractualVigente = useMemo(() => {
+    return Math.max(0, montoAjustadoVigente - totalValorBrutoAprobado)
+  }, [montoAjustadoVigente, totalValorBrutoAprobado])
+
+  // Control de Plazo dinámico
+  const plazoDiasCalculados = useMemo(() => {
+    const fFinRaw = proyecto?.fechaFinalizacionReal || (proyecto as any)?.fechaFinContractualPlan || proyecto?.fechaFin || (proyecto as any)?.fecha_fin
+    const fIniRaw = proyecto?.fechaInicioContractual || proyecto?.fechaInicio || (proyecto as any)?.fecha_inicio
+    const dFin = fFinRaw ? new Date(fFinRaw) : null
+    const dIni = fIniRaw ? new Date(fIniRaw) : null
+    const hoy = new Date()
+
+    let totalDias = pAny.plazoMeses ? Number(pAny.plazoMeses) * 30 : (pAny.plazoContractual ? Number(pAny.plazoContractual) : 365)
+    if (dIni && dFin && !isNaN(dIni.getTime()) && !isNaN(dFin.getTime())) {
+      totalDias = Math.max(1, Math.ceil((dFin.getTime() - dIni.getTime()) / (1000 * 60 * 60 * 24)))
+    }
+
+    let diasRestantes = totalDias
+    if (dFin && !isNaN(dFin.getTime())) {
+      diasRestantes = Math.max(0, Math.ceil((dFin.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24)))
+    }
+
+    return { totalDias, diasRestantes }
+  }, [proyecto, pAny.plazoMeses])
+
+  const calcularSiguienteNumeroEstimacion = (perspectiva: 'ejecutora' | 'supervisora') => {
+    const filtradas = estimacionesGeneradas.filter((e) => e.perspectiva === perspectiva)
+    let maxNum = 0
+    filtradas.forEach((e) => {
+      const match = e.numero.match(/\d+/)
+      if (match) {
+        const n = parseInt(match[0], 10)
+        if (!isNaN(n) && n > maxNum) maxNum = n
+      }
+    })
+    const prox = Math.max(filtradas.length + 1, maxNum + 1)
+    return prox < 10 ? `Est. 0${prox}` : `Est. ${prox}`
+  }
 
   const handleAbrirCrearEstimacionManual = () => {
     setEstimacionEnEdicion(null)
-    const proxNum = (estimacionesManuales.length > 0 ? estimacionesManuales.length + 1 : 8)
-    setFormEstNumero(`Est. 0${proxNum}`)
-    setFormEstNombre(`Estimación No. 0${proxNum} - Ingreso Manual`)
+    const numStr = calcularSiguienteNumeroEstimacion(perspectivaEstimacion)
+    const numDigitos = numStr.replace(/\D/g, '')
+    const hoyStr = new Date().toISOString().split('T')[0]
+    const mesStr = new Date().toLocaleDateString('es-GT', { month: 'long', year: 'numeric' })
+    const pctAmort = perspectivaEstimacion === 'ejecutora' ? pctAnticipoEjecucionNum : pctAnticipoSupervisionNum
+
+    setFormEstNumero(numStr)
+    setFormEstNombre(`Estimación No. ${numDigitos || '01'}`)
     setFormEstPerspectiva(perspectivaEstimacion)
-    setFormEstFechaInicio('2026-08-01')
-    setFormEstFechaFin('2026-08-31')
-    setFormEstMes('Agosto 2026')
-    setFormEstValorBruto('1500000')
-    setFormEstPctAmortizacion(perspectivaEstimacion === 'ejecutora' ? pctAnticipoEjecucionNum.toString() : pctAnticipoSupervisionNum.toString())
-    setFormEstMontoLiquido('1200000')
-    setFormEstSaldoRestante('25000000')
-    setFormEstEstado('aprobada')
-    setFormEstObservaciones('Monto registrado manualmente por el usuario.')
+    setFormEstFechaInicio(hoyStr)
+    setFormEstFechaFin(hoyStr)
+    setFormEstMes(mesStr)
+    setFormEstValorBruto('0.00')
+    setFormEstPctAmortizacion(pctAmort.toString())
+    setFormEstMontoLiquido('0.00')
+    setFormEstSaldoRestante(saldoContractualVigente.toFixed(2))
+    setFormEstEstado('borrador') // Por defecto en borrador para permitir su posterior edición o borrado
+    setFormEstObservaciones('Monto registrado y verificado en campo.')
     setFormEstDiasRetraso('0')
     setFormEstRendimiento('100')
     setModalEstimacionManualOpen(true)
@@ -447,177 +354,10 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
     setModalEstimacionManualOpen(true)
   }
 
-  // Estimaciones Base Calculadas
-  const estimacionesGeneradasBase: EstimacionFinancieraItem[] = useMemo(() => {
-    const periodos = [
-      {
-        num: 'Est. 01',
-        nombre: 'Estimación No. 01 - Trabajos Preliminares y Terracería',
-        mes: 'Enero 2026',
-        fIni: '2026-01-01',
-        fFin: '2026-01-31',
-        diasRetraso: 0,
-        rendimiento: 99.2,
-        calif: 'bueno' as const,
-        factorBruto: 0.10,
-        estado: 'pagada' as const,
-      },
-      {
-        num: 'Est. 02',
-        nombre: 'Estimación No. 02 - Excavación Masiva y Drenajes Menores',
-        mes: 'Febrero 2026',
-        fIni: '2026-02-01',
-        fFin: '2026-02-28',
-        diasRetraso: 0,
-        rendimiento: 98.5,
-        calif: 'bueno' as const,
-        factorBruto: 0.12,
-        estado: 'pagada' as const,
-      },
-      {
-        num: 'Est. 03',
-        nombre: 'Estimación No. 03 - Terraplenes y Estructuras de Soporte',
-        mes: 'Marzo 2026',
-        fIni: '2026-03-01',
-        fFin: '2026-03-31',
-        diasRetraso: 3,
-        rendimiento: 86.4,
-        calif: 'regular' as const,
-        factorBruto: 0.14,
-        estado: 'pagada' as const,
-      },
-      {
-        num: 'Est. 04',
-        nombre: 'Estimación No. 04 - Subbase Granular y Obras de Arte',
-        mes: 'Abril 2026',
-        fIni: '2026-04-01',
-        fFin: '2026-04-30',
-        diasRetraso: 0,
-        rendimiento: 97.0,
-        calif: 'bueno' as const,
-        factorBruto: 0.11,
-        estado: 'pagada' as const,
-      },
-      {
-        num: 'Est. 05',
-        nombre: 'Estimación No. 05 - Base Granular y Colocación de Tubería',
-        mes: 'Mayo 2026',
-        fIni: '2026-05-01',
-        fFin: '2026-05-31',
-        diasRetraso: 7,
-        rendimiento: 78.5,
-        calif: 'regular' as const,
-        factorBruto: 0.13,
-        estado: 'pagada' as const,
-      },
-      {
-        num: 'Est. 06',
-        nombre: 'Estimación No. 06 - Pavimento Asfáltico y Concreto Hidráulico',
-        mes: 'Junio 2026',
-        fIni: '2026-06-01',
-        fFin: '2026-06-30',
-        diasRetraso: 12,
-        rendimiento: 64.0,
-        calif: 'malo' as const,
-        factorBruto: 0.08,
-        estado: 'aprobada' as const,
-      },
-      {
-        num: 'Est. 07 (Actual)',
-        nombre: 'Estimación No. 07 - Pavimento Rígido y Señalización Vial',
-        mes: 'Julio 2026',
-        fIni: '2026-07-01',
-        fFin: '2026-07-31',
-        diasRetraso: 5,
-        rendimiento: 82.0,
-        calif: 'regular' as const,
-        factorBruto: 0.005,
-        estado: 'en_revision' as const,
-      },
-    ]
-
-    let acumuladoBrutoEjec = 0
-    let acumuladoBrutoSup = 0
-
-    return periodos.flatMap((p, idx) => {
-      const baseBruto = montoAjustadoVigente * p.factorBruto
-
-      // 1. Perspectiva Empresa Ejecutora (Contratista)
-      acumuladoBrutoEjec += baseBruto
-      const amortEjec = baseBruto * pctAnticipoEjec
-      const liqEjec = baseBruto - amortEjec
-      const saldoEjec = Math.max(0, montoAjustadoVigente - acumuladoBrutoEjec)
-
-      const estEjecutora: EstimacionFinancieraItem = {
-        id: `est-ejec-${idx + 1}`,
-        numero: p.num,
-        nombreEstimacion: p.nombre,
-        delegadoResidente: nombreDelegadoProyecto,
-        perspectiva: 'ejecutora',
-        fechaInicio: p.fIni,
-        fechaFin: p.fFin,
-        mes: p.mes,
-        diasRetraso: p.diasRetraso,
-        porcentajeRendimiento: p.rendimiento,
-        calificacionDesempeno: p.calif,
-        valorBrutoTrabajado: baseBruto,
-        porcentajeAmortizacion: pctAnticipoEjecucionNum,
-        montoAmortizacion: amortEjec,
-        montoLiquidoAPagar: liqEjec,
-        saldoContractualRestante: saldoEjec,
-        estado: p.estado,
-        supervisadoPor: nombreEmpresaEjecutora,
-        observaciones: 'Presentada según memoria analítica de campo y libretas topográficas.',
-      }
-
-      // 2. Perspectiva Empresa Supervisora (CIV / DGC)
-      const factorAjusteSupervisor = p.estado === 'en_revision' ? 0.96 : (idx === 4 ? 0.98 : 1.0)
-      const brutoSup = baseBruto * factorAjusteSupervisor
-      acumuladoBrutoSup += brutoSup
-      const amortSup = brutoSup * pctAnticipoSup
-      const liqSup = brutoSup - amortSup
-      const saldoSup = Math.max(0, montoAjustadoVigente - acumuladoBrutoSup)
-
-      const estSupervisora: EstimacionFinancieraItem = {
-        id: `est-sup-${idx + 1}`,
-        numero: p.num,
-        nombreEstimacion: `${p.nombre} (Dictamen Supervisión)`,
-        delegadoResidente: nombreDelegadoProyecto,
-        perspectiva: 'supervisora',
-        fechaInicio: p.fIni,
-        fechaFin: p.fFin,
-        mes: p.mes,
-        diasRetraso: p.diasRetraso,
-        porcentajeRendimiento: Math.max(0, p.rendimiento * factorAjusteSupervisor),
-        calificacionDesempeno: factorAjusteSupervisor < 1.0 ? (p.calif === 'bueno' ? 'regular' : p.calif) : p.calif,
-        valorBrutoTrabajado: brutoSup,
-        porcentajeAmortizacion: pctAnticipoSupervisionNum,
-        montoAmortizacion: amortSup,
-        montoLiquidoAPagar: liqSup,
-        saldoContractualRestante: saldoSup,
-        estado: p.estado,
-        supervisadoPor: nombreEmpresaSupervisora,
-        observaciones: factorAjusteSupervisor < 1.0
-          ? 'Ajuste técnico por prueba de laboratorio AASHTO en proceso de resolución.'
-          : 'Certificación técnica conforme a especificaciones del Libro Azul DGC.',
-      }
-
-      return [estEjecutora, estSupervisora]
-    })
-  }, [montoAjustadoVigente, pctAnticipoEjec, pctAnticipoSup, pctAnticipoEjecucionNum, pctAnticipoSupervisionNum, nombreDelegadoProyecto, nombreEmpresaEjecutora, nombreEmpresaSupervisora])
-
-  // Estimaciones Finales (Manuales si existen o Calculadas)
-  const estimacionesGeneradas = useMemo<EstimacionFinancieraItem[]>(() => {
-    if (modoManual && estimacionesManuales.length > 0) {
-      return estimacionesManuales
-    }
-    return estimacionesGeneradasBase
-  }, [modoManual, estimacionesManuales, estimacionesGeneradasBase])
-
   const handleGuardarEstimacionManual = (e: React.FormEvent) => {
     e.preventDefault()
     if (!formEstNumero.trim()) {
-      showErrorToast('El número de estimación es obligatorio (ej. Est. 08)')
+      showErrorToast('El número de estimación es obligatorio (ej. Est. 01)')
       return
     }
     const bruto = parseFloat(formEstValorBruto) || 0
@@ -627,14 +367,14 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
     const saldo = parseFloat(formEstSaldoRestante) || Math.max(0, montoAjustadoVigente - bruto)
 
     const nueva: EstimacionFinancieraItem = {
-      id: estimacionEnEdicion?.id || `est-man-${Date.now()}`,
+      id: estimacionEnEdicion?.id || `est-${formEstPerspectiva}-${Date.now()}`,
       numero: formEstNumero.trim(),
       nombreEstimacion: formEstNombre.trim() || `Estimación ${formEstNumero}`,
-      delegadoResidente: nombreDelegadoProyecto,
+      delegadoResidente: nombreDelegadoProyecto !== '-' ? nombreDelegadoProyecto : 'Delegado Asignado',
       perspectiva: formEstPerspectiva,
-      fechaInicio: formEstFechaInicio || '2026-08-01',
-      fechaFin: formEstFechaFin || '2026-08-31',
-      mes: formEstMes || 'Agosto 2026',
+      fechaInicio: formEstFechaInicio || new Date().toISOString().split('T')[0],
+      fechaFin: formEstFechaFin || new Date().toISOString().split('T')[0],
+      mes: formEstMes || new Date().toLocaleDateString('es-GT', { month: 'long', year: 'numeric' }),
       diasRetraso: parseInt(formEstDiasRetraso) || 0,
       porcentajeRendimiento: parseFloat(formEstRendimiento) || 100,
       calificacionDesempeno: (parseFloat(formEstRendimiento) || 100) >= 90 ? 'bueno' : (parseFloat(formEstRendimiento) || 100) >= 70 ? 'regular' : 'malo',
@@ -645,10 +385,10 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
       saldoContractualRestante: saldo,
       estado: formEstEstado,
       supervisadoPor: formEstPerspectiva === 'ejecutora' ? nombreEmpresaEjecutora : nombreEmpresaSupervisora,
-      observaciones: formEstObservaciones || 'Monto registrado manualmente por el usuario.',
+      observaciones: formEstObservaciones || 'Monto registrado por el usuario.',
     }
 
-    const baseLista = estimacionesManuales.length > 0 ? estimacionesManuales : estimacionesGeneradasBase
+    const baseLista = estimacionesGeneradas
     let actualizadas: EstimacionFinancieraItem[] = []
     if (estimacionEnEdicion) {
       actualizadas = baseLista.map((item) => (item.id === estimacionEnEdicion.id ? nueva : item))
@@ -666,13 +406,21 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
   }
 
   const handleEliminarEstimacionManual = (id: string) => {
-    const baseLista = estimacionesManuales.length > 0 ? estimacionesManuales : estimacionesGeneradasBase
-    const filtradas = baseLista.filter((item) => item.id !== id)
+    const target = estimacionesGeneradas.find((item) => item.id === id)
+    if (target && target.estado !== 'borrador') {
+      showErrorToast('Solo las estimaciones en estado Borrador pueden eliminarse.')
+      return
+    }
+    const filtradas = estimacionesGeneradas.filter((item) => item.id !== id)
     setEstimacionesManuales(filtradas)
     if (proyecto?.id) {
       localStorage.setItem(`domun_estimaciones_manuales_${proyecto.id}`, JSON.stringify(filtradas))
     }
-    showSuccessToast('Estimación eliminada exitosamente')
+    showSuccessToast(`Estimación ${target?.numero || ''} eliminada exitosamente`)
+    if (modalEstimacionManualOpen) {
+      setModalEstimacionManualOpen(false)
+      setEstimacionEnEdicion(null)
+    }
   }
 
   const estimacionesFiltradas = useMemo(() => {
@@ -690,37 +438,29 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
     return estimacionesFiltradas.slice(inicio, inicio + itemsPorPaginaEstimaciones)
   }, [estimacionesFiltradas, paginaEstimaciones, itemsPorPaginaEstimaciones])
 
-  // Fuente de Renglones reales (del proyecto o catálogo integral de 88 renglones DGC)
+  // Fuente de Renglones reales (del proyecto o vacío si no se han establecido)
   const listaRenglonesFuente = useMemo<RenglonItemFinanciero[]>(() => {
-    const rawRenglones = (proyecto as any)?.renglones || (proyecto as any)?.renglones_sabana
+    const rawRenglones = (proyecto as any)?.renglones || (proyecto as any)?.renglones_sabana || (proyecto as any)?.planTrabajo
     if (Array.isArray(rawRenglones) && rawRenglones.length > 0) {
-      return rawRenglones.map((r: any, idx: number) => ({
-        id: r.id || `r-${idx}`,
-        capituloId: Number(r.capituloId || r.capitulo || 1),
-        capituloNombre: r.capituloNombre || `Capítulo ${r.capituloId || 1}`,
-        codigoDGC: r.codigoDGC || r.codigo || `10${idx + 1}.01`,
-        descripcion: r.descripcion || '',
-        unidad: r.unidad || 'm³',
-        cantidadContratada: Number(r.cantidadContratada || r.cantidad || 0),
-        cantidadAjustada: Number(r.cantidadAjustada || r.cantidadContratada || 0),
-        costoUnitarioDirecto: Number(r.costoUnitarioDirecto || r.costoUnitario || r.precioUnitario || 0),
-        cantidadEstePeriodo: Number(r.cantidadEstePeriodo || 0),
-        cantidadAcumuladaAnterior: Number(r.cantidadAcumuladaAnterior || 0),
-      }))
+      const seleccionados = rawRenglones.filter((r: any) => r.seleccionado !== false)
+      if (seleccionados.length > 0) {
+        return seleccionados.map((r: any, idx: number) => ({
+          id: r.id || `r-${idx}`,
+          capituloId: Number(r.capituloId || r.capitulo || 1),
+          capituloNombre: r.capituloNombre || `Capítulo ${r.capituloId || 1}`,
+          codigoDGC: r.codigoDGC || r.codigo || `10${idx + 1}.01`,
+          descripcion: r.descripcion || '',
+          unidad: r.unidad || 'm³',
+          cantidadContratada: Number(r.cantidadContratada || r.cantidad || 0),
+          cantidadAjustada: Number(r.cantidadAjustada || r.cantidadContratada || 0),
+          costoUnitarioDirecto: Number(r.costoUnitarioDirecto || r.costoUnitario || r.precioUnitario || 0),
+          cantidadEstePeriodo: Number(r.cantidadEstePeriodo || 0),
+          cantidadAcumuladaAnterior: Number(r.cantidadAcumuladaAnterior || 0),
+        }))
+      }
     }
-    return (CATALOGO_COMPLETO_88 as any[]).map((r: any, idx: number) => ({
-      id: r.id || `r-cat-${idx}`,
-      capituloId: Number(r.capituloId || 1),
-      capituloNombre: r.capituloNombre || `Capítulo ${r.capituloId || 1}`,
-      codigoDGC: r.codigoDGC || `10${idx + 1}.01`,
-      descripcion: r.descripcion || '',
-      unidad: r.unidad || 'm³',
-      cantidadContratada: Number(r.cantidadContratada || 1),
-      cantidadAjustada: Number(r.cantidadAjustada || r.cantidadContratada || 1),
-      costoUnitarioDirecto: Number(r.costoUnitarioDirecto || 100),
-      cantidadEstePeriodo: Number(r.cantidadEstePeriodo || 0),
-      cantidadAcumuladaAnterior: Number(r.cantidadAcumuladaAnterior || 0),
-    }))
+    // Si no se han establecido renglones en el proyecto, no deben salir renglones por defecto
+    return []
   }, [proyecto])
 
   // Filtrado de Renglones en Programa de Trabajo (Filtro por Capítulo + Filtro por Renglón / Búsqueda)
@@ -752,10 +492,10 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
     return items.map((r) => ({ codigo: r.codigoDGC, descripcion: r.descripcion }))
   }, [listaRenglonesFuente, filtroCapitulo])
 
-  // Datos de la Curva S Financiera Dinámica basada en fechas reales y avance del proyecto
+  // Datos de la Curva S Financiera Dinámica basada en fechas reales y avance de estimaciones del proyecto
   const puntosCurvaS = useMemo(() => {
-    const fIniRaw = proyecto?.fechaInicioContractual || proyecto?.fechaInicio || '2026-01-01'
-    const fFinRaw = proyecto?.fechaFinalizacionReal || (proyecto as any)?.fechaFinContractualPlan || proyecto?.fechaFin || '2026-12-31'
+    const fIniRaw = proyecto?.fechaInicioContractual || proyecto?.fechaInicio || (proyecto as any)?.fecha_inicio || '2026-01-01'
+    const fFinRaw = proyecto?.fechaFinalizacionReal || (proyecto as any)?.fechaFinContractualPlan || proyecto?.fechaFin || (proyecto as any)?.fecha_fin || '2026-12-31'
 
     const partesIni = String(fIniRaw).split('-').map(Number)
     const partesFin = String(fFinRaw).split('-').map(Number)
@@ -770,7 +510,6 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
     const cursor = new Date(dIni.getFullYear(), dIni.getMonth(), 1)
     const limite = new Date(dFin.getFullYear(), dFin.getMonth(), 1)
 
-    // Límite de seguridad de 60 meses
     let count = 0
     while (cursor <= limite && count < 60) {
       const mIdx = cursor.getMonth()
@@ -797,46 +536,43 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
     }
 
     const total = listaMeses.length
-    const currentAvance = esBorrador ? 0 : Number(proyecto?.avance ?? 0)
-    const hoy = new Date()
+    const estimacionesPerspectiva = estimacionesGeneradas.filter((e) => e.perspectiva === perspectivaCurva)
 
-    let idxCorte = 0
-    if (currentAvance <= 0) {
-      idxCorte = 0
-    } else {
-      const idxHoy = listaMeses.findIndex((m) => m.date.getFullYear() === hoy.getFullYear() && m.date.getMonth() === hoy.getMonth())
-      if (idxHoy !== -1) {
-        idxCorte = idxHoy
-      } else {
-        idxCorte = Math.min(total - 1, Math.max(1, Math.round((currentAvance / 100) * (total - 1))))
-      }
-    }
+    let acumuladoEjecutado = 0
 
     return listaMeses.map((m, idx) => {
-      // Función S-curve estándar
-      const t = idx / (total - 1)
+      // Función S-curve contractual programada estándar
+      const t = idx / Math.max(1, total - 1)
       const prog = Math.round((3 * t * t - 2 * t * t * t) * 10000) / 100
+
+      // Buscar si existen estimaciones asociadas a este mes o período
+      const estsDelMes = estimacionesPerspectiva.filter((e) => {
+        const eFin = e.fechaFin ? new Date(e.fechaFin) : null
+        if (eFin && !isNaN(eFin.getTime())) {
+          return eFin.getFullYear() === m.año && eFin.getMonth() === m.mesIdx
+        }
+        return e.mes.toLowerCase().includes(mesesCompletos[m.mesIdx].toLowerCase()) && e.mes.includes(String(m.año))
+      })
 
       let real: number | null = null
       let esCorte = false
 
-      if (idx <= idxCorte) {
-        if (currentAvance === 0) {
-          real = 0
-          if (idx === idxCorte) esCorte = true
-        } else {
-          const factor = idx / Math.max(1, idxCorte)
-          real = Math.round((currentAvance * (factor * factor * (3 - 2 * factor))) * 100) / 100
-          if (idx === idxCorte) {
-            real = currentAvance
-            esCorte = true
-          }
-        }
+      if (estsDelMes.length > 0) {
+        estsDelMes.forEach((est) => {
+          acumuladoEjecutado += Number(est.valorBrutoTrabajado) || 0
+        })
+        real = montoBaseCurva > 0 ? Number(((acumuladoEjecutado / montoBaseCurva) * 100).toFixed(2)) : 0
+      } else if (acumuladoEjecutado > 0 && idx < total) {
+        real = montoBaseCurva > 0 ? Number(((acumuladoEjecutado / montoBaseCurva) * 100).toFixed(2)) : 0
+      }
+
+      if (idx === total - 1 && real !== null) {
+        esCorte = true
       }
 
       const variacion = real !== null ? Number((real - prog).toFixed(2)) : null
       const montoProg = montoBaseCurva * (prog / 100)
-      const montoReal = real !== null ? montoBaseCurva * (real / 100) : null
+      const montoReal = real !== null ? acumuladoEjecutado : null
 
       return {
         mes: m.mes,
@@ -851,7 +587,7 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
         montoReal,
       }
     })
-  }, [proyecto?.fechaInicioContractual, proyecto?.fechaInicio, proyecto?.fechaFinalizacionReal, (proyecto as any)?.fechaFinContractualPlan, proyecto?.fechaFin, proyecto?.avance, esBorrador, montoBaseCurva])
+  }, [proyecto, estimacionesGeneradas, perspectivaCurva, montoBaseCurva])
 
   // Años disponibles en la serie de datos para el filtro
   const aniosDisponiblesCurva = useMemo(() => {
@@ -878,23 +614,23 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
 
   return (
     <div className="space-y-2.5 font-[Poppins] text-[10.5px]">
-      {/* Banner Superior Limpio (img5 corregido: sin fondo en icono y sin caja en anticipo) */}
+      {/* Banner Superior */}
       <div className="rounded-xl border border-gray-200 bg-white p-2.5 shadow-2xs">
         <div className="flex flex-wrap items-center justify-between gap-2.5">
           <div className="flex items-center gap-2.5">
             <Banknote size={16} className="text-[#9B0F06] shrink-0" />
             <div>
-              <p className="text-[8px] font-bold uppercase tracking-wider text-gray-400">
+              <p className="text-[8px] font-bold uppercase tracking-wider text-gray-400 font-sans">
                 Presupuesto / Monto Contractual Global
               </p>
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-[13px] font-black text-gray-900 font-mono leading-none">
+                <span className="text-[13px] font-black text-gray-900 leading-none font-sans">
                   Q {montoContractualOriginal.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
                 </span>
-                <span className="text-[10px] text-gray-500 font-medium">
+                <span className="text-[10px] text-gray-500 font-medium font-sans">
                   · Anticipo: {(pctAnticipoEjec * 100).toFixed(0)}% (Q {anticipoOtorgado.toLocaleString('es-GT', { minimumFractionDigits: 2 })})
                 </span>
-                <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[8.5px] font-bold border ${
+                <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[8.5px] font-bold border font-sans ${
                   modoManual
                     ? 'bg-amber-50 text-amber-800 border-amber-300'
                     : 'bg-emerald-50 text-emerald-800 border-emerald-300'
@@ -906,7 +642,7 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 font-sans">
             <div className="text-right hidden sm:block">
               <span className="text-[7.5px] font-bold uppercase tracking-wider text-gray-400 block">
                 Delegado Residente Autorizado:
@@ -982,9 +718,9 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
       {/* 1. SUB-TAB 1: RESUMEN (KPIS + PROGRAMA DE TRABAJO CON PAGINACIÓN DE 10)    */}
       {/* ========================================================================= */}
       {subTab === 'resumen' && (
-        <div className="space-y-2.5">
+        <div className="space-y-2.5 font-[Poppins]">
           {/* 3 Tarjetas de Resumen Financiero Ejecutivo Compacto */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 font-mono">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 font-sans">
             {/* Tarjeta 1: Resumen Financiero / Líquido */}
             <div className="rounded-xl border border-gray-200 bg-white p-2.5 shadow-2xs flex flex-col justify-between">
               <div className="flex items-center justify-between">
@@ -1002,8 +738,8 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
               </div>
               <div className="mt-1">
                 <span className="text-[7.5px] text-gray-400 block uppercase font-sans">Monto Líquido a Pagar</span>
-                <p className="text-[13px] font-black text-gray-900 font-mono">
-                  Q {estimacionesGeneradas.reduce((acc, curr) => curr.perspectiva === 'ejecutora' && curr.estado === 'aprobada' ? acc + curr.montoLiquidoAPagar : acc, 0).toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                <p className="text-[13px] font-black text-gray-900 font-sans">
+                  Q {totalLiquidoAPagar.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
                 </p>
               </div>
             </div>
@@ -1026,7 +762,7 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
               <div className="mt-1">
                 <span className="text-[7.5px] text-gray-400 block uppercase font-sans">% Amortizado a la Fecha</span>
                 <div className="flex items-baseline justify-between">
-                  <p className="text-[13px] font-black text-gray-900 font-mono">
+                  <p className="text-[13px] font-black text-gray-900 font-sans">
                     {pctAmortizadoAnticipo.toFixed(1)}%
                   </p>
                   <span className="text-[8px] text-gray-500 font-sans">
@@ -1054,11 +790,11 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
               <div className="mt-1">
                 <span className="text-[7.5px] text-gray-400 block uppercase font-sans">Días por Emplearse</span>
                 <div className="flex items-baseline justify-between">
-                  <p className="text-[13px] font-black text-gray-900 font-mono">
-                    92 <span className="text-[9px] font-semibold text-gray-500">días</span>
+                  <p className="text-[13px] font-black text-gray-900 font-sans">
+                    {plazoDiasCalculados.diasRestantes} <span className="text-[9px] font-semibold text-gray-500">días</span>
                   </p>
                   <span className="text-[8px] text-gray-500 font-sans">
-                    Plazo: {pAny.plazoMeses ? `${Number(pAny.plazoMeses) * 30}d` : '365d'}
+                    Plazo: {plazoDiasCalculados.totalDias}d
                   </span>
                 </div>
               </div>
@@ -1077,7 +813,7 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
                     setFiltroRenglon('todos')
                     setPaginaRenglones(1)
                   }}
-                  className="w-full rounded-md border border-gray-200 bg-white px-2 py-1 text-[10px] font-semibold text-gray-700 focus:border-[#9B0F06] focus:outline-none cursor-pointer"
+                  className="w-full rounded-md border border-gray-200 bg-white px-2 py-1 text-[9.5px] font-semibold text-gray-700 focus:border-[#9B0F06] focus:outline-none cursor-pointer"
                 >
                   <option value="todos">Todos los Capítulos DGC</option>
                   {CAPITULOS_LIBRO_AZUL_DGC.map((c) => (
@@ -1096,7 +832,7 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
                     setFiltroRenglon(e.target.value)
                     setPaginaRenglones(1)
                   }}
-                  className="w-full rounded-md border border-gray-200 bg-white px-2 py-1 text-[10px] font-semibold text-gray-700 focus:border-[#9B0F06] focus:outline-none cursor-pointer"
+                  className="w-full rounded-md border border-gray-200 bg-white px-2 py-1 text-[9.5px] font-semibold text-gray-700 focus:border-[#9B0F06] focus:outline-none cursor-pointer"
                 >
                   <option value="todos">Todos los Renglones</option>
                   {listaCodigosRenglon.map((r) => (
@@ -1143,11 +879,23 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
                     <th className="px-2.5 py-1.5 text-center w-28">Acción</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100 font-mono text-[10px]">
+                <tbody className="divide-y divide-gray-100 font-sans text-[10px]">
                   {renglonesPaginados.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="p-4 text-center text-[10.5px] text-gray-500 font-sans">
-                        No se encontraron renglones con los filtros seleccionados.
+                      <td colSpan={7} className="p-8 text-center text-[10.5px] text-gray-500 font-sans">
+                        <div className="flex flex-col items-center justify-center py-5 text-gray-400">
+                          <Layers size={26} className="text-gray-300 mb-2" />
+                          <p className="font-bold text-gray-700 text-xs">
+                            {listaRenglonesFuente.length === 0
+                              ? 'No hay renglones asignados a este proyecto'
+                              : 'No se encontraron renglones con los filtros seleccionados'}
+                          </p>
+                          <p className="text-[10px] text-gray-400 mt-0.5">
+                            {listaRenglonesFuente.length === 0
+                              ? 'Aún no se han establecido renglones de trabajo para este proyecto.'
+                              : 'Prueba cambiando o limpiando los filtros de búsqueda.'}
+                          </p>
+                        </div>
                       </td>
                     </tr>
                   ) : (
@@ -1206,13 +954,13 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
             </div>
 
             {/* Paginación estilo Hoja Sábana con Selector de Cantidad (8, 16, 24, 50, etc.) */}
-            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 bg-gray-50/60 px-2.5 py-1 text-[8.5px] text-gray-600">
+            <div data-paginacion="true" className="paginacion-control flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 bg-gray-50/60 px-2.5 py-1 text-[8.5px] text-gray-600">
               <div className="flex items-center gap-2">
-                <span className="font-medium">
+                <span className="font-medium text-[8.5px]">
                   Página <strong className="text-gray-900">{paginaRenglones}</strong> de <strong className="text-gray-900">{totalPaginasRenglones}</strong> ({renglonesFiltrados.length} renglones)
                 </span>
                 <span className="text-gray-300">|</span>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1 text-[8.5px]">
                   <span>Mostrar:</span>
                   <select
                     value={itemsPorPagina}
@@ -1220,7 +968,7 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
                       setItemsPorPagina(Number(e.target.value))
                       setPaginaRenglones(1)
                     }}
-                    className="rounded border border-gray-200 bg-white px-1.5 py-0.5 text-[8.5px] font-semibold text-gray-700 shadow-2xs focus:border-[#9B0F06] focus:outline-none cursor-pointer"
+                    className="paginacion-control h-5.5 rounded border border-gray-200 bg-white px-1.5 py-0.5 text-[8.5px] font-semibold text-gray-700 shadow-2xs focus:border-[#9B0F06] focus:outline-none cursor-pointer"
                   >
                     <option value={8}>8</option>
                     <option value={16}>16</option>
@@ -1284,6 +1032,15 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
                 >
                   <Building2 size={11} className={perspectivaEstimacion === 'ejecutora' ? 'text-[#9B0F06]' : 'text-gray-500'} />
                   <span>Empresa Ejecutora ({nombreEmpresaEjecutora})</span>
+                  {esModoSabana && (
+                    <span className={`text-[8px] px-1.5 py-0.5 rounded-full font-bold ml-1 ${
+                      ambitoPlanTrabajo === 'obra'
+                        ? 'bg-red-50 text-[#9B0F06] border border-red-200'
+                        : 'bg-amber-50 text-amber-800 border border-amber-300'
+                    }`}>
+                      {ambitoPlanTrabajo === 'obra' ? 'Plan de Trabajo' : 'Manual'}
+                    </span>
+                  )}
                 </button>
                 <button
                   type="button"
@@ -1299,6 +1056,15 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
                 >
                   <UserCheck size={11} className={perspectivaEstimacion === 'supervisora' ? 'text-[#9B0F06]' : 'text-gray-500'} />
                   <span>Empresa Supervisora ({nombreEmpresaSupervisora})</span>
+                  {esModoSabana && (
+                    <span className={`text-[8px] px-1.5 py-0.5 rounded-full font-bold ml-1 ${
+                      ambitoPlanTrabajo === 'supervision'
+                        ? 'bg-orange-50 text-orange-800 border border-orange-200'
+                        : 'bg-amber-50 text-amber-800 border border-amber-300'
+                    }`}>
+                      {ambitoPlanTrabajo === 'supervision' ? 'Plan de Trabajo' : 'Manual'}
+                    </span>
+                  )}
                 </button>
               </div>
             </div>
@@ -1362,6 +1128,59 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
             </div>
           </div>
 
+          {/* Banner contextual de Estimación según Ámbito del Plan de Trabajo en Modo Sábana */}
+          {esModoSabana && perspectivaEsManual && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50/70 p-3 shadow-2xs font-[Poppins]">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-100 text-amber-800 shrink-0 border border-amber-200">
+                  <Info size={16} />
+                </div>
+                <div>
+                  <h4 className="text-[11px] font-bold text-amber-900">
+                    Apartado de Estimación Manual: {perspectivaEstimacion === 'supervisora' ? 'Contrato de Supervisión' : 'Contrato de Obra (Ejecución)'}
+                  </h4>
+                  <p className="text-[9.5px] text-amber-800 leading-snug">
+                    El Plan de Trabajo con Hoja Sábana está implementado para el contrato de <strong>{ambitoPlanTrabajo === 'obra' ? 'Obra (Ejecución)' : 'Supervisión'}</strong>. En este apartado las estimaciones de <strong>{perspectivaEstimacion === 'supervisora' ? 'Supervisión' : 'Obra'}</strong> se van ingresando de forma manual.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleAbrirCrearEstimacionManual}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-amber-700 px-3 py-1.5 text-[10px] font-bold text-white hover:bg-amber-800 transition-colors shadow-2xs shrink-0 cursor-pointer"
+              >
+                <Plus size={12} />
+                <span>+ Ingresar Estimación Manual</span>
+              </button>
+            </div>
+          )}
+
+          {esModoSabana && !perspectivaEsManual && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50/60 p-3 shadow-2xs font-[Poppins]">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-100 text-emerald-800 shrink-0 border border-emerald-200">
+                  <FileSpreadsheet size={16} />
+                </div>
+                <div>
+                  <h4 className="text-[11px] font-bold text-emerald-900">
+                    Plan de Trabajo Implementado: {ambitoPlanTrabajo === 'obra' ? 'Contrato de Obra (Ejecución)' : 'Contrato de Supervisión'}
+                  </h4>
+                  <p className="text-[9.5px] text-emerald-800 leading-snug">
+                    Este apartado está vinculado a la Hoja Sábana Digital para el desglose analítico de renglones y estimaciones.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => navegarAHojaSabana({ tab: 'sabana' })}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 px-3 py-1.5 text-[10px] font-bold text-white hover:bg-emerald-800 transition-colors shadow-2xs shrink-0 cursor-pointer"
+              >
+                <FileSpreadsheet size={12} />
+                <span>Abrir Hoja Sábana</span>
+              </button>
+            </div>
+          )}
+
           {/* Tabla de Estimaciones con Acción (Solo Ojo / Editar) y Paginación */}
           <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xs">
             <div className="overflow-x-auto">
@@ -1380,11 +1199,29 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
                     <th className="px-2.5 py-1.5 text-center w-20">Acción</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100 font-mono text-[10px]">
+                <tbody className="divide-y divide-gray-100 font-sans text-[10px]">
                   {estimacionesPaginadas.length === 0 ? (
                     <tr>
-                      <td colSpan={10} className="p-4 text-center text-[10px] text-gray-500 font-sans">
-                        No se encontraron estimaciones con los filtros de fecha seleccionados.
+                      <td colSpan={10} className="py-10 px-4 text-center font-sans">
+                        <div className="flex flex-col items-center justify-center max-w-sm mx-auto space-y-2">
+                          <div className="p-3 bg-red-50 text-[#9B0F06] rounded-full border border-red-100">
+                            <Receipt size={22} />
+                          </div>
+                          <p className="text-xs font-bold text-gray-800">
+                            No hay estimaciones registradas
+                          </p>
+                          <p className="text-[10px] text-gray-500 leading-normal">
+                            Este proyecto no cuenta con estimaciones registradas en la perspectiva actual. Haz clic en el botón para crear la primera estimación progresiva.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={handleAbrirCrearEstimacionManual}
+                            className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-[#9B0F06] px-3.5 py-1.5 text-[10px] font-bold text-white hover:bg-[#7a0c05] transition-colors cursor-pointer shadow-xs"
+                          >
+                            <Plus size={12} />
+                            <span>Crear Primera Estimación</span>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ) : (
@@ -1394,7 +1231,11 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
                         <td className="px-2.5 py-1.5 font-sans">
                           <div className="flex items-center gap-1">
                             <span className="font-bold text-gray-900">{est.numero}</span>
-                            <span className="text-[8px] text-gray-400 font-mono">({est.estado.toUpperCase()})</span>
+                            <span className={`text-[8px] font-mono px-1 py-0.2 rounded font-bold uppercase ${
+                              est.estado === 'borrador' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
+                            }`}>
+                              {est.estado}
+                            </span>
                           </div>
                           <p className="text-[9px] text-gray-500 font-medium truncate max-w-[180px]" title={est.nombreEstimacion}>
                             {est.nombreEstimacion}
@@ -1476,30 +1317,46 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
                           Q {est.saldoContractualRestante.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
                         </td>
 
-                        {/* Botón Acción: Ojo y Editar Manual */}
+                        {/* Botón Acción: Ojo, Editar y Eliminar (solo en borrador) */}
                         <td className="px-2.5 py-1.5 text-center font-sans">
                           <div className="flex items-center justify-center gap-1">
                             <button
                               type="button"
-                              onClick={() => navegarAHojaSabana({ estimacion: est.numero })}
-                              disabled={!tieneAccesoHojaSabana}
+                              onClick={() => {
+                                if (perspectivaEsManual) {
+                                  handleAbrirEditarEstimacionManual(est)
+                                } else {
+                                  navegarAHojaSabana({ estimacion: est.numero })
+                                }
+                              }}
+                              disabled={!perspectivaEsManual && !tieneAccesoHojaSabana}
                               className={`inline-flex h-6 w-6 items-center justify-center rounded transition-colors ${
-                                tieneAccesoHojaSabana
+                                perspectivaEsManual || tieneAccesoHojaSabana
                                   ? 'text-gray-600 hover:text-[#9B0F06] hover:bg-red-50 cursor-pointer shadow-2xs'
                                   : 'text-gray-300 cursor-not-allowed'
                               }`}
-                              title={tieneAccesoHojaSabana ? `Ver Hoja Sábana para ${est.numero}` : 'Solo el Delegado Residente o Administrador tiene acceso'}
+                              title={perspectivaEsManual ? `Ver detalles de ${est.numero}` : (tieneAccesoHojaSabana ? `Ver Hoja Sábana para ${est.numero}` : 'Solo el Delegado Residente o Administrador tiene acceso')}
                             >
-                              {tieneAccesoHojaSabana ? <Eye size={13} /> : <Lock size={12} />}
+                              {perspectivaEsManual || tieneAccesoHojaSabana ? <Eye size={13} /> : <Lock size={12} />}
                             </button>
                             <button
                               type="button"
                               onClick={() => handleAbrirEditarEstimacionManual(est)}
                               className="inline-flex h-6 w-6 items-center justify-center rounded text-amber-700 hover:bg-amber-50 cursor-pointer transition-colors shadow-2xs"
-                              title="Editar montos manualmente"
+                              title="Editar estimación"
                             >
                               <Edit2 size={11} />
                             </button>
+                            {est.estado === 'borrador' ? (
+                              <button
+                                type="button"
+                                onClick={() => setEstimacionParaEliminar(est)}
+                                className="inline-flex h-6 w-6 items-center justify-center rounded text-red-600 hover:bg-red-50 hover:text-red-700 cursor-pointer transition-colors shadow-2xs"
+                                title={`Eliminar ${est.numero} (Permitido en estado Borrador)`}
+                              >
+                                <Trash2 size={11} />
+                              </button>
+                            ) : null}
                           </div>
                         </td>
                       </tr>
@@ -1951,7 +1808,7 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
                       Q {saldoAnticipoPendiente.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
                     </p>
                     <span className="text-[7.5px] text-gray-400 font-sans">
-                      Amortizado: Q {anticipoAmortizado.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                      Amortizado: Q {totalAmortizadoAnticipo.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
                 </div>
@@ -1963,116 +1820,162 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
 
       {/* MODAL REGISTRO / EDICIÓN DE ESTIMACIÓN MANUAL */}
       {modalEstimacionManualOpen && (
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs font-[Poppins]">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl space-y-4 border border-gray-200 animate-fadeIn max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-lg bg-amber-50 text-amber-800 border border-amber-200">
-                  <Calculator size={16} />
+        <div
+          className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 p-3 sm:p-5 md:p-8 backdrop-blur-xs font-[Poppins]"
+          onClick={() => setModalEstimacionManualOpen(false)}
+        >
+          <div
+            className="w-full max-w-4xl lg:max-w-5xl max-h-[92vh] flex flex-col rounded-2xl bg-white shadow-2xl border border-gray-200 overflow-hidden animate-fadeIn"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Barra superior institucional */}
+            <div className="h-1.5 w-full bg-gradient-to-r from-[#9B0F06] via-red-600 to-[#9B0F06]" />
+
+            {/* Cabecera del Modal */}
+            <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4 bg-gray-50/70">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-red-50 text-[#9B0F06] border border-red-100 shadow-2xs">
+                  <Calculator size={22} />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-gray-900">
-                    {estimacionEnEdicion ? `Editar ${estimacionEnEdicion.numero}` : 'Nueva Estimación Manual'}
+                  <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                    {estimacionEnEdicion ? `Editar Estimación: ${estimacionEnEdicion.numero}` : 'Nueva Estimación Manual'}
+                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-amber-50 text-amber-900 border border-amber-200">
+                      {formEstPerspectiva === 'ejecutora' ? 'Empresa Ejecutora' : 'Empresa Supervisora'}
+                    </span>
                   </h3>
-                  <p className="text-[10px] text-gray-500 font-medium">
-                    Registro directo de montos contractuales y liquidación
+                  <p className="text-xs text-gray-500 font-medium">
+                    Registro de liquidación contractual y control financiero de la obra
                   </p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setModalEstimacionManualOpen(false)}
-                className="text-gray-400 hover:text-gray-600 transition-colors p-1 cursor-pointer"
-                title="Cerrar"
+                className="rounded-lg p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer"
+                title="Cerrar modal"
               >
-                <X size={16} />
+                <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={handleGuardarEstimacionManual} className="space-y-3 text-[10.5px]">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            {/* Formulario */}
+            <form onSubmit={handleGuardarEstimacionManual} className="flex-1 overflow-y-auto px-6 py-5 space-y-5 text-xs">
+              {/* Sección 1: Identificación y Perspectiva */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* No. de Estimación (Bloqueado / Progresivo) */}
                 <div>
-                  <label className="block text-[10px] font-bold text-gray-700 mb-0.5">
-                    No. de Estimación <span className="text-[#9B0F06]">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={formEstNumero}
-                    onChange={(e) => setFormEstNumero(e.target.value)}
-                    placeholder="Ej: Est. 08"
-                    className="w-full rounded-lg border border-gray-200 bg-gray-50/50 px-2.5 py-1.5 font-bold text-gray-900 focus:bg-white focus:border-[#9B0F06] focus:outline-none"
-                  />
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold text-gray-700">
+                      No. de Estimación <span className="text-[#9B0F06]">*</span>
+                    </label>
+                    <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
+                      <Lock size={9} /> Correlativo bloqueado
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      readOnly
+                      disabled
+                      value={formEstNumero}
+                      placeholder="Ej: Est. 01"
+                      className="w-full rounded-xl border border-gray-200 bg-gray-100/90 pl-3 pr-8 py-2 font-mono text-xs font-bold text-gray-800 cursor-not-allowed select-none focus:outline-none"
+                      title="El número de estimación es correlativo progresivo y no puede modificarse manualmente."
+                    />
+                    <div className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                      <Lock size={13} />
+                    </div>
+                  </div>
                 </div>
 
+                {/* Perspectiva Contractual */}
                 <div>
-                  <label className="block text-[10px] font-bold text-gray-700 mb-0.5">
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
                     Perspectiva Contractual
                   </label>
                   <select
                     value={formEstPerspectiva}
-                    onChange={(e) => setFormEstPerspectiva(e.target.value as any)}
-                    className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 font-semibold text-gray-800 focus:border-[#9B0F06] focus:outline-none"
+                    onChange={(e) => {
+                      const nuevaPerspectiva = e.target.value as 'ejecutora' | 'supervisora'
+                      setFormEstPerspectiva(nuevaPerspectiva)
+                      if (!estimacionEnEdicion) {
+                        const numStr = calcularSiguienteNumeroEstimacion(nuevaPerspectiva)
+                        const numDigitos = numStr.replace(/\D/g, '')
+                        setFormEstNumero(numStr)
+                        setFormEstNombre(`Estimación No. ${numDigitos || '01'}`)
+                        setFormEstPctAmortizacion(nuevaPerspectiva === 'ejecutora' ? pctAnticipoEjecucionNum.toString() : pctAnticipoSupervisionNum.toString())
+                      }
+                    }}
+                    className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-800 focus:border-[#9B0F06] focus:outline-none"
                   >
                     <option value="ejecutora">Empresa Ejecutora (Contratista)</option>
                     <option value="supervisora">Empresa Supervisora (DGC)</option>
                   </select>
                 </div>
-              </div>
 
-              <div>
-                <label className="block text-[10px] font-bold text-gray-700 mb-0.5">
-                  Concepto / Título de la Estimación
-                </label>
-                <input
-                  type="text"
-                  value={formEstNombre}
-                  onChange={(e) => setFormEstNombre(e.target.value)}
-                  placeholder="Ej: Estimación No. 08 - Pavimentación y Señalización"
-                  className="w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-gray-800 focus:border-[#9B0F06] focus:outline-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                {/* Concepto / Título de la Estimación */}
                 <div>
-                  <label className="block text-[10px] font-bold text-gray-700 mb-0.5">Fecha Inicio</label>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    Concepto / Título de la Estimación
+                  </label>
+                  <input
+                    type="text"
+                    value={formEstNombre}
+                    onChange={(e) => setFormEstNombre(e.target.value)}
+                    placeholder="Ej: Estimación No. 01 - Obras Preliminares"
+                    className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs text-gray-800 focus:border-[#9B0F06] focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Sección 2: Período y Fechas */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Fecha Inicio</label>
                   <input
                     type="date"
                     value={formEstFechaInicio}
                     onChange={(e) => setFormEstFechaInicio(e.target.value)}
-                    className="w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-gray-800 focus:border-[#9B0F06] focus:outline-none"
+                    className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs text-gray-800 focus:border-[#9B0F06] focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-gray-700 mb-0.5">Fecha Fin</label>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Fecha Fin</label>
                   <input
                     type="date"
                     value={formEstFechaFin}
                     onChange={(e) => setFormEstFechaFin(e.target.value)}
-                    className="w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-gray-800 focus:border-[#9B0F06] focus:outline-none"
+                    className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs text-gray-800 focus:border-[#9B0F06] focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-gray-700 mb-0.5">Mes / Período</label>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Mes / Período</label>
                   <input
                     type="text"
                     value={formEstMes}
                     onChange={(e) => setFormEstMes(e.target.value)}
-                    placeholder="Ej: Agosto 2026"
-                    className="w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-gray-800 focus:border-[#9B0F06] focus:outline-none"
+                    placeholder="Ej: Octubre 2026"
+                    className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs text-gray-800 focus:border-[#9B0F06] focus:outline-none"
                   />
                 </div>
               </div>
 
-              {/* Montos Financieros Directos */}
-              <div className="rounded-xl border border-gray-200 bg-gray-50/60 p-3 space-y-2.5">
-                <span className="text-[9px] font-extrabold uppercase tracking-wider text-gray-600 block">
-                  Liquidación Financiera Directa
-                </span>
+              {/* Sección 3: Liquidación Financiera Directa */}
+              <div className="rounded-2xl border border-gray-200 bg-gray-50/70 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-gray-600 flex items-center gap-1.5">
+                    <Banknote size={14} className="text-[#9B0F06]" />
+                    Liquidación Financiera y Amortización Directa
+                  </span>
+                  <span className="text-[10px] text-gray-500 font-mono">
+                    Presupuesto Base: Q {montoAjustadoVigente.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                   <div>
-                    <label className="block text-[10px] font-bold text-gray-700 mb-0.5">
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
                       Valor Bruto Trabajado (Q) <span className="text-[#9B0F06]">*</span>
                     </label>
                     <input
@@ -2089,13 +1992,13 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
                         setFormEstMontoLiquido((bruto - amort).toFixed(2))
                       }}
                       placeholder="0.00"
-                      className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 font-mono font-bold text-gray-900 focus:border-[#9B0F06] focus:outline-none"
+                      className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 font-mono text-xs font-bold text-gray-900 focus:border-[#9B0F06] focus:outline-none"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold text-gray-700 mb-0.5">
-                      % Amortización Anticipo (%)
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      % Amortización Anticipo
                     </label>
                     <input
                       type="number"
@@ -2110,15 +2013,13 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
                         setFormEstMontoLiquido((bruto - amort).toFixed(2))
                       }}
                       placeholder="20"
-                      className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 font-mono text-gray-800 focus:border-[#9B0F06] focus:outline-none"
+                      className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 font-mono text-xs text-gray-800 focus:border-[#9B0F06] focus:outline-none"
                     />
                   </div>
-                </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
                   <div>
-                    <label className="block text-[10px] font-bold text-gray-700 mb-0.5">
-                      Monto Líquido a Pagar (Q)
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      Líquido a Pagar (Q)
                     </label>
                     <input
                       type="number"
@@ -2126,12 +2027,12 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
                       value={formEstMontoLiquido}
                       onChange={(e) => setFormEstMontoLiquido(e.target.value)}
                       placeholder="0.00"
-                      className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 font-mono font-black text-[#9B0F06] focus:border-[#9B0F06] focus:outline-none"
+                      className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 font-mono text-xs font-black text-[#9B0F06] focus:border-[#9B0F06] focus:outline-none"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold text-gray-700 mb-0.5">
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
                       Saldo Contractual Restante (Q)
                     </label>
                     <input
@@ -2140,94 +2041,174 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
                       value={formEstSaldoRestante}
                       onChange={(e) => setFormEstSaldoRestante(e.target.value)}
                       placeholder="0.00"
-                      className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 font-mono text-gray-800 focus:border-[#9B0F06] focus:outline-none"
+                      className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 font-mono text-xs text-gray-800 focus:border-[#9B0F06] focus:outline-none"
                     />
                   </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              {/* Sección 4: Estado, Rendimiento y Días de Retraso */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-[10px] font-bold text-gray-700 mb-0.5">Estado</label>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    Estado de la Estimación
+                  </label>
                   <select
                     value={formEstEstado}
                     onChange={(e) => setFormEstEstado(e.target.value as any)}
-                    className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 font-semibold text-gray-800 focus:border-[#9B0F06] focus:outline-none"
+                    className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-800 focus:border-[#9B0F06] focus:outline-none"
                   >
-                    <option value="aprobada">Aprobada</option>
-                    <option value="en_revision">En Revisión</option>
-                    <option value="pagada">Pagada</option>
-                    <option value="borrador">Borrador</option>
+                    <option value="borrador">Borrador (Editable y eliminable)</option>
+                    <option value="en_revision">En Revisión (Protegida)</option>
+                    <option value="aprobada">Aprobada (Protegida)</option>
+                    <option value="pagada">Pagada (Protegida)</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold text-gray-700 mb-0.5">Rendimiento (%)</label>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Rendimiento (%)</label>
                   <input
                     type="number"
                     step="0.1"
                     value={formEstRendimiento}
                     onChange={(e) => setFormEstRendimiento(e.target.value)}
                     placeholder="100"
-                    className="w-full rounded-lg border border-gray-200 px-2.5 py-1.5 font-mono text-gray-800 focus:border-[#9B0F06] focus:outline-none"
+                    className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 font-mono text-xs text-gray-800 focus:border-[#9B0F06] focus:outline-none"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold text-gray-700 mb-0.5">Días Retraso</label>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Días Retraso</label>
                   <input
                     type="number"
                     value={formEstDiasRetraso}
                     onChange={(e) => setFormEstDiasRetraso(e.target.value)}
                     placeholder="0"
-                    className="w-full rounded-lg border border-gray-200 px-2.5 py-1.5 font-mono text-gray-800 focus:border-[#9B0F06] focus:outline-none"
+                    className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 font-mono text-xs text-gray-800 focus:border-[#9B0F06] focus:outline-none"
                   />
                 </div>
               </div>
 
+              {/* Banner contextual de seguridad según el estado */}
+              {formEstEstado === 'borrador' ? (
+                <div className="flex items-center gap-2.5 rounded-xl border border-emerald-200 bg-emerald-50/70 p-3 text-emerald-800">
+                  <CheckCircle2 size={16} className="shrink-0 text-emerald-600" />
+                  <p className="text-[11px] font-medium leading-relaxed">
+                    <strong>Modo Borrador activo:</strong> Esta estimación se puede editar libremente y <strong>se puede eliminar</strong> mientras conserve este estado.
+                  </p>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2.5 rounded-xl border border-amber-200 bg-amber-50/70 p-3 text-amber-800">
+                  <AlertTriangle size={16} className="shrink-0 text-amber-600" />
+                  <p className="text-[11px] font-medium leading-relaxed">
+                    <strong>Estado {formEstEstado.toUpperCase()}:</strong> Esta estimación está protegida contra eliminación para preservar los registros contractuales. Para poder borrarla, debes cambiar su estado a <strong>Borrador</strong>.
+                  </p>
+                </div>
+              )}
+
+              {/* Observaciones */}
               <div>
-                <label className="block text-[10px] font-bold text-gray-700 mb-0.5">Observaciones</label>
+                <label className="block text-xs font-bold text-gray-700 mb-1">
+                  Observaciones / Notas de Campo
+                </label>
                 <textarea
                   rows={2}
                   value={formEstObservaciones}
                   onChange={(e) => setFormEstObservaciones(e.target.value)}
-                  placeholder="Notas u observaciones de la estimación..."
-                  className="w-full rounded-lg border border-gray-200 p-2 text-xs text-gray-800 focus:border-[#9B0F06] focus:outline-none"
+                  placeholder="Detalles sobre avance físico, justificación o notas técnicas..."
+                  className="w-full rounded-xl border border-gray-200 bg-white p-3 text-xs text-gray-800 focus:border-[#9B0F06] focus:outline-none"
                 />
               </div>
 
-              <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-                {estimacionEnEdicion && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      handleEliminarEstimacionManual(estimacionEnEdicion.id)
-                      setModalEstimacionManualOpen(false)
-                    }}
-                    className="inline-flex items-center gap-1 text-red-600 hover:text-red-800 text-[10px] font-bold cursor-pointer"
-                  >
-                    <Trash2 size={12} />
-                    <span>Eliminar</span>
-                  </button>
-                )}
-                <div className="flex items-center gap-2 ml-auto">
+              {/* Footer de Acciones del Formulario */}
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-gray-100">
+                <div>
+                  {estimacionEnEdicion && (
+                    formEstEstado === 'borrador' ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleEliminarEstimacionManual(estimacionEnEdicion.id)
+                          setModalEstimacionManualOpen(false)
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3.5 py-2 text-xs font-bold text-red-700 hover:bg-red-100 transition-colors cursor-pointer shadow-2xs"
+                        title="Eliminar estimación en modo borrador"
+                      >
+                        <Trash2 size={13} />
+                        <span>Eliminar Estimación</span>
+                      </button>
+                    ) : (
+                      <div className="inline-flex items-center gap-1.5 text-[10px] text-gray-400 font-medium bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100">
+                        <Lock size={11} className="text-gray-400" />
+                        <span>Solo eliminable en estado Borrador</span>
+                      </div>
+                    )
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2.5 ml-auto">
                   <button
                     type="button"
                     onClick={() => setModalEstimacionManualOpen(false)}
-                    className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 cursor-pointer"
+                    className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
                   >
                     Cancelar
                   </button>
                   <button
                     type="submit"
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-[#9B0F06] hover:bg-[#7a0c05] text-white px-4 py-1.5 text-xs font-bold shadow-2xs cursor-pointer"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-[#9B0F06] hover:bg-[#7a0c05] text-white px-5 py-2 text-xs font-bold shadow-sm transition-colors cursor-pointer"
                   >
-                    <CheckCircle2 size={13} />
+                    <CheckCircle2 size={14} />
                     <span>Guardar Estimación</span>
                   </button>
                 </div>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE CONFIRMACIÓN DE ELIMINACIÓN DE ESTIMACIÓN */}
+      {estimacionParaEliminar && (
+        <div
+          className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs font-[Poppins]"
+          onClick={() => setEstimacionParaEliminar(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl border border-gray-200 animate-fadeIn space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-100 text-[#9B0F06]">
+                <Trash2 size={20} />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-gray-900">¿Eliminar estimación en borrador?</h4>
+                <p className="text-xs text-gray-500 font-medium">{estimacionParaEliminar.numero}</p>
+              </div>
+            </div>
+            <p className="text-xs text-gray-600 bg-gray-50 p-3 rounded-xl border border-gray-100 leading-relaxed">
+              ¿Deseas eliminar la estimación <strong>{estimacionParaEliminar.numero}</strong> ({estimacionParaEliminar.nombreEstimacion})? Al encontrarse en estado <strong>Borrador</strong>, puede removerse con total seguridad.
+            </p>
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setEstimacionParaEliminar(null)}
+                className="rounded-xl border border-gray-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  handleEliminarEstimacionManual(estimacionParaEliminar.id)
+                  setEstimacionParaEliminar(null)
+                }}
+                className="rounded-xl bg-[#9B0F06] hover:bg-[#7a0c05] text-white px-4 py-1.5 text-xs font-bold cursor-pointer transition-colors"
+              >
+                Sí, Eliminar
+              </button>
+            </div>
           </div>
         </div>
       )}

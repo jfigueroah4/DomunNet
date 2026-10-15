@@ -2,8 +2,8 @@ import Link from 'next/link'
 import { ArrowLeft, ShieldCheck } from 'lucide-react'
 
 export const metadata = {
-  title: 'Aviso Legal | DOMUN-Sistema',
-  description: 'Información legal, términos de uso y propiedad de DOMUN-Sistema para control y supervisión de obras.',
+  title: 'Aviso Legal',
+  description: 'Información legal, términos de uso y propiedad de DOMUN para control y supervisión de obras.',
 }
 
 export default function AvisoLegalPage() {

@@ -20,6 +20,7 @@ export interface DocumentoProyecto {
   subidoPor: string
   categoria?: string
   url?: string
+  origen?: 'formulario' | 'modulo_documentos' | string
 }
 
 export interface FotografiaProyecto {
@@ -84,6 +85,8 @@ export interface Proyecto {
   empresaContratista?: string;
   empresaSupervisora?: string;
   delegadoResidente?: string;
+  delegadoResidenteId?: string | null;
+  responsable_id?: string | null;
   fechaAdjudicacion?: string;
   numeroEscrituraPublica?: string;
   fechaInicioContractual?: string;
@@ -108,17 +111,25 @@ export interface Proyecto {
   descripcion: string
   estado: EstadoProyecto
   en_replanificacion?: boolean
+  tieneSabana?: boolean
+  usarModoSabana?: boolean
+  modoGestionFinanciera?: string
+  totalRenglones?: number
+  totalBitacoras?: number
+  tieneBitacoras?: boolean
+  esEliminable?: boolean
+  motivoNoEliminable?: string
   ubicacion: string
   responsable: string
-  equipo: MiembroEquipo[]
+  equipo?: MiembroEquipo[]
   categorias?: string[]
   rolesProyecto?: RolProyecto[]
   presupuesto: number
   avance: number
   fechaInicio: string
   fechaFin: string
-  creadoEn: string
-  documentos: DocumentoProyecto[]
-  fotografias: FotografiaProyecto[]
-  fases: FaseTimeline[]
+  creadoEn?: string
+  documentos?: DocumentoProyecto[]
+  fotografias?: FotografiaProyecto[]
+  fases?: FaseTimeline[]
 }

@@ -5,7 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { ChevronLeft, Check } from 'lucide-react'
 import { TipoReporte, Reporte } from '@/types/reporte'
 import { PROYECTOS_MOCK } from '@/data/proyectos.mock'
-import { ReporteVistaPrevia } from '@/components/modules/reportes/ReporteVistaPrevia'
+import { ReporteVistaPrevia } from '@/components/modules/reportes/ReporteVistaPrevia'
+import { Combobox } from '@/components/ui/Combobox'
 
 function NuevoReporteContent() {
   const router = useRouter()
@@ -100,13 +101,13 @@ function NuevoReporteContent() {
               </h2>
 
               <div>
-                <label className="text-[10px] font-medium text-gray-600 block mb-1.5">
+                <label className="text-xs sm:text-[10px] font-medium text-gray-700 sm:text-gray-600 block mb-1.5">
                   Tipo de Reporte
                 </label>
                 <select
                   value={tipo}
                   onChange={(e) => setTipo(e.target.value as TipoReporte)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-[10px] text-gray-700 bg-white focus:outline-none focus:border-[#9B0F06]"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 sm:py-2 text-sm sm:text-xs text-gray-700 bg-white focus:outline-none focus:border-[#9B0F06]"
                 >
                   <option value="">Seleccionar tipo...</option>
                   <option value="avance_proyecto">Avance de Proyecto</option>
@@ -115,51 +116,51 @@ function NuevoReporteContent() {
               </div>
 
               <div>
-                <label className="text-[10px] font-medium text-gray-600 block mb-1.5">
+                <label className="text-xs sm:text-[10px] font-medium text-gray-700 sm:text-gray-600 block mb-1.5">
                   Proyecto
                 </label>
-                <select
-                  value={proyectoId}
-                  onChange={(e) => setProyectoId(e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-[10px] text-gray-700 bg-white focus:outline-none focus:border-[#9B0F06]"
-                >
-                  <option value="">Seleccionar proyecto...</option>
-                  {PROYECTOS_MOCK.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.nombre}
-                    </option>
-                  ))}
-                </select>
+                <Combobox
+                  options={[
+                    { value: '', label: 'Seleccionar proyecto...' },
+                    ...PROYECTOS_MOCK.map((p) => ({ value: p.id, label: p.nombre })),
+                  ]}
+                  value={proyectoId}
+                  onChange={(val) => setProyectoId(val)}
+                  placeholder="Seleccionar proyecto..."
+                  allowNumbers={true}
+                  inputClassName="w-full !rounded-lg text-sm sm:text-xs font-medium bg-white"
+                  dropdownClassName="z-50 shadow-2xl min-w-full"
+                />
               </div>
 
               <div>
-                <label className="text-[10px] font-medium text-gray-600 block mb-1.5">
+                <label className="text-xs sm:text-[10px] font-medium text-gray-700 sm:text-gray-600 block mb-1.5">
                   Fecha Desde
                 </label>
                 <input
                   type="date"
                   value={fechaDesde}
                   onChange={(e) => setFechaDesde(e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-[10px] bg-white focus:outline-none focus:border-[#9B0F06]"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 sm:py-2 text-sm sm:text-xs bg-white focus:outline-none focus:border-[#9B0F06]"
                 />
               </div>
 
               <div>
-                <label className="text-[10px] font-medium text-gray-600 block mb-1.5">
+                <label className="text-xs sm:text-[10px] font-medium text-gray-700 sm:text-gray-600 block mb-1.5">
                   Fecha Hasta
                 </label>
                 <input
                   type="date"
                   value={fechaHasta}
                   onChange={(e) => setFechaHasta(e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-[10px] bg-white focus:outline-none focus:border-[#9B0F06]"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 sm:py-2 text-sm sm:text-xs bg-white focus:outline-none focus:border-[#9B0F06]"
                 />
               </div>
 
               <button
                 onClick={() => setPaso(2)}
                 disabled={!tipo || !proyectoId || !fechaDesde || !fechaHasta}
-                className="w-full bg-[#9B0F06] text-white text-[10px] font-medium py-2 rounded-lg hover:bg-[#5E0006] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="w-full bg-[#9B0F06] text-white text-xs sm:text-[10px] font-bold py-2.5 sm:py-2 rounded-xl sm:rounded-lg active:scale-95 hover:bg-[#5E0006] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 Siguiente →
               </button>
@@ -216,13 +217,13 @@ function NuevoReporteContent() {
               <div className="flex gap-2 pt-2">
                 <button
                   onClick={() => setPaso(1)}
-                  className="flex-1 border border-gray-200 text-gray-700 text-[10px] font-medium py-2 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="flex-1 border border-gray-200 text-gray-700 text-xs sm:text-[10px] font-bold py-2.5 sm:py-2 rounded-xl sm:rounded-lg active:scale-95 hover:bg-gray-50 transition-colors"
                 >
                   ← Anterior
                 </button>
                 <button
                   onClick={() => setPaso(3)}
-                  className="flex-1 bg-[#9B0F06] text-white text-[10px] font-medium py-2 rounded-lg hover:bg-[#5E0006] transition-colors"
+                  className="flex-1 bg-[#9B0F06] text-white text-xs sm:text-[10px] font-bold py-2.5 sm:py-2 rounded-xl sm:rounded-lg active:scale-95 hover:bg-[#5E0006] transition-colors"
                 >
                   Siguiente →
                 </button>
@@ -291,13 +292,13 @@ function NuevoReporteContent() {
               <div className="flex gap-2 pt-2">
                 <button
                   onClick={() => setPaso(2)}
-                  className="flex-1 border border-gray-200 text-gray-700 text-[10px] font-medium py-2 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="flex-1 border border-gray-200 text-gray-700 text-xs sm:text-[10px] font-bold py-2.5 sm:py-2 rounded-xl sm:rounded-lg active:scale-95 hover:bg-gray-50 transition-colors"
                 >
                   ← Anterior
                 </button>
                 <button
                   onClick={handleGenerar}
-                  className="flex-1 bg-[#9B0F06] text-white text-[10px] font-medium py-2 rounded-lg hover:bg-[#5E0006] transition-colors"
+                  className="flex-1 bg-[#9B0F06] text-white text-xs sm:text-[10px] font-bold py-2.5 sm:py-2 rounded-xl sm:rounded-lg active:scale-95 hover:bg-[#5E0006] transition-colors"
                 >
                   Generar Reporte
                 </button>

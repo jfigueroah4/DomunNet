@@ -52,6 +52,9 @@ function getPermisosDefectoPorRol(roleName: string, existingPermisos?: string[])
       'Generar reportes PDF / Excel',
       'Reportes avanzados de costos',
       'Configuración General de la Empresa',
+      'Ver centro de notificaciones y alertas',
+      'Recibir alertas automáticas de estimaciones',
+      'Recibir avisos de backup del sistema',
     ]
   }
   if (normName.includes('supervisor')) {
@@ -89,6 +92,8 @@ function getPermisosDefectoPorRol(roleName: string, existingPermisos?: string[])
       'Dashboard completo',
       'Generar reportes PDF / Excel',
       'Asignar delegados residentes',
+      'Ver centro de notificaciones y alertas',
+      'Recibir alertas automáticas de estimaciones',
     ]
   }
   if (normName.includes('laboratorista')) {
@@ -141,6 +146,8 @@ export function getPermisosPorNivelJerarquico(nivel: string): string[] {
         'Dashboard completo',
         'Generar reportes PDF / Excel',
         'Reportes avanzados de costos',
+        'Ver centro de notificaciones y alertas',
+        'Recibir alertas automáticas de estimaciones',
       ]
     case 'Operativo':
       return [
@@ -206,6 +213,15 @@ export function mapearPermisosACatalogo(permisos: string[], roleName?: string): 
         else if (pNorm.includes('ejecutivo')) result.add('Dashboard ejecutivo')
         else result.add('Dashboard limitado')
       }
+      if (pNorm.includes('notificaci') || pNorm.includes('alerta')) {
+        if (pNorm.includes('backup') || pNorm.includes('respaldo')) {
+          result.add('Recibir avisos de backup del sistema')
+        } else if (pNorm.includes('estimaci')) {
+          result.add('Recibir alertas automáticas de estimaciones')
+        } else {
+          result.add('Ver centro de notificaciones y alertas')
+        }
+      }
     } else if (p.length > 0) {
       result.add(p)
     }
@@ -236,6 +252,14 @@ const defaultForm = (role?: any) => {
 }
 
 const CATALOGO_PERMISOS_SISTEMA = [
+  {
+    categoria: 'Módulo de Notificaciones y Alertas',
+    items: [
+      'Ver centro de notificaciones y alertas',
+      'Recibir alertas automáticas de estimaciones',
+      'Recibir avisos de backup del sistema',
+    ],
+  },
   {
     categoria: 'Módulo de Proyectos',
     items: [
@@ -479,7 +503,7 @@ export function RoleDrawer({
     <Portal>
       <div className="fixed inset-0 z-[9999] bg-black/40 backdrop-blur-[1px]" onClick={onClose} />
       <div className="fixed inset-0 z-[10000] flex justify-end overflow-hidden pointer-events-none">
-        <aside className="pointer-events-auto relative w-[520px] max-w-[100vw] box-border bg-white h-full shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-right font-[Poppins]">
+        <aside className="role-drawer pointer-events-auto relative w-full sm:w-[520px] max-w-[100vw] box-border bg-white h-full shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-right font-[Poppins]">
           <div className="flex-shrink-0 flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-white">
             <div className="flex items-start gap-3">
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-50 text-[#9B0F06]">
@@ -487,7 +511,7 @@ export function RoleDrawer({
               </div>
               <div>
                 <h2 className="text-base font-bold text-gray-800">{title}</h2>
-                <p className="text-[10px] text-gray-400 mt-0.5">
+                <p className="text-xs sm:text-[10px] text-gray-500 mt-0.5">
                   {isUsersMode
                     ? 'Gestiona los usuarios vinculados a este rol'
                     : isViewMode
@@ -501,9 +525,9 @@ export function RoleDrawer({
 
             <button
               onClick={onClose}
-              className="rounded-lg p-1.5 transition-colors hover:bg-gray-100"
+              className="rounded-lg p-2 sm:p-1.5 transition-colors hover:bg-gray-100"
             >
-              <X size={16} className="text-gray-600" />
+              <X size={18} className="text-gray-600 sm:w-4 sm:h-4" />
             </button>
           </div>
             
@@ -511,19 +535,19 @@ export function RoleDrawer({
             {!isUsersMode && (
               <div className="space-y-4">
                 
-                <p className="text-[10px] uppercase tracking-widest font-semibold text-gray-500 border-b border-gray-100 pb-1">
+                <p className="text-xs sm:text-[10px] uppercase tracking-widest font-bold text-gray-500 border-b border-gray-100 pb-1">
                   Información Principal
                 </p>
                 
                 <div className="grid grid-cols-1 gap-4">
                   <div>
-                    <label className="mb-1 block text-[10px] font-semibold text-gray-700 uppercase tracking-wide">Nombre del rol *</label>
+                    <label className="mb-1 block text-xs sm:text-[10px] font-bold text-gray-700 uppercase tracking-wide">Nombre del rol *</label>
                     <input
                       name="name"
                       value={formData.name}
                       onChange={handleChange}
                       disabled={isViewMode || isContratanteRole}
-                      className={`w-full h-9 px-3 text-xs border rounded-lg focus:outline-none focus:border-[#9B0F06] transition-colors disabled:bg-gray-50 text-gray-700 ${
+                      className={`w-full h-10 sm:h-9 px-3 text-base sm:text-xs border rounded-lg focus:outline-none focus:border-[#9B0F06] transition-colors disabled:bg-gray-50 text-gray-700 ${
                         errors.name ? 'border-red-500 bg-red-50/40' : 'border-gray-200'
                       }`}
                       placeholder="Ej: Supervisor"
@@ -531,14 +555,14 @@ export function RoleDrawer({
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-[10px] font-semibold text-gray-700 uppercase tracking-wide">Descripción *</label>
+                    <label className="mb-1 block text-xs sm:text-[10px] font-bold text-gray-700 uppercase tracking-wide">Descripción *</label>
                     <textarea
                       name="descripcion"
                       value={formData.descripcion}
                       onChange={handleChange}
                       disabled={isViewMode}
                       rows={3}
-                      className={`w-full border rounded-lg px-3 py-2.5 text-xs focus:outline-none focus:border-[#9B0F06] transition-colors disabled:bg-gray-50 text-gray-700 resize-none ${
+                      className={`w-full border rounded-lg px-3 py-2.5 text-base sm:text-xs focus:outline-none focus:border-[#9B0F06] transition-colors disabled:bg-gray-50 text-gray-700 resize-none ${
                         errors.descripcion ? 'border-red-500 bg-red-50/40' : 'border-gray-200'
                       }`}
                       placeholder="Describe el alcance del rol..."
@@ -548,13 +572,13 @@ export function RoleDrawer({
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="mb-1 block text-[10px] font-semibold text-gray-700 uppercase tracking-wide">Nivel Jerárquico *</label>
+                    <label className="mb-1 block text-xs sm:text-[10px] font-bold text-gray-700 uppercase tracking-wide">Nivel Jerárquico *</label>
                     <select
                       name="nivelJerarquico"
                       value={formData.nivelJerarquico}
                       onChange={handleChange}
                       disabled={isViewMode}
-                      className={`w-full h-9 px-3 text-xs border rounded-lg focus:outline-none focus:border-[#9B0F06] transition-colors disabled:bg-gray-50 text-gray-700 ${
+                      className={`w-full h-10 sm:h-9 px-3 text-base sm:text-xs border rounded-lg focus:outline-none focus:border-[#9B0F06] transition-colors disabled:bg-gray-50 text-gray-700 ${
                         errors.nivelJerarquico ? 'border-red-500 bg-red-50/40' : 'border-gray-200'
                       }`}
                     >
@@ -566,13 +590,13 @@ export function RoleDrawer({
                     </select>
                   </div>
                   <div>
-                    <label className="mb-1 block text-[10px] font-semibold text-gray-700 uppercase tracking-wide">Estado *</label>
+                    <label className="mb-1 block text-xs sm:text-[10px] font-bold text-gray-700 uppercase tracking-wide">Estado *</label>
                     <select
                       name="estado"
                       value={formData.estado}
                       onChange={handleChange}
                       disabled={isViewMode}
-                      className={`w-full h-9 px-3 text-xs border rounded-lg focus:outline-none focus:border-[#9B0F06] transition-colors disabled:bg-gray-50 text-gray-700 ${
+                      className={`w-full h-10 sm:h-9 px-3 text-base sm:text-xs border rounded-lg focus:outline-none focus:border-[#9B0F06] transition-colors disabled:bg-gray-50 text-gray-700 ${
                         errors.estado ? 'border-red-500 bg-red-50/40' : 'border-gray-200'
                       }`}
                     >
@@ -627,7 +651,7 @@ export function RoleDrawer({
                             }
                           }}
                           placeholder="Buscar o seleccionar permiso del catálogo..."
-                          className="w-full h-9 px-3 text-[11px] border border-gray-200 rounded-lg focus:outline-none focus:border-[#9B0F06] transition-colors bg-white text-gray-700 font-medium"
+                          className="w-full h-10 sm:h-9 px-3 text-base sm:text-[11px] border border-gray-200 rounded-lg focus:outline-none focus:border-[#9B0F06] transition-colors bg-white text-gray-700 font-medium"
                         />
                         {mostrarDropdownCombobox && opcionesDropdownCombobox.length > 0 && (
                           <>
@@ -640,10 +664,10 @@ export function RoleDrawer({
                                 <li
                                   key={p}
                                   onClick={() => handleAgregarNuevoPermiso(p)}
-                                  className="px-3 py-2 text-[11px] text-gray-700 hover:bg-red-50 hover:text-[#9B0F06] cursor-pointer font-medium flex items-center justify-between transition-colors"
+                                  className="px-3 py-2 text-sm sm:text-[11px] text-gray-700 hover:bg-red-50 hover:text-[#9B0F06] cursor-pointer font-medium flex items-center justify-between transition-colors"
                                 >
                                   <span>{p}</span>
-                                  <span className="text-[9px] text-gray-400 font-normal">Catálogo</span>
+                                  <span className="text-xs sm:text-[9px] text-gray-400 font-normal">Catálogo</span>
                                 </li>
                               ))}
                             </ul>
@@ -653,7 +677,7 @@ export function RoleDrawer({
                       <button
                         type="button"
                         onClick={() => handleAgregarNuevoPermiso()}
-                        className="px-3.5 py-1.5 bg-[#9B0F06] hover:bg-[#5E0006] text-white text-[11px] font-semibold rounded-lg transition-colors cursor-pointer whitespace-nowrap shadow-2xs"
+                        className="px-4 py-2 sm:py-1.5 bg-[#9B0F06] hover:bg-[#5E0006] text-white text-base sm:text-[11px] font-semibold rounded-lg transition-colors cursor-pointer whitespace-nowrap shadow-2xs active:scale-95"
                       >
                         Agregar
                       </button>
@@ -757,7 +781,7 @@ export function RoleDrawer({
           <div className="flex-shrink-0 px-5 py-4 border-t border-gray-100 bg-gray-50 flex gap-3">
             <button
               onClick={() => isUsersMode && currentMode !== mode ? setCurrentMode('edit') : onClose()}
-              className="flex-1 border border-gray-200 bg-white text-gray-700 text-xs font-semibold h-9 rounded-lg hover:bg-gray-50 transition-colors"
+              className="flex-1 border border-gray-200 bg-white text-gray-700 text-base sm:text-xs font-semibold h-11 sm:h-9 rounded-lg hover:bg-gray-50 transition-colors active:scale-95 cursor-pointer"
             >
               {isViewMode ? 'Cerrar' : isUsersMode && currentMode !== mode ? 'Volver al formulario' : 'Cancelar'}
             </button>
@@ -765,7 +789,7 @@ export function RoleDrawer({
               <button
                 onClick={handleGuardar}
                 disabled={isSubmitting}
-                className="flex-1 bg-[#9B0F06] text-white text-xs font-semibold h-9 rounded-lg hover:bg-[#5E0006] transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 bg-[#9B0F06] text-white text-base sm:text-xs font-bold h-11 sm:h-9 rounded-lg hover:bg-[#5E0006] transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 cursor-pointer shadow-xs"
               >
                 {isSubmitting ? 'Guardando...' : currentMode === 'create' ? 'Crear Rol' : 'Guardar Cambios'}
               </button>
@@ -778,7 +802,7 @@ export function RoleDrawer({
         <Portal>
           <div className="fixed inset-0 z-[11000] bg-black/40 backdrop-blur-[1px]" onClick={() => setIsPermisosModalOpen(false)} />
           <div className="fixed inset-0 z-[11001] flex justify-end overflow-hidden pointer-events-none">
-            <aside className="pointer-events-auto relative w-[520px] max-w-[100vw] box-border bg-white h-full shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-right font-[Poppins]">
+            <aside className="pointer-events-auto relative w-full sm:w-[520px] max-w-[100vw] box-border bg-white h-full shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-right font-[Poppins]">
               <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between bg-white flex-shrink-0">
                 <div className="flex items-center gap-2.5">
                   <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gray-100 text-gray-700">

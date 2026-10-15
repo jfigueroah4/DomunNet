@@ -160,8 +160,14 @@ export default function PasswordRecoveryModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-md p-4">
-      <div className="relative w-full max-w-xs bg-black rounded-2xl border border-white/10 p-6 shadow-2xl animate-slideUp font-poppins">
+    <div 
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-md p-4"
+      onClick={onClose}
+    >
+      <div 
+        className="relative w-full max-w-xs bg-black rounded-2xl border border-white/10 p-6 shadow-2xl animate-slideUp font-poppins"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Close button */}
         <button
           onClick={onClose}
@@ -177,7 +183,8 @@ export default function PasswordRecoveryModal({
             alt="DOMUN"
             width={40}
             height={40}
-            className="h-[40px] w-auto"
+            style={{ width: 'auto', height: '40px' }}
+            priority
           />
         </div>
 

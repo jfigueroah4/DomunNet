@@ -1,6 +1,7 @@
 'use client'
 
-import React, { useEffect, useState, memo } from 'react'
+import React, { useEffect, memo, useRef, useState, useCallback } from 'react'
+import 'leaflet/dist/leaflet.css'
 import {
   ChevronLeft,
   ChevronRight,
@@ -8,16 +9,14 @@ import {
   Calendar,
   User,
   MapPin,
-  Clock,
-  Layers,
   ExternalLink,
-  Maximize2,
-  Minimize2,
-  Milestone,
+  Layers,
+  Navigation,
+  Compass,
+  RotateCcw,
 } from 'lucide-react'
 import { Fotografia } from '@/types/fotografia'
-import { MapaGuatemalaDepartamentos } from './MapaGuatemalaDepartamentos'
-import { MapaRutaProyecto } from './MapaRutaProyecto'
+import { Portal } from '@/components/ui/Portal'
 
 interface FotografiaLightboxProps {
   foto: Fotografia | null
@@ -26,313 +25,638 @@ interface FotografiaLightboxProps {
   onNext: () => void
 }
 
+interface MapaLeafletProps {
+  lat: number
+  lng: number
+  googleMapsUrl: string
+  altura?: string
+}
+
+function MapaLeafletContainer({ lat, lng, googleMapsUrl, altura = '140px' }: MapaLeafletProps) {
+  const mapaRef = useRef<HTMLDivElement>(null)
+  const instanciaMapaRef = useRef<any>(null)
+
+  useEffect(() => {
+    let activo = true
+
+    const inicializarMapa = async () => {
+      try {
+        if (instanciaMapaRef.current) {
+          try {
+            instanciaMapaRef.current.remove()
+          } catch (_) {}
+          instanciaMapaRef.current = null
+        }
+
+        if (!activo || !mapaRef.current) return
+
+        try {
+          delete (mapaRef.current as any)._leaflet_id
+          mapaRef.current.innerHTML = ''
+        } catch (_) {}
+
+        const leafletModule = await import('leaflet')
+        const L = (leafletModule as any).default?.map
+          ? (leafletModule as any).default
+          : (leafletModule as any).map
+            ? (leafletModule as any)
+            : ((leafletModule as any).default || leafletModule)
+
+        if (!activo || !mapaRef.current || !L?.map) return
+
+        const mapa = L.map(mapaRef.current, {
+          center: [lat, lng],
+          zoom: 15,
+          zoomControl: true,
+          attributionControl: false,
+        })
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '',
+        }).addTo(mapa)
+
+        // Marcador distintivo institucional Domun
+        const pinIcon = L.divIcon({
+          className: 'domun-static-marker',
+          html: `<div style="background-color: #9B0F06; width: 18px; height: 18px; border-radius: 50%; border: 3px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center;"><div style="background-color: #ffffff; width: 4px; height: 4px; border-radius: 50%;"></div></div>`,
+          iconSize: [18, 18],
+          iconAnchor: [9, 9],
+        })
+
+        L.marker([lat, lng], { icon: pinIcon }).addTo(mapa)
+        instanciaMapaRef.current = mapa
+
+        // Invalidate size to guarantee tile rendering
+        const timeouts = [80, 200, 450, 800]
+        timeouts.forEach((delay) => {
+          setTimeout(() => {
+            if (activo && instanciaMapaRef.current) {
+              instanciaMapaRef.current.invalidateSize()
+            }
+          }, delay)
+        })
+      } catch (err) {
+        console.warn('Error al cargar mapa Leaflet:', err)
+      }
+    }
+
+    void inicializarMapa()
+
+    return () => {
+      activo = false
+      if (instanciaMapaRef.current) {
+        instanciaMapaRef.current.remove()
+        instanciaMapaRef.current = null
+      }
+    }
+  }, [lat, lng])
+
+  return (
+    <div
+      className="relative w-full rounded-xl overflow-hidden border border-white/20 bg-slate-900 shadow-lg font-[Poppins]"
+      style={{ height: altura }}
+    >
+      <div
+        ref={mapaRef}
+        style={{ width: '100%', height: '100%', minHeight: altura, zIndex: 1 }}
+      />
+      <a
+        href={googleMapsUrl}
+        target="_blank"
+        rel="noreferrer"
+        className="absolute top-2 right-2 z-10 flex items-center gap-1 rounded-md bg-white/95 px-2 py-1 text-[10px] font-bold text-gray-800 hover:bg-white shadow transition-colors"
+      >
+        <span>Abrir en Google Maps</span>
+        <ExternalLink size={11} />
+      </a>
+    </div>
+  )
+}
+
 export const FotografiaLightbox = memo(function FotografiaLightbox({
   foto,
   onClose,
   onPrev,
   onNext,
 }: FotografiaLightboxProps) {
-  const [zoomImg, setZoomImg] = useState(false)
+  const [mostrarMapaModal, setMostrarMapaModal] = useState(false)
+  const [zoom, setZoom] = useState(1)
+  const [pan, setPan] = useState({ x: 0, y: 0 })
 
+  // Touch gesture tracking for pinch-zoom and drag-pan
+  const touchStartDist = useRef<number | null>(null)
+  const touchStartZoom = useRef<number>(1)
+  const touchLastPos = useRef<{ x: number; y: number } | null>(null)
+  const lastTapTime = useRef<number>(0)
+
+  // Reset zoom on photo change
+  useEffect(() => {
+    setZoom(1)
+    setPan({ x: 0, y: 0 })
+    setMostrarMapaModal(false)
+  }, [foto?.id])
+
+  // Bloqueo total de scroll y movimiento del fondo en dispositivos móviles y de escritorio
+  useEffect(() => {
+    if (!foto) return
+
+    const originalOverflow = document.body.style.overflow
+    const originalTouchAction = document.body.style.touchAction
+    const originalPosition = document.body.style.position
+
+    document.body.style.overflow = 'hidden'
+    document.body.style.touchAction = 'none'
+
+    return () => {
+      document.body.style.overflow = originalOverflow
+      document.body.style.touchAction = originalTouchAction
+      document.body.style.position = originalPosition
+    }
+  }, [foto])
+
+  // Teclado
   useEffect(() => {
     if (!foto) return
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-      if (e.key === 'ArrowLeft') onPrev()
-      if (e.key === 'ArrowRight') onNext()
+      if (e.key === 'Escape') {
+        if (mostrarMapaModal) {
+          setMostrarMapaModal(false)
+        } else {
+          onClose()
+        }
+      }
+      if (!mostrarMapaModal) {
+        if (e.key === 'ArrowLeft') onPrev()
+        if (e.key === 'ArrowRight') onNext()
+      }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [foto, onClose, onPrev, onNext])
+  }, [foto, onClose, onPrev, onNext, mostrarMapaModal])
+
+  // Gestores táctiles de Zoom (Doble toque y Pinch-to-zoom)
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      )
+      touchStartDist.current = dist
+      touchStartZoom.current = zoom
+    } else if (e.touches.length === 1) {
+      touchLastPos.current = {
+        x: e.touches[0].clientX,
+        y: e.touches[0].clientY,
+      }
+
+      // Doble toque para hacer zoom alternado (1x <-> 2.4x)
+      const now = Date.now()
+      if (now - lastTapTime.current < 300) {
+        e.preventDefault()
+        setZoom((prev) => {
+          if (prev > 1.2) {
+            setPan({ x: 0, y: 0 })
+            return 1
+          }
+          return 2.4
+        })
+      }
+      lastTapTime.current = now
+    }
+  }
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 2 && touchStartDist.current !== null) {
+      e.preventDefault()
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      )
+      const ratio = dist / touchStartDist.current
+      const newZoom = Math.min(Math.max(touchStartZoom.current * ratio, 1), 3.5)
+      setZoom(newZoom)
+      if (newZoom <= 1.05) {
+        setPan({ x: 0, y: 0 })
+      }
+    } else if (e.touches.length === 1 && zoom > 1.1 && touchLastPos.current) {
+      e.preventDefault()
+      const dx = e.touches[0].clientX - touchLastPos.current.x
+      const dy = e.touches[0].clientY - touchLastPos.current.y
+      touchLastPos.current = {
+        x: e.touches[0].clientX,
+        y: e.touches[0].clientY,
+      }
+      setPan((prev) => ({
+        x: prev.x + dx,
+        y: prev.y + dy,
+      }))
+    }
+  }
+
+  const handleTouchEnd = () => {
+    touchStartDist.current = null
+    touchLastPos.current = null
+    if (zoom < 1.05) {
+      setZoom(1)
+      setPan({ x: 0, y: 0 })
+    }
+  }
+
+  const handleResetZoom = useCallback(() => {
+    setZoom(1)
+    setPan({ x: 0, y: 0 })
+  }, [])
 
   if (!foto) return null
+
+  // Coordenadas GPS con fallback institucional
+  const lat =
+    (foto as any)?.coordenadasGps?.lat ??
+    (foto as any)?.gpsLat ??
+    (foto as any)?.lat ??
+    (foto as any)?.latitud ??
+    14.634915
+
+  const lng =
+    (foto as any)?.coordenadasGps?.lng ??
+    (foto as any)?.gpsLng ??
+    (foto as any)?.lng ??
+    (foto as any)?.longitud ??
+    -90.506882
+
+  const tieneGpsValido =
+    (typeof (foto as any)?.lat === 'number' && !isNaN((foto as any)?.lat)) ||
+    (typeof (foto as any)?.coordenadasGps?.lat === 'number') ||
+    (typeof (foto as any)?.latitud === 'number')
 
   // Metadatos de la fotografía
   const renglonNombre =
     (foto as any).renglon ||
     (foto as any).renglonNombre ||
-    (foto as any).renglonId ||
-    (foto.etiquetas && foto.etiquetas.length > 0
-      ? `Renglón: ${foto.etiquetas.join(' · ')}`
-      : '104.01 · Excavación estructural y reacondicionamiento de subrasante')
+    (foto as any).renglon_nombre ||
+    (foto.etiquetas && foto.etiquetas.find((e: string) => e !== 'Campo' && e !== 'Bitácora' && e !== 'Avance Físico')) ||
+    (foto.tipo ? (foto.tipo.charAt(0).toUpperCase() + foto.tipo.slice(1)) : 'Avance')
 
-  const usuarioNombre = foto.autor || 'Ing. Carlos Mendoza (Residente)'
-  const fechaTexto = foto.fecha || '28/09/2026'
-  const horaTexto = foto.hora ? `${foto.hora} hrs` : '09:30 hrs'
-  const estacionInicio = (foto as any).estacionInicio || (foto as any).estInicio || '0+000'
-  const estacionFin = (foto as any).estacionFin || (foto as any).estFin || '0+150'
+  const usuarioNombre = foto.autor || 'Ingeniero Residente'
+  const fechaTexto = foto.fecha || new Date().toISOString().slice(0, 10)
+  const horaTexto = (foto as any).hora ? `${(foto as any).hora} hrs` : ''
+  const estacionInicio = (foto as any).estacionInicio || (foto as any).estInicio || (foto as any).estacion_inicio || ''
+  const estacionFin = (foto as any).estacionFin || (foto as any).estFin || (foto as any).estacion_fin || ''
+  const ladoTexto = (foto as any).lado || (foto as any).lado_via || ''
   const direccionTexto =
     foto.ubicacionObra ||
-    'Km 14.5 Carretera al Atlántico CA-09 Norte, Aldea El Fiscal, Palencia, Guatemala'
+    (foto as any).ubicacion ||
+    foto.proyectoNombre ||
+    'Frente de Trabajo de Obra Vial'
 
   const imgUrl = foto.url || foto.urlMiniatura
+  const googleMapsUrl = `https://www.google.com/maps?q=${lat},${lng}`
 
   return (
-    <div
-      className="fixed inset-0 z-[9999] bg-black/92 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-y-auto font-[Poppins]"
-      onClick={onClose}
-    >
-      {/* Contenedor Principal del Modal con vista dividida */}
+    <Portal>
       <div
-        className="relative w-full max-w-6xl bg-white rounded-2xl shadow-2xl overflow-hidden border border-gray-200 my-auto flex flex-col lg:flex-row max-h-[94vh]"
-        onClick={(e) => e.stopPropagation()}
+        className="fixed inset-0 z-[99999] w-screen h-screen bg-[#090a0f] flex flex-col items-center justify-center p-3 sm:p-5 overflow-hidden font-[Poppins] select-none touch-none"
+        onClick={onClose}
       >
-        {/* ========================================================================= */}
-        {/* COLUMNA IZQUIERDA: VISUALIZADOR DE LA FOTO + MAPA NEGRO DE GUATEMALA      */}
-        {/* ========================================================================= */}
-        <div className="relative flex-1 bg-slate-950 flex flex-col justify-between p-3 min-h-[360px] lg:min-h-[560px]">
-          {/* Barra superior de la foto */}
-          <div className="flex items-center justify-between text-white z-10 pb-1">
-            <div className="flex items-center gap-2">
-              <span className="rounded-md bg-white/15 px-2 py-0.5 text-[10px] font-bold text-white uppercase tracking-wider backdrop-blur-xs">
-                {foto.tipo || 'Evidencia'}
+        {/* BOTONES FLOTANTES SUPERIORES (Sin fondo circular, iconos limpios) */}
+        <div className="fixed top-4 right-4 sm:top-5 sm:right-6 z-50 flex items-center gap-3">
+          {/* Ícono de ubicación en blanco que SOLO se muestra en móviles (sin fondo) */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              setMostrarMapaModal(true)
+            }}
+            className="lg:hidden p-1.5 text-white/90 hover:text-white hover:scale-110 active:scale-95 transition-all cursor-pointer"
+            title="Ver mapa Leaflet"
+            aria-label="Ver mapa Leaflet"
+          >
+            <MapPin size={24} className="text-white" />
+          </button>
+
+          {/* Botón Cerrar Flotante (sin fondo) */}
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 text-white/80 hover:text-white hover:scale-110 active:scale-95 transition-all cursor-pointer"
+            title="Cerrar visor (Esc)"
+            aria-label="Cerrar visor"
+          >
+            <X size={24} className="text-white" />
+          </button>
+        </div>
+
+        {/* Flechas de Navegación fijas a los lados de la pantalla */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            onPrev()
+          }}
+          className="fixed left-2 sm:left-6 top-1/2 -translate-y-1/2 z-40 p-2 text-white/60 hover:text-white transition-all transform hover:scale-125 cursor-pointer"
+          aria-label="Fotografía anterior"
+          title="Anterior (Flecha izquierda)"
+        >
+          <ChevronLeft size={38} className="text-white" />
+        </button>
+
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            onNext()
+          }}
+          className="fixed right-2 sm:right-6 top-1/2 -translate-y-1/2 z-40 p-2 text-white/60 hover:text-white transition-all transform hover:scale-125 cursor-pointer"
+          aria-label="Siguiente fotografía"
+          title="Siguiente (Flecha derecha)"
+        >
+          <ChevronRight size={38} className="text-white" />
+        </button>
+
+        {/* BLOQUE CENTRAL UNIFICADO: FOTO + TEXTO ELEVADO JUSTO DEBAJO */}
+        <div
+          className="relative flex flex-col items-center justify-center max-w-4xl w-full z-20 my-auto px-2 sm:px-4"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div
+            className="relative inline-flex items-center justify-center touch-none max-w-full"
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            onDoubleClick={() => {
+              setZoom((prev) => {
+                if (prev > 1.2) {
+                  setPan({ x: 0, y: 0 })
+                  return 1
+                }
+                return 2.2
+              })
+            }}
+          >
+            <img
+              src={imgUrl}
+              alt={foto.titulo || 'Fotografía de obra'}
+              decoding="async"
+              style={{
+                transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
+                transition: touchStartDist.current ? 'none' : 'transform 0.18s ease-out',
+                touchAction: 'none',
+              }}
+              className="max-h-[48vh] sm:max-h-[54vh] max-w-full object-contain rounded-2xl shadow-2xl border border-white/10 select-none pointer-events-auto"
+            />
+
+            {/* Pill indicador de zoom activo para reset rápido */}
+            {zoom > 1.05 && (
+              <button
+                type="button"
+                onClick={handleResetZoom}
+                className="absolute bottom-2 right-2 z-30 flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/80 backdrop-blur-md text-white text-[10px] font-bold border border-white/20 shadow-lg hover:bg-black cursor-pointer"
+              >
+                <RotateCcw size={11} className="text-white" />
+                <span>{Math.round(zoom * 100)}% (Reiniciar)</span>
+              </button>
+            )}
+
+            {/* Widget de Ubicación en Desktop (Lateral) */}
+            <div
+              className="hidden lg:block absolute left-[calc(100%+1.5rem)] top-0 w-52 text-white"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[11.5px] font-bold text-white flex items-center gap-1.5">
+                  <MapPin size={13} className="text-white" />
+                  Ubicación Leaflet
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setMostrarMapaModal(true)}
+                  className="text-[10px] text-white/80 hover:text-white underline cursor-pointer"
+                >
+                  Ampliar
+                </button>
+              </div>
+
+              <MapaLeafletContainer lat={lat} lng={lng} googleMapsUrl={googleMapsUrl} altura="120px" />
+
+              <div className="mt-2.5 space-y-1.5 text-left text-[10.5px]">
+                <div className="flex items-start gap-1.5 text-white/90">
+                  <MapPin size={12} className="text-white shrink-0 mt-0.5" />
+                  <span className="font-medium leading-tight line-clamp-2">
+                    {direccionTexto}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 text-white/90">
+                  <Navigation size={11} className="text-white shrink-0" />
+                  <span className="font-medium text-white">
+                    {lat.toFixed(6)}, {lng.toFixed(6)}
+                  </span>
+                </div>
+                {(estacionInicio || estacionFin) && (
+                  <div className="flex items-center gap-1.5 text-white/90">
+                    <Layers size={11} className="text-white shrink-0" />
+                    <span className="font-medium text-white">
+                      Est. {estacionInicio || '0+000'} a {estacionFin || '0+000'}
+                    </span>
+                  </div>
+                )}
+                {ladoTexto && (
+                  <div className="flex items-center gap-1.5 text-white/90">
+                    <Compass size={11} className="text-white shrink-0" />
+                    <span className="font-medium text-white">
+                      Lado: {ladoTexto}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* INFORMACIÓN DE LA FOTO ELEVADA: INMEDIATAMENTE DEBAJO DE LA FOTO Y TODO EN BLANCO */}
+          <div
+            className="w-full max-w-2xl text-center mt-3 sm:mt-4 px-2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Renglón en Color Blanco */}
+            <div className="text-[11.5px] sm:text-[12px] font-extrabold text-white uppercase tracking-wider mb-1">
+              {foto.tipo === 'inspeccion' ? 'Inspección' : renglonNombre}
+            </div>
+
+            {/* Título de la Foto en Color Blanco (oculta nombres crudos de archivo con extensiones tipo .jpg, [JPG], .png, etc.) */}
+            {(() => {
+              const tituloLimpio = (foto.titulo || '').trim()
+              const esNombreArchivo = /\.(jpe?g|png|webp|gif|bmp)(\s*\[[a-zA-Z0-9]+\])?$/i.test(tituloLimpio) || /\[(JPG|PNG|JPEG|WEBP|IMG)\]$/i.test(tituloLimpio)
+              if (!tituloLimpio || esNombreArchivo || tituloLimpio.toLowerCase() === renglonNombre.toLowerCase()) {
+                return null
+              }
+              return (
+                <h2 className="text-[13px] sm:text-[14px] font-bold text-white text-center line-clamp-1 mb-1">
+                  {tituloLimpio}
+                </h2>
+              )
+            })()}
+
+            {/* Descripción en Blanco Suave */}
+            <p className="text-[11px] sm:text-[11.5px] text-white/80 text-center max-w-xl mx-auto mb-2.5 line-clamp-2 leading-relaxed">
+              {foto.descripcion || 'Evidencia fotográfica documentada en bitácora de obra.'}
+            </p>
+
+            {/* Fila de Metadatos: TODO EN COLOR BLANCO */}
+            <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-[10.5px] sm:text-[11px] text-white font-medium font-[Poppins]">
+              {/* Coordenadas GPS (Clickable para abrir mapa en móviles) */}
+              <button
+                type="button"
+                onClick={() => setMostrarMapaModal(true)}
+                className="flex items-center gap-1.5 text-white hover:text-white/80 transition-colors cursor-pointer"
+                title="Ver ubicación en mapa Leaflet"
+              >
+                <Navigation size={12} className="text-white shrink-0" />
+                <span className="underline decoration-white/40 underline-offset-2">
+                  {lat.toFixed(5)}, {lng.toFixed(5)}
+                </span>
+              </button>
+
+              {/* Tramo / Estaciones */}
+              {(estacionInicio || estacionFin) && (
+                <span className="flex items-center gap-1.5 text-white">
+                  <Layers size={12} className="text-white shrink-0" />
+                  <span>
+                    Est. {estacionInicio || '0+000'} a {estacionFin || '0+000'}
+                  </span>
+                </span>
+              )}
+
+              {/* Lado de la vía */}
+              {ladoTexto && (
+                <span className="flex items-center gap-1.5 text-white">
+                  <Compass size={12} className="text-white shrink-0" />
+                  <span>Lado: {ladoTexto}</span>
+                </span>
+              )}
+
+              {/* Fecha y Hora */}
+              <span className="flex items-center gap-1.5 text-white">
+                <Calendar size={12} className="text-white shrink-0" />
+                <span>
+                  {fechaTexto} {horaTexto ? `• ${horaTexto}` : ''}
+                </span>
               </span>
-              <p className="text-xs font-bold truncate max-w-[220px] sm:max-w-[300px] text-gray-200">
-                {foto.titulo || 'Registro Fotográfico'}
-              </p>
+
+              {/* Autor */}
+              <span className="flex items-center gap-1.5 text-white">
+                <User size={12} className="text-white shrink-0" />
+                <span>{usuarioNombre}</span>
+              </span>
             </div>
-
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => setZoomImg(!zoomImg)}
-                className="rounded-lg bg-white/10 p-1.5 text-white hover:bg-white/20 transition-colors cursor-pointer"
-                title={zoomImg ? 'Ajustar al cuadro' : 'Zoom a pantalla completa'}
-              >
-                {zoomImg ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
-              </button>
-
-              <a
-                href={imgUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="rounded-lg bg-white/10 p-1.5 text-white hover:bg-white/20 transition-colors cursor-pointer"
-                title="Abrir imagen original"
-              >
-                <ExternalLink size={15} />
-              </a>
-            </div>
-          </div>
-
-          {/* Área Central: Foto y Mapa de Guatemala en Negro (a la par de la foto) */}
-          <div className="relative flex-1 flex flex-col md:flex-row items-center justify-center gap-3 my-auto overflow-hidden p-1">
-            {/* Contenedor de la Imagen con Botones de Navegación */}
-            <div className="relative flex-1 flex items-center justify-center max-h-[55vh] lg:max-h-[70vh] w-full">
-              <button
-                type="button"
-                onClick={onPrev}
-                className="absolute left-2 z-20 h-10 w-10 rounded-full bg-black/60 text-white hover:bg-[#9B0F06] flex items-center justify-center transition-all cursor-pointer shadow-lg backdrop-blur-xs"
-                aria-label="Fotografía anterior"
-                title="Anterior (Flecha izquierda)"
-              >
-                <ChevronLeft size={22} />
-              </button>
-
-              <img
-                src={imgUrl}
-                alt={foto.titulo || 'Fotografía de obra'}
-                decoding="async"
-                className={`max-h-[48vh] lg:max-h-[68vh] max-w-full object-contain rounded-lg transition-transform duration-300 select-none ${
-                  zoomImg ? 'scale-125 cursor-zoom-out' : 'cursor-zoom-in'
-                }`}
-                onClick={() => setZoomImg(!zoomImg)}
-              />
-
-              <button
-                type="button"
-                onClick={onNext}
-                className="absolute right-2 z-20 h-10 w-10 rounded-full bg-black/60 text-white hover:bg-[#9B0F06] flex items-center justify-center transition-all cursor-pointer shadow-lg backdrop-blur-xs"
-                aria-label="Siguiente fotografía"
-                title="Siguiente (Flecha derecha)"
-              >
-                <ChevronRight size={22} />
-              </button>
-            </div>
-
-            {/* MAPA DE GUATEMALA EN NEGRO CON EL DEPARTAMENTO ALUMBRADO (A LA PAR DE LA FOTO) */}
-            <div className="shrink-0 w-36 sm:w-40 md:w-44 lg:w-40 xl:w-44">
-              <MapaGuatemalaDepartamentos
-                ubicacion={direccionTexto}
-                compacto={true}
-                className="w-full"
-              />
-            </div>
-          </div>
-
-          {/* Barra inferior de la foto */}
-          <div className="text-center text-[10px] text-gray-400 z-10 pt-1 border-t border-white/10">
-            <span>Usa las flechas del teclado o los botones laterales para navegar entre fotos</span>
           </div>
         </div>
 
-        {/* ========================================================================= */}
-        {/* COLUMNA DERECHA: CAMPOS DE DETALLE + MAPA DE RUTA VIAL ESTABLECIDA        */}
-        {/* ========================================================================= */}
-        <div className="w-full lg:w-[400px] xl:w-[440px] bg-gray-50 flex flex-col justify-between border-t lg:border-t-0 lg:border-l border-gray-200 overflow-y-auto">
-          {/* Header del Panel Derecho con Botón de Cerrar */}
-          <div className="p-3.5 bg-white border-b border-gray-200 flex items-center justify-between sticky top-0 z-10 shadow-2xs">
-            <div>
-              <span className="text-[9px] font-black uppercase tracking-wider text-[#9B0F06] block">
-                Detalle de Fotografía
-              </span>
-              <h3 className="text-xs font-extrabold text-gray-900 leading-tight">
-                {foto.proyectoNombre || 'Proyecto de Obra'}
-              </h3>
+        {/* VISTA DE MAPA: TODO NEGRO SIN MÁRGENES (FULLSCREEN) */}
+        {mostrarMapaModal && (
+          <div
+            className="fixed inset-0 z-[100000] bg-black flex flex-col text-white font-[Poppins] overflow-y-auto animate-in fade-in duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header en negro sin márgenes */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 shrink-0 bg-black">
+              <div className="flex items-center gap-2.5">
+                <div className="p-1.5 rounded-lg bg-[#9B0F06] text-white shrink-0">
+                  <MapPin size={16} className="text-white" />
+                </div>
+                <div>
+                  <h3 className="text-xs sm:text-sm font-bold text-white leading-tight">
+                    Ubicación de la Evidencia
+                  </h3>
+                  <p className="text-[10px] text-white/60">
+                    Mapa Leaflet (OpenStreetMap) • Domun Bitácora
+                  </p>
+                </div>
+              </div>
+
+              {/* Botón de la 'X' para regresar a la parte anterior */}
+              <button
+                type="button"
+                onClick={() => setMostrarMapaModal(false)}
+                className="p-2 rounded-full text-white/80 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Cerrar y volver a la fotografía"
+              >
+                <X size={20} className="text-white" />
+              </button>
             </div>
 
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-[#9B0F06] transition-colors cursor-pointer"
-              title="Cerrar ventana"
-            >
-              <X size={18} />
-            </button>
-          </div>
+            {/* Contenido sin márgenes exteriores */}
+            <div className="flex-1 flex flex-col p-3 sm:p-5 space-y-3 bg-black max-w-4xl w-full mx-auto">
+              {/* Mapa Leaflet interactivo a ancho completo */}
+              <div className="w-full overflow-hidden rounded-xl border border-white/15 shrink-0 shadow-lg">
+                <MapaLeafletContainer
+                  lat={lat}
+                  lng={lng}
+                  googleMapsUrl={googleMapsUrl}
+                  altura="320px"
+                />
+              </div>
 
-          {/* Cuerpo con los campos requeridos: Renglón, Usuario, Fecha, Hora, Estación Inicio, Estación Final, Dirección */}
-          <div className="p-3.5 space-y-3.5 flex-1 text-xs">
-            {/* Tarjeta de Metadatos */}
-            <div className="rounded-xl bg-white p-3.5 border border-gray-200 shadow-2xs space-y-3">
-              <p className="text-[9.5px] font-black uppercase tracking-wider text-[#9B0F06] border-b border-gray-100 pb-1.5">
-                Datos del Registro
-              </p>
-
-              <div className="space-y-2.5 text-[11px]">
-                {/* 1. RENGLÓN */}
-                <div className="flex items-start gap-2">
-                  <div className="mt-0.5 flex h-5 w-5 items-center justify-center rounded bg-red-50 text-[#9B0F06] shrink-0">
-                    <Layers size={12} />
+              {/* Desglose de Metadatos de Ubicación sobre fondo negro */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[10.5px]">
+                {/* Coordenadas */}
+                <div className="p-3 rounded-xl bg-white/[0.05] border border-white/10">
+                  <div className="text-[9.5px] uppercase font-bold text-white/60 mb-0.5 flex items-center gap-1.5">
+                    <Navigation size={12} className="text-[#9B0F06]" />
+                    Coordenadas GPS
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <span className="text-gray-400 font-bold block text-[8.5px] uppercase">
-                      Renglón
-                    </span>
-                    <strong className="text-gray-900 block leading-tight font-mono">
-                      {renglonNombre}
-                    </strong>
+                  <div className="font-semibold text-white">
+                    Lat: {lat.toFixed(6)}
+                  </div>
+                  <div className="font-semibold text-white">
+                    Lng: {lng.toFixed(6)}
+                  </div>
+                  {!tieneGpsValido && (
+                    <div className="text-[9px] text-white/50 mt-0.5">
+                      (Coordenadas referenciales)
+                    </div>
+                  )}
+                </div>
+
+                {/* Tramo y Lado */}
+                <div className="p-3 rounded-xl bg-white/[0.05] border border-white/10">
+                  <div className="text-[9.5px] uppercase font-bold text-white/60 mb-0.5 flex items-center gap-1.5">
+                    <Layers size={12} className="text-[#9B0F06]" />
+                    Tramo y Lado de Obra
+                  </div>
+                  <div className="font-semibold text-white">
+                    Est. Inicio: {estacionInicio || '0+000'}
+                  </div>
+                  <div className="font-semibold text-white">
+                    Est. Fin: {estacionFin || '0+000'}
+                  </div>
+                  <div className="font-semibold text-white/90 mt-0.5">
+                    Lado: {ladoTexto || 'No especificado'}
                   </div>
                 </div>
 
-                {/* 2. USUARIO */}
-                <div className="flex items-start gap-2">
-                  <div className="mt-0.5 flex h-5 w-5 items-center justify-center rounded bg-slate-100 text-slate-700 shrink-0">
-                    <User size={12} />
+                {/* Ubicación / Obra */}
+                <div className="sm:col-span-2 p-3 rounded-xl bg-white/[0.05] border border-white/10">
+                  <div className="text-[9.5px] uppercase font-bold text-white/60 mb-0.5 flex items-center gap-1.5">
+                    <MapPin size={12} className="text-[#9B0F06]" />
+                    Ubicación / Proyecto
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <span className="text-gray-400 font-bold block text-[8.5px] uppercase">
-                      Usuario
-                    </span>
-                    <strong className="text-gray-900 block leading-tight">
-                      {usuarioNombre}
-                    </strong>
+                  <div className="font-medium text-white">
+                    {direccionTexto}
                   </div>
-                </div>
-
-                {/* 3 & 4. FECHA Y HORA */}
-                <div className="grid grid-cols-2 gap-2 pt-1 border-t border-gray-100">
-                  <div className="flex items-start gap-2">
-                    <div className="mt-0.5 flex h-5 w-5 items-center justify-center rounded bg-blue-50 text-blue-700 shrink-0">
-                      <Calendar size={12} />
+                  {(foto.titulo || renglonNombre) && (
+                    <div className="text-[9.5px] text-white/70 mt-1">
+                      {foto.titulo || renglonNombre}
                     </div>
-                    <div>
-                      <span className="text-gray-400 font-bold block text-[8.5px] uppercase">
-                        Fecha
-                      </span>
-                      <strong className="text-gray-800 font-mono block">
-                        {fechaTexto}
-                      </strong>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-2">
-                    <div className="mt-0.5 flex h-5 w-5 items-center justify-center rounded bg-amber-50 text-amber-700 shrink-0">
-                      <Clock size={12} />
-                    </div>
-                    <div>
-                      <span className="text-gray-400 font-bold block text-[8.5px] uppercase">
-                        Hora
-                      </span>
-                      <strong className="text-gray-800 font-mono block">
-                        {horaTexto}
-                      </strong>
-                    </div>
-                  </div>
-                </div>
-
-                {/* ESTACIÓN INICIO Y ESTACIÓN FINAL */}
-                <div className="grid grid-cols-2 gap-2 pt-1 border-t border-gray-100 bg-gray-50/70 p-2 rounded-lg border border-gray-100">
-                  <div className="flex items-start gap-1.5">
-                    <Milestone size={12} className="text-indigo-600 mt-0.5 shrink-0" />
-                    <div>
-                      <span className="text-gray-400 font-bold block text-[8px] uppercase">
-                        Estación Inicio
-                      </span>
-                      <strong className="text-gray-900 font-mono block text-xs">
-                        {estacionInicio}
-                      </strong>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-1.5">
-                    <Milestone size={12} className="text-indigo-600 mt-0.5 shrink-0" />
-                    <div>
-                      <span className="text-gray-400 font-bold block text-[8px] uppercase">
-                        Estación Final
-                      </span>
-                      <strong className="text-gray-900 font-mono block text-xs">
-                        {estacionFin}
-                      </strong>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 5. DIRECCIÓN */}
-                <div className="flex items-start gap-2 pt-1 border-t border-gray-100">
-                  <div className="mt-0.5 flex h-5 w-5 items-center justify-center rounded bg-emerald-50 text-emerald-700 shrink-0">
-                    <MapPin size={12} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <span className="text-gray-400 font-bold block text-[8.5px] uppercase">
-                      Dirección
-                    </span>
-                    <strong className="text-gray-800 block leading-tight">
-                      {direccionTexto}
-                    </strong>
-                  </div>
+                  )}
                 </div>
               </div>
             </div>
-
-            {/* MAPA DE RUTA VIAL ESTABLECIDA */}
-            <div className="space-y-1.5">
-              <MapaRutaProyecto
-                estacionInicio={estacionInicio}
-                estacionFin={estacionFin}
-                ubicacionTexto={direccionTexto}
-                className="w-full shadow-2xs"
-              />
-            </div>
           </div>
-
-          {/* Footer del Panel */}
-          <div className="p-3 bg-white border-t border-gray-200 flex items-center justify-between text-xs sticky bottom-0">
-            <span className="text-[10px] text-gray-400 font-mono">
-              Ref: {foto.id}
-            </span>
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-lg bg-[#9B0F06] px-4 py-1.5 text-xs font-bold text-white hover:bg-[#5E0006] transition-colors cursor-pointer shadow-2xs"
-            >
-              Cerrar Vista
-            </button>
-          </div>
-        </div>
+        )}
       </div>
-    </div>
+    </Portal>
   )
 })
 

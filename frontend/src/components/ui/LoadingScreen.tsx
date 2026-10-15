@@ -1,22 +1,26 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import Image from 'next/image'
 
 export default function LoadingScreen() {
-  const [show, setShow] = useState(false)
+  const [show, setShow] = useState(true)
   const [fade, setFade] = useState(false)
 
-  useEffect(() => {
-    setShow(true)
+  const handleFinish = useCallback(() => {
+    setShow(false)
+  }, [])
 
+  useEffect(() => {
+    // Permitir apreciar la animación de carga antes de iniciar la transición
     const fadeTimer = setTimeout(() => {
       setFade(true)
-    }, 1000)
+    }, 850)
 
+    // Margen de seguridad para desmontar completamente tras finalizar la transición de 500ms
     const unmountTimer = setTimeout(() => {
       setShow(false)
-    }, 1300)
+    }, 1450)
 
     return () => {
       clearTimeout(fadeTimer)
@@ -29,40 +33,30 @@ export default function LoadingScreen() {
   return (
     <div
       id="global-loading-screen"
-      className={`fixed inset-0 bg-[#F3F4F7] z-[9999] flex flex-col items-center justify-center transition-opacity duration-500 ${
+      onTransitionEnd={(e) => {
+        // Al culminar la transición de opacidad del contenedor, desmontar limpiamente
+        if (e.target === e.currentTarget && fade) {
+          handleFinish()
+        }
+      }}
+      className={`loading-screen fixed inset-0 bg-[#F3F4F7] z-[9999] flex flex-col items-center justify-center transition-opacity duration-500 ease-out ${
         fade ? 'opacity-0 pointer-events-none' : 'opacity-100'
       }`}
     >
-      <script
-        dangerouslySetInnerHTML={{
-          __html: `
-            setTimeout(function() {
-              var screen = document.getElementById('global-loading-screen');
-              if (screen) {
-                screen.style.transition = 'opacity 0.5s ease';
-                screen.style.opacity = '0';
-                screen.style.pointerEvents = 'none';
-                setTimeout(function() {
-                  screen.style.display = 'none';
-                }, 500);
-              }
-            }, 1200);
-          `
-        }}
-      />
-      <div className="flex flex-col items-center gap-4">
+      <div className="loading-content flex flex-col items-center gap-4">
         <div className="relative w-16 h-16 animate-pulse">
           <Image
             src="/logo.png"
             alt="DOMUN Logo"
             fill
+            sizes="64px"
             className="object-contain"
             priority
           />
         </div>
 
         <div className="flex flex-col items-center gap-1.5 mt-2">
-          <span className="text-[10px] font-bold text-gray-500 tracking-[0.2em] uppercase">
+          <span className="text-[10px] font-bold text-gray-500 tracking-[0.2em] uppercase font-poppins">
             Cargando
           </span>
           <div className="flex gap-1 items-center justify-center mt-1">

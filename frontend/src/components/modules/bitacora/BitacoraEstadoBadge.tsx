@@ -22,14 +22,14 @@ export function BitacoraEstadoBadge({ estado, sinFondo }: BitacoraEstadoBadgePro
 
   if (sinFondo) {
     return (
-      <span className="text-[9.5px] font-medium text-gray-500">
+      <span className="text-[11px] sm:text-xs font-normal text-gray-500">
         {config.label}
       </span>
     )
   }
 
   return (
-    <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border ${config.bg} ${config.text} ${config.border}`}>
+    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${config.bg} ${config.text} ${config.border}`}>
       {config.label}
     </span>
   )

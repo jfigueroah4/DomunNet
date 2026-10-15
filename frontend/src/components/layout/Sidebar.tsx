@@ -1,8 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { useState, useMemo } from 'react'
+import { usePathname, useSearchParams } from 'next/navigation'
+import { useState, useMemo, useEffect } from 'react'
 import { tienePermiso, RUTAS_PERMISOS } from '@/lib/rutas-permisos'
 import { useAuthStore } from '@/stores/useAuthStore'
 import Image from 'next/image'
@@ -26,6 +26,7 @@ interface SidebarProps {
 
 export default function Sidebar({ collapsed = false }: SidebarProps) {
   const pathname = usePathname()
+  const searchParams = useSearchParams()
   const [expandedMenus, setExpandedMenus] = useState<string[]>([])
 
   const isActive = (path: string) => {
@@ -35,10 +36,23 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
     return pathname === path || pathname.startsWith(`${path}/`)
   }
 
+  const isSubActive = (href: string) => {
+    const [subPath, subQuery] = href.split('?')
+    if (subQuery) {
+      if (pathname !== subPath) return false
+      const params = new URLSearchParams(subQuery)
+      for (const [key, val] of params.entries()) {
+        if (searchParams?.get(key) !== val) return false
+      }
+      return true
+    }
+    if (pathname === subPath) {
+      return !searchParams?.get('nuevo')
+    }
+    return isActive(subPath)
+  }
 
   const { profile } = useAuthStore()
-
-
 
   const navSections = useMemo(() => {
     const fotosHref = '/dashboard/fotografias';
@@ -61,8 +75,7 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
             href: '/dashboard/bitacora',
             label: 'Bitácora',
             submenu: [
-              { icon: Package, href: '/dashboard/bitacora?tab=laboratorio', label: 'Laboratorio' },
-              { icon: Package, href: '/dashboard/bitacora?tab=campo', label: 'Campo de Trabajo' },
+              { icon: Package, href: '/dashboard/bitacora?nuevo=true', label: 'Nuevo registro' },
             ],
           },
           { icon: Camera, href: fotosHref, label: 'Fotografías' },
@@ -70,7 +83,7 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
             icon: BarChart2,
             href: '/dashboard/reportes',
             label: 'Reportes',
-            submenu: [{ icon: Package, href: '/dashboard/reportes', label: 'Documentos formales' }],
+            submenu: [{ icon: Package, href: '/dashboard/estadisticas', label: 'Estadísticas' }],
           },
         ],
       },
@@ -117,6 +130,17 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
     }).filter(section => section.items.length > 0)
   }, [profile?.permisos, profile?.rol])
 
+  // Auto-expandir menús cuando un subitem esté activo
+  useEffect(() => {
+    navSections.forEach((section) => {
+      section.items.forEach((item) => {
+        if (item.submenu?.some((sub) => isSubActive(sub.href))) {
+          setExpandedMenus((prev) => (prev.includes(item.href) ? prev : [...prev, item.href]))
+        }
+      })
+    })
+  }, [pathname, searchParams, navSections])
+
   return (
     <aside
       className={`hidden md:flex ${collapsed ? 'w-[72px]' : 'w-[185px]'} h-screen shrink-0 flex-col border-r border-gray-100 bg-white shadow-[2px_0_16px_-4px_rgba(0,0,0,0.08)] transition-all duration-300 relative z-30`}
@@ -138,7 +162,8 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
 
             {section.items.map((item) => {
               const Icon = item.icon
-              const active = isActive(item.href)
+              const isSubItemActive = Boolean(item.submenu?.some((sub) => isSubActive(sub.href)))
+              const active = isActive(item.href) || isSubItemActive
               const hasSubmenu = Boolean(item.submenu?.length)
               const isExpanded = expandedMenus.includes(item.href)
 
@@ -182,7 +207,7 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
                       <div className="overflow-hidden">
                         <div className="ml-3.5 mt-1 space-y-1 pl-2 border-l border-gray-100">
                           {item.submenu!.map((subitem) => {
-                            const subActive = isActive(subitem.href.split('?')[0])
+                            const subActive = isSubActive(subitem.href)
                             return (
                               <Link
                                 key={subitem.href}

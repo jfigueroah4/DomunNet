@@ -2,8 +2,8 @@ import Link from 'next/link'
 import { ArrowLeft, Lock } from 'lucide-react'
 
 export const metadata = {
-  title: 'Política de Privacidad | DOMUN-Sistema',
-  description: 'Tratamiento y protección de datos personales y operativos en DOMUN-Sistema.',
+  title: 'Política de Privacidad',
+  description: 'Tratamiento y protección de datos personales y operativos en DOMUN.',
 }
 
 export default function PrivacidadPage() {

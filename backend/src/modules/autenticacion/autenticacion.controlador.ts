@@ -6,6 +6,7 @@ import { iniciarSesion } from '@/modules/autenticacion/autenticacion.servicio'
 import { obtenerCookie } from '@/shared/utils/cookies'
 import { entorno } from '@/configuracion/entorno'
 import { clienteSupabase } from '@/configuracion/cliente-supabase'
+import { capitalizarNombrePropio } from '@/modules/usuarios/usuarios.servicio'
 
 const esquemaInicioSesion = z.object({
   correo: z.string().min(1).optional(),
@@ -112,8 +113,13 @@ export async function obtenerPerfilControlador(req: SolicitudAutenticada, res: R
 
     const dato = Array.isArray(usuario.dato_usuario) ? usuario.dato_usuario[0] : usuario.dato_usuario
 
-    const nombreCompleto = [dato?.primer_nombre, dato?.segundo_nombre].filter(Boolean).join(' ') || req.usuario.nombre
-    const apellidoCompleto = [dato?.primer_apellido, dato?.segundo_apellido].filter(Boolean).join(' ') || ''
+    const primerNom = capitalizarNombrePropio(dato?.primer_nombre)
+    const segundoNom = capitalizarNombrePropio(dato?.segundo_nombre)
+    const primerApe = capitalizarNombrePropio(dato?.primer_apellido)
+    const segundoApe = capitalizarNombrePropio(dato?.segundo_apellido)
+
+    const nombreCompleto = [primerNom, segundoNom].filter(Boolean).join(' ') || capitalizarNombrePropio(req.usuario.nombre)
+    const apellidoCompleto = [primerApe, segundoApe].filter(Boolean).join(' ') || ''
 
     return sendResponse(
       res,
@@ -128,10 +134,10 @@ export async function obtenerPerfilControlador(req: SolicitudAutenticada, res: R
         nombre: nombreCompleto,
         apellido: apellidoCompleto,
         username: dato?.username || '',
-        primerNombre: dato?.primer_nombre || '',
-        segundoNombre: dato?.segundo_nombre || '',
-        primerApellido: dato?.primer_apellido || '',
-        segundoApellido: dato?.segundo_apellido || '',
+        primerNombre: primerNom,
+        segundoNombre: segundoNom,
+        primerApellido: primerApe,
+        segundoApellido: segundoApe,
         telefono: dato?.telefono || '',
         direccion: dato?.direccion || '',
         cargo: '',

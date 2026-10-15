@@ -2,14 +2,17 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
-import { Plus, Users, Shield, Search, Loader2, ChevronLeft, ChevronRight, LogOut, X } from 'lucide-react'
+import { Plus, Users, Shield, Search, Loader2, ChevronLeft, ChevronRight, LogOut, X, Filter } from 'lucide-react'
 import { useRolesStore } from '@/stores/useRolesStore'
+import { Portal } from '@/components/ui/Portal'
+import { useUIStore } from '@/stores/useUIStore'
 
 import { api, apiGetDeduplicado, limpiarCacheMemoria } from '@/lib/api/cliente'
 
 import { Usuario, RolUsuario, EstadoUsuario } from '@/types/usuario'
 
 import { UsuarioTabla } from '@/components/modules/usuarios/UsuarioTabla'
+import { formatearNombrePropio } from '@/lib/utils/formatters'
 
 import { type UsuarioDrawerMode } from '@/components/modules/usuarios/UsuarioDrawer'
 
@@ -30,8 +33,7 @@ import { useAuthStore } from '@/stores/useAuthStore'
 export default function UsuariosPage() {
   const { roles, fetchRoles } = useRolesStore()
   const profile = useAuthStore((state) => state.profile)
-
-
+  const setOcultarBottomNav = useUIStore((state) => state.setOcultarBottomNav)
 
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
 
@@ -44,6 +46,28 @@ export default function UsuariosPage() {
   const [filtroRol, setFiltroRol] = useState<RolUsuario | 'Todos'>('Todos')
 
   const [filtroEstado, setFiltroEstado] = useState<EstadoUsuario | 'Todos'>('Todos')
+
+  const [modalFiltrosAbierto, setModalFiltrosAbierto] = useState(false)
+
+  // Ocultar navbar al abrir modal de filtros en móvil
+  useEffect(() => {
+    if (modalFiltrosAbierto) {
+      setOcultarBottomNav(true)
+      const prev = document.body.style.overflow
+      document.body.style.overflow = 'hidden'
+      return () => {
+        setOcultarBottomNav(false)
+        document.body.style.overflow = prev
+      }
+    }
+  }, [modalFiltrosAbierto, setOcultarBottomNav])
+
+  const filtrosActivosCount = useMemo(() => {
+    let count = 0
+    if (filtroEstado !== 'Todos') count++
+    if (filtroRol !== 'Todos') count++
+    return count
+  }, [filtroEstado, filtroRol])
 
   
 
@@ -73,7 +97,14 @@ export default function UsuariosPage() {
         apiGetDeduplicado('/proyectos').catch(() => ({ data: { data: [] } })),
       ])
 
-      const listaUsuarios: Usuario[] = resUsuarios.data?.data || []
+      const listaUsuarios: Usuario[] = (resUsuarios.data?.data || []).map((u: any) => ({
+        ...u,
+        primer_nombre: formatearNombrePropio(u.primer_nombre),
+        segundo_nombre: formatearNombrePropio(u.segundo_nombre),
+        primer_apellido: formatearNombrePropio(u.primer_apellido),
+        segundo_apellido: formatearNombrePropio(u.segundo_apellido),
+        nombre: formatearNombrePropio(u.nombre || `${u.primer_nombre || ''} ${u.primer_apellido || ''}`.trim()),
+      }))
       const listaProyectos: any[] = resProyectos.data?.data || []
 
       const proyectosActivos = listaProyectos.filter(
@@ -258,10 +289,10 @@ export default function UsuariosPage() {
 
       // Construir payload solo con los campos que el backend espera
       const payloadApi: Record<string, unknown> = {
-        primer_nombre: payload.primer_nombre,
-        segundo_nombre: payload.segundo_nombre || null,
-        primer_apellido: payload.primer_apellido,
-        segundo_apellido: payload.segundo_apellido || null,
+        primer_nombre: formatearNombrePropio(payload.primer_nombre?.trim()),
+        segundo_nombre: payload.segundo_nombre?.trim() ? formatearNombrePropio(payload.segundo_nombre.trim()) : null,
+        primer_apellido: formatearNombrePropio(payload.primer_apellido?.trim()),
+        segundo_apellido: payload.segundo_apellido?.trim() ? formatearNombrePropio(payload.segundo_apellido.trim()) : null,
         correo: payload.correo,
         telefono: payload.telefono || '',
         rol: payload.rol,
@@ -509,8 +540,8 @@ export default function UsuariosPage() {
       <div className="sticky -top-4 z-20 bg-[#F3F4F7] pt-4 pb-3 space-y-3 -mx-4 px-4 xl:-mx-5 xl:px-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="text-[18px] font-extrabold leading-none text-gray-800">Usuarios</h1>
-            <p className="mt-1 text-[11px] text-gray-400">
+            <h1 className="text-xl sm:text-[18px] font-extrabold leading-tight text-gray-800">Usuarios</h1>
+            <p className="mt-1 text-xs sm:text-[11px] text-gray-500">
               Gestión de accesos y permisos del sistema
             </p>
           </div>
@@ -518,41 +549,63 @@ export default function UsuariosPage() {
           <div className="flex items-center gap-2">
             <Link
               href="/dashboard/roles"
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-[11px] font-semibold rounded-lg transition-colors shadow-2xs cursor-pointer"
+              className="flex items-center gap-1.5 px-3.5 sm:px-3 py-2 sm:py-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs sm:text-[11px] font-semibold rounded-lg transition-colors shadow-2xs cursor-pointer active:scale-95"
             >
-              <Shield size={12} />
-              Gestión de Roles
+              <Shield size={14} className="sm:w-3 sm:h-3" />
+              <span>Gestión de Roles</span>
             </Link>
 
             <button
               onClick={handleNuevo}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#9B0F06] hover:bg-[#5E0006] text-white text-[11px] font-bold rounded-lg transition-colors shadow-sm cursor-pointer"
+              className="flex items-center gap-1.5 px-3.5 sm:px-3 py-2 sm:py-1.5 bg-[#9B0F06] hover:bg-[#5E0006] text-white text-xs sm:text-[11px] font-bold rounded-lg transition-colors shadow-sm cursor-pointer active:scale-95"
             >
-              <Plus size={12} />
-              Nuevo Usuario
+              <Plus size={14} className="sm:w-3 sm:h-3" />
+              <span>Nuevo Usuario</span>
             </button>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-2.5 bg-white p-2.5 rounded-xl border border-gray-100 shadow-2xs">
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative md:w-48 w-full">
-              <Search size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+        <div className="flex items-center justify-between gap-2 bg-white p-2 sm:p-2.5 rounded-xl border border-gray-100 shadow-2xs">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            {/* Buscador de texto */}
+            <div className="relative flex-1 sm:w-52 sm:flex-initial">
+              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 sm:w-3 sm:h-3" />
               <input
                 type="text"
                 placeholder="Buscar usuario..."
                 value={busqueda}
                 onChange={(e) => setBusqueda(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 border border-gray-200 rounded-lg text-[10px] text-gray-700 focus:outline-none focus:border-[#9B0F06] transition-colors"
+                className="w-full pl-8 pr-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-700 placeholder-gray-400 focus:outline-none focus:border-[#9B0F06] transition-colors h-[34px] sm:h-auto"
               />
             </div>
 
-            <div className="flex items-center gap-0.5 bg-gray-100 p-0.5 rounded-lg">
+            {/* Botón Filtros Móvil */}
+            <button
+              type="button"
+              onClick={() => setModalFiltrosAbierto(true)}
+              className={`sm:hidden flex items-center justify-center gap-1.5 px-3 h-[34px] rounded-lg border text-[11px] font-bold transition-all cursor-pointer shrink-0 ${
+                filtrosActivosCount > 0
+                  ? 'bg-[#9B0F06] text-white border-[#9B0F06] shadow-xs'
+                  : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+              }`}
+              title="Filtrar usuarios"
+            >
+              <Filter size={13} />
+              <span>Filtros</span>
+              {filtrosActivosCount > 0 && (
+                <span className="ml-0.5 rounded-full bg-white text-[#9B0F06] px-1.5 py-0.2 text-[9px] font-extrabold leading-none">
+                  {filtrosActivosCount}
+                </span>
+              )}
+            </button>
+
+            {/* Controles Desktop (Ocultos en Móvil) */}
+            <div className="hidden sm:flex items-center gap-0.5 bg-gray-100 p-0.5 rounded-lg overflow-x-auto max-w-full">
               {['Todos', 'Activo', 'Inactivo', 'Suspendido'].map((estado) => (
                 <button
                   key={estado}
                   onClick={() => setFiltroEstado(estado as EstadoUsuario | 'Todos')}
-                  className={`px-3 py-1 text-[10px] transition-colors rounded-md cursor-pointer ${
+                  className={`px-3 py-1 text-[10px] transition-colors rounded-md cursor-pointer whitespace-nowrap ${
                     filtroEstado === estado
                       ? 'bg-white text-gray-800 shadow-2xs font-semibold'
                       : 'text-gray-500 hover:text-gray-700 font-medium'
@@ -566,7 +619,7 @@ export default function UsuariosPage() {
             <select
               value={filtroRol}
               onChange={(e) => setFiltroRol(e.target.value as RolUsuario | 'Todos')}
-              className="h-8 rounded-md border border-gray-200 bg-white px-2 text-[10px] text-gray-600 focus:border-[#9B0F06] focus:outline-none cursor-pointer"
+              className="hidden sm:inline-block h-8 rounded-md border border-gray-200 bg-white px-2 text-[10px] text-gray-700 focus:border-[#9B0F06] focus:outline-none cursor-pointer"
             >
               <option value="Todos">Todos los roles</option>
               {(() => {
@@ -592,11 +645,126 @@ export default function UsuariosPage() {
             </select>
           </div>
 
-          <div className="text-[10px] text-gray-400 font-medium mr-1">
+          <div className="text-[10px] text-gray-400 font-medium mr-1 shrink-0">
             {usuariosFiltrados.length} usuario{usuariosFiltrados.length !== 1 ? 's' : ''}
           </div>
         </div>
       </div>
+
+      {/* Modal Bottom Sheet de Filtros en Móvil */}
+      {modalFiltrosAbierto && (
+        <Portal>
+          <div
+            className="fixed inset-0 z-[10000] bg-black/40 backdrop-blur-2xs transition-opacity cursor-pointer sm:hidden"
+            onClick={() => setModalFiltrosAbierto(false)}
+          />
+          <div className="fixed inset-x-0 bottom-0 z-[10001] w-full bg-white rounded-t-2xl shadow-2xl border-t border-gray-200 flex flex-col max-h-[85vh] animate-in slide-in-from-bottom duration-200 sm:hidden font-[Poppins]">
+            {/* Header del Bottom Sheet */}
+            <div className="p-3.5 border-b border-gray-100 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Filter size={15} className="text-[#9B0F06]" />
+                <h3 className="text-xs font-bold text-gray-800">Filtros de Usuarios</h3>
+                {filtrosActivosCount > 0 && (
+                  <span className="bg-red-50 text-[#9B0F06] text-[9.5px] font-bold px-2 py-0.5 rounded-full">
+                    {filtrosActivosCount} activo{filtrosActivosCount > 1 ? 's' : ''}
+                  </span>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalFiltrosAbierto(false)}
+                className="p-1 rounded-lg hover:bg-gray-100 text-gray-400 cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Contenido scrolleable del Bottom Sheet */}
+            <div className="p-4 overflow-y-auto space-y-4 flex-1 text-[9.5px]">
+              {/* Sección Estado */}
+              <div className="space-y-1.5">
+                <label className="text-[8.5px] font-bold text-gray-400 uppercase tracking-wider block">
+                  Estado de Cuenta
+                </label>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {['Todos', 'Activo', 'Inactivo', 'Suspendido'].map((estado) => {
+                    const activo = filtroEstado === estado
+                    return (
+                      <button
+                        key={estado}
+                        type="button"
+                        onClick={() => setFiltroEstado(estado as EstadoUsuario | 'Todos')}
+                        className={`h-[34px] rounded-lg border text-[10px] font-medium flex items-center justify-center transition-all cursor-pointer ${
+                          activo
+                            ? 'bg-[#9B0F06] border-[#9B0F06] text-white shadow-xs font-bold'
+                            : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        <span>{estado}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Sección Rol */}
+              <div className="space-y-1.5">
+                <label className="text-[8.5px] font-bold text-gray-400 uppercase tracking-wider block">
+                  Rol Asignado
+                </label>
+                <select
+                  value={filtroRol}
+                  onChange={(e) => setFiltroRol(e.target.value as RolUsuario | 'Todos')}
+                  className="w-full h-[36px] rounded-lg border border-gray-200 bg-white px-2.5 text-[11px] text-gray-700 focus:border-[#9B0F06] focus:outline-none cursor-pointer"
+                >
+                  <option value="Todos">Todos los roles</option>
+                  {(() => {
+                    const fallbackRoles = [
+                      { id: 'r1', nombre: 'Administrador' },
+                      { id: 'r2', nombre: 'Gerencia' },
+                      { id: 'r3', nombre: 'IngenieroResidente' },
+                      { id: 'r4', nombre: 'Laboratorista' },
+                      { id: 'r5', nombre: 'AuxiliarDeCampo' },
+                      { id: 'r6', nombre: 'Contratante' },
+                      { id: 'r7', nombre: 'Supervisor' },
+                      { id: 'r8', nombre: 'Inspector' },
+                      { id: 'r9', nombre: 'Campo' },
+                      { id: 'r10', nombre: 'Proveedor' },
+                      { id: 'r11', nombre: 'Delegado Residente' },
+                    ]
+                    const listaBase = roles && roles.length > 0 ? roles : fallbackRoles
+                    return listaBase.map((rol: any) => (
+                      <option key={rol.id || rol.nombre} value={rol.nombre}>{rol.nombre}</option>
+                    ))
+                  })()}
+                </select>
+              </div>
+
+              {/* Acciones en el Sheet */}
+              <div className="pt-2 border-t border-gray-100 flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={filtrosActivosCount === 0}
+                  onClick={() => {
+                    setFiltroEstado('Todos')
+                    setFiltroRol('Todos')
+                  }}
+                  className="flex-1 h-[36px] rounded-lg border border-gray-200 bg-white text-[11px] font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
+                >
+                  Limpiar Filtros
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setModalFiltrosAbierto(false)}
+                  className="flex-1 h-[36px] rounded-lg bg-[#9B0F06] text-white text-[11px] font-bold hover:bg-[#5E0006] transition-all cursor-pointer shadow-xs"
+                >
+                  Aplicar
+                </button>
+              </div>
+            </div>
+          </div>
+        </Portal>
+      )}
 
       {loading ? (
         <div className="flex flex-col items-center justify-center p-12 bg-white border border-gray-100 rounded-2xl shadow-sm">
@@ -614,20 +782,19 @@ export default function UsuariosPage() {
           />
 
           {/* Controls de Paginación iniciando en 8, luego 16 */}
-          <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-xl border border-gray-100 shadow-2xs">
-            <div className="flex items-center gap-2 text-[10px] text-gray-500">
+          <div data-paginacion="true" className="paginacion-control flex flex-wrap items-center justify-between gap-3 bg-white p-2.5 sm:p-3 rounded-xl border border-gray-100 shadow-2xs text-[9.5px]">
+            <div className="flex items-center gap-1.5 text-[9.5px] text-gray-500">
               <span>Mostrar</span>
               <select
                 value={registrosPorPagina}
                 onChange={(e) => setRegistrosPorPagina(Number(e.target.value))}
-                className="h-7 rounded-md border border-gray-200 bg-white px-1 focus:border-[#9B0F06] focus:outline-none cursor-pointer font-medium"
+                className="paginacion-control h-6 rounded-md border border-gray-200 bg-white px-1 text-[9.5px] focus:border-[#9B0F06] focus:outline-none cursor-pointer font-semibold"
               >
                 {[8, 16, 24, 32, 50].map((num) => (
-                  <option key={num} value={num}>{num}</option>
+                  <option key={num} value={num} className="text-[9.5px]">{num}</option>
                 ))}
               </select>
-              <span>registros por página</span>
-
+              <span className="hidden sm:inline">registros por página</span>
             </div>
 
             

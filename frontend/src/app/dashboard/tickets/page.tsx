@@ -1,8 +1,32 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { AlertCircle, CheckCircle2, Clock, Plus, Send, X, Search, Filter, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
+import {
+  AlertCircle,
+  CheckCircle2,
+  Clock,
+  Plus,
+  Send,
+  X,
+  Search,
+  Filter,
+  ChevronLeft,
+  ChevronRight,
+  Trash2,
+  Mail,
+  Phone,
+  KeyRound,
+  ShieldAlert,
+  Eye,
+  EyeOff,
+  Copy,
+  RefreshCw,
+  MessageCircle,
+} from 'lucide-react';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { apiGetDeduplicado } from '@/lib/api/cliente';
+import { USUARIOS_MOCK } from '@/data/usuarios.mock';
+import { showErrorToast, showSuccessToast } from '@/hooks/useCustomToast';
 
 interface TicketMessage {
   id: string;
@@ -20,6 +44,7 @@ interface SupportTicket {
   createdBy: string;
   createdByRole?: string;
   createdByEmail?: string;
+  createdByPhone?: string;
   assignedTo?: string;
   messages: TicketMessage[];
   createdAt: string;
@@ -30,6 +55,52 @@ const getFechaReciente = (horasMenos = 0) => {
   return d.toISOString().slice(0, 16).replace('T', ' ');
 };
 
+const USUARIOS_SISTEMA_BASE = [
+  ...USUARIOS_MOCK,
+  {
+    id: 'demo-001',
+    nombre: 'Daniel Figueroa',
+    correo: 'daniel.figueroa@domunnet.test',
+    rol: 'Administrador',
+    telefono: '+502 5555 9901',
+  },
+  {
+    id: 'demo-002',
+    nombre: 'Jorge Figueroa',
+    correo: 'jorge.figueroa@domunnet.test',
+    rol: 'Gerencia',
+    telefono: '+502 5555 9902',
+  },
+  {
+    id: 'demo-003',
+    nombre: 'Raul Alvarado',
+    correo: 'raul.alvarado@domunnet.test',
+    rol: 'IngenieroResidente',
+    telefono: '+502 4432 1098',
+  },
+  {
+    id: 'demo-004',
+    nombre: 'Mario Tzul',
+    correo: 'mario.tzul@domunnet.test',
+    rol: 'Laboratorista',
+    telefono: '+502 4589 7712',
+  },
+  {
+    id: 'demo-005',
+    nombre: 'Luis Arriaga',
+    correo: 'luis.arriaga@domunnet.test',
+    rol: 'IngenieroResidente',
+    telefono: '+502 4589 1234',
+  },
+  {
+    id: 'demo-006',
+    nombre: 'Marco Estrada',
+    correo: 'marco.estrada@domunnet.test',
+    rol: 'Administrador',
+    telefono: '+502 5555 9988',
+  },
+];
+
 const INITIAL_TICKETS: SupportTicket[] = [
   {
     id: '1',
@@ -39,6 +110,7 @@ const INITIAL_TICKETS: SupportTicket[] = [
     createdBy: 'Luis Arriaga',
     createdByRole: 'IngenieroResidente',
     createdByEmail: 'luis.arriaga@domunnet.test',
+    createdByPhone: '+502 4589 1234',
     assignedTo: 'Administrador / Gerencia',
     createdAt: getFechaReciente(2),
     messages: [
@@ -66,6 +138,7 @@ const INITIAL_TICKETS: SupportTicket[] = [
     createdBy: 'Marco Estrada',
     createdByRole: 'Administrador',
     createdByEmail: 'marco.estrada@domunnet.test',
+    createdByPhone: '+502 5555 9988',
     assignedTo: 'Administrador / Gerencia',
     createdAt: getFechaReciente(5),
     messages: [
@@ -75,6 +148,48 @@ const INITIAL_TICKETS: SupportTicket[] = [
         role: 'user',
         message: 'El PDF del informe abre, pero necesito confirmar si incluye todas las fotografías seleccionadas.',
         timestamp: getFechaReciente(5),
+      },
+    ],
+  },
+  {
+    id: '3',
+    title: 'Restablecimiento de credenciales de acceso',
+    status: 'abierto',
+    category: 'contrasena',
+    createdBy: 'Roberto Díaz Cortés',
+    createdByRole: 'Laboratorista',
+    createdByEmail: 'roberto.diaz@domun.gt',
+    createdByPhone: '+502 7456 7890',
+    assignedTo: 'Administrador / Gerencia',
+    createdAt: getFechaReciente(1),
+    messages: [
+      {
+        id: '1',
+        author: 'Roberto Díaz Cortés',
+        role: 'user',
+        message: 'Buen día, solicito una contraseña temporal para ingresar los ensayos de laboratorio correspondientes a esta semana.',
+        timestamp: getFechaReciente(1),
+      },
+    ],
+  },
+  {
+    id: '4',
+    title: 'Solicitud de contraseña para cuenta gerencial',
+    status: 'abierto',
+    category: 'contrasena',
+    createdBy: 'Laura Pérez López',
+    createdByRole: 'Gerencia',
+    createdByEmail: 'laura.perez@domun.gt',
+    createdByPhone: '+502 7654 3210',
+    assignedTo: 'Administrador / Gerencia',
+    createdAt: getFechaReciente(0.5),
+    messages: [
+      {
+        id: '1',
+        author: 'Laura Pérez López',
+        role: 'user',
+        message: 'Solicito el restablecimiento de las credenciales de acceso para la cuenta gerencial.',
+        timestamp: getFechaReciente(0.5),
       },
     ],
   },
@@ -105,12 +220,68 @@ export default function TicketsPage() {
     message: '',
   });
 
+  // Estados para recuperación y despacho de contraseña
+  const [usuariosSistema, setUsuariosSistema] = useState<any[]>(USUARIOS_SISTEMA_BASE);
+  const [modoEnvio, setModoEnvio] = useState<'correo' | 'whatsapp'>('correo');
+  const [correoEnvio, setCorreoEnvio] = useState('');
+  const [telefonoEnvio, setTelefonoEnvio] = useState('');
+  const [rolDetectado, setRolDetectado] = useState('');
+  const [nombreDetectado, setNombreDetectado] = useState('');
+  const [contrasenaTemporal, setContrasenaTemporal] = useState('');
+  const [mostrarContrasena, setMostrarContrasena] = useState(false);
+
+  const generarContrasenaSegura = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+    let rand = '';
+    for (let i = 0; i < 4; i++) {
+      rand += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    const anio = new Date().getFullYear();
+    return `Domun#${rand}${anio}!`;
+  };
+
+  // Cargar usuarios del sistema (backend + mock)
+  useEffect(() => {
+    let mounted = true;
+    apiGetDeduplicado('/usuarios')
+      .then((res) => {
+        if (mounted && res?.data && Array.isArray(res.data) && res.data.length > 0) {
+          const combinados = [...res.data];
+          for (const baseUsr of USUARIOS_SISTEMA_BASE) {
+            if (!combinados.some((u) => (u.correo || '').toLowerCase() === (baseUsr.correo || '').toLowerCase())) {
+              combinados.push(baseUsr);
+            }
+          }
+          setUsuariosSistema(combinados);
+        }
+      })
+      .catch(() => {
+        if (mounted) {
+          setUsuariosSistema(USUARIOS_SISTEMA_BASE);
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   // Cargar tickets de localStorage
   useEffect(() => {
     try {
       const stored = localStorage.getItem('domun_support_tickets');
       if (stored) {
-        setTickets(JSON.parse(stored));
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const existingIds = new Set(parsed.map((p: any) => p.id));
+          const nuevos = INITIAL_TICKETS.filter((init) => !existingIds.has(init.id));
+          const combinados = [...parsed, ...nuevos];
+          setTickets(combinados);
+          localStorage.setItem('domun_support_tickets', JSON.stringify(combinados));
+        } else {
+          setTickets(INITIAL_TICKETS);
+          localStorage.setItem('domun_support_tickets', JSON.stringify(INITIAL_TICKETS));
+        }
       } else {
         setTickets(INITIAL_TICKETS);
         localStorage.setItem('domun_support_tickets', JSON.stringify(INITIAL_TICKETS));
@@ -119,6 +290,43 @@ export default function TicketsPage() {
       setTickets(INITIAL_TICKETS);
     }
   }, []);
+
+  // Detección automática de datos vinculados del usuario al seleccionar un ticket
+  useEffect(() => {
+    if (!selectedTicket) return;
+
+    const emailTicket = (selectedTicket.createdByEmail || '').toLowerCase().trim();
+    const creadorTicket = (selectedTicket.createdBy || '').toLowerCase().trim();
+
+    const usuarioEncontrado = usuariosSistema.find((u: any) => {
+      const uCorreo = (u.correo || '').toLowerCase().trim();
+      if (emailTicket && uCorreo === emailTicket) return true;
+
+      const uNombre = (u.nombre || `${u.primer_nombre || ''} ${u.primer_apellido || ''}`).toLowerCase().trim();
+      if (creadorTicket && (uNombre === creadorTicket || (u.username && u.username.toLowerCase() === creadorTicket))) return true;
+
+      return false;
+    });
+
+    const nombreFinal = usuarioEncontrado?.nombre || selectedTicket.createdBy || 'Usuario';
+    const rolFinal = usuarioEncontrado?.rol || selectedTicket.createdByRole || 'Usuario';
+    const correoFinal =
+      usuarioEncontrado?.correo ||
+      selectedTicket.createdByEmail ||
+      (selectedTicket.createdBy.includes('@') ? selectedTicket.createdBy : '');
+    const telefonoFinal =
+      usuarioEncontrado?.telefono ||
+      selectedTicket.createdByPhone ||
+      '';
+
+    setNombreDetectado(nombreFinal);
+    setRolDetectado(rolFinal);
+    setCorreoEnvio(correoFinal);
+    setTelefonoEnvio(telefonoFinal);
+    setContrasenaTemporal(generarContrasenaSegura());
+    setModoEnvio('correo');
+    setMostrarContrasena(false);
+  }, [selectedTicket?.id, usuariosSistema]);
 
   const saveTickets = (updated: SupportTicket[]) => {
     setTickets(updated);
@@ -271,6 +479,7 @@ export default function TicketsPage() {
     const creatorName = profile ? `${profile.nombre} ${profile.apellido}` : 'Usuario';
     const creatorRole = profile?.rol || 'Usuario';
     const creatorEmail = profile?.correo || '';
+    const creatorPhone = profile?.telefono || '';
 
     const newTicket: SupportTicket = {
       id: `TICK-${Date.now().toString().slice(-6)}`,
@@ -280,6 +489,7 @@ export default function TicketsPage() {
       createdBy: creatorName,
       createdByRole: creatorRole,
       createdByEmail: creatorEmail,
+      createdByPhone: creatorPhone,
       assignedTo: 'Administrador / Gerencia',
       createdAt: nowStr,
       messages: [
@@ -298,6 +508,170 @@ export default function TicketsPage() {
     setFormData({ subject: '', category: 'contrasena', message: '' });
     setShowCreateForm(false);
     setSelectedTicket(newTicket);
+  };
+
+  const esRolProtegido = (rol: string) => {
+    const r = (rol || '').toLowerCase().trim();
+    return (
+      r === 'administrador' ||
+      r === 'gerencia' ||
+      r === 'admin' ||
+      r.includes('admin') ||
+      r.includes('geren')
+    );
+  };
+
+  const esCategoriaContrasena = (selectedTicket?.category || '').toLowerCase().includes('contra');
+
+  const esTicketProtegido =
+    esRolProtegido(rolDetectado) ||
+    esRolProtegido(selectedTicket?.createdByRole || '');
+
+  const handleCopiarContrasena = () => {
+    if (!contrasenaTemporal) return;
+    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(contrasenaTemporal);
+      showSuccessToast('Contraseña copiada al portapapeles.');
+    } else {
+      showSuccessToast(`Contraseña: ${contrasenaTemporal}`);
+    }
+  };
+
+  const handleEnviarPorCorreo = () => {
+    if (!selectedTicket) return;
+
+    const trimmedCorreo = correoEnvio.trim();
+    if (!trimmedCorreo || !trimmedCorreo.includes('@') || !trimmedCorreo.includes('.')) {
+      showErrorToast('Por favor ingrese un correo electrónico válido para enviar la contraseña.');
+      return;
+    }
+
+    if (!contrasenaTemporal.trim()) {
+      showErrorToast('Debe ingresar o generar una contraseña temporal.');
+      return;
+    }
+
+    const nowStr = new Date().toISOString().slice(0, 16).replace('T', ' ');
+    const authorName = profile ? `${profile.nombre} ${profile.apellido}` : 'Administrador';
+
+    const mensajeDespacho = `🔐 [Credenciales Enviadas por Correo]
+Se ha generado y enviado la nueva contraseña temporal para el acceso a la plataforma DOMUN:
+
+• Destinatario: ${nombreDetectado || selectedTicket.createdBy}
+• Correo vinculado: ${trimmedCorreo}
+• Contraseña temporal: ${contrasenaTemporal.trim()}
+
+Indicación: Al iniciar sesión en el portal, se le solicitará actualizar su clave de acceso.`;
+
+    const updatedMessages: TicketMessage[] = [
+      ...selectedTicket.messages,
+      {
+        id: Date.now().toString(),
+        author: authorName,
+        role: 'admin',
+        message: mensajeDespacho,
+        timestamp: nowStr,
+      },
+    ];
+
+    const updatedStatus =
+      selectedTicket.status === 'abierto' || selectedTicket.status === 'en_revision'
+        ? ('en_progreso' as const)
+        : selectedTicket.status;
+
+    const updatedTicket: SupportTicket = {
+      ...selectedTicket,
+      createdByEmail: trimmedCorreo,
+      createdByPhone: telefonoEnvio.trim() || selectedTicket.createdByPhone,
+      status: updatedStatus,
+      messages: updatedMessages,
+    };
+
+    const updatedTickets = tickets.map((t) => (t.id === selectedTicket.id ? updatedTicket : t));
+    saveTickets(updatedTickets);
+    setSelectedTicket(updatedTicket);
+
+    showSuccessToast(`Contraseña enviada exitosamente al correo ${trimmedCorreo}.`);
+  };
+
+  const handleEnviarPorWhatsApp = () => {
+    if (!selectedTicket) return;
+
+    const rawPhone = telefonoEnvio.trim();
+    const digitsOnly = rawPhone.replace(/\D/g, '');
+
+    if (!digitsOnly || digitsOnly.length < 8) {
+      showErrorToast('Por favor ingrese un número de teléfono válido con al menos 8 dígitos para WhatsApp.');
+      return;
+    }
+
+    if (!contrasenaTemporal.trim()) {
+      showErrorToast('Debe ingresar o generar una contraseña temporal.');
+      return;
+    }
+
+    const cleanPhone = digitsOnly.length === 8 ? `502${digitsOnly}` : digitsOnly;
+    const destinatario = nombreDetectado || selectedTicket.createdBy;
+    const correoCuenta = correoEnvio.trim() || selectedTicket.createdByEmail || 'su cuenta registrada';
+
+    const textoWhatsApp = `*DOMUN - Restablecimiento de Credenciales*
+
+Hola *${destinatario}*,
+
+Atendiendo a tu solicitud de soporte técnico en DOMUN, hemos generado tus credenciales de acceso:
+
+👤 *Usuario / Correo:* ${correoCuenta}
+🔑 *Contraseña temporal:* ${contrasenaTemporal.trim()}
+
+⚠️ _Por motivos de seguridad, te sugerimos iniciar sesión y actualizar tu contraseña desde tu perfil de usuario._
+
+Si no solicitaste este cambio, comunícate de inmediato con el Administrador.`;
+
+    const nowStr = new Date().toISOString().slice(0, 16).replace('T', ' ');
+    const authorName = profile ? `${profile.nombre} ${profile.apellido}` : 'Administrador';
+
+    const mensajeDespacho = `📱 [Credenciales Enviadas por WhatsApp]
+Se ha generado y despachado el mensaje con credenciales vía WhatsApp al número +${cleanPhone}:
+
+• Destinatario: ${destinatario}
+• Teléfono: +${cleanPhone}
+• Contraseña temporal asignada: ${contrasenaTemporal.trim()}
+• Estado: En progreso`;
+
+    const updatedMessages: TicketMessage[] = [
+      ...selectedTicket.messages,
+      {
+        id: Date.now().toString(),
+        author: authorName,
+        role: 'admin',
+        message: mensajeDespacho,
+        timestamp: nowStr,
+      },
+    ];
+
+    const updatedStatus =
+      selectedTicket.status === 'abierto' || selectedTicket.status === 'en_revision'
+        ? ('en_progreso' as const)
+        : selectedTicket.status;
+
+    const updatedTicket: SupportTicket = {
+      ...selectedTicket,
+      createdByEmail: correoEnvio.trim() || selectedTicket.createdByEmail,
+      createdByPhone: rawPhone,
+      status: updatedStatus,
+      messages: updatedMessages,
+    };
+
+    const updatedTickets = tickets.map((t) => (t.id === selectedTicket.id ? updatedTicket : t));
+    saveTickets(updatedTickets);
+    setSelectedTicket(updatedTicket);
+
+    const waUrl = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(textoWhatsApp)}`;
+    if (typeof window !== 'undefined') {
+      window.open(waUrl, '_blank', 'noopener,noreferrer');
+    }
+
+    showSuccessToast(`Mensaje de WhatsApp preparado para +${cleanPhone}.`);
   };
 
   return (
@@ -600,6 +974,9 @@ export default function TicketsPage() {
                       {selectedTicket.createdByEmail && (
                         <span className="text-gray-400">({selectedTicket.createdByEmail})</span>
                       )}
+                      {selectedTicket.createdByPhone && (
+                        <span className="text-gray-400">&bull; Tel: {selectedTicket.createdByPhone}</span>
+                      )}
                       <span>&bull; {selectedTicket.createdAt}</span>
                     </div>
                   </div>
@@ -656,6 +1033,196 @@ export default function TicketsPage() {
                   </div>
                 ))}
               </div>
+
+              {/* Sección especial de Contraseña: Solo si la categoría es Contraseña */}
+              {esCategoriaContrasena && (
+                <div className="border-t border-gray-200 bg-gray-50/70 p-4">
+                  {esTicketProtegido ? (
+                    /* Tarjeta de Seguridad Restringida: Gerencia / Administrador */
+                    <div className="rounded-lg border border-amber-300 bg-amber-50 p-3.5 shadow-2xs">
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-800">
+                          <ShieldAlert size={18} />
+                        </div>
+                        <div className="flex-1 text-xs">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h4 className="font-bold text-amber-950">
+                              Acción Restringida por Seguridad
+                            </h4>
+                            <span className="rounded bg-amber-200/80 px-2 py-0.5 text-[10px] font-bold text-amber-900 uppercase">
+                              Rol: {rolDetectado || selectedTicket.createdByRole}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-amber-900 leading-relaxed">
+                            Por políticas estrictas de seguridad de la plataforma DOMUN, las cuentas con rol <strong>Gerencia</strong> o <strong>Administrador</strong> no permiten el envío ni restablecimiento automatizado de contraseñas mediante tickets de soporte.
+                          </p>
+                          <p className="mt-1 text-[11px] text-amber-800 font-medium">
+                            Para actualizar las credenciales de este perfil, realice el cambio directamente desde el catálogo de Usuarios por un administrador general o de manera presencial.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    /* Módulo de Gestión y Despacho de Contraseña */
+                    <div className="rounded-lg border border-red-200/80 bg-white p-3.5 shadow-2xs space-y-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 pb-2.5">
+                        <div className="flex items-center gap-2">
+                          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-red-100 text-red-800">
+                            <KeyRound size={15} />
+                          </div>
+                          <div>
+                            <h4 className="text-xs font-bold text-gray-900">
+                              Despacho de Contraseña Temporal
+                            </h4>
+                            <p className="text-[10px] text-gray-500">
+                              Datos detectados del usuario. Selecciona el canal de envío (Correo o WhatsApp).
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Selector de Modo de Envío */}
+                        <div className="flex rounded-lg bg-gray-100 p-0.5 border border-gray-200 text-xs">
+                          <button
+                            type="button"
+                            onClick={() => setModoEnvio('correo')}
+                            className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-semibold transition-all ${
+                              modoEnvio === 'correo'
+                                ? 'bg-red-800 text-white shadow-2xs'
+                                : 'text-gray-600 hover:text-gray-900'
+                            }`}
+                          >
+                            <Mail size={12} />
+                            Correo
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setModoEnvio('whatsapp')}
+                            className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-semibold transition-all ${
+                              modoEnvio === 'whatsapp'
+                                ? 'bg-emerald-600 text-white shadow-2xs'
+                                : 'text-gray-600 hover:text-gray-900'
+                            }`}
+                          >
+                            <MessageCircle size={12} />
+                            WhatsApp
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Datos Vinculados Detectados + Campo Contraseña */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                        {/* Correo Vinculado */}
+                        <div>
+                          <label className="mb-1 flex items-center gap-1 text-[10px] font-semibold text-gray-600">
+                            <Mail size={11} className="text-gray-400" />
+                            Correo vinculado:
+                          </label>
+                          <input
+                            type="email"
+                            value={correoEnvio}
+                            onChange={(e) => setCorreoEnvio(e.target.value)}
+                            placeholder="correo@ejemplo.com"
+                            className="w-full rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs text-gray-900 focus:border-red-800 focus:outline-none"
+                          />
+                        </div>
+
+                        {/* Teléfono Vinculado */}
+                        <div>
+                          <label className="mb-1 flex items-center gap-1 text-[10px] font-semibold text-gray-600">
+                            <Phone size={11} className="text-gray-400" />
+                            Teléfono / WhatsApp vinculado:
+                          </label>
+                          <input
+                            type="text"
+                            value={telefonoEnvio}
+                            onChange={(e) => setTelefonoEnvio(e.target.value)}
+                            placeholder="+502 1234 5678"
+                            className="w-full rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs text-gray-900 focus:border-red-800 focus:outline-none"
+                          />
+                        </div>
+
+                        {/* Contraseña Temporal Generada */}
+                        <div className="sm:col-span-2 lg:col-span-1">
+                          <label className="mb-1 flex items-center justify-between text-[10px] font-semibold text-gray-600">
+                            <span className="flex items-center gap-1">
+                              <KeyRound size={11} className="text-gray-400" />
+                              Contraseña a enviar:
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setContrasenaTemporal(generarContrasenaSegura())}
+                              title="Generar nueva contraseña"
+                              className="flex items-center gap-0.5 text-[10px] font-semibold text-red-800 hover:text-red-900"
+                            >
+                              <RefreshCw size={10} />
+                              Regenerar
+                            </button>
+                          </label>
+                          <div className="relative flex items-center">
+                            <input
+                              type={mostrarContrasena ? 'text' : 'password'}
+                              value={contrasenaTemporal}
+                              onChange={(e) => setContrasenaTemporal(e.target.value)}
+                              className="w-full rounded-md border border-gray-300 bg-gray-50/50 py-1.5 pl-2.5 pr-14 font-mono text-xs text-gray-900 focus:border-red-800 focus:bg-white focus:outline-none"
+                            />
+                            <div className="absolute right-1 flex items-center gap-0.5">
+                              <button
+                                type="button"
+                                onClick={() => setMostrarContrasena(!mostrarContrasena)}
+                                title={mostrarContrasena ? 'Ocultar' : 'Mostrar'}
+                                className="p-1 text-gray-400 hover:text-gray-700"
+                              >
+                                {mostrarContrasena ? <EyeOff size={13} /> : <Eye size={13} />}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={handleCopiarContrasena}
+                                title="Copiar contraseña"
+                                className="p-1 text-gray-400 hover:text-red-800"
+                              >
+                                <Copy size={13} />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Botón de Envío según Modo */}
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 pt-1">
+                        <div className="text-[10px] text-gray-500">
+                          {modoEnvio === 'correo' ? (
+                            <span>Se enviará la credencial por correo electrónico a <strong>{correoEnvio || 'la cuenta vinculada'}</strong></span>
+                          ) : (
+                            <span>Se enviará mensaje formateado a WhatsApp <strong>{telefonoEnvio || 'del número vinculado'}</strong></span>
+                          )}
+                        </div>
+
+                        <div>
+                          {modoEnvio === 'correo' ? (
+                            <button
+                              type="button"
+                              onClick={handleEnviarPorCorreo}
+                              className="flex items-center gap-1.5 rounded-md bg-red-800 px-3 py-1.5 text-xs font-semibold text-white shadow-2xs transition-colors hover:bg-red-900"
+                            >
+                              <Mail size={13} />
+                              Enviar Contraseña por Correo
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={handleEnviarPorWhatsApp}
+                              className="flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-2xs transition-colors hover:bg-emerald-700"
+                            >
+                              <MessageCircle size={13} />
+                              Enviar Contraseña por WhatsApp
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Responder */}
               <div className="border-t border-gray-200 bg-white p-4">

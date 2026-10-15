@@ -27,6 +27,7 @@
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.0",
     "morgan": "^1.10.0",
+    "pg": "^8.23.0",
     "puppeteer": "^21.6.0",
     "sharp": "^0.32.6",
     "winston": "^3.11.0",

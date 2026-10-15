@@ -37,33 +37,33 @@ export function RoleInactivateModal({
             </button>
           </div>
 
-          <h3 className="text-[18px] font-bold text-gray-800">Inactivar Rol</h3>
-          <p className="mt-1.5 text-[12px] leading-relaxed text-gray-600">
+          <h3 className="text-base sm:text-[18px] font-bold text-gray-800">Inactivar Rol</h3>
+          <p className="mt-1.5 text-sm sm:text-[12px] leading-relaxed text-gray-600">
             ¿Estás seguro que deseas cambiar a estado <span className="font-semibold text-amber-700">Inactivo</span> el rol{' '}
             <span className="font-bold text-gray-800">{roleName}</span>?
           </p>
 
           <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50/80 p-3.5 space-y-1">
-            <p className="text-[11.5px] font-bold text-amber-900">Impacto en usuarios</p>
-            <p className="text-[11px] text-amber-800 leading-snug">
+            <p className="text-xs sm:text-[11.5px] font-bold text-amber-900">Impacto en usuarios</p>
+            <p className="text-xs sm:text-[11px] text-amber-800 leading-snug">
               {numUsuarios > 0
-                ? `Actualmente hay ${numUsuarios} usuario(s) asignado(s) a este rol. Pasarám automáticamente a estado Suspendido hasta que el rol vuelva a reactivarse.`
+                ? `Actualmente hay ${numUsuarios} usuario(s) asignado(s) a este rol. Pasarán automáticamente a estado Suspendido hasta que el rol vuelva a reactivarse.`
                 : 'Los usuarios asociados a este rol no podrán operar mientras el rol permanezca inactivo.'}
             </p>
           </div>
 
-          <div className="mt-6 flex gap-3">
+          <div className="mt-5 sm:mt-6 flex gap-3">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 rounded-xl border border-gray-200 py-2.5 text-[12px] font-semibold text-gray-700 transition-colors hover:bg-gray-50 cursor-pointer"
+              className="flex-1 rounded-xl border border-gray-200 py-3 sm:py-2.5 text-sm sm:text-[12px] font-semibold text-gray-700 transition-colors hover:bg-gray-50 cursor-pointer"
             >
               Cancelar
             </button>
             <button
               type="button"
               onClick={onConfirm}
-              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#9B0F06] py-2.5 text-[12px] font-bold text-white transition-colors hover:bg-[#5E0006] shadow-sm cursor-pointer"
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#9B0F06] py-3 sm:py-2.5 text-sm sm:text-[12px] font-bold text-white transition-colors hover:bg-[#5E0006] shadow-sm cursor-pointer"
             >
               Confirmar e Inactivar
             </button>

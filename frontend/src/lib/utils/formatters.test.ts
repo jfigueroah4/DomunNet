@@ -1,5 +1,5 @@
 import { test, expect } from 'vitest'
-import { formatFullName } from './formatters'
+import { formatFullName, formatearNombrePropio } from './formatters'
 
 test('formatFullName - todos los campos', () => {
   const resultado = formatFullName('Juan', 'Pérez', 'Carlos', 'López')
@@ -34,4 +34,24 @@ test('formatFullName - solo primer nombre y apellido', () => {
 test('formatFullName - con espacios en blanco', () => {
   const resultado = formatFullName('  Juan  ', '  Pérez  ', '  Carlos  ', '  López  ')
   expect(resultado).toBe('Juan Carlos Pérez López')
+})
+
+test('formatearNombrePropio - convierte minúsculas a capitalizada', () => {
+  expect(formatearNombrePropio('joshua')).toBe('Joshua')
+  expect(formatearNombrePropio('da')).toBe('Da')
+  expect(formatearNombrePropio('figue')).toBe('Figue')
+  expect(formatearNombrePropio('figueroa')).toBe('Figueroa')
+})
+
+test('formatearNombrePropio - no permite mayúsculas sostenidas', () => {
+  expect(formatearNombrePropio('JOSHUA')).toBe('Joshua')
+  expect(formatearNombrePropio('FIGUEROA')).toBe('Figueroa')
+  expect(formatearNombrePropio('JOSHUA DAVID FIGUEROA')).toBe('Joshua David Figueroa')
+})
+
+test('formatearNombrePropio - maneja tildes y caracteres especiales en español', () => {
+  expect(formatearNombrePropio('ÁNGEL MARÍA')).toBe('Ángel María')
+  expect(formatearNombrePropio('pérez')).toBe('Pérez')
+  expect(formatearNombrePropio('ñáñez')).toBe('Ñáñez')
+  expect(formatearNombrePropio('GÜEREÑA')).toBe('Güereña')
 })

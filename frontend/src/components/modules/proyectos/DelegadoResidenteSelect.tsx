@@ -13,16 +13,18 @@ interface DelegadoResidenteSelectProps {
   hasError?: boolean
   onAbrirCrearDelegado?: () => void
   reloadTrigger?: number
+  excluirUsuarioId?: string
 }
 
 export function DelegadoResidenteSelect({
   value,
   onChange,
-  labelClass = 'block text-[9px] font-bold text-gray-700 uppercase tracking-wide',
+  labelClass = 'block text-[10px] md:text-[9px] font-bold text-gray-700 uppercase tracking-wide font-[Poppins]',
   className = '',
   hasError = false,
   onAbrirCrearDelegado,
   reloadTrigger = 0,
+  excluirUsuarioId,
 }: DelegadoResidenteSelectProps) {
   const router = useRouter()
   const [delegados, setDelegados] = useState<{ id: string; nombre: string }[]>([])
@@ -48,13 +50,15 @@ export function DelegadoResidenteSelect({
     cargarDelegados()
   }, [reloadTrigger])
 
-  const options = delegados.map((d) => ({
-    value: d.id,
-    label: d.nombre,
-  }))
+  const options = delegados
+    .filter((d) => !excluirUsuarioId || d.id !== excluirUsuarioId)
+    .map((d) => ({
+      value: d.id,
+      label: d.nombre,
+    }))
 
   return (
-    <div className={className}>
+    <div className={`font-[Poppins] ${className}`}>
       <label className={labelClass}>Delegado Residente de Proyecto <span className="text-[#9B0F06]">*</span></label>
       <Combobox
         options={options}

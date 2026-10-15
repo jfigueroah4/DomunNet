@@ -1,11 +1,13 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Edit, Eye, Search, Trash2, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
+import { Edit, Eye, Search, Trash2, ArrowUpDown, ArrowUp, ArrowDown, FolderGit2, Users } from 'lucide-react'
 import { api } from '@/lib/api/cliente'
 import { showErrorToast, showSuccessToast } from '@/hooks/useCustomToast'
 import { AccionEstadoModal } from '@/components/ui/AccionEstadoModal'
 import { EmpresaRelacionadaDrawer } from './EmpresaRelacionadaDrawer'
+import { ProyectosVinculadosModal } from './ProyectosVinculadosModal'
+import { ContactosEmpresaDrawer } from './ContactosEmpresaDrawer'
 import { EmpresaRelacionada } from '@/stores/useEmpresasRelacionadasStore'
 
 export function EmpresasRelacionadasTab({
@@ -19,12 +21,13 @@ export function EmpresasRelacionadasTab({
   empresas: EmpresaRelacionada[]
   recargar: () => Promise<void>
   crearSolicitud: number
-  onFilteredCountChange: (count: number) => void
+  onFilteredCountChange?: (count: number) => void
 }) {
   const [query, setQuery] = useState('')
-  const [estado, setEstado] = useState<'Todos' | 'Activos' | 'Inactivos'>('Todos')
   const [paginaActual, setPaginaActual] = useState(1)
   const [registrosPorPagina, setRegistrosPorPagina] = useState(10)
+  const [empresaModalProyectos, setEmpresaModalProyectos] = useState<EmpresaRelacionada | null>(null)
+  const [empresaContactosDrawer, setEmpresaContactosDrawer] = useState<EmpresaRelacionada | null>(null)
 
   const [sortColumn, setSortColumn] = useState<'nombre' | 'nit' | 'telefono' | 'contactos' | 'proyectos' | ''>('')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
@@ -38,6 +41,15 @@ export function EmpresasRelacionadasTab({
   useEffect(() => {
     void recargar()
   }, [tipo, recargar])
+
+  useEffect(() => {
+    if (empresaContactosDrawer) {
+      const updated = empresas.find((e) => e.id === empresaContactosDrawer.id)
+      if (updated) {
+        setEmpresaContactosDrawer(updated)
+      }
+    }
+  }, [empresas])
 
   useEffect(() => {
     if (crearSolicitud === 0) return
@@ -65,12 +77,12 @@ export function EmpresasRelacionadasTab({
   }
 
   const listaFiltrada = useMemo(() => {
-    return empresas.filter(
-      (e) =>
-        (!query || `${e.nombre} ${e.nit} ${e.correo_institucional}`.toLowerCase().includes(query.toLowerCase())) &&
-        (estado === 'Todos' || (estado === 'Activos' ? e.activo : !e.activo))
+    if (!query.trim()) return empresas
+    const q = query.toLowerCase().trim()
+    return empresas.filter((e) =>
+      `${e.nombre} ${e.nit || ''} ${e.correo_institucional || ''}`.toLowerCase().includes(q)
     )
-  }, [empresas, query, estado])
+  }, [empresas, query])
 
   const listaOrdenada = useMemo(() => {
     if (!sortColumn) return listaFiltrada
@@ -106,10 +118,10 @@ export function EmpresasRelacionadasTab({
 
   useEffect(() => {
     setPaginaActual(1)
-  }, [query, estado, registrosPorPagina, sortColumn, sortDirection])
+  }, [query, registrosPorPagina, sortColumn, sortDirection])
 
   useEffect(() => {
-    onFilteredCountChange(listaOrdenada.length)
+    onFilteredCountChange?.(listaOrdenada.length)
   }, [listaOrdenada.length, onFilteredCountChange])
 
   const endpoint = tipo === 'entidad' ? '/entidades-contratantes' : '/empresas-contratistas'
@@ -179,32 +191,26 @@ export function EmpresasRelacionadasTab({
 
   return (
     <div className="space-y-3 font-[Poppins]">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="text-sm font-bold text-gray-800">{titulo}</h2>
           <p className="text-[10px] text-gray-400">Catálogo de empresas vinculadas con ordenamiento de columnas</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 bg-white p-2 shadow-sm">
-          <div className="relative min-w-[220px] flex-1">
-            <Search size={13} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
+        <div className="flex w-full flex-col items-start sm:w-auto sm:items-end gap-1.5">
+          <span className="text-[10px] sm:text-[10.5px] font-medium text-gray-500">
+            {tipo === 'entidad'
+              ? `${listaOrdenada.length} ${listaOrdenada.length === 1 ? 'entidad encontrada' : 'entidades encontradas'}`
+              : `${listaOrdenada.length} ${listaOrdenada.length === 1 ? 'empresa encontrada' : 'empresas encontradas'}`}
+          </span>
+          <div className="relative w-full sm:w-72">
+            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Buscar nombre, NIT o correo"
-              className="w-full bg-gray-50 border border-gray-200 rounded-md pl-7 pr-2 py-1.5 text-xs font-medium text-gray-800 placeholder:text-gray-400 focus:outline-none focus:border-[#9B0F06] focus:bg-white transition-colors"
+              className="w-full bg-white border border-gray-200 rounded-lg pl-8 pr-3 py-1.5 text-xs font-medium text-gray-800 placeholder:text-gray-400 shadow-2xs focus:outline-none focus:border-[#9B0F06] transition-colors"
             />
           </div>
-          {(['Todos', 'Activos', 'Inactivos'] as const).map((item) => (
-            <button
-              key={item}
-              onClick={() => setEstado(item)}
-              className={`rounded-md px-3 py-1.5 text-[10px] font-bold transition-all cursor-pointer ${
-                estado === item ? 'bg-[#9B0F06] text-white shadow-2xs' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              {item}
-            </button>
-          ))}
         </div>
       </div>
 
@@ -245,7 +251,7 @@ export function EmpresasRelacionadasTab({
               <th className="p-3 text-right">Acciones</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100 font-sans">
+          <tbody className="divide-y divide-gray-100 font-[Poppins]">
             {listaPaginada.map((e) => (
               <tr key={e.id} className="text-[10px] hover:bg-gray-50/80 transition-colors">
                 <td className="p-3 font-medium text-gray-900">
@@ -262,10 +268,44 @@ export function EmpresasRelacionadasTab({
                   <div className="font-medium text-gray-700">{e.telefono || 'Sin teléfono'}</div>
                   <div className="text-[9px] text-gray-400">{e.correo_institucional || 'Sin correo'}</div>
                 </td>
-                <td className="p-3 text-center font-bold text-gray-700">{e.contactos?.length || 0}</td>
-                <td className="p-3 text-center font-bold text-[#9B0F06]">{e.proyectos_vinculados || 0}</td>
+                <td className="p-3 text-center whitespace-nowrap">
+                  <button
+                    type="button"
+                    onClick={() => setEmpresaContactosDrawer(e)}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-white border border-gray-200 px-2.5 py-1 text-[10px] font-semibold text-gray-700 hover:border-[#9B0F06] hover:text-[#9B0F06] transition-all cursor-pointer shadow-2xs whitespace-nowrap"
+                    title={`Gestionar contactos de ${e.nombre}`}
+                  >
+                    <Users size={12} className="text-gray-500" />
+                    <span>{e.contactos?.length || 0}</span>
+                    <span className="text-[9.5px]">
+                      {(e.contactos?.length || 0) === 1 ? 'contacto' : 'contactos'}
+                    </span>
+                  </button>
+                </td>
+                <td className="p-3 text-center whitespace-nowrap">
+                  <button
+                    type="button"
+                    onClick={() => setEmpresaModalProyectos(e)}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-white border border-gray-200 px-2.5 py-1 text-[10px] font-semibold text-gray-700 hover:border-[#9B0F06] hover:text-[#9B0F06] transition-all cursor-pointer shadow-2xs whitespace-nowrap"
+                    title={`Ver proyectos vinculados con ${e.nombre}`}
+                  >
+                    <FolderGit2 size={12} className="text-gray-500" />
+                    <span>{e.proyectos_vinculados || 0}</span>
+                    <span className="text-[9.5px]">
+                      {(e.proyectos_vinculados || 0) === 1 ? 'proyecto' : 'proyectos'}
+                    </span>
+                  </button>
+                </td>
                 <td className="p-3 text-right">
                   <div className="flex items-center justify-end gap-1">
+                    <button
+                      type="button"
+                      className="p-1 text-gray-400 hover:text-[#9B0F06] transition-colors cursor-pointer"
+                      onClick={() => setEmpresaContactosDrawer(e)}
+                      title="Gestionar Contactos"
+                    >
+                      <Users size={13} />
+                    </button>
                     <button
                       type="button"
                       className="p-1 text-gray-400 hover:text-gray-700 transition-colors cursor-pointer"
@@ -309,32 +349,32 @@ export function EmpresasRelacionadasTab({
         )}
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-100 bg-white px-3 py-2.5 shadow-2xs">
-        <div className="flex items-center gap-2">
-          <span className="text-[9px] font-medium text-gray-500">Mostrar</span>
+      <div data-paginacion="true" className="paginacion-control font-[Poppins] flex flex-nowrap items-center justify-between gap-2 rounded-xl border border-gray-100 bg-white px-2.5 py-2 shadow-2xs">
+        <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
+          <span className="text-[9.5px] font-normal text-gray-500">Mostrar</span>
           <select
             value={registrosPorPagina}
             onChange={(e) => setRegistrosPorPagina(Number(e.target.value))}
-            className="h-6 rounded border border-gray-200 bg-gray-50 px-1 text-[9px] font-bold text-gray-700 focus:border-[#9B0F06] focus:outline-none cursor-pointer"
+            className="paginacion-control h-6 rounded border border-gray-200 bg-gray-50 px-1 text-[9.5px] font-normal text-gray-700 focus:border-[#9B0F06] focus:outline-none cursor-pointer font-[Poppins]"
           >
-            <option value={10}>10</option>
-            <option value={15}>15</option>
-            <option value={25}>25</option>
-            <option value={50}>50</option>
+            <option value={10} className="text-[9.5px] font-[Poppins]">10</option>
+            <option value={15} className="text-[9.5px] font-[Poppins]">15</option>
+            <option value={25} className="text-[9.5px] font-[Poppins]">25</option>
+            <option value={50} className="text-[9.5px] font-[Poppins]">50</option>
           </select>
-          <span className="text-[9px] text-gray-500">registros por página</span>
-          <span className="hidden h-4 w-px bg-gray-200 sm:block" />
-          <span className="hidden text-[9px] font-semibold text-gray-600 sm:inline">
+          <span className="hidden text-[9.5px] font-normal text-gray-500 sm:inline">registros por página</span>
+          <span className="h-3.5 w-px bg-gray-200" />
+          <span className="whitespace-nowrap text-[9.5px] font-normal text-gray-600">
             Página {paginaActual} de {totalPaginas}
           </span>
         </div>
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex shrink-0 items-center gap-1">
           <button
             type="button"
             onClick={() => setPaginaActual((page) => Math.max(1, page - 1))}
             disabled={paginaActual === 1}
-            className="rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-[9px] font-bold text-gray-600 transition-colors hover:border-[#9B0F06] hover:text-[#9B0F06] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+            className="inline-flex h-6 sm:h-7 items-center justify-center rounded-lg border border-gray-200 bg-white px-2 py-0.5 text-[9.5px] font-normal text-gray-600 transition-colors hover:border-[#9B0F06] hover:text-[#9B0F06] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer font-[Poppins]"
           >
             Anterior
           </button>
@@ -342,7 +382,7 @@ export function EmpresasRelacionadasTab({
             type="button"
             onClick={() => setPaginaActual((page) => Math.min(totalPaginas, page + 1))}
             disabled={paginaActual === totalPaginas}
-            className="rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-[9px] font-bold text-gray-600 transition-colors hover:border-[#9B0F06] hover:text-[#9B0F06] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+            className="inline-flex h-6 sm:h-7 items-center justify-center rounded-lg border border-gray-200 bg-white px-2 py-0.5 text-[9.5px] font-normal text-gray-600 transition-colors hover:border-[#9B0F06] hover:text-[#9B0F06] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer font-[Poppins]"
           >
             Siguiente
           </button>
@@ -369,6 +409,19 @@ export function EmpresasRelacionadasTab({
         subtitulo1={empresaEliminar?.nit ? `NIT: ${empresaEliminar.nit}` : ''}
         subtitulo2={empresaEliminar?.correo_institucional || ''}
         isSuspended={!empresaEliminar?.activo}
+      />
+      <ProyectosVinculadosModal
+        isOpen={Boolean(empresaModalProyectos)}
+        onClose={() => setEmpresaModalProyectos(null)}
+        empresa={empresaModalProyectos}
+        tipo={tipo}
+      />
+      <ContactosEmpresaDrawer
+        isOpen={Boolean(empresaContactosDrawer)}
+        onClose={() => setEmpresaContactosDrawer(null)}
+        empresa={empresaContactosDrawer}
+        tipo={tipo}
+        recargarEmpresas={recargar}
       />
     </div>
   )

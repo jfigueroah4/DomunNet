@@ -16,6 +16,19 @@ export class ValidationError extends Error {
   }
 }
 
+let cacheEstadoCodigoToId: Map<string, string> | null = null
+let cacheEstadoCodigoTimestamp = 0
+let cacheEmpresaDefaultId: string | null = null
+
+export async function obtenerEmpresaDefaultId(): Promise<string | null> {
+  if (cacheEmpresaDefaultId) return cacheEmpresaDefaultId
+  const { data } = await clienteSupabase.from('empresa').select('id').limit(1).maybeSingle()
+  if (data?.id) {
+    cacheEmpresaDefaultId = data.id
+  }
+  return cacheEmpresaDefaultId
+}
+
 /**
  * Función genérica y reutilizable (usando JOIN seguro) para encontrar el UUID 
  * de un estado basado en su código de catálogo portable (en minúsculas).
@@ -26,15 +39,6 @@ export async function obtenerEstadoIdPorCodigo(codigo: string): Promise<string> 
   }
   const codigoNorm = codigo.toLowerCase().trim()
 
-  const { data: exact } = await clienteSupabase
-    .from('catalogo_item')
-    .select('id, codigo, catalogo!inner(codigo)')
-    .eq('catalogo.codigo', 'estado_proyecto')
-    .eq('codigo', codigoNorm)
-    .maybeSingle()
-
-  if (exact?.id) return exact.id
-
   const aliasMap: Record<string, string[]> = {
     'borrador': ['borrador', 'draft', 'planificacion', 'modificacion', 'modificativo', 'en_modificacion', 'modificación'],
     'activo': ['activo', 'active', 'en_ejecucion'],
@@ -44,21 +48,36 @@ export async function obtenerEstadoIdPorCodigo(codigo: string): Promise<string> 
     'suspendido': ['suspendido', 'en_suspension', 'suspension', 'en_suspensión', 'pausado']
   }
 
-  const posibles = aliasMap[codigoNorm] || [codigoNorm]
+  if (!cacheEstadoCodigoToId || Date.now() - cacheEstadoCodigoTimestamp > 10 * 60 * 1000) {
+    const { data: items } = await clienteSupabase
+      .from('catalogo_item')
+      .select('id, codigo, catalogo!inner(codigo)')
+      .eq('catalogo.codigo', 'estado_proyecto')
 
-  const { data: items } = await clienteSupabase
-    .from('catalogo_item')
-    .select('id, codigo, catalogo!inner(codigo)')
-    .eq('catalogo.codigo', 'estado_proyecto')
+    if (items && items.length > 0) {
+      cacheEstadoCodigoToId = new Map<string, string>()
+      cacheEstadoItems = new Map<string, string>()
+      for (const it of items) {
+        const c = String(it.codigo || '').toLowerCase()
+        cacheEstadoCodigoToId.set(c, it.id)
+        cacheEstadoItems.set(it.id, c)
+      }
+      cacheEstadoCodigoTimestamp = Date.now()
+      cacheEstadoItemsTimestamp = Date.now()
+    }
+  }
 
-  if (items && items.length > 0) {
-    const match = items.find((it: any) =>
-      posibles.includes(it.codigo.toLowerCase()) ||
-      it.codigo.toLowerCase().includes(codigoNorm) ||
-      codigoNorm.includes(it.codigo.toLowerCase())
-    )
-    if (match?.id) return match.id
-    return items[0].id
+  if (cacheEstadoCodigoToId && cacheEstadoCodigoToId.size > 0) {
+    if (cacheEstadoCodigoToId.has(codigoNorm)) {
+      return cacheEstadoCodigoToId.get(codigoNorm)!
+    }
+    const posibles = aliasMap[codigoNorm] || [codigoNorm]
+    for (const [codKey, idVal] of cacheEstadoCodigoToId.entries()) {
+      if (posibles.includes(codKey) || codKey.includes(codigoNorm) || codigoNorm.includes(codKey)) {
+        return idVal
+      }
+    }
+    return Array.from(cacheEstadoCodigoToId.values())[0]
   }
 
   throw new ValidationError(`Estado '${codigo}' no existe en el catálogo.`, 'estado_codigo')
@@ -84,21 +103,23 @@ export async function validarOperacionProyectoPermitida(proyectoId: string, tipo
   const estadoCodigo = ((proy.catalogo_item as any)?.codigo || '').toLowerCase()
   const enReplanificacion = Boolean(proy.en_replanificacion)
 
-  if (enReplanificacion) {
-    throw new ValidationError('El proyecto se encuentra en ciclo de modificación de plazo / replanificación. Operación no permitida.', 'en_replanificacion')
-  }
-
   if (tipoOperacion === 'bitacora') {
+    if (enReplanificacion) {
+      throw new ValidationError('El proyecto se encuentra en ciclo de modificación de plazo / replanificación. Operación no permitida.', 'en_replanificacion')
+    }
     if (estadoCodigo !== 'activo') {
       throw new ValidationError(`No se pueden registrar avances de Bitácora cuando el proyecto está en estado '${estadoCodigo}'.`, 'estado')
     }
   } else if (tipoOperacion === 'analitico') {
+    if (enReplanificacion) {
+      throw new ValidationError('El proyecto se encuentra en ciclo de modificación de plazo / replanificación. Operación no permitida.', 'en_replanificacion')
+    }
     if (['pausado', 'inactivo', 'completado', 'en_revision', 'borrador'].includes(estadoCodigo)) {
       throw new ValidationError(`Operación no permitida en Analítico para el estado '${estadoCodigo}'.`, 'estado')
     }
   } else if (tipoOperacion === 'fechas') {
-    if (['pausado', 'inactivo', 'completado', 'en_revision'].includes(estadoCodigo) || enReplanificacion) {
-      throw new ValidationError('No se pueden editar las fechas del proyecto mientras esté pausado, inactivo, completado, en revisión o en replanificación.', 'fechas')
+    if (['pausado', 'inactivo', 'completado', 'en_revision'].includes(estadoCodigo)) {
+      throw new ValidationError('No se pueden editar las fechas del proyecto mientras esté pausado, inactivo, completado o en revisión.', 'fechas')
     }
   }
 }
@@ -311,28 +332,54 @@ async function resolverEmpresaContratanteId(val: any): Promise<string | null> {
   return null
 }
 
-async function resolverEmpresaContratistaId(val: any): Promise<string | null> {
+async function resolverEmpresaContratistaId(
+  val: any,
+  datosExtra?: { direccion?: string; telefono?: string; correo?: string; nit?: string }
+): Promise<string | null> {
   if (!val || typeof val !== 'string') return null
   const uuid = esUuidValido(val)
   if (uuid) return uuid
 
+  const cleanVal = val.trim()
   const { data: emp } = await clienteSupabase
     .from('empresa_contratista')
-    .select('id')
-    .or(`nombre.ilike.${val.trim()},razon_social.ilike.${val.trim()}`)
+    .select('id, direccion, telefono, correo_institucional')
+    .or(`nombre.ilike.${cleanVal},razon_social.ilike.${cleanVal}`)
     .maybeSingle()
-  if (emp?.id) return emp.id
+
+  if (emp?.id) {
+    if (datosExtra && (datosExtra.direccion || datosExtra.telefono || datosExtra.correo)) {
+      const updates: any = {}
+      if (datosExtra.direccion && !emp.direccion) updates.direccion = datosExtra.direccion
+      if (datosExtra.telefono && !emp.telefono) updates.telefono = datosExtra.telefono
+      if (datosExtra.correo && !emp.correo_institucional) updates.correo_institucional = datosExtra.correo
+      if (Object.keys(updates).length > 0) {
+        await clienteSupabase.from('empresa_contratista').update(updates).eq('id', emp.id)
+      }
+    }
+    return emp.id
+  }
 
   const { data: empRel } = await clienteSupabase
     .from('empresa_relacionada')
     .select('id')
-    .ilike('nombre', val.trim())
+    .ilike('nombre', cleanVal)
     .maybeSingle()
   if (empRel?.id) return empRel.id
 
+  const insertPayload: any = {
+    nombre: cleanVal,
+    razon_social: cleanVal,
+    activo: true,
+  }
+  if (datosExtra?.direccion) insertPayload.direccion = datosExtra.direccion
+  if (datosExtra?.telefono) insertPayload.telefono = datosExtra.telefono
+  if (datosExtra?.correo) insertPayload.correo_institucional = datosExtra.correo
+  if (datosExtra?.nit) insertPayload.nit = datosExtra.nit
+
   const { data: nuevaEmp } = await clienteSupabase
     .from('empresa_contratista')
-    .insert({ nombre: val.trim(), razon_social: val.trim() })
+    .insert(insertPayload)
     .select('id')
     .maybeSingle()
   if (nuevaEmp?.id) return nuevaEmp.id
@@ -340,47 +387,80 @@ async function resolverEmpresaContratistaId(val: any): Promise<string | null> {
   return null
 }
 
+async function sincronizarEmpresaSupervisora(
+  nombre?: string,
+  datosExtra?: { direccion?: string; telefono?: string; correo?: string; propietario?: string }
+): Promise<void> {
+  if (!nombre || typeof nombre !== 'string' || !nombre.trim()) return
+  const clean = nombre.trim()
+  if (clean.toLowerCase() === 'domun') return
+
+  try {
+    const { data: existing } = await clienteSupabase
+      .from('empresa_contratista')
+      .select('id, direccion, telefono, correo_institucional')
+      .or(`nombre.ilike.${clean},razon_social.ilike.${clean}`)
+      .maybeSingle()
+
+    if (existing?.id) {
+      const updates: any = {}
+      if (datosExtra?.direccion && !existing.direccion) updates.direccion = datosExtra.direccion
+      if (datosExtra?.telefono && !existing.telefono) updates.telefono = datosExtra.telefono
+      if (datosExtra?.correo && !existing.correo_institucional) updates.correo_institucional = datosExtra.correo
+      if (Object.keys(updates).length > 0) {
+        await clienteSupabase.from('empresa_contratista').update(updates).eq('id', existing.id)
+      }
+    } else {
+      await clienteSupabase.from('empresa_contratista').insert({
+        nombre: clean,
+        razon_social: clean,
+        direccion: datosExtra?.direccion || null,
+        telefono: datosExtra?.telefono || null,
+        correo_institucional: datosExtra?.correo || null,
+        activo: true,
+      })
+    }
+  } catch (e) {
+    console.error('Error sincronizando empresa supervisora:', e)
+  }
+}
+
+const cacheProyectoDetalleMap = new Map<string, { data: any; timestamp: number }>()
+const TTL_CACHE_PROYECTO_DETALLE_MS = 20 * 1000 // 20s de caché en memoria para detalle
+
+export function invalidarCacheProyectos(proyectoId?: string) {
+  cacheProyectosList = null
+  if (proyectoId) {
+    cacheProyectoDetalleMap.delete(proyectoId)
+  } else {
+    cacheProyectoDetalleMap.clear()
+  }
+}
+
 export async function obtenerProyectoPorId(proyectoId: string) {
-  const { data: proyecto, error: proyectoError } = await clienteSupabase
-    .from('proyecto')
-    .select('id, codigo, nombre, descripcion, ubicacion, responsable_id, fecha_inicio, fecha_fin_estimada, estado_id')
-    .eq('id', proyectoId)
-    .single()
+  if (cacheProyectoDetalleMap.has(proyectoId)) {
+    const cached = cacheProyectoDetalleMap.get(proyectoId)!
+    if (Date.now() - cached.timestamp < TTL_CACHE_PROYECTO_DETALLE_MS) {
+      return cached.data
+    }
+  }
 
-  if (proyectoError || !proyecto) throw new Error('Proyecto no encontrado')
+  const [proyectoRes, detalleRes] = await Promise.all([
+    clienteSupabase
+      .from('proyecto')
+      .select('id, codigo, nombre, descripcion, ubicacion, responsable_id, fecha_inicio, fecha_fin_estimada, estado_id')
+      .eq('id', proyectoId)
+      .single(),
+    clienteSupabase
+      .from('proyecto_detalle')
+      .select('nombre_oficial, descripcion_proyecto, tramo, direccion, latitud, longitud, municipio_id, departamento_id, municipio_fin_id, departamento_fin_id, direccion_fin, kilometro_inicio, kilometro_fin, empresa_contratante_id, empresa_contratista_id, empresa_supervisora, delegado_residente_id, fecha_adjudicacion, fecha_inicio_contractual, numero_escritura_publica, monto_original, plazo_ejecucion_original, plazo_ejecucion_ampliado, fecha_finalizacion_real, monto_final')
+      .eq('proyecto_id', proyectoId)
+      .maybeSingle(),
+  ])
 
-  const { data: detalle, error: detalleError } = await clienteSupabase
-    .from('proyecto_detalle')
-    .select('nombre_oficial, descripcion_proyecto, tramo, direccion, latitud, longitud, municipio_id, departamento_id, municipio_fin_id, departamento_fin_id, direccion_fin, kilometro_inicio, kilometro_fin, empresa_contratante_id, empresa_contratista_id, empresa_supervisora, delegado_residente_id, fecha_adjudicacion, fecha_inicio_contractual, numero_escritura_publica, monto_original, plazo_ejecucion_original, plazo_ejecucion_ampliado, fecha_finalizacion_real, monto_final')
-    .eq('proyecto_id', proyectoId)
-    .single()
-
-  if (detalleError || !detalle) throw new Error('Detalle del proyecto no encontrado')
-
-  const { data: equipoRows } = await clienteSupabase
-    .from('proyecto_usuario')
-    .select('usuario_id, rol_proyecto, usuario:usuario_id(id, correo, dato_usuario(primer_nombre, primer_apellido))')
-    .eq('proyecto_id', proyectoId)
-
-  const { data: paramRow } = await clienteSupabase
-    .from('parametro_proyecto')
-    .select('porcentaje_indirectos, porcentaje_iva, porcentaje_amortizacion_anticipo, porcentaje_retencion_garantia, monto_anticipo_total')
-    .eq('proyecto_id', proyectoId)
-    .maybeSingle()
-
-  const { data: renglonesRows } = await clienteSupabase
-    .from('renglon_trabajo')
-    .select(`
-      id,
-      descripcion,
-      cantidad_contractual,
-      cantidad_ejecutada,
-      cantidad_ajustada,
-      precio_unitario_directo,
-      especificacion:especificacion_id(codigo, descripcion, unidad),
-      unidad:unidad_id(abreviatura, nombre)
-    `)
-    .eq('proyecto_id', proyectoId)
+  if (proyectoRes.error || !proyectoRes.data) throw new Error('Proyecto no encontrado')
+  const proyecto = proyectoRes.data
+  const detalle: any = detalleRes.data || {}
 
   function extraerCodigoRenglon(desc?: string, codExplicit?: string | null): string | null {
     if (codExplicit) return codExplicit
@@ -389,13 +469,107 @@ export async function obtenerProyectoPorId(proyectoId: string) {
     return match ? match[1] : null
   }
 
-  const mappedRenglones = (renglonesRows || []).map((r: any) => {
+  const [
+    equipoRes,
+    paramRes,
+    renglonesRes,
+    contratosRes,
+    entidadContratanteNombre,
+    empresaContratistaNombre,
+    delegadoResidenteNombre,
+    responsableNombre,
+    estadoCodigo,
+  ] = await Promise.all([
+    clienteSupabase
+      .from('proyecto_usuario')
+      .select('usuario_id, rol_proyecto, usuario:usuario_id(id, correo, dato_usuario(primer_nombre, primer_apellido))')
+      .eq('proyecto_id', proyectoId),
+
+    clienteSupabase
+      .from('parametro_proyecto')
+      .select('porcentaje_indirectos, porcentaje_iva, porcentaje_amortizacion_anticipo, porcentaje_retencion_garantia, monto_anticipo_total')
+      .eq('proyecto_id', proyectoId)
+      .maybeSingle(),
+
+    clienteSupabase
+      .from('renglon_trabajo')
+      .select(`
+        id,
+        codigo,
+        descripcion,
+        capitulo_id,
+        unidad_id,
+        cantidad_contractual,
+        cantidad_ejecutada,
+        cantidad_ajustada,
+        precio_unitario_directo,
+        especificacion:especificacion_id(codigo, descripcion, unidad),
+        unidad:unidad_id(abreviatura, nombre)
+      `)
+      .eq('proyecto_id', proyectoId),
+
+    clienteSupabase
+      .from('proyecto_contrato')
+      .select('*')
+      .eq('proyecto_id', proyectoId),
+
+    (async () => {
+      if (!detalle.empresa_contratante_id) return ''
+      const entId = detalle.empresa_contratante_id
+      const { data: ent0 } = await clienteSupabase.from('entidad_contratante').select('nombre').eq('id', entId).maybeSingle()
+      if (ent0?.nombre) return ent0.nombre
+      const { data: ent1 } = await clienteSupabase.from('empresa_relacionada').select('nombre').eq('id', entId).maybeSingle()
+      if (ent1?.nombre) return ent1.nombre
+      const { data: ent2 } = await clienteSupabase.from('empresa_contratante').select('nombre').eq('id', entId).maybeSingle()
+      return ent2?.nombre || ''
+    })(),
+
+    (async () => {
+      if (!detalle.empresa_contratista_id) return ''
+      const empId = detalle.empresa_contratista_id
+      const { data: emp0 } = await clienteSupabase.from('empresa_contratista').select('nombre').eq('id', empId).maybeSingle()
+      if (emp0?.nombre) return emp0.nombre
+      const { data: emp1 } = await clienteSupabase.from('empresa_relacionada').select('nombre').eq('id', empId).maybeSingle()
+      return emp1?.nombre || ''
+    })(),
+
+    (async () => {
+      if (!detalle.delegado_residente_id) return ''
+      const { data: del } = await clienteSupabase
+        .from('usuario')
+        .select('correo, dato_usuario(primer_nombre, primer_apellido)')
+        .eq('id', detalle.delegado_residente_id)
+        .maybeSingle()
+      if (!del) return ''
+      const dato = (del as any).dato_usuario
+      const full = dato ? `${dato.primer_nombre || ''} ${dato.primer_apellido || ''}`.trim() : ''
+      return full || del.correo || ''
+    })(),
+
+    (async () => {
+      if (!proyecto.responsable_id) return ''
+      const { data: respU } = await clienteSupabase
+        .from('usuario')
+        .select('correo, dato_usuario(primer_nombre, primer_apellido)')
+        .eq('id', proyecto.responsable_id)
+        .maybeSingle()
+      if (!respU) return ''
+      const dato = (respU as any).dato_usuario
+      const full = dato ? `${dato.primer_nombre || ''} ${dato.primer_apellido || ''}`.trim() : ''
+      return full || respU.correo || ''
+    })(),
+
+    resolverCodigoEstado(proyecto.estado_id),
+  ])
+
+  const mappedRenglones = (renglonesRes.data || []).map((r: any) => {
     const esp = r.especificacion || {}
     const uni = r.unidad || {}
-    const codParsed = extraerCodigoRenglon(r.descripcion, esp.codigo || r.codigo)
-    const cod = codParsed || esp.codigo || r.codigo || r.id
+    const codParsed = extraerCodigoRenglon(r.descripcion, r.codigo || esp.codigo)
+    const cod = r.codigo || codParsed || esp.codigo || r.id
     const desc = r.descripcion || esp.descripcion || 'Renglón de trabajo'
-    const unidad = uni.abreviatura || esp.unidad || r.unidad_medida || ''
+    const unidad = uni.abreviatura || esp.unidad || r.unidad_medida || 'm³'
+    const capId = Number(r.capitulo_id) || 1
     return {
       id: cod,
       renglonId: r.id,
@@ -405,13 +579,16 @@ export async function obtenerProyectoPorId(proyectoId: string) {
       descripcion: desc,
       unidad,
       unidad_medida: unidad,
+      capituloId: capId,
+      capituloNombre: `Capítulo ${capId}`,
       cantidadContratada: Number(r.cantidad_contractual) || 0,
       cantidadAjustada: Number(r.cantidad_ajustada) || 0,
       costoUnitarioDirecto: Number(r.precio_unitario_directo) || 0,
+      seleccionado: true,
     }
   })
 
-  const equipo = (equipoRows || []).map((row: any) => {
+  const equipo = (equipoRes.data || []).map((row: any) => {
     const u = row.usuario
     const dato = u?.dato_usuario
     const nombre = dato
@@ -424,138 +601,51 @@ export async function obtenerProyectoPorId(proyectoId: string) {
     }
   })
 
-  let entidadContratanteNombre = ''
-  if (detalle.empresa_contratante_id) {
-    const { data: ent0 } = await clienteSupabase
-      .from('entidad_contratante')
-      .select('nombre')
-      .eq('id', detalle.empresa_contratante_id)
-      .maybeSingle()
-    if (ent0?.nombre) {
-      entidadContratanteNombre = ent0.nombre
-    } else {
-      const { data: ent } = await clienteSupabase
-        .from('empresa_relacionada')
-        .select('nombre')
-        .eq('id', detalle.empresa_contratante_id)
-        .maybeSingle()
-      if (ent?.nombre) {
-        entidadContratanteNombre = ent.nombre
-      } else {
-        const { data: ent2 } = await clienteSupabase
-          .from('empresa_contratante')
-          .select('nombre')
-          .eq('id', detalle.empresa_contratante_id)
-          .maybeSingle()
-        if (ent2?.nombre) entidadContratanteNombre = ent2.nombre
-      }
+  const fInicioCalc = detalle.fecha_inicio_contractual || proyecto.fecha_inicio || detalle.fecha_adjudicacion || ''
+  const plazoNumCalc = detalle.plazo_ejecucion_original || detalle.plazo_ejecucion_ampliado || null
+  let fFinCalc = detalle.fecha_finalizacion_real || proyecto.fecha_fin_estimada || ''
+  if (!fFinCalc && fInicioCalc && plazoNumCalc) {
+    const dInicio = new Date(fInicioCalc)
+    if (!isNaN(dInicio.getTime())) {
+      const dFin = new Date(dInicio.getTime() + (plazoNumCalc * 86400000))
+      fFinCalc = dFin.toISOString().split('T')[0]
     }
   }
+  const plazoStrCalc = plazoNumCalc ? `${plazoNumCalc} días` : (fInicioCalc && fFinCalc ? `${Math.round((new Date(fFinCalc).getTime() - new Date(fInicioCalc).getTime()) / 86400000)} días` : '')
 
-  let empresaContratistaNombre = ''
-  if (detalle.empresa_contratista_id) {
-    const { data: emp0 } = await clienteSupabase
-      .from('empresa_contratista')
-      .select('nombre')
-      .eq('id', detalle.empresa_contratista_id)
-      .maybeSingle()
-    if (emp0?.nombre) {
-      empresaContratistaNombre = emp0.nombre
-    } else {
-      const { data: emp } = await clienteSupabase
-        .from('empresa_relacionada')
-        .select('nombre')
-        .eq('id', detalle.empresa_contratista_id)
-        .maybeSingle()
-      if (emp?.nombre) {
-        empresaContratistaNombre = emp.nombre
-      }
-    }
-  }
-
-  let delegadoResidenteNombre = ''
-  if (detalle.delegado_residente_id) {
-    const { data: del } = await clienteSupabase
-      .from('usuario')
-      .select('correo, dato_usuario(primer_nombre, primer_apellido)')
-      .eq('id', detalle.delegado_residente_id)
-      .maybeSingle()
-    if (del) {
-      const dato = (del as any).dato_usuario
-      const full = dato ? `${dato.primer_nombre || ''} ${dato.primer_apellido || ''}`.trim() : ''
-      delegadoResidenteNombre = full || del.correo || ''
-    }
-  }
-
-  let responsableNombre = ''
-  if (proyecto.responsable_id) {
-    const { data: respU } = await clienteSupabase
-      .from('usuario')
-      .select('correo, dato_usuario(primer_nombre, primer_apellido)')
-      .eq('id', proyecto.responsable_id)
-      .maybeSingle()
-    if (respU) {
-      const dato = (respU as any).dato_usuario
-      const full = dato ? `${dato.primer_nombre || ''} ${dato.primer_apellido || ''}`.trim() : ''
-      responsableNombre = full || respU.correo || ''
-    }
-  }
-
-    const fInicioCalc = detalle.fecha_inicio_contractual || proyecto.fecha_inicio || detalle.fecha_adjudicacion || ''
-    const plazoNumCalc = detalle.plazo_ejecucion_original || detalle.plazo_ejecucion_ampliado || null
-    let fFinCalc = detalle.fecha_finalizacion_real || proyecto.fecha_fin_estimada || ''
-    if (!fFinCalc && fInicioCalc && plazoNumCalc) {
-      const dInicio = new Date(fInicioCalc)
-      if (!isNaN(dInicio.getTime())) {
-        const dFin = new Date(dInicio.getTime() + (plazoNumCalc * 86400000))
-        fFinCalc = dFin.toISOString().split('T')[0]
-      }
-    }
-    const plazoStrCalc = plazoNumCalc ? `${plazoNumCalc} días` : (fInicioCalc && fFinCalc ? `${Math.round((new Date(fFinCalc).getTime() - new Date(fInicioCalc).getTime()) / 86400000)} días` : '')
-
-  let contratos: any[] = []
-  try {
-    const { data: cRows } = await clienteSupabase
-      .from('proyecto_contrato')
-      .select('*')
-      .eq('proyecto_id', proyectoId)
-    if (cRows && cRows.length > 0) {
-      contratos = cRows.map((c: any) => ({
-        id: c.id,
-        proyectoId: c.proyecto_id,
-        tipo: c.tipo,
-        empresaNombre: c.empresa_nombre,
-        propietario: c.propietario,
-        registroMercantil: c.registro_mercantil,
-        direccion: c.direccion,
-        telefono: c.telefono,
-        correo: c.correo,
-        responsable: c.responsable,
-        licitacionNumero: c.licitacion_numero,
-        actaInicioNumero: c.acta_inicio_numero,
-        programa: c.programa,
-        subprograma: c.subprograma,
-        fuenteFinanciamiento: c.fuente_financiamiento,
-        partidaFondos: c.partida_fondos,
-        cdp: c.cdp,
-        contratoNumero: c.contrato_numero,
-        acuerdoMinisterial: c.acuerdo_ministerial,
-        montoOriginal: Number(c.monto_original) || 0,
-        porcentajeAnticipo: Number(c.porcentaje_anticipo) || 0,
-        montoAnticipo: Number(c.monto_anticipo) || 0,
-        fechaInicio: c.fecha_inicio,
-        plazoMesesDetalle: c.plazo_meses_detalle,
-        fechaFin: c.fecha_fin,
-      }))
-    }
-  } catch (err) {
-    console.error('Error cargando proyecto_contrato:', err)
-  }
+  const cRows = contratosRes.data || []
+  const contratos = cRows.map((c: any) => ({
+    id: c.id,
+    proyectoId: c.proyecto_id,
+    tipo: c.tipo,
+    empresaNombre: c.empresa_nombre,
+    propietario: c.propietario,
+    registroMercantil: c.registro_mercantil,
+    direccion: c.direccion,
+    telefono: c.telefono,
+    correo: c.correo,
+    responsable: c.responsable,
+    licitacionNumero: c.licitacion_numero,
+    actaInicioNumero: c.acta_inicio_numero,
+    programa: c.programa,
+    subprograma: c.subprograma,
+    fuenteFinanciamiento: c.fuente_financiamiento,
+    partidaFondos: c.partida_fondos,
+    cdp: c.cdp,
+    contratoNumero: c.contrato_numero,
+    acuerdoMinisterial: c.acuerdo_ministerial,
+    montoOriginal: Number(c.monto_original) || 0,
+    porcentajeAnticipo: Number(c.porcentaje_anticipo) || 0,
+    montoAnticipo: Number(c.monto_anticipo) || 0,
+    fechaInicio: c.fecha_inicio,
+    plazoMesesDetalle: c.plazo_meses_detalle,
+    fechaFin: c.fecha_fin,
+  }))
 
   const contratoEjecucion = contratos.find((c) => c.tipo === 'EJECUCION') || null
   const contratoSupervision = contratos.find((c) => c.tipo === 'SUPERVISION') || null
 
-  return {
+  const resultadoCompleto = {
     id: proyecto.id,
     codigo: proyecto.codigo,
     nombre: proyecto.nombre,
@@ -606,37 +696,85 @@ export async function obtenerProyectoPorId(proyectoId: string) {
     montoFinancieroFinalEjecutado: detalle.monto_final ?? null,
     montoFinal: detalle.monto_final ?? null,
     equipo,
-    estado: await resolverCodigoEstado(proyecto.estado_id),
-    parametro_proyecto: paramRow || null,
-    parametroProyecto: paramRow || null,
+    estado: estadoCodigo,
+    parametro_proyecto: paramRes.data || null,
+    parametroProyecto: paramRes.data || null,
     planTrabajo: mappedRenglones,
     renglones: mappedRenglones,
+    tieneSabana: mappedRenglones.length > 0,
+    usarModoSabana: mappedRenglones.length > 0,
+    modoGestionFinanciera: mappedRenglones.length > 0 ? 'sabana' : 'manual',
+    totalRenglones: mappedRenglones.length,
     contratoEjecucion,
     contratoSupervision,
     contratos,
+    licitacionEjecutora: contratoEjecucion?.licitacionNumero || null,
+    propietarioContratista: contratoEjecucion?.propietario || null,
+    registroMercantilContratista: contratoEjecucion?.registroMercantil || null,
+    direccionContratista: contratoEjecucion?.direccion || null,
+    telefonoContratista: contratoEjecucion?.telefono || null,
+    correoContratista: contratoEjecucion?.correo || null,
+    superintendente: contratoEjecucion?.responsable || null,
+    actaInicioEjecutora: contratoEjecucion?.actaInicioNumero || null,
+    programaObra: contratoEjecucion?.programa || null,
+    subprogramaObra: contratoEjecucion?.subprograma || null,
+    fuenteFinanciamientoObra: contratoEjecucion?.fuenteFinanciamiento || null,
+    partidaFondosObra: contratoEjecucion?.partidaFondos || null,
+    cdpObra: contratoEjecucion?.cdp || null,
+    numeroContratoOriginal: contratoEjecucion?.contratoNumero || null,
+    acuerdoMinisterialOriginal: contratoEjecucion?.acuerdoMinisterial || null,
+    porcentajeAnticipoObra: contratoEjecucion?.porcentajeAnticipo || 0,
+    montoAnticipoObra: contratoEjecucion?.montoAnticipo || 0,
+    mesesContratadosObra: contratoEjecucion?.plazoMesesDetalle || null,
+    fechaTerminacionOriginalObra: contratoEjecucion?.fechaFin || null,
+    licitacionSupervisora: contratoSupervision?.licitacionNumero || null,
+    propietarioSupervisora: contratoSupervision?.propietario || null,
+    registroMercantilSupervisora: contratoSupervision?.registroMercantil || null,
+    direccionSupervisora: contratoSupervision?.direccion || null,
+    telefonoSupervisora: contratoSupervision?.telefono || null,
+    correoSupervisora: contratoSupervision?.correo || null,
+    actaInicioSupervisora: contratoSupervision?.actaInicioNumero || null,
+    responsableSupervisora: contratoSupervision?.responsable || null,
+    programaSupervisora: contratoSupervision?.programa || null,
+    subprogramaSupervisora: contratoSupervision?.subprograma || null,
+    fuenteFinanciamientoSupervisora: contratoSupervision?.fuenteFinanciamiento || null,
+    partidaFondosSupervisora: contratoSupervision?.partidaFondos || null,
+    cdpSupervisora: contratoSupervision?.cdp || null,
+    contratoSupervisora: contratoSupervision?.contratoNumero || null,
+    acuerdoSupervisora: contratoSupervision?.acuerdoMinisterial || null,
+    supervisoraMontoOriginal: contratoSupervision?.montoOriginal || 0,
+    porcentajeAnticipoSupervision: contratoSupervision?.porcentajeAnticipo || 0,
+    montoAnticipoSupervision: contratoSupervision?.montoAnticipo || 0,
+    fechaInicioSupervisora: contratoSupervision?.fechaInicio || null,
+    mesesContratadosSupervisora: contratoSupervision?.plazoMesesDetalle || null,
+    fechaFinSupervisora: contratoSupervision?.fechaFin || null,
     paso2: {},
     paso3: {},
   }
+
+  cacheProyectoDetalleMap.set(proyectoId, { data: resultadoCompleto, timestamp: Date.now() })
+  return resultadoCompleto
 }
 
 async function resolverCodigoEstado(estadoId: string | null): Promise<string> {
   if (!estadoId) return 'borrador'
+  if (cacheEstadoItems && cacheEstadoItems.has(estadoId)) {
+    return cacheEstadoItems.get(estadoId)!
+  }
   const { data } = await clienteSupabase
     .from('catalogo_item')
     .select('codigo')
     .eq('id', estadoId)
     .maybeSingle()
-  return (data?.codigo || 'borrador').toLowerCase()
+  const cod = (data?.codigo || 'borrador').toLowerCase()
+  if (cacheEstadoItems) cacheEstadoItems.set(estadoId, cod)
+  return cod
 }
 
 let cacheProyectosList: { data: any[]; timestamp: number } | null = null
 const TTL_CACHE_PROYECTOS_MS = 30 * 1000 // 30s de caché en memoria backend
 let cacheEstadoItems: Map<string, string> | null = null
 let cacheEstadoItemsTimestamp = 0
-
-export function invalidarCacheProyectos() {
-  cacheProyectosList = null
-}
 
 export async function obtenerProyectos() {
   if (cacheProyectosList && Date.now() - cacheProyectosList.timestamp < TTL_CACHE_PROYECTOS_MS) {
@@ -658,11 +796,17 @@ export async function obtenerProyectos() {
         fecha_inicio,
         fecha_fin_estimada,
         estado_id,
+        renglon_trabajo ( id ),
+        bitacora_entrada ( id ),
+        bitacora_avance ( id ),
+        bitacora_pendiente ( id ),
         proyecto_detalle (
           nombre_oficial,
           descripcion_proyecto,
           tramo,
           direccion,
+          latitud,
+          longitud,
           municipio_id,
           departamento_id,
           departamento:departamento_id(id, nombre),
@@ -696,10 +840,14 @@ export async function obtenerProyectos() {
 
   if (estadoItemsRes.data && Array.isArray(estadoItemsRes.data)) {
     cacheEstadoItems = new Map<string, string>()
+    cacheEstadoCodigoToId = new Map<string, string>()
     for (const item of estadoItemsRes.data) {
-      cacheEstadoItems.set(item.id, item.codigo.toLowerCase())
+      const cod = String(item.codigo || '').toLowerCase()
+      cacheEstadoItems.set(item.id, cod)
+      cacheEstadoCodigoToId.set(cod, item.id)
     }
     cacheEstadoItemsTimestamp = Date.now()
+    cacheEstadoCodigoTimestamp = Date.now()
   }
 
   const estadoMapa = cacheEstadoItems || new Map<string, string>()
@@ -746,7 +894,22 @@ export async function obtenerProyectos() {
     const plazoStr = plazoNum ? `${plazoNum} días` : (fInicio && fFin ? `${Math.round((new Date(fFin).getTime() - new Date(fInicio).getTime()) / 86400000)} días` : '')
     const estadoCod = p.estado_id ? (estadoMapa.get(p.estado_id) || 'borrador') : 'borrador'
     const delegadoNombre = d.delegado_residente_id ? (delegadoMapa.get(d.delegado_residente_id) || '') : ''
-    const responsableNombre = delegadoNombre || 'No asignado'
+    const ubicacionCalc = d.tramo || d.direccion || (d.departamento?.nombre ? (d.municipio?.nombre ? `${d.departamento.nombre}, ${d.municipio.nombre}` : d.departamento.nombre) : '') || p.ubicacion || ''
+    const tieneSabana = Array.isArray(p.renglon_trabajo) && p.renglon_trabajo.length > 0
+    const totalRenglones = Array.isArray(p.renglon_trabajo) ? p.renglon_trabajo.length : 0
+
+    const totalBitacoras =
+      (Array.isArray(p.bitacora_entrada) ? p.bitacora_entrada.length : 0) +
+      (Array.isArray(p.bitacora_avance) ? p.bitacora_avance.length : 0) +
+      (Array.isArray(p.bitacora_pendiente) ? p.bitacora_pendiente.length : 0)
+    const tieneBitacoras = totalBitacoras > 0
+    const esEliminable = estadoCod === 'borrador' && totalBitacoras === 0
+    let motivoNoEliminable = ''
+    if (estadoCod !== 'borrador') {
+      motivoNoEliminable = `Solo proyectos en Borrador pueden eliminarse (estado actual: ${estadoCod})`
+    } else if (tieneBitacoras) {
+      motivoNoEliminable = `Tiene ${totalBitacoras} registro(s) de bitácora vinculado(s)`
+    }
 
     return {
       id: p.id,
@@ -754,8 +917,11 @@ export async function obtenerProyectos() {
       nombre: p.nombre,
       nombreOficial: d.nombre_oficial || p.nombre,
       descripcion: d.descripcion_proyecto || p.descripcion || '',
-      ubicacionFisica: d.tramo || d.direccion || p.ubicacion || '',
+      ubicacion: ubicacionCalc,
+      ubicacionFisica: ubicacionCalc || d.tramo || d.direccion || p.ubicacion || '',
       direccion: d.direccion || '',
+      latitud: d.latitud ?? null,
+      longitud: d.longitud ?? null,
       presupuesto: d.monto_original || 0,
       montoContractualOriginal: d.monto_original || 0,
       fechaInicio: fInicio,
@@ -772,14 +938,31 @@ export async function obtenerProyectos() {
       municipioId: d.municipio_id,
       departamentoNombre: d.departamento?.nombre || '',
       municipioNombre: d.municipio?.nombre || '',
+      departamento_nombre: d.departamento?.nombre || '',
+      municipio_nombre: d.municipio?.nombre || '',
       estado: estadoCod,
+      responsable_id: p.responsable_id || null,
+      responsableId: p.responsable_id || null,
       delegadoResidenteId: d.delegado_residente_id || null,
       delegadoResidente: delegadoNombre,
       delegado_residente: delegadoNombre,
-      responsable: responsableNombre,
+      responsable: delegadoNombre,
+      empresaContratanteId: d.empresa_contratante_id || null,
+      empresa_contratante_id: d.empresa_contratante_id || null,
+      empresaContratistaId: d.empresa_contratista_id || null,
+      empresa_contratista_id: d.empresa_contratista_id || null,
+      tieneSabana,
+      usarModoSabana: tieneSabana,
+      modoGestionFinanciera: tieneSabana ? 'sabana' : 'manual',
+      totalRenglones,
+      totalBitacoras,
+      tieneBitacoras,
+      esEliminable,
+      motivoNoEliminable,
     }
   })
 
+  cacheProyectosList = { data: resultado, timestamp: Date.now() }
   return resultado
 }
 
@@ -789,35 +972,54 @@ export async function crearProyecto(datosFormulario: any) {
     throw new ValidationError('El nombre del proyecto es obligatorio.', 'nombre')
   }
 
-  // 1. Resolver estado ('borrador', 'activo', etc.) desde datosFormulario
   const estadoCodigo = (datosFormulario.estado || 'borrador').toLowerCase()
-  const estadoId = await obtenerEstadoIdPorCodigo(estadoCodigo)
+  const fechaInicio = datosFormulario.fechaInicioContractual || datosFormulario.fechaInicio || null
+  const fechaFinEstimada = datosFormulario.fechaFinContractualPlan || datosFormulario.fechaFin || null
 
-  const fechaInicio = datosFormulario.fechaInicioContractual || datosFormulario.fechaInicio || new Date().toISOString().split('T')[0]
-  let fechaFinEstimada = datosFormulario.fechaFinContractualPlan || datosFormulario.fechaFin
-  if (!fechaFinEstimada) {
-    const dt = new Date(fechaInicio)
-    if (isNaN(dt.getTime())) {
-      fechaFinEstimada = new Date().toISOString().split('T')[0]
-    } else {
-      dt.setDate(dt.getDate() + 30)
-      fechaFinEstimada = dt.toISOString().split('T')[0]
-    }
-  }
+  const contratoEjec = datosFormulario.contratoEjecucion || {}
+  const contratoSup = datosFormulario.contratoSupervision || {}
+
+  // 1. Resolver en paralelo estado, empresa base y entidades participantes
+  const [estadoId, empresaBaseId, empContratanteId, empContratistaId] = await Promise.all([
+    obtenerEstadoIdPorCodigo(estadoCodigo),
+    datosFormulario.empresa_id ? Promise.resolve(datosFormulario.empresa_id) : obtenerEmpresaDefaultId(),
+    esUuidValido(datosFormulario.empresaContratanteId)
+      ? Promise.resolve(datosFormulario.empresaContratanteId)
+      : resolverEmpresaContratanteId(datosFormulario.entidadContratante || datosFormulario.empresaContratanteId),
+    esUuidValido(datosFormulario.empresaContratistaId)
+      ? Promise.resolve(datosFormulario.empresaContratistaId)
+      : resolverEmpresaContratistaId(
+          datosFormulario.empresaContratista || datosFormulario.empresaContratistaId,
+          {
+            direccion: contratoEjec.direccion || datosFormulario.contratistaDireccion,
+            telefono: contratoEjec.telefono || datosFormulario.contratistaTelefono,
+            correo: contratoEjec.correo || datosFormulario.contratistaCorreo,
+            nit: contratoEjec.registroMercantil || datosFormulario.contratistaRegistroMercantil,
+          }
+        ),
+    datosFormulario.empresaSupervisora
+      ? sincronizarEmpresaSupervisora(datosFormulario.empresaSupervisora, {
+          direccion: contratoSup.direccion || datosFormulario.supervisoraDireccion,
+          telefono: contratoSup.telefono || datosFormulario.supervisoraTelefono,
+          correo: contratoSup.correo || datosFormulario.supervisoraCorreo,
+          propietario: contratoSup.propietario || datosFormulario.supervisoraPropietario,
+        })
+      : Promise.resolve(),
+  ])
 
   // 2. Insertar en tabla base `proyecto`
   const { data: proyecto, error: errorProyecto } = await clienteSupabase
     .from('proyecto')
     .insert({
-      codigo: datosFormulario.codigo || `PROY-${Math.floor(Math.random()*10000)}`, // Provisional
+      codigo: datosFormulario.codigo || `PROY-${Math.floor(Math.random() * 10000)}`,
       nombre: nombreFinal,
       descripcion: datosFormulario.descripcion || null,
-      ubicacion: datosFormulario.ubicacionFisica || null,
+      ubicacion: datosFormulario.ubicacionFisica || datosFormulario.direccion || null,
       fecha_inicio: fechaInicio,
       fecha_fin_estimada: fechaFinEstimada,
       responsable_id: esUuidValido(datosFormulario.responsable) || null,
       estado_id: estadoId,
-      empresa_id: datosFormulario.empresa_id || (await clienteSupabase.from('empresa').select('id').limit(1).single()).data?.id
+      empresa_id: empresaBaseId,
     })
     .select('id')
     .single()
@@ -831,23 +1033,36 @@ export async function crearProyecto(datosFormulario: any) {
   const depaId = esUuidValido(datosFormulario.departamentoId)
   const muniFinId = esUuidValido(datosFormulario.municipioFinId)
   const depaFinId = esUuidValido(datosFormulario.departamentoFinId)
-  const empContratanteId = esUuidValido(datosFormulario.empresaContratanteId) 
-    ? datosFormulario.empresaContratanteId 
-    : await resolverEmpresaContratanteId(datosFormulario.entidadContratante || datosFormulario.empresaContratanteId)
-  const empContratistaId = esUuidValido(datosFormulario.empresaContratistaId)
-    ? datosFormulario.empresaContratistaId
-    : await resolverEmpresaContratistaId(datosFormulario.empresaContratista || datosFormulario.empresaContratistaId)
   const delegadoResId = esUuidValido(datosFormulario.delegadoResidenteId)
 
-  // 3. Insertar en `proyecto_detalle`
-  const { error: errorDetalle } = await clienteSupabase
-    .from('proyecto_detalle')
-    .insert({
+  const usuariosAInsertar: any[] = []
+  if (delegadoResId) {
+    usuariosAInsertar.push({
       proyecto_id: proyecto.id,
-      nombre_oficial: datosFormulario.nombreOficial,
-      descripcion_proyecto: datosFormulario.descripcion,
-      tramo: datosFormulario.ubicacionFisica,
-      
+      usuario_id: delegadoResId,
+      rol_proyecto: 'Delegado Residente',
+    })
+  }
+  if (Array.isArray(datosFormulario.equipo)) {
+    for (const miembro of datosFormulario.equipo) {
+      const uId = esUuidValido(miembro?.id || miembro?.usuarioId)
+      if (uId && uId !== delegadoResId) {
+        usuariosAInsertar.push({
+          proyecto_id: proyecto.id,
+          usuario_id: uId,
+          rol_proyecto: miembro.rol || 'Miembro',
+        })
+      }
+    }
+  }
+
+  // 3. Ejecutar en paralelo la inserción de detalle, equipo, parámetros, contratos y renglones
+  const [detalleRes, equipoRes, paramRes] = await Promise.all([
+    clienteSupabase.from('proyecto_detalle').insert({
+      proyecto_id: proyecto.id,
+      nombre_oficial: datosFormulario.nombreOficial || nombreFinal,
+      descripcion_proyecto: datosFormulario.descripcion || null,
+      tramo: datosFormulario.ubicacionFisica || datosFormulario.direccion || null,
       municipio_id: muniId,
       departamento_id: depaId,
       municipio_fin_id: muniFinId,
@@ -855,11 +1070,10 @@ export async function crearProyecto(datosFormulario: any) {
       direccion_fin: datosFormulario.direccionFin || null,
       kilometro_inicio: datosFormulario.kilometroInicio ?? null,
       kilometro_fin: datosFormulario.kilometroFin ?? null,
-      latitud: datosFormulario.latitud || null,
-      longitud: datosFormulario.longitud || null,
+      latitud: datosFormulario.latitud ?? datosFormulario.coordenadasMapa?.lat ?? datosFormulario.coordenadas?.lat ?? null,
+      longitud: datosFormulario.longitud ?? datosFormulario.coordenadasMapa?.lng ?? datosFormulario.coordenadas?.lng ?? null,
       direccion: datosFormulario.direccion || null,
       monto_final: datosFormulario.montoFinal || null,
-
       empresa_contratante_id: empContratanteId,
       empresa_contratista_id: empContratistaId,
       empresa_supervisora: datosFormulario.empresaSupervisora || null,
@@ -870,58 +1084,31 @@ export async function crearProyecto(datosFormulario: any) {
       monto_original: datosFormulario.montoContractualOriginal || null,
       plazo_ejecucion_original: datosFormulario.plazoEjecucionOriginal ? parseInt(datosFormulario.plazoEjecucionOriginal, 10) : null,
       plazo_ejecucion_ampliado: datosFormulario.plazoEjecucionRealAmpliado ? parseInt(datosFormulario.plazoEjecucionRealAmpliado, 10) : null,
-      fecha_finalizacion_real: datosFormulario.fechaFinalizacionReal || null
-    })
+      fecha_finalizacion_real: datosFormulario.fechaFinalizacionReal || null,
+    }),
+    usuariosAInsertar.length > 0
+      ? clienteSupabase.from('proyecto_usuario').insert(usuariosAInsertar)
+      : Promise.resolve({ error: null }),
+    clienteSupabase.from('parametro_proyecto').insert({
+      proyecto_id: proyecto.id,
+      porcentaje_indirectos: typeof datosFormulario.porcentajeIndirectos === 'number' ? datosFormulario.porcentajeIndirectos : 0,
+      porcentaje_iva: typeof datosFormulario.porcentajeIva === 'number' ? datosFormulario.porcentajeIva : 0,
+      porcentaje_amortizacion_anticipo: typeof datosFormulario.porcentajeAnticipo === 'number' ? datosFormulario.porcentajeAnticipo : 0,
+      monto_anticipo_total: 0,
+    }),
+    guardarContratosProyecto(proyecto.id, datosFormulario, true),
+    guardarRenglonesProyecto(proyecto.id, datosFormulario, true),
+  ])
 
-  if (errorDetalle) {
-    console.error("SUPABASE ERROR:", errorDetalle);
+  if (detalleRes.error) {
+    console.error('SUPABASE ERROR:', detalleRes.error)
     await clienteSupabase.from('proyecto').delete().eq('id', proyecto.id)
     throw new Error('Error al insertar detalles del proyecto')
   }
+  if (equipoRes.error) console.error('EQUIPO ERROR:', equipoRes.error)
+  if (paramRes.error) console.error('PARAMETRO_PROYECTO AUTO-INSERT ERROR:', paramRes.error)
 
-  // 4. Insertar equipo en `proyecto_usuario`
-  const usuariosAInsertar: any[] = [];
-  
-  if (delegadoResId) {
-    usuariosAInsertar.push({
-      proyecto_id: proyecto.id,
-      usuario_id: delegadoResId,
-      rol_proyecto: 'Delegado Residente'
-    });
-  }
-  
-  if (Array.isArray(datosFormulario.equipo)) {
-    for (const miembro of datosFormulario.equipo) {
-      const uId = esUuidValido(miembro?.id || miembro?.usuarioId)
-      if (uId && uId !== delegadoResId) {
-        usuariosAInsertar.push({
-          proyecto_id: proyecto.id,
-          usuario_id: uId,
-          rol_proyecto: miembro.rol || 'Miembro'
-        });
-      }
-    }
-  }
-  
-  if (usuariosAInsertar.length > 0) {
-    const { error: errorEq } = await clienteSupabase.from('proyecto_usuario').insert(usuariosAInsertar);
-    if (errorEq) console.error('EQUIPO ERROR:', errorEq);
-  }
-
-  // 5. Insertar parámetros por defecto en `parametro_proyecto`
-  const { error: errorParam } = await clienteSupabase
-    .from('parametro_proyecto')
-    .insert({
-      proyecto_id: proyecto.id,
-      porcentaje_indirectos: typeof datosFormulario.porcentajeIndirectos === 'number' ? datosFormulario.porcentajeIndirectos : 0.45,
-      porcentaje_iva: typeof datosFormulario.porcentajeIva === 'number' ? datosFormulario.porcentajeIva : 0.12,
-      porcentaje_amortizacion_anticipo: typeof datosFormulario.porcentajeAnticipo === 'number' ? datosFormulario.porcentajeAnticipo : 0.20,
-      monto_anticipo_total: 0
-    });
-  if (errorParam) console.error('PARAMETRO_PROYECTO AUTO-INSERT ERROR:', errorParam);
-
-  await guardarContratosProyecto(proyecto.id, datosFormulario);
-  invalidarCacheProyectos();
+  invalidarCacheProyectos()
 
   return proyecto.id
 }
@@ -963,8 +1150,12 @@ export async function actualizarProyecto(proyectoId: string, datosFormulario: Re
   if ('municipioFinId' in datosFormulario) detalleUpdates.municipio_fin_id = esUuidValido(datosFormulario.municipioFinId)
   if ('departamentoFinId' in datosFormulario) detalleUpdates.departamento_fin_id = esUuidValido(datosFormulario.departamentoFinId)
   if ('direccionFin' in datosFormulario) detalleUpdates.direccion_fin = datosFormulario.direccionFin || null
-  if ('latitud' in datosFormulario) detalleUpdates.latitud = datosFormulario.latitud
-  if ('longitud' in datosFormulario) detalleUpdates.longitud = datosFormulario.longitud
+  if ('latitud' in datosFormulario || 'longitud' in datosFormulario || 'coordenadasMapa' in datosFormulario || 'coordenadas' in datosFormulario) {
+    const lat = datosFormulario.latitud ?? (datosFormulario.coordenadasMapa as any)?.lat ?? (datosFormulario.coordenadas as any)?.lat
+    const lng = datosFormulario.longitud ?? (datosFormulario.coordenadasMapa as any)?.lng ?? (datosFormulario.coordenadas as any)?.lng
+    if (lat !== undefined) detalleUpdates.latitud = lat
+    if (lng !== undefined) detalleUpdates.longitud = lng
+  }
   if ('direccion' in datosFormulario) detalleUpdates.direccion = datosFormulario.direccion
   if ('kilometroInicio' in datosFormulario) detalleUpdates.kilometro_inicio = datosFormulario.kilometroInicio
   if ('kilometroFin' in datosFormulario) detalleUpdates.kilometro_fin = datosFormulario.kilometroFin
@@ -973,10 +1164,31 @@ export async function actualizarProyecto(proyectoId: string, datosFormulario: Re
     if (val) detalleUpdates.empresa_contratante_id = val
   }
   if ('empresaContratista' in datosFormulario || 'empresaContratistaId' in datosFormulario) {
-    const val = await resolverEmpresaContratistaId(datosFormulario.empresaContratistaId || datosFormulario.empresaContratista)
+    const contratoEjec = (datosFormulario.contratoEjecucion as any) || {}
+    const val = await resolverEmpresaContratistaId(
+      datosFormulario.empresaContratistaId || datosFormulario.empresaContratista,
+      {
+        direccion: contratoEjec.direccion || (datosFormulario.contratistaDireccion as string),
+        telefono: contratoEjec.telefono || (datosFormulario.contratistaTelefono as string),
+        correo: contratoEjec.correo || (datosFormulario.contratistaCorreo as string),
+        nit: contratoEjec.registroMercantil || (datosFormulario.contratistaRegistroMercantil as string),
+      }
+    )
     if (val) detalleUpdates.empresa_contratista_id = val
   }
-  if ('empresaSupervisora' in datosFormulario) detalleUpdates.empresa_supervisora = datosFormulario.empresaSupervisora
+  if ('empresaSupervisora' in datosFormulario) {
+    detalleUpdates.empresa_supervisora = datosFormulario.empresaSupervisora
+    const contratoSup = (datosFormulario.contratoSupervision as any) || {}
+    await sincronizarEmpresaSupervisora(
+      datosFormulario.empresaSupervisora as string,
+      {
+        direccion: contratoSup.direccion || (datosFormulario.supervisoraDireccion as string),
+        telefono: contratoSup.telefono || (datosFormulario.supervisoraTelefono as string),
+        correo: contratoSup.correo || (datosFormulario.supervisoraCorreo as string),
+        propietario: contratoSup.propietario || (datosFormulario.supervisoraPropietario as string),
+      }
+    )
+  }
   if ('delegadoResidenteId' in datosFormulario) {
     const val = esUuidValido(datosFormulario.delegadoResidenteId)
     if (val) detalleUpdates.delegado_residente_id = val
@@ -1020,6 +1232,9 @@ export async function actualizarProyecto(proyectoId: string, datosFormulario: Re
   if ('estado' in datosFormulario && datosFormulario.estado) {
     const estadoId = await obtenerEstadoIdPorCodigo(datosFormulario.estado as string)
     if (estadoId) proyectoUpdates.estado_id = estadoId
+    if (datosFormulario.estado === 'borrador' || datosFormulario.estado === 'activo') {
+      proyectoUpdates.en_replanificacion = false
+    }
   }
   if ('fechaFinalizacionReal' in datosFormulario || 'fechaFinContractualPlan' in datosFormulario || 'fechaFin' in datosFormulario) {
     const fFin = (datosFormulario.fechaFinalizacionReal || datosFormulario.fechaFinContractualPlan || datosFormulario.fechaFin) as string
@@ -1064,21 +1279,42 @@ export async function actualizarProyecto(proyectoId: string, datosFormulario: Re
     }
   }
 
-  await guardarContratosProyecto(proyectoId, datosFormulario)
-  invalidarCacheProyectos()
+  await Promise.all([
+    guardarContratosProyecto(proyectoId, datosFormulario, false),
+    guardarRenglonesProyecto(proyectoId, datosFormulario, false),
+  ])
+  invalidarCacheProyectos(proyectoId)
 
   return { id: proyectoId }
 }
 
-async function guardarContratosProyecto(proyectoId: string, datosFormulario: any) {
+async function guardarContratosProyecto(proyectoId: string, datosFormulario: any, esNuevoProyecto = false) {
   try {
     const listaContratos: any[] = []
     if (datosFormulario.contratoEjecucion) {
       listaContratos.push({ ...datosFormulario.contratoEjecucion, tipo: 'EJECUCION' })
+    } else if (
+      datosFormulario.empresaContratista ||
+      datosFormulario.propietarioContratista ||
+      datosFormulario.licitacionEjecutora ||
+      datosFormulario.montoContractualOriginal ||
+      datosFormulario.programaObra
+    ) {
+      listaContratos.push({ tipo: 'EJECUCION' })
     }
+
     if (datosFormulario.contratoSupervision) {
       listaContratos.push({ ...datosFormulario.contratoSupervision, tipo: 'SUPERVISION' })
+    } else if (
+      datosFormulario.empresaSupervisora ||
+      datosFormulario.propietarioSupervisora ||
+      datosFormulario.licitacionSupervisora ||
+      datosFormulario.supervisoraMontoOriginal ||
+      datosFormulario.programaSupervisora
+    ) {
+      listaContratos.push({ tipo: 'SUPERVISION' })
     }
+
     if (Array.isArray(datosFormulario.contratos)) {
       for (const c of datosFormulario.contratos) {
         if (c && c.tipo && !listaContratos.some((x) => x.tipo === c.tipo)) {
@@ -1087,56 +1323,196 @@ async function guardarContratosProyecto(proyectoId: string, datosFormulario: any
       }
     }
 
-    for (const c of listaContratos) {
-      const row: any = {
+    if (listaContratos.length === 0) return
+
+    const rows = listaContratos.map((c) => {
+      const esEjec = c.tipo === 'EJECUCION'
+      return {
         proyecto_id: proyectoId,
         tipo: c.tipo,
-        empresa_nombre: c.empresaNombre || c.empresa_nombre || null,
-        propietario: c.propietario || null,
-        registro_mercantil: c.registroMercantil || c.registro_mercantil || null,
-        direccion: c.direccion || null,
-        telefono: c.telefono || null,
-        correo: c.correo || null,
-        responsable: c.responsable || null,
-        licitacion_numero: c.licitacionNumero || c.licitacion_numero || null,
-        acta_inicio_numero: c.actaInicioNumero || c.acta_inicio_numero || null,
-        programa: c.programa || null,
-        subprograma: c.subprograma || null,
-        fuente_financiamiento: c.fuenteFinanciamiento || c.fuente_financiamiento || null,
-        partida_fondos: c.partidaFondos || c.partida_fondos || null,
-        cdp: c.cdp || null,
-        contrato_numero: c.contratoNumero || c.contrato_numero || null,
-        acuerdo_ministerial: c.acuerdoMinisterial || c.acuerdo_ministerial || null,
-        monto_original: Number(c.montoOriginal || c.monto_original) || 0,
-        porcentaje_anticipo: Number(c.porcentajeAnticipo || c.porcentaje_anticipo) || 0,
-        monto_anticipo: Number(c.montoAnticipo || c.monto_anticipo) || 0,
-        fecha_inicio: c.fechaInicio || c.fecha_inicio || null,
-        plazo_meses_detalle: c.plazoMesesDetalle || c.plazo_meses_detalle || null,
-        fecha_fin: c.fechaFin || c.fecha_fin || null,
+        empresa_nombre: c.empresaNombre || c.empresa_nombre || (esEjec ? datosFormulario.empresaContratista : datosFormulario.empresaSupervisora) || null,
+        propietario: c.propietario || (esEjec ? datosFormulario.propietarioContratista : datosFormulario.propietarioSupervisora) || null,
+        registro_mercantil: c.registroMercantil || c.registro_mercantil || (esEjec ? datosFormulario.registroMercantilContratista : datosFormulario.registroMercantilSupervisora) || null,
+        direccion: c.direccion || (esEjec ? datosFormulario.direccionContratista : datosFormulario.direccionSupervisora) || null,
+        telefono: c.telefono || (esEjec ? datosFormulario.telefonoContratista : datosFormulario.telefonoSupervisora) || null,
+        correo: c.correo || (esEjec ? datosFormulario.correoContratista : datosFormulario.correoSupervisora) || null,
+        responsable: c.responsable || (esEjec ? (datosFormulario.superintendente || datosFormulario.responsableNombre) : (datosFormulario.delegadoResidente || datosFormulario.responsableSupervisora)) || null,
+        licitacion_numero: c.licitacionNumero || c.licitacion_numero || (esEjec ? datosFormulario.licitacionEjecutora : datosFormulario.licitacionSupervisora) || null,
+        acta_inicio_numero: c.actaInicioNumero || c.acta_inicio_numero || (esEjec ? datosFormulario.actaInicioEjecutora : datosFormulario.actaInicioSupervisora) || null,
+        programa: c.programa || (esEjec ? datosFormulario.programaObra : datosFormulario.programaSupervisora) || null,
+        subprograma: c.subprograma || (esEjec ? datosFormulario.subprogramaObra : datosFormulario.subprogramaSupervisora) || null,
+        fuente_financiamiento: c.fuenteFinanciamiento || c.fuente_financiamiento || (esEjec ? datosFormulario.fuenteFinanciamientoObra : datosFormulario.fuenteFinanciamientoSupervisora) || null,
+        partida_fondos: c.partidaFondos || c.partida_fondos || (esEjec ? datosFormulario.partidaFondosObra : datosFormulario.partidaFondosSupervisora) || null,
+        cdp: c.cdp || (esEjec ? datosFormulario.cdpObra : datosFormulario.cdpSupervisora) || null,
+        contrato_numero: c.contratoNumero || c.contrato_numero || (esEjec ? datosFormulario.numeroContratoOriginal : datosFormulario.contratoSupervisora) || null,
+        acuerdo_ministerial: c.acuerdoMinisterial || c.acuerdo_ministerial || (esEjec ? datosFormulario.acuerdoMinisterialOriginal : datosFormulario.acuerdoSupervisora) || null,
+        monto_original: Number(c.montoOriginal || c.monto_original || (esEjec ? (datosFormulario.montoContractualOriginal || datosFormulario.presupuesto) : datosFormulario.supervisoraMontoOriginal)) || 0,
+        porcentaje_anticipo: Number(c.porcentajeAnticipo || c.porcentaje_anticipo || (esEjec ? datosFormulario.porcentajeAnticipoObra : datosFormulario.porcentajeAnticipoSupervision)) || 0,
+        monto_anticipo: Number(c.montoAnticipo || c.monto_anticipo || (esEjec ? datosFormulario.montoAnticipoObra : datosFormulario.montoAnticipoSupervision)) || 0,
+        fecha_inicio: c.fechaInicio || c.fecha_inicio || (esEjec ? (datosFormulario.fechaInicioContractual || datosFormulario.fechaInicio) : datosFormulario.fechaInicioSupervisora) || null,
+        plazo_meses_detalle: c.plazoMesesDetalle || c.plazo_meses_detalle || (esEjec ? datosFormulario.mesesContratadosObra : datosFormulario.mesesContratadosSupervisora) || null,
+        fecha_fin: c.fechaFin || c.fecha_fin || (esEjec ? (datosFormulario.fechaFinContractualPlan || datosFormulario.fechaFin || datosFormulario.fechaTerminacionOriginalObra) : datosFormulario.fechaFinSupervisora) || null,
         updated_at: new Date().toISOString(),
       }
+    })
 
-      const { data: existing } = await clienteSupabase
-        .from('proyecto_contrato')
-        .select('id')
-        .eq('proyecto_id', proyectoId)
-        .eq('tipo', c.tipo)
-        .maybeSingle()
+    if (esNuevoProyecto) {
+      await clienteSupabase.from('proyecto_contrato').insert(rows)
+      return
+    }
 
-      if (existing?.id) {
-        await clienteSupabase.from('proyecto_contrato').update(row).eq('id', existing.id)
+    const { data: existentes } = await clienteSupabase
+      .from('proyecto_contrato')
+      .select('id, tipo')
+      .eq('proyecto_id', proyectoId)
+
+    const mapaExistentes = new Map<string, string>()
+    for (const ex of existentes || []) {
+      mapaExistentes.set(ex.tipo, ex.id)
+    }
+
+    const aInsertar: any[] = []
+    const promesasUpdate: Promise<any>[] = []
+
+    for (const row of rows) {
+      const exId = mapaExistentes.get(row.tipo)
+      if (exId) {
+        promesasUpdate.push(clienteSupabase.from('proyecto_contrato').update(row).eq('id', exId) as any)
       } else {
-        await clienteSupabase.from('proyecto_contrato').insert(row)
+        aInsertar.push(row)
       }
+    }
+
+    if (aInsertar.length > 0) {
+      promesasUpdate.push(clienteSupabase.from('proyecto_contrato').insert(aInsertar) as any)
+    }
+    if (promesasUpdate.length > 0) {
+      await Promise.all(promesasUpdate)
     }
   } catch (err) {
     console.error('Error en guardarContratosProyecto:', err)
   }
 }
 
+async function guardarRenglonesProyecto(proyectoId: string, datosFormulario: any, esNuevoProyecto = false) {
+  const listaRenglones = datosFormulario?.renglones || datosFormulario?.planTrabajo || datosFormulario?.renglones_seleccionados
+  if (!Array.isArray(listaRenglones) || listaRenglones.length === 0) return
+
+  try {
+    // 1. Eliminar renglones anteriores del proyecto solo cuando es actualización
+    if (!esNuevoProyecto) {
+      await clienteSupabase.from('renglon_trabajo').delete().eq('proyecto_id', proyectoId)
+    }
+
+    // Resolver mapa de unidades de medida para vincular unidad_id si es posible
+    const { data: listaUnidades } = await clienteSupabase.from('unidad_medida').select('id, abreviatura, nombre')
+    const mapUnidades = new Map<string, string>()
+    if (Array.isArray(listaUnidades)) {
+      for (const u of listaUnidades) {
+        if (u.id) {
+          mapUnidades.set(u.id.toLowerCase(), u.id)
+          if (u.abreviatura) mapUnidades.set(u.abreviatura.toLowerCase().trim(), u.id)
+          if (u.nombre) mapUnidades.set(u.nombre.toLowerCase().trim(), u.id)
+        }
+      }
+    }
+
+    // 2. Preparar registros para inserción
+    const construirFilas = (forzarPrecioCero: boolean) =>
+      listaRenglones.map((r: any) => {
+        const cod = r.codigoDGC || r.codigo || r.id || '101.01'
+        const desc = r.descripcion || r.desc || r.nombre || 'Renglón de trabajo'
+        const capId = Number(r.capituloId || r.capitulo_id || 1)
+        const unidadRaw = String(r.unidad_id || r.unidad || r.unidad_medida || '').trim()
+        const resolvedUnidadId = mapUnidades.get(unidadRaw.toLowerCase()) || (unidadRaw.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i) ? unidadRaw : null)
+
+        return {
+          proyecto_id: proyectoId,
+          codigo: String(cod),
+          descripcion: String(desc),
+          capitulo_id: isNaN(capId) ? 1 : capId,
+          unidad_id: resolvedUnidadId,
+          cantidad_contractual: Number(r.cantidadContratada ?? r.cantidadContractual ?? r.cantidad_contractual ?? 1),
+          cantidad_ajustada: Number(r.cantidadAjustada ?? r.cantidadContratada ?? r.cantidad_ajustada ?? 1),
+          precio_unitario_directo: forzarPrecioCero ? 0 : Number(r.costoUnitarioDirecto ?? r.precioUnitario ?? r.precio_unitario_directo ?? 0),
+          aplica_indirectos: true,
+          aplica_iva: true,
+        }
+      })
+
+    const aInsertar = construirFilas(false)
+
+    if (aInsertar.length > 0) {
+      const { error } = await clienteSupabase.from('renglon_trabajo').insert(aInsertar)
+      if (error) {
+        if (error.code === 'P0001') {
+          await clienteSupabase.from('renglon_trabajo').insert(construirFilas(true))
+        } else {
+          console.error('Error al insertar renglones del proyecto:', error)
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Error en guardarRenglonesProyecto:', err)
+  }
+}
+
 export async function eliminarProyecto(id: string) {
+  // 1. Obtener proyecto y estado
+  const { data: proyecto, error: proyError } = await clienteSupabase
+    .from('proyecto')
+    .select(`
+      id,
+      nombre,
+      estado_id,
+      catalogo_item:estado_id(codigo)
+    `)
+    .eq('id', id)
+    .single()
+
+  if (proyError || !proyecto) {
+    throw new ValidationError('El proyecto a eliminar no existe.', 'id')
+  }
+
+  // 2. Validar que esté en modo borrador
+  const estadoCodigo = ((proyecto.catalogo_item as any)?.codigo || '').toLowerCase()
+  if (proyecto.estado_id && estadoCodigo && estadoCodigo !== 'borrador') {
+    throw new ValidationError(
+      `Solo se pueden eliminar proyectos en estado Borrador. El proyecto "${proyecto.nombre}" tiene estado "${estadoCodigo}".`,
+      'estado'
+    )
+  }
+
+  // 3. Validar que no tenga ningún registro de bitácora vinculado
+  const [entradasRes, avancesRes, pendientesRes] = await Promise.all([
+    clienteSupabase.from('bitacora_entrada').select('id', { count: 'exact', head: true }).eq('proyecto_id', id),
+    clienteSupabase.from('bitacora_avance').select('id', { count: 'exact', head: true }).eq('proyecto_id', id),
+    clienteSupabase.from('bitacora_pendiente').select('id', { count: 'exact', head: true }).eq('proyecto_id', id),
+  ])
+
+  const totalBitacoras = (entradasRes.count || 0) + (avancesRes.count || 0) + (pendientesRes.count || 0)
+  if (totalBitacoras > 0) {
+    throw new ValidationError(
+      `No se puede eliminar el proyecto "${proyecto.nombre}" porque tiene ${totalBitacoras} registro(s) de bitácora vinculado(s).`,
+      'bitacora'
+    )
+  }
+
+  // 4. Limpiar dependencias asociadas y eliminar proyecto
+  const { data: entradasIds } = await clienteSupabase.from('bitacora_entrada').select('id').eq('proyecto_id', id)
+  if (entradasIds && entradasIds.length > 0) {
+    const eIds = entradasIds.map((e) => e.id)
+    await clienteSupabase.from('evidencia_fotografica').delete().in('bitacora_entrada_id', eIds)
+  }
+  await clienteSupabase.from('bitacora_pendiente').delete().eq('proyecto_id', id)
+  await clienteSupabase.from('bitacora_avance').delete().eq('proyecto_id', id)
+  await clienteSupabase.from('bitacora_entrada').delete().eq('proyecto_id', id)
+  await clienteSupabase.from('renglon_trabajo').delete().eq('proyecto_id', id)
   await clienteSupabase.from('proyecto_detalle').delete().eq('proyecto_id', id)
   await clienteSupabase.from('proyecto_usuario').delete().eq('proyecto_id', id)
+  await clienteSupabase.from('proyecto_contrato').delete().eq('proyecto_id', id)
+  await clienteSupabase.from('parametro_proyecto').delete().eq('proyecto_id', id)
+  await clienteSupabase.from('documento_proyecto').delete().eq('proyecto_id', id)
   const { error } = await clienteSupabase.from('proyecto').delete().eq('id', id)
   if (error) throw new Error(error.message)
   invalidarCacheProyectos()
@@ -1186,7 +1562,7 @@ export async function obtenerPendientesPorProyecto(proyectoId: string) {
         titulo,
         descripcion,
         comentarios,
-        evidencia_fotografica(id, url_archivo, descripcion)
+        evidencia_fotografica(id, url_storage, descripcion)
       )
     `)
     .eq('proyecto_id', proyectoId)
@@ -1254,7 +1630,7 @@ export async function obtenerPendientesPorProyecto(proyectoId: string) {
       bitacoraTitulo: bitacora.titulo || '',
       bitacoraDescripcion: bitacora.descripcion || '',
       bitacoraObservaciones: bitacora.comentarios || '',
-      fotoEvidenciaUrl: evidencias[0]?.url_archivo || null,
+      fotoEvidenciaUrl: evidencias[0]?.url_storage || evidencias[0]?.url_archivo || null,
       fotoEvidencias: evidencias
     }
   })

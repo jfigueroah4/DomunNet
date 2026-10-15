@@ -57,6 +57,9 @@ importers:
       morgan:
         specifier: ^1.10.0
         version: 1.10.1
+      pg:
+        specifier: ^8.23.0
+        version: 8.23.0
       puppeteer:
         specifier: ^21.6.0
         version: 21.11.0(typescript@5.9.3)

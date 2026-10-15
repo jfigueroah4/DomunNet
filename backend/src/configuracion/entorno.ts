@@ -1,6 +1,5 @@
 import dotenv from 'dotenv'
 import path from 'path'
-import crypto from 'crypto'
 
 dotenv.config()
 if (!process.env.SUPABASE_URL) {
@@ -9,10 +8,10 @@ if (!process.env.SUPABASE_URL) {
 
 const isProd = process.env.NODE_ENV === 'production'
 
-const jwtSecret = process.env.JWT_SECRET || (isProd ? 'domunnet-secret' : crypto.randomBytes(32).toString('hex'))
+const jwtSecret = process.env.JWT_SECRET || (isProd ? 'domunnet-secret' : 'domunnet-dev-secret-key-2026')
 
-if (!isProd) {
-  console.log('🔑 JWT_SECRET dinámico generado para esta sesión de desarrollo (las sesiones anteriores quedarán invalidadas)')
+if (!process.env.JWT_SECRET && !isProd) {
+  console.log('⚠️  JWT_SECRET no encontrado en .env, usando clave por defecto para desarrollo')
 }
 
 export const entorno = {
@@ -21,6 +20,7 @@ export const entorno = {
   origenCors: process.env.CORS_ORIGIN || 'http://localhost:3000',
   supabaseUrl: process.env.SUPABASE_URL || '',
   supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+  databaseUrl: process.env.DATABASE_URL || process.env.SUPABASE_DB_URL || '',
   jwtSecret,
   cloudinary: {
     cloudName: process.env.CLOUDINARY_CLOUD_NAME || '',

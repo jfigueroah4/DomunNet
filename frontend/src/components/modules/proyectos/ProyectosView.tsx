@@ -2,13 +2,18 @@
 
 import React, { useMemo, useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Building2, ChevronLeft, ChevronRight, List, MapPin, Plus, User, LayoutGrid, Trash2, Loader2 } from 'lucide-react'
+import {
+  Building2, ChevronLeft, ChevronRight, List, MapPin, Plus, User, LayoutGrid, Trash2, Loader2, Calendar,
+  X, ShieldAlert, AlertCircle, CheckCircle2
+} from 'lucide-react'
 import { api, apiGetDeduplicado, limpiarCacheMemoria } from '@/lib/api/cliente'
 import { EstadoProyecto, Proyecto } from '@/types/proyecto'
 import { useCustomToast } from '@/hooks/useCustomToast'
 import { useAuthStore } from '@/stores/useAuthStore'
 import ProyectoFiltros from '@/components/modules/proyectos/ProyectoFiltros'
 import ProyectoCard from '@/components/modules/proyectos/ProyectoCard'
+import ProyectoEstadoBadge from './ProyectoEstadoBadge'
+import { formatearRangoFechas, debeMostrarMontoYAvance, esProyectoEliminable } from '@/lib/utils/formatters'
 
 const estadoColor: Record<EstadoProyecto, string> = {
   borrador: '#9CA3AF',
@@ -32,6 +37,7 @@ function ProyectoListItem({
   onToggleSelect?: () => void
 }) {
   const color = estadoColor[proyecto.estado] || '#9CA3AF'
+  const eliminableInfo = esProyectoEliminable(proyecto)
 
   return (
     <div
@@ -39,7 +45,9 @@ function ProyectoListItem({
         if (modoSeleccion) {
           e.preventDefault()
           e.stopPropagation()
-          onToggleSelect?.()
+          if (eliminableInfo.puedeEliminar) {
+            onToggleSelect?.()
+          }
         } else {
           onClick()
         }
@@ -52,52 +60,60 @@ function ProyectoListItem({
         <input
           type="checkbox"
           checked={isSelected}
+          disabled={!eliminableInfo.puedeEliminar}
+          title={!eliminableInfo.puedeEliminar ? eliminableInfo.motivo : 'Seleccionar para eliminar'}
           onChange={(e) => {
             e.stopPropagation()
-            onToggleSelect?.()
+            if (eliminableInfo.puedeEliminar) {
+              onToggleSelect?.()
+            }
           }}
-          className="mr-3 h-4 w-4 rounded border-gray-300 text-[#9B0F06] focus:ring-[#9B0F06] cursor-pointer shrink-0"
+          className={`mr-3 h-4 w-4 rounded border-gray-300 text-[#9B0F06] focus:ring-[#9B0F06] shrink-0 ${
+            !eliminableInfo.puedeEliminar ? 'opacity-30 cursor-not-allowed bg-gray-100' : 'cursor-pointer'
+          }`}
         />
       )}
 
-      <div className="mr-4 h-8 w-1 shrink-0 rounded-full" style={{ background: color }} />
+      <div className="mr-3 h-8 w-1 shrink-0 rounded-full" style={{ background: color }} />
 
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 mb-1">
-          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[9px] font-semibold text-gray-500">
-            {proyecto.codigo || 'N/A'}
-          </span>
-          <p className="truncate text-xs font-bold text-gray-900">{proyecto.nombre}</p>
+          <p className="truncate text-[12px] font-bold text-gray-900 font-[Poppins]">{proyecto.nombre}</p>
         </div>
-        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-gray-400">
+        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs sm:text-[10px] text-gray-500 font-[Poppins]">
           <span className="inline-flex items-center gap-1">
-            <MapPin size={10} />
+            <MapPin size={11} className="text-[#9B0F06]" />
             {proyecto.ubicacion}
           </span>
           <span className="inline-flex items-center gap-1">
-            <User size={10} />
+            <User size={11} className="text-gray-400" />
             {proyecto.responsable}
           </span>
         </div>
       </div>
 
-      <div className="mx-6 hidden w-32 shrink-0 lg:block">
-        <div className="mb-1 flex items-center justify-between">
-          <span className="text-[9px] font-semibold text-gray-400">Avance</span>
-          <span className="text-[9px] font-bold text-gray-900">{Math.round(proyecto.avance)}%</span>
+      {debeMostrarMontoYAvance(proyecto) && (
+        <div className="mx-6 hidden w-32 shrink-0 lg:block">
+          <div className="mb-1 flex items-center justify-between">
+            <span className="text-[9px] font-semibold text-gray-400">Avance</span>
+            <span className="text-[9px] font-bold text-gray-900">{Math.round(proyecto.avance)}%</span>
+          </div>
+          <div className="h-1 overflow-hidden rounded-full bg-gray-100">
+            <div className="h-full rounded-full bg-[#9B0F06]" style={{ width: `${proyecto.avance}%` }} />
+          </div>
         </div>
-        <div className="h-1 overflow-hidden rounded-full bg-gray-100">
-          <div className="h-full rounded-full bg-[#9B0F06]" style={{ width: `${proyecto.avance}%` }} />
-        </div>
+      )}
+
+      {debeMostrarMontoYAvance(proyecto) && (
+        <p className="hidden w-28 shrink-0 text-right text-[11px] font-bold text-gray-900 md:block font-[Poppins]">
+          Q {Number(proyecto.presupuesto).toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        </p>
+      )}
+
+      <div className="hidden shrink-0 text-right xl:flex items-center justify-end gap-1.5 text-[10.5px] text-gray-500 whitespace-nowrap min-w-[190px]">
+        <Calendar size={12} className="text-[#9B0F06] shrink-0" />
+        <span className="font-medium font-[Poppins]">{formatearRangoFechas(proyecto.fechaInicio, proyecto.fechaFin)}</span>
       </div>
-
-      <p className="hidden w-28 shrink-0 text-right text-[11px] font-bold text-gray-900 md:block">
-        Q {Number(proyecto.presupuesto).toLocaleString('es-GT')}
-      </p>
-
-      <p className="hidden w-40 shrink-0 text-right text-[10px] text-gray-400 xl:block">
-        {proyecto.fechaInicio} al {proyecto.fechaFin}
-      </p>
 
       <ChevronRight size={14} className="ml-3 shrink-0 text-gray-300" />
     </div>
@@ -105,10 +121,61 @@ function ProyectoListItem({
 }
 
 
+function mapearProyectoApi(p: any): Proyecto {
+  const totalBitacoras = Number(p.totalBitacoras || 0)
+  const tieneBitacoras = Boolean(p.tieneBitacoras || totalBitacoras > 0)
+  const estadoNorm = (p.estado || p.estado_codigo || 'borrador').toLowerCase() as EstadoProyecto
+  const esEliminable = typeof p.esEliminable === 'boolean'
+    ? p.esEliminable
+    : (estadoNorm === 'borrador' && !tieneBitacoras)
+  const motivoNoEliminable = p.motivoNoEliminable || (
+    estadoNorm !== 'borrador'
+      ? `Solo proyectos en modo Borrador pueden eliminarse (estado actual: ${estadoNorm})`
+      : tieneBitacoras
+        ? `Tiene ${totalBitacoras} registro(s) de bitácora vinculado(s)`
+        : ''
+  )
+
+  return {
+    id: p.id,
+    codigo: p.codigo || p.numero_contrato_original || 'PROY',
+    nombre: p.nombre_oficial || p.nombre || 'Proyecto Sin Nombre',
+    descripcion: p.descripcion_proyecto || p.descripcion || '',
+    ubicacion: p.ubicacion_fisica || p.direccion || p.tramo || p.ubicacion || 'Ubicación General',
+    responsable: p.delegadoResidente || p.delegado_residente || p.responsable || 'No asignado',
+    responsable_id: p.responsable_id || p.responsableId || null,
+    delegadoResidente: p.delegadoResidente || p.delegado_residente || '',
+    delegadoResidenteId: p.delegadoResidenteId || p.delegado_residente_id || null,
+    presupuesto: Number(p.monto_contractual_original || p.presupuesto || p.monto_original || 0),
+    avance: Number(p.avance || 0),
+    estado: estadoNorm,
+    fechaInicio: p.fechaInicioContractual || p.fechaInicio || p.fecha_inicio_contractual || p.fecha_inicio || '',
+    fechaFin: p.fechaFinalContractual || p.fechaFin || p.fecha_final_contractual || p.fecha_fin_contractual_plan || p.fecha_fin || '',
+    departamentoId: p.departamento_id || p.departamentoId,
+    municipioId: p.municipio_id || p.municipioId,
+    departamentoNombre: p.departamentoNombre || p.departamento_nombre || '',
+    municipioNombre: p.municipioNombre || p.municipio_nombre || '',
+    tieneSabana: Boolean(p.tieneSabana || (Array.isArray(p.renglon_trabajo) && p.renglon_trabajo.length > 0) || p.usarModoSabana),
+    usarModoSabana: Boolean(p.usarModoSabana || p.tieneSabana || (Array.isArray(p.renglon_trabajo) && p.renglon_trabajo.length > 0)),
+    modoGestionFinanciera: p.modoGestionFinanciera || (p.tieneSabana ? 'sabana' : 'manual'),
+    totalRenglones: Number(p.totalRenglones || 0),
+    totalBitacoras,
+    tieneBitacoras,
+    esEliminable,
+    motivoNoEliminable,
+    equipo: Array.isArray(p.equipo) ? p.equipo : [],
+    creadoEn: p.creadoEn || p.creado_en || p.created_at || new Date().toISOString(),
+    documentos: Array.isArray(p.documentos) ? p.documentos : [],
+    fotografias: Array.isArray(p.fotografias) ? p.fotografias : [],
+    fases: Array.isArray(p.fases) ? p.fases : [],
+  }
+}
+
 export function ProyectosView() {
   const router = useRouter()
   const { showSuccessToast, showErrorToast } = useCustomToast()
   const [busqueda, setBusqueda] = useState('')
+  const [proyectoFiltroId, setProyectoFiltroId] = useState('')
   const [estadoFiltro, setEstadoFiltro] = useState<EstadoProyecto | 'todos'>('todos')
   
   const [pagina, setPagina] = useState(1)
@@ -128,22 +195,21 @@ export function ProyectosView() {
   const [showModalEliminar, setShowModalEliminar] = useState(false)
   const [isEliminando, setIsEliminando] = useState(false)
 
-  const toggleSeleccionarProyecto = (id: string) => {
-    setSeleccionados((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
-    )
-  }
-
-  const toggleSeleccionarTodos = () => {
-    if (proyectosFiltrados.length > 0 && seleccionados.length === proyectosFiltrados.length) {
-      setSeleccionados([])
-    } else {
-      setSeleccionados(proyectosFiltrados.map((p) => p.id))
-    }
-  }
-
   const handleConfirmarEliminar = async () => {
     if (seleccionados.length === 0) return
+
+    // Validar que ningún proyecto seleccionado viole las reglas
+    const invalidos = seleccionados
+      .map((id) => proyectosReales.find((p) => p.id === id))
+      .filter((p) => p && !esProyectoEliminable(p).puedeEliminar)
+
+    if (invalidos.length > 0) {
+      showErrorToast(
+        'No se pueden eliminar proyectos que no estén en modo Borrador o tengan registros de bitácora vinculados.'
+      )
+      return
+    }
+
     try {
       setIsEliminando(true)
       await Promise.all(
@@ -153,7 +219,16 @@ export function ProyectosView() {
         `Se ${seleccionados.length === 1 ? 'eliminó el proyecto' : `eliminaron ${seleccionados.length} proyectos`} exitosamente`
       )
       limpiarCacheMemoria('/proyectos')
-      try { sessionStorage.removeItem('domun_proyectos_cache') } catch (e) {}
+      try {
+        sessionStorage.removeItem('domun_proyectos_cache')
+        seleccionados.forEach((id) => {
+          localStorage.removeItem(`domun_estimacion_activa_${id}`)
+          localStorage.removeItem(`domun_proyecto_${id}`)
+          localStorage.removeItem(`proyecto_${id}`)
+        })
+        window.dispatchEvent(new Event('storage'))
+        window.dispatchEvent(new CustomEvent('sabana-alertas-updated'))
+      } catch (e) {}
       setSeleccionados([])
       setModoSeleccion(false)
       setShowModalEliminar(false)
@@ -161,24 +236,7 @@ export function ProyectosView() {
       setLoadingProyectos(true)
       const res = await apiGetDeduplicado('/proyectos', { bypassCache: true })
       if (res.data?.success && Array.isArray(res.data.data)) {
-        const mapeados: Proyecto[] = res.data.data.map((p: any) => ({
-          id: p.id,
-          codigo: p.codigo || p.numero_contrato_original || 'PROY',
-          nombre: p.nombre_oficial || p.nombre || 'Proyecto Sin Nombre',
-          descripcion: p.descripcion_proyecto || p.descripcion || '',
-          ubicacion: p.ubicacion_fisica || p.direccion || p.tramo || 'Ubicación General',
-          responsable: p.delegadoResidente || p.delegado_residente || p.responsable || 'No asignado',
-          delegadoResidente: p.delegadoResidente || p.delegado_residente || '',
-          presupuesto: Number(p.monto_contractual_original || p.presupuesto || p.monto_original || 0),
-          avance: Number(p.avance || 0),
-          estado: (p.estado || p.estado_codigo || 'borrador').toLowerCase() as EstadoProyecto,
-          fechaInicio: p.fechaInicioContractual || p.fechaInicio || p.fecha_inicio_contractual || p.fecha_inicio || '',
-          fechaFin: p.fechaFinalContractual || p.fechaFin || p.fecha_final_contractual || p.fecha_fin_contractual_plan || p.fecha_fin || '',
-          departamentoId: p.departamento_id || p.departamentoId,
-          municipioId: p.municipio_id || p.municipioId,
-          departamentoNombre: p.departamentoNombre || p.departamento_nombre || '',
-          municipioNombre: p.municipioNombre || p.municipio_nombre || '',
-        }))
+        const mapeados: Proyecto[] = res.data.data.map(mapearProyectoApi)
         setProyectosReales(mapeados)
         try { sessionStorage.setItem('domun_proyectos_cache', JSON.stringify(mapeados)) } catch (e) {}
       } else {
@@ -220,27 +278,10 @@ export function ProyectosView() {
       setLoadingProyectos(true)
     }
 
-    apiGetDeduplicado('/proyectos')
+    apiGetDeduplicado('/proyectos', { bypassCache: true })
       .then((res) => {
         if (res.data?.success && Array.isArray(res.data.data)) {
-          const mapeados: Proyecto[] = res.data.data.map((p: any) => ({
-            id: p.id,
-            codigo: p.codigo || p.numero_contrato_original || 'PROY',
-            nombre: p.nombre_oficial || p.nombre || 'Proyecto Sin Nombre',
-            descripcion: p.descripcion_proyecto || p.descripcion || '',
-            ubicacion: p.ubicacion_fisica || p.direccion || p.tramo || 'Ubicación General',
-            responsable: p.delegadoResidente || p.delegado_residente || p.responsable || 'No asignado',
-            delegadoResidente: p.delegadoResidente || p.delegado_residente || '',
-            presupuesto: Number(p.monto_contractual_original || p.presupuesto || p.monto_original || 0),
-            avance: Number(p.avance || 0),
-            estado: (p.estado || p.estado_codigo || 'borrador').toLowerCase() as EstadoProyecto,
-            fechaInicio: p.fechaInicioContractual || p.fechaInicio || p.fecha_inicio_contractual || p.fecha_inicio || '',
-            fechaFin: p.fechaFinalContractual || p.fechaFin || p.fecha_final_contractual || p.fecha_fin_contractual_plan || p.fecha_fin || '',
-            departamentoId: p.departamento_id || p.departamentoId,
-            municipioId: p.municipio_id || p.municipioId,
-            departamentoNombre: p.departamentoNombre || p.departamento_nombre || '',
-            municipioNombre: p.municipioNombre || p.municipio_nombre || '',
-          }))
+          const mapeados: Proyecto[] = res.data.data.map(mapearProyectoApi)
           setProyectosReales(mapeados)
           try {
             sessionStorage.setItem('domun_proyectos_cache', JSON.stringify(mapeados))
@@ -268,6 +309,7 @@ export function ProyectosView() {
 
   const handleLimpiarFiltros = () => {
     setBusqueda('')
+    setProyectoFiltroId('')
     setEstadoFiltro('todos')
     setFiltroDepa('')
     setFiltroMuni('')
@@ -290,7 +332,7 @@ export function ProyectosView() {
 
   const proyectosFiltrados = useMemo(() => {
     return proyectosReales.filter((proyecto) => {
-      // Si es Residente o Delegado, solo ver proyectos donde esté asignado
+      // Si es Residente o Delegado, solo ver proyectos donde esté asignado (o borradores recién creados sin asignar)
       if (esResidenteODelegado && usuario?.id) {
         const pAny = proyecto as any
         const uId = usuario.id
@@ -300,10 +342,15 @@ export function ProyectosView() {
         const esDel = pAny.delegadoResidenteId === uId || pAny.delegado_residente_id === uId
         const enEquipo = Array.isArray(pAny.equipo) && pAny.equipo.some((m: any) => m.id === uId || m.usuarioId === uId || (m.nombre && m.nombre.toLowerCase().trim().includes(uNombre)))
         const coincideNombre = pAny.responsable && typeof pAny.responsable === 'string' && uNombre.length > 2 && pAny.responsable.toLowerCase().includes(uNombre)
+        const esBorradorSinAsignar = proyecto.estado === 'borrador' && !pAny.responsable_id && !pAny.delegadoResidenteId
 
-        if (!esResp && !esDel && !enEquipo && !coincideNombre) {
+        if (!esResp && !esDel && !enEquipo && !coincideNombre && !esBorradorSinAsignar) {
           return false
         }
+      }
+
+      if (proyectoFiltroId && String(proyecto.id) !== String(proyectoFiltroId)) {
+        return false
       }
 
       const texto = `${proyecto.codigo} ${proyecto.nombre} ${proyecto.ubicacion} ${proyecto.responsable}`.toLowerCase()
@@ -349,7 +396,44 @@ export function ProyectosView() {
 
       return matchBusqueda && matchEstado && matchDepa && matchMuni && matchFecha
     })
-  }, [proyectosReales, busqueda, estadoFiltro, filtroDepa, filtroMuni, filtroFechaInicio, filtroFechaFin, esResidenteODelegado, usuario])
+  }, [proyectosReales, busqueda, proyectoFiltroId, estadoFiltro, filtroDepa, filtroMuni, filtroFechaInicio, filtroFechaFin, esResidenteODelegado, usuario])
+
+  const proyectosEliminables = useMemo(() => {
+    return proyectosFiltrados.filter((p) => esProyectoEliminable(p).puedeEliminar)
+  }, [proyectosFiltrados])
+
+  const proyectosSeleccionadosObjetos = useMemo(() => {
+    return proyectosReales.filter((p) => seleccionados.includes(p.id))
+  }, [proyectosReales, seleccionados])
+
+  const aptosParaEliminar = useMemo(() => {
+    return proyectosSeleccionadosObjetos.filter((p) => esProyectoEliminable(p).puedeEliminar)
+  }, [proyectosSeleccionadosObjetos])
+
+  const noAptosParaEliminar = useMemo(() => {
+    return proyectosSeleccionadosObjetos.filter((p) => !esProyectoEliminable(p).puedeEliminar)
+  }, [proyectosSeleccionadosObjetos])
+
+  const todosAptos = proyectosSeleccionadosObjetos.length > 0 && noAptosParaEliminar.length === 0
+
+  const toggleSeleccionarProyecto = (proyecto: Proyecto) => {
+    const check = esProyectoEliminable(proyecto)
+    if (!check.puedeEliminar && !seleccionados.includes(proyecto.id)) {
+      showErrorToast(check.motivo)
+      return
+    }
+    setSeleccionados((prev) =>
+      prev.includes(proyecto.id) ? prev.filter((item) => item !== proyecto.id) : [...prev, proyecto.id]
+    )
+  }
+
+  const toggleSeleccionarTodos = () => {
+    if (proyectosEliminables.length > 0 && seleccionados.length === proyectosEliminables.length) {
+      setSeleccionados([])
+    } else {
+      setSeleccionados(proyectosEliminables.map((p) => p.id))
+    }
+  }
 
   const totalPaginas = Math.max(1, Math.ceil(proyectosFiltrados.length / porPagina))
   
@@ -377,56 +461,56 @@ export function ProyectosView() {
             <ChevronLeft size={18} />
           </button>
           <div>
-            <h1 className="m-0 text-[18px] font-black text-gray-900 tracking-wide">Proyectos</h1>
-            <p className="m-0 mt-0.5 text-[11px] font-medium text-gray-400">Gestión de proyectos de construcción</p>
+            <h1 className="m-0 text-[15px] sm:text-[18px] font-extrabold text-gray-900 leading-tight">Gestión de Proyectos</h1>
+            <p className="m-0 mt-0.5 text-[11px] font-medium text-gray-400">Administra y supervisa tus proyectos de construcción</p>
           </div>
         </div>
         
-        <div className="flex flex-col md:items-end gap-2">
-          <div className="flex flex-wrap items-center gap-2">
-            
+        <div className="flex flex-col md:items-end gap-2 w-full md:w-auto">
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
             {/* Toggle de Vistas */}
-            <div className="flex items-center overflow-hidden rounded-md border border-gray-200 bg-white shadow-sm">
+            <div className="flex items-center overflow-hidden rounded-md border border-gray-200 bg-white shadow-sm shrink-0">
               <button
                 type="button"
                 onClick={() => handleVistaChange('lista')}
-                className={`flex h-8 items-center gap-1.5 px-3 text-[10px] font-bold transition-colors ${vista === 'lista' ? 'bg-[#9B0F06] text-white' : 'text-gray-600 hover:bg-gray-50'}`}
+                className={`flex h-8 items-center gap-1.5 px-2.5 sm:px-3 text-[10px] font-bold transition-colors ${vista === 'lista' ? 'bg-[#9B0F06] text-white' : 'text-gray-600 hover:bg-gray-50'}`}
               >
-                <List size={12} />
-                <span className="hidden sm:inline">Lista</span>
+                <List size={13} />
+                <span>Lista</span>
               </button>
               <div className="w-px h-4 bg-gray-200"></div>
               <button
                 type="button"
                 onClick={() => handleVistaChange('detalles')}
-                className={`flex h-8 items-center gap-1.5 px-3 text-[10px] font-bold transition-colors ${vista === 'detalles' ? 'bg-[#9B0F06] text-white' : 'text-gray-600 hover:bg-gray-50'}`}
+                className={`flex h-8 items-center gap-1.5 px-2.5 sm:px-3 text-[10px] font-bold transition-colors ${vista === 'detalles' ? 'bg-[#9B0F06] text-white' : 'text-gray-600 hover:bg-gray-50'}`}
               >
-                <LayoutGrid size={12} />
-                <span className="hidden sm:inline">Detalles</span>
+                <LayoutGrid size={13} />
+                <span>Detalles</span>
               </button>
             </div>
 
+            <button
+              type="button"
+              onClick={() => router.push('/dashboard/proyectos/empresas')}
+              className="inline-flex h-8 items-center gap-1.5 rounded-md bg-white border border-gray-200 px-2.5 sm:px-3 text-[10px] sm:text-[11px] font-bold text-gray-700 transition-colors hover:bg-gray-50 shadow-sm shrink-0"
+              title="Catálogo de Empresas"
+            >
+              <Building2 size={13} className="text-[#9B0F06]" />
+              <span className="hidden xs:inline sm:inline">Empresas</span>
+              <span className="inline xs:hidden sm:hidden">Empresas</span>
+            </button>
             
+            {!esResidenteODelegado && (
               <button
                 type="button"
-                onClick={() => router.push('/dashboard/proyectos/empresas')}
-                className="inline-flex h-8 items-center gap-1.5 rounded-md bg-white border border-gray-200 px-3 text-[11px] font-bold text-gray-700 transition-colors hover:bg-gray-50 shadow-sm"
-                title="Catálogo de Empresas"
+                onClick={() => router.push('/dashboard/proyectos/nuevo')}
+                className="inline-flex h-8 items-center gap-1.5 rounded-md bg-[#9B0F06] px-3 sm:px-3.5 text-[10px] sm:text-[11px] font-bold text-white transition-colors hover:bg-[#5E0006] shadow-sm shrink-0 cursor-pointer"
               >
-                <Building2 size={12} className="text-[#9B0F06]" />
-                <span className="hidden sm:inline">Gestion de Empresas y Entidades</span>
+                <Plus size={13} />
+                <span className="hidden sm:inline">Nuevo Proyecto</span>
+                <span className="inline sm:hidden">Nuevo</span>
               </button>
-              
-              {!esResidenteODelegado && (
-                <button
-                  type="button"
-                  onClick={() => router.push('/dashboard/proyectos/nuevo')}
-                  className="inline-flex h-8 items-center gap-1.5 rounded-md bg-[#9B0F06] px-3.5 text-[11px] font-bold text-white transition-colors hover:bg-[#5E0006] shadow-sm"
-                >
-                  <Plus size={12} />
-                  Nuevo Proyecto
-                </button>
-              )}
+            )}
           </div>
           <span className="text-[10px] font-medium text-gray-500">
             {proyectosFiltrados.length} proyectos encontrados
@@ -439,6 +523,9 @@ export function ProyectosView() {
           proyectos={proyectosReales}
           busqueda={busqueda}
           setBusqueda={setBusqueda}
+          proyectoSeleccionadoId={proyectoFiltroId}
+          setProyectoSeleccionadoId={(valor) => { setProyectoFiltroId(valor); setPagina(1); }}
+          mostrarSelectorProyecto={true}
           estadoFiltro={estadoFiltro}
           setEstadoFiltro={(valor) => { setEstadoFiltro(valor); setPagina(1); }}
           filtroDepa={filtroDepa}
@@ -456,23 +543,24 @@ export function ProyectosView() {
       </div>
 
       {modoSeleccion && (
-        <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50/90 p-2.5 px-4 shadow-2xs font-[Poppins] text-xs font-semibold text-gray-800">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 rounded-xl border border-gray-200 bg-gray-50/90 p-2.5 px-4 shadow-2xs font-[Poppins] text-xs font-semibold text-gray-800">
           <div className="flex items-center gap-2">
             <input
               type="checkbox"
-              checked={proyectosFiltrados.length > 0 && seleccionados.length === proyectosFiltrados.length}
+              checked={proyectosEliminables.length > 0 && seleccionados.length === proyectosEliminables.length}
               onChange={toggleSeleccionarTodos}
-              className="h-4 w-4 rounded border-gray-300 text-[#9B0F06] focus:ring-[#9B0F06] cursor-pointer"
+              disabled={proyectosEliminables.length === 0}
+              className="h-4 w-4 rounded border-gray-300 text-[#9B0F06] focus:ring-[#9B0F06] cursor-pointer disabled:opacity-40"
             />
             <span>
-              Seleccionar Todos ({seleccionados.length} de {proyectosFiltrados.length} seleccionados)
+              Seleccionar aptos para eliminar ({seleccionados.length} de {proyectosEliminables.length} en borrador sin bitácoras)
             </span>
           </div>
           {seleccionados.length > 0 && (
             <button
               type="button"
               onClick={() => setShowModalEliminar(true)}
-              className="inline-flex items-center gap-1.5 rounded-md bg-red-600 px-3.5 py-1 text-xs font-bold text-white hover:bg-red-700 shadow-2xs transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 rounded-md bg-red-600 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-red-700 shadow-2xs transition-colors cursor-pointer"
             >
               <Trash2 size={13} />
               <span>Eliminar ({seleccionados.length})</span>
@@ -498,7 +586,7 @@ export function ProyectosView() {
                   proyecto={proyecto}
                   modoSeleccion={modoSeleccion}
                   isSelected={seleccionados.includes(proyecto.id)}
-                  onToggleSelect={() => toggleSeleccionarProyecto(proyecto.id)}
+                  onToggleSelect={() => toggleSeleccionarProyecto(proyecto)}
                   onClick={() => router.push(`/dashboard/proyectos/detalles?slug=${proyecto.id}`)}
                 />
               ))}
@@ -513,41 +601,41 @@ export function ProyectosView() {
                   proyecto={proyecto}
                   modoSeleccion={modoSeleccion}
                   isSelected={seleccionados.includes(proyecto.id)}
-                  onToggleSelect={() => toggleSeleccionarProyecto(proyecto.id)}
+                  onToggleSelect={() => toggleSeleccionarProyecto(proyecto)}
                 />
               ))}
             </div>
           )}
           
           {/* PAGINACIÓN COMPARTIDA (APLICA A TODAS LAS VISTAS) */}
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-100 bg-white px-3 py-2.5 shadow-sm mt-4">
-            <div className="flex items-center gap-3">
-              <span className="text-[11px] text-gray-500 font-medium">Mostrar</span>
+          <div className="flex flex-nowrap items-center justify-between gap-2 rounded-xl border border-gray-100 bg-white px-2.5 py-2.5 shadow-sm mt-4 font-[Poppins]">
+            <div className="flex min-w-0 items-center gap-1.5 sm:gap-3">
+              <span className="text-[9px] sm:text-[11px] text-gray-500 font-medium">Mostrar</span>
               <select 
                 value={porPagina} 
                 onChange={(e) => {
                   setPorPagina(Number(e.target.value))
                   setPagina(1)
                 }}
-                className="h-6 rounded border border-gray-200 bg-gray-50 px-1 text-[11px] font-bold text-gray-700 focus:border-[#9B0F06] focus:outline-none"
+                className="paginacion-control h-6 rounded border border-gray-200 bg-gray-50 px-1 text-[9px] sm:text-[11px] font-bold text-gray-700 focus:border-[#9B0F06] focus:outline-none cursor-pointer"
               >
-                <option value={3}>3</option>
-                <option value={6}>6</option>
-                <option value={10}>10</option>
-                <option value={20}>20</option>
-                <option value={50}>50</option>
+                <option value={3} className="text-[9px]">3</option>
+                <option value={6} className="text-[9px]">6</option>
+                <option value={10} className="text-[9px]">10</option>
+                <option value={20} className="text-[9px]">20</option>
+                <option value={50} className="text-[9px]">50</option>
               </select>
-              <div className="h-4 w-px bg-gray-200 mx-1 hidden sm:block"></div>
-              <span className="text-[11px] font-semibold text-gray-600 hidden sm:inline">
+              <div className="h-4 w-px bg-gray-200 mx-0.5 sm:mx-1"></div>
+              <span className="whitespace-nowrap text-[9px] sm:text-[11px] font-semibold text-gray-600">
                 Página {pagina} de {totalPaginas}
               </span>
             </div>
 
-            <div className="flex items-center gap-1.5">
+            <div className="flex shrink-0 items-center gap-1">
               <button
                 onClick={() => irAPagina(pagina - 1)}
                 disabled={pagina === 1}
-                className="rounded-lg border border-gray-200 bg-white px-3 py-1 text-[11px] font-bold text-gray-600 transition-colors hover:border-[#9B0F06] hover:text-[#9B0F06] disabled:cursor-not-allowed disabled:opacity-40"
+                className="inline-flex h-7 items-center justify-center rounded-lg border border-gray-200 bg-white px-2 sm:px-3 text-[9px] sm:text-[11px] font-bold text-gray-600 transition-colors hover:border-[#9B0F06] hover:text-[#9B0F06] disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Anterior
               </button>
@@ -555,7 +643,7 @@ export function ProyectosView() {
               <button
                 onClick={() => irAPagina(pagina + 1)}
                 disabled={pagina === totalPaginas}
-                className="rounded-lg border border-gray-200 bg-white px-3 py-1 text-[11px] font-bold text-gray-600 transition-colors hover:border-[#9B0F06] hover:text-[#9B0F06] disabled:cursor-not-allowed disabled:opacity-40"
+                className="inline-flex h-7 items-center justify-center rounded-lg border border-gray-200 bg-white px-2 sm:px-3 text-[9px] sm:text-[11px] font-bold text-gray-600 transition-colors hover:border-[#9B0F06] hover:text-[#9B0F06] disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Siguiente
               </button>
@@ -569,51 +657,196 @@ export function ProyectosView() {
         </div>
       )}
 
-      {/* Modal de Confirmación de Eliminación */}
+      {/* Modal de Confirmación de Eliminación (Optimizado para Desktop y Móvil) */}
       {showModalEliminar && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 transition-opacity">
-          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl space-y-4 font-[Poppins]">
-            <div className="flex items-start gap-3">
-              <div className="rounded-full bg-red-100 p-2.5 text-red-600 shrink-0">
-                <Trash2 size={20} />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-gray-900">
-                  ¿Eliminar {seleccionados.length} proyecto{seleccionados.length > 1 ? 's' : ''}?
-                </h3>
-                <p className="text-[11px] text-gray-500 mt-1 leading-normal">
-                  Esta acción no se puede deshacer. Se {seleccionados.length > 1 ? 'eliminarán' : 'eliminará'} permanentemente {seleccionados.length > 1 ? 'los' : 'el'} proyecto{seleccionados.length > 1 ? 's' : ''} seleccionado{seleccionados.length > 1 ? 's' : ''} de la base de datos Supabase.
-                </p>
-              </div>
-            </div>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-3 sm:p-4 md:p-6 transition-all"
+          onClick={() => {
+            if (!isEliminando) setShowModalEliminar(false)
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-lg sm:max-w-xl md:max-w-2xl rounded-2xl bg-white shadow-2xl overflow-hidden border border-gray-100 flex flex-col max-h-[90vh] font-[Poppins] animate-in fade-in zoom-in-95 duration-150"
+          >
+            {/* Franja superior de acento */}
+            <div className="h-1.5 w-full bg-gradient-to-r from-red-600 via-[#9B0F06] to-red-800 shrink-0" />
 
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-gray-100">
+            {/* Cabecera del Modal */}
+            <div className="p-5 sm:p-6 pb-4 flex items-start justify-between gap-3 border-b border-gray-100 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="rounded-2xl bg-red-50 p-3 text-[#9B0F06] shrink-0 ring-4 ring-red-50/50">
+                  <Trash2 size={22} />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-bold text-gray-900 leading-tight">
+                    Eliminar {seleccionados.length} {seleccionados.length === 1 ? 'proyecto' : 'proyectos'}
+                  </h3>
+                  <p className="text-xs text-gray-500 mt-1 leading-normal">
+                    Verificación de requisitos antes de confirmar la eliminación definitiva
+                  </p>
+                </div>
+              </div>
               <button
                 type="button"
                 disabled={isEliminando}
                 onClick={() => setShowModalEliminar(false)}
-                className="rounded-lg border border-gray-300 bg-white px-4 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 cursor-pointer"
+                className="rounded-lg p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer"
+                title="Cerrar modal"
               >
-                Cancelar
+                <X size={18} />
               </button>
-              <button
-                type="button"
-                disabled={isEliminando}
-                onClick={handleConfirmarEliminar}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-red-700 transition-colors shadow-2xs disabled:opacity-50 cursor-pointer"
-              >
-                {isEliminando ? (
-                  <>
-                    <Loader2 size={13} className="animate-spin" />
-                    <span>Eliminando...</span>
-                  </>
+            </div>
+
+            {/* Cuerpo del Modal con scroll */}
+            <div className="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
+              {/* Regla de negocio en banner destacado */}
+              <div className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50/90 p-3 text-xs text-amber-900 leading-relaxed shadow-2xs">
+                <ShieldAlert size={18} className="text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-bold text-amber-950">Condición de seguridad requerida:</p>
+                  <p className="mt-0.5 text-amber-800 text-[11px] sm:text-xs">
+                    Solo se pueden eliminar proyectos en modo <strong className="font-bold text-amber-950 underline">Borrador</strong> y que <strong className="font-bold text-amber-950 underline">no tengan ningún registro de bitácora</strong> vinculado.
+                  </p>
+                </div>
+              </div>
+
+              {/* Lista de Proyectos Seleccionados */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    Proyectos en selección ({seleccionados.length})
+                  </h4>
+                  {noAptosParaEliminar.length > 0 && aptosParaEliminar.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setSeleccionados(aptosParaEliminar.map((p) => p.id))}
+                      className="text-[11px] font-bold text-[#9B0F06] hover:underline cursor-pointer"
+                    >
+                      Conservar solo aptos ({aptosParaEliminar.length})
+                    </button>
+                  )}
+                </div>
+
+                <div className="max-h-56 sm:max-h-64 overflow-y-auto space-y-2 rounded-xl border border-gray-200 bg-gray-50/60 p-2.5">
+                  {proyectosSeleccionadosObjetos.map((p) => {
+                    const check = esProyectoEliminable(p)
+                    return (
+                      <div
+                        key={p.id}
+                        className={`p-3 rounded-xl border bg-white transition-all ${
+                          check.puedeEliminar
+                            ? 'border-gray-200 hover:border-gray-300'
+                            : 'border-red-300 bg-red-50/40'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                              <span className="font-mono text-[9px] font-bold px-1.5 py-0.5 rounded bg-gray-100 text-gray-700 border border-gray-200">
+                                {p.codigo || 'PROY'}
+                              </span>
+                              <p className="text-xs sm:text-[13px] font-bold text-gray-900 truncate">
+                                {p.nombre}
+                              </p>
+                            </div>
+                            <p className="text-[10px] sm:text-[11px] text-gray-500 truncate">
+                              {p.ubicacion} • {p.responsable}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <ProyectoEstadoBadge estado={p.estado} />
+                          </div>
+                        </div>
+
+                        <div className="mt-2 pt-2 border-t border-gray-100 flex items-center justify-between text-[10px] sm:text-[11px]">
+                          <span className="text-gray-500 font-medium">
+                            Bitácoras vinculadas: <strong className="text-gray-800">{p.totalBitacoras || 0}</strong>
+                          </span>
+                          {check.puedeEliminar ? (
+                            <span className="inline-flex items-center gap-1 text-green-700 bg-green-50 px-2 py-0.5 rounded-md font-semibold border border-green-200">
+                              <CheckCircle2 size={12} />
+                              Apto para eliminar
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-red-700 bg-red-100/70 px-2 py-0.5 rounded-md font-semibold border border-red-300">
+                              <AlertCircle size={12} />
+                              No eliminable
+                            </span>
+                          )}
+                        </div>
+
+                        {!check.puedeEliminar && (
+                          <p className="mt-1.5 text-[10.5px] text-red-600 font-medium leading-tight">
+                            • Motivo: {check.motivo}
+                          </p>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Mensaje de Bloqueo si hay proyectos que no cumplen */}
+              {noAptosParaEliminar.length > 0 && (
+                <div className="flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-800 shadow-2xs">
+                  <AlertCircle size={18} className="text-red-600 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-bold text-red-900">
+                      Eliminación bloqueada por restricciones de negocio:
+                    </p>
+                    <p className="mt-0.5 text-red-700 text-[11px] leading-normal">
+                      {noAptosParaEliminar.length === 1
+                        ? '1 de los proyectos seleccionados no puede eliminarse porque no está en modo Borrador o tiene bitácoras asociadas.'
+                        : `${noAptosParaEliminar.length} de los proyectos seleccionados no pueden eliminarse porque no están en modo Borrador o tienen bitácoras asociadas.`}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Pie del Modal */}
+            <div className="p-4 sm:p-5 px-5 sm:px-6 bg-gray-50/90 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
+              <div className="text-[11px] text-gray-500 text-center sm:text-left">
+                {todosAptos ? (
+                  <span className="text-gray-600">
+                    Esta acción es irreversible y eliminará permanentemente los datos en Supabase.
+                  </span>
                 ) : (
-                  <>
-                    <Trash2 size={13} />
-                    <span>Eliminar Definitivamente</span>
-                  </>
+                  <span className="text-red-600 font-semibold">
+                    Deselecciona los proyectos no aptos para habilitar la eliminación.
+                  </span>
                 )}
-              </button>
+              </div>
+
+              <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
+                <button
+                  type="button"
+                  disabled={isEliminando}
+                  onClick={() => setShowModalEliminar(false)}
+                  className="flex-1 sm:flex-none rounded-xl border border-gray-300 bg-white px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-100 transition-colors disabled:opacity-50 cursor-pointer shadow-2xs"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  disabled={isEliminando || !todosAptos || seleccionados.length === 0}
+                  onClick={handleConfirmarEliminar}
+                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl bg-[#9B0F06] hover:bg-[#5E0006] px-5 py-2 text-xs font-bold text-white transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  {isEliminando ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" />
+                      <span>Eliminando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 size={14} />
+                      <span>Eliminar Definitivamente ({seleccionados.length})</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>

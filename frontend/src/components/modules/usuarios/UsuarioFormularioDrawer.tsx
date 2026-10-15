@@ -7,7 +7,9 @@ import { useAuthStore } from '@/stores/useAuthStore'
 import { X, Calendar, Eye, EyeOff, CheckCircle2, AlertCircle } from 'lucide-react'
 import { Usuario, RolUsuario } from '@/types/usuario'
 import { useCustomToast } from '@/hooks/useCustomToast'
-import { apiGetDeduplicado } from '@/lib/api/cliente'
+import { api, apiGetDeduplicado, limpiarCacheMemoria } from '@/lib/api/cliente'
+import { formatearNombrePropio } from '@/lib/utils/formatters'
+import { validarFechaNacimiento } from '@/lib/utils/validations'
 
 interface UsuarioFormularioDrawerProps {
   isOpen: boolean
@@ -15,20 +17,137 @@ interface UsuarioFormularioDrawerProps {
   usuario?: Usuario
   onSave?: (data: any) => void
   rolesPermitidos?: string[]
+  rolInicial?: string
+  empresaContratistaIdInicial?: string
+  ocultarEmpresaContratista?: boolean
   isPerfilEdit?: boolean
+  bloquearRol?: boolean
+  bloquearEstado?: boolean
 }
 
-function calcularEdad(d: string, m: string, a: string) {
-  if (!d || !m || !a) return 0
-  const today = new Date()
-  const birthDate = new Date(parseInt(a, 10), parseInt(m, 10) - 1, parseInt(d, 10))
-  if (isNaN(birthDate.getTime())) return 0
-  let age = today.getFullYear() - birthDate.getFullYear()
-  const mDiff = today.getMonth() - birthDate.getMonth()
-  if (mDiff < 0 || (mDiff === 0 && today.getDate() < birthDate.getDate())) {
-    age--
+export function generarUsernameSugerido(
+  primerNombre: string,
+  segundoNombre: string,
+  primerApellido: string,
+  usuariosExistentes: any[] = [],
+  usuarioIdActual?: string
+): string {
+  const cleanPN = (primerNombre || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '')
+
+  const cleanPA = (primerApellido || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '')
+
+  if (!cleanPN || !cleanPA) {
+    return cleanPN || ''
   }
-  return age
+
+  const primerResto = (segundoNombre || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)[0]
+    .replace(/[^a-z0-9]/g, '')
+
+  const usernamesOcupados = new Set(
+    (usuariosExistentes || [])
+      .filter((u: any) => usuarioIdActual ? u.id !== usuarioIdActual : true)
+      .map((u: any) => String(u.username || '').toLowerCase().trim())
+  )
+
+  // 1. Por defecto toma en cuenta el primer nombre: ej. "jorge_recinos"
+  const base1 = `${cleanPN}_${cleanPA}`
+  if (!usernamesOcupados.has(base1)) {
+    return base1
+  }
+
+  // 2. En caso se genere uno repetido que use el campo del resto de nombre: ej. "jorge_arturo_recinos"
+  if (primerResto) {
+    const base2 = `${cleanPN}_${primerResto}_${cleanPA}`
+    if (!usernamesOcupados.has(base2)) {
+      return base2
+    }
+
+    // 3a. Y si aun así no encuentra nada que le ponga algún número: iniciando en 1: "jorge_arturo_recinos1", "jorge_arturo_recinos2", ...
+    let num = 1
+    while (usernamesOcupados.has(`${base2}${num}`)) {
+      num++
+    }
+    return `${base2}${num}`
+  }
+
+  // 3b. Si no tiene resto del nombre o no encuentra nada que le ponga algún número: iniciando en 1: "jorge_recinos1", "jorge_recinos2", ...
+  let num = 1
+  while (usernamesOcupados.has(`${base1}${num}`)) {
+    num++
+  }
+  return `${base1}${num}`
+}
+
+export function generarCorreoSugerido(
+  primerNombre: string,
+  segundoNombre: string,
+  primerApellido: string,
+  usuariosExistentes: any[] = [],
+  usuarioIdActual?: string
+): string {
+  const cleanPN = (primerNombre || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '')
+
+  const cleanPA = (primerApellido || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '')
+
+  if (!cleanPN || !cleanPA) return ''
+
+  const primerResto = (segundoNombre || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)[0]
+    .replace(/[^a-z0-9]/g, '')
+
+  const correosOcupados = new Set(
+    (usuariosExistentes || [])
+      .filter((u: any) => usuarioIdActual ? u.id !== usuarioIdActual : true)
+      .map((u: any) => String(u.correo || u.email || '').toLowerCase().trim())
+  )
+
+  const base1 = `${cleanPN}.${cleanPA}@domun.gt`
+  if (!correosOcupados.has(base1)) return base1
+
+  if (primerResto) {
+    const base2 = `${cleanPN}.${primerResto}.${cleanPA}@domun.gt`
+    if (!correosOcupados.has(base2)) return base2
+    let num = 1
+    while (correosOcupados.has(`${cleanPN}.${primerResto}.${cleanPA}${num}@domun.gt`)) {
+      num++
+    }
+    return `${cleanPN}.${primerResto}.${cleanPA}${num}@domun.gt`
+  }
+
+  let num = 1
+  while (correosOcupados.has(`${cleanPN}.${cleanPA}${num}@domun.gt`)) {
+    num++
+  }
+  return `${cleanPN}.${cleanPA}${num}@domun.gt`
 }
 
 export function UsuarioFormularioDrawer({
@@ -37,7 +156,12 @@ export function UsuarioFormularioDrawer({
   usuario,
   onSave,
   rolesPermitidos,
+  rolInicial,
+  empresaContratistaIdInicial,
+  ocultarEmpresaContratista = false,
   isPerfilEdit = false,
+  bloquearRol = false,
+  bloquearEstado = false,
 }: UsuarioFormularioDrawerProps) {
   const { roles, fetchRoles } = useRolesStore()
   const profile = useAuthStore((state) => state.profile)
@@ -66,10 +190,28 @@ export function UsuarioFormularioDrawer({
   const rolActualNorm = (formData.rol || usuario?.rol || profile?.rol || '').toString().toLowerCase().replace(/\s+/g, '')
   const esRestringidoPerfil = (isPerfilEdit || Boolean(usuario)) && ['ingenieroresidente', 'auxiliardecampo', 'contratante', 'laboratorista'].includes(rolActualNorm)
 
+  const isRolBloqueado = Boolean(
+    bloquearRol ||
+    esRestringidoPerfil ||
+    (isPerfilEdit || (usuario && profile && (usuario.id === profile.id || usuario.correo?.toLowerCase() === profile.correo?.toLowerCase()))) ||
+    (!esAdmin && usuario?.rol === 'Administrador') ||
+    (!usuario && rolesPermitidos && rolesPermitidos.length === 1)
+  )
+
+  const isEstadoBloqueado = Boolean(
+    bloquearEstado ||
+    !usuario ||
+    esRestringidoPerfil
+  )
+
+  const [usernameModificadoManualmente, setUsernameModificadoManualmente] = useState(false)
+  const [correoModificadoManualmente, setCorreoModificadoManualmente] = useState(false)
+
   const [errors, setErrors] = useState<Record<string, boolean>>({})
   const [showPassword, setShowPassword] = useState(false)
   const [fechaInvalida, setFechaInvalida] = useState(false)
-  const { showErrorToast } = useCustomToast()
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const { showSuccessToast, showErrorToast } = useCustomToast()
 
   const rolSeleccionado = useMemo(() => {
     if (!formData.rol || !roles) return null
@@ -100,15 +242,31 @@ export function UsuarioFormularioDrawer({
   // Carga de catálogos y usuarios existentes para verificación en vivo
   useEffect(() => {
     if (isOpen) {
+      setUsernameModificadoManualmente(false)
+      setCorreoModificadoManualmente(false)
       fetchRoles({ bypassCache: true })
       apiGetDeduplicado('/empresas-contratistas')
         .then((r) => setEmpresasContratistas(r.data?.data || []))
         .catch(() => {})
       apiGetDeduplicado('/usuarios')
-        .then((r) => setUsuariosExistentes(r.data?.data || []))
+        .then((r) => {
+          const list = r.data?.data || []
+          setUsuariosExistentes(list)
+          if (!usuario) {
+            setFormData((prev) => {
+              if (prev.primer_nombre && prev.primer_apellido && !usernameModificadoManualmente) {
+                const nuevoUser = generarUsernameSugerido(prev.primer_nombre, prev.segundo_nombre, prev.primer_apellido, list)
+                if (nuevoUser) {
+                  return { ...prev, username: nuevoUser }
+                }
+              }
+              return prev
+            })
+          }
+        })
         .catch(() => {})
 
-      setEmpresaContratistaId('')
+      setEmpresaContratistaId(empresaContratistaIdInicial || '')
       setErrors({})
       setFechaInvalida(false)
 
@@ -117,15 +275,19 @@ export function UsuarioFormularioDrawer({
       const initialMes = parsedDate ? String(parsedDate.getUTCMonth() + 1).padStart(2, '0') : ''
       const initialAno = parsedDate ? String(parsedDate.getUTCFullYear()) : ''
 
+      const defaultRol = (usuario?.rol as RolUsuario) ||
+        (rolInicial as RolUsuario) ||
+        (rolesPermitidos && rolesPermitidos.length > 0 ? (rolesPermitidos[0] as RolUsuario) : ('IngenieroResidente' as RolUsuario))
+
       setFormData({
-        primer_nombre: usuario?.primer_nombre || '',
-        segundo_nombre: usuario?.segundo_nombre || '',
-        primer_apellido: usuario?.primer_apellido || '',
-        segundo_apellido: usuario?.segundo_apellido || '',
+        primer_nombre: formatearNombrePropio(usuario?.primer_nombre || ''),
+        segundo_nombre: formatearNombrePropio(usuario?.segundo_nombre || ''),
+        primer_apellido: formatearNombrePropio(usuario?.primer_apellido || ''),
+        segundo_apellido: formatearNombrePropio(usuario?.segundo_apellido || ''),
         username: (usuario as any)?.username || '',
         correo: usuario?.correo || '',
         telefono: usuario?.telefono || '',
-        rol: (usuario?.rol as RolUsuario) || ('IngenieroResidente' as RolUsuario),
+        rol: defaultRol,
         estado: usuario?.estado || 'Activo',
         diaNacimiento: initialDia,
         mesNacimiento: initialMes,
@@ -134,7 +296,7 @@ export function UsuarioFormularioDrawer({
         direccion: usuario?.direccion || '',
       })
     }
-  }, [isOpen, usuario])
+  }, [isOpen, usuario, rolInicial, empresaContratistaIdInicial, rolesPermitidos, bloquearRol, bloquearEstado])
 
   // --- Verificaciones en Vivo ---
 
@@ -219,35 +381,23 @@ export function UsuarioFormularioDrawer({
       if (!diaNacimiento || !mesNacimiento || anoNacimiento.length !== 4) {
         return { state: 'info', message: 'Formato: DD / MM / YYYY' }
       }
-      const d = parseInt(diaNacimiento, 10)
-      const m = parseInt(mesNacimiento, 10)
-      const a = parseInt(anoNacimiento, 10)
 
-      if (isNaN(d) || d < 1 || d > 31) return { state: 'error', message: 'Día debe ser entre 1 y 31' }
-      if (isNaN(m) || m < 1 || m > 12) return { state: 'error', message: 'Mes debe ser entre 1 y 12' }
-      if (isNaN(a) || a < 1900 || a > new Date().getFullYear()) return { state: 'error', message: 'Año de nacimiento no válido' }
-
-      const dateObj = new Date(a, m - 1, d)
-      if (dateObj.getFullYear() !== a || dateObj.getMonth() !== m - 1 || dateObj.getDate() !== d) {
-        return { state: 'error', message: 'Fecha no existe en el calendario' }
+      const res = validarFechaNacimiento(diaNacimiento, mesNacimiento, anoNacimiento)
+      if (!res.valida) {
+        return { state: 'error', message: res.mensajeError || 'Fecha no válida' }
       }
-
-      const edad = calcularEdad(diaNacimiento, mesNacimiento, anoNacimiento)
-      if (edad < 18) {
-        return { state: 'error', message: 'El usuario debe ser mayor de 18 años' }
-      }
-      return { state: 'valid', message: `Fecha válida (${edad} años, mayor de edad)` }
+      return { state: 'valid', message: res.mensaje || `Fecha válida (${res.edad} años, mayor de edad)` }
     }
     return null
   }, [formData.diaNacimiento, formData.mesNacimiento, formData.anoNacimiento])
 
-  // Helper para generar clase de input con borde verde / rojo en vivo (fuente 11px)
+  // Helper para generar clase de input con borde verde / rojo en vivo (fuente 16px en mobile para evitar auto-zoom, 11px en desktop)
   const getLiveInputClass = (
     isError: boolean,
     status: { state: string; message: string } | null,
     disabled = false
   ) => {
-    const base = `w-full h-8 border rounded-lg px-2.5 text-[11px] text-gray-700 ${
+    const base = `w-full h-10 sm:h-8 border rounded-lg px-2.5 text-base sm:text-[11px] text-gray-700 ${
       disabled ? 'bg-gray-100/90 text-gray-400 cursor-not-allowed' : 'bg-white'
     } focus:outline-none transition-colors`
     if (isError || status?.state === 'error') {
@@ -264,30 +414,37 @@ export function UsuarioFormularioDrawer({
     let valLimpio = value
 
     if (name === 'primer_nombre' || name === 'segundo_nombre' || name === 'primer_apellido' || name === 'segundo_apellido') {
-      valLimpio = value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '')
+      const soloLetrasYEspacios = value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]/g, '')
+      valLimpio = formatearNombrePropio(soloLetrasYEspacios)
     } else if (name === 'telefono') {
       valLimpio = value.replace(/[^\d]/g, '').slice(0, 8)
     } else if (name === 'username') {
       valLimpio = value.replace(/[\s@]/g, '').toLowerCase()
+      setUsernameModificadoManualmente(valLimpio.length > 0)
+    } else if (name === 'correo') {
+      setCorreoModificadoManualmente(valLimpio.length > 0)
     }
 
     setFormData((prev) => {
       const nextData = { ...prev, [name]: valLimpio }
 
-      // Auto-generación inteligente de username y correo si es un nuevo usuario y están vacíos
-      if (!usuario && (name === 'primer_nombre' || name === 'primer_apellido')) {
+      // Auto-generación inteligente de username y correo si es un nuevo usuario
+      if (!usuario && (name === 'primer_nombre' || name === 'segundo_nombre' || name === 'primer_apellido')) {
         const pNombre = name === 'primer_nombre' ? valLimpio : prev.primer_nombre
+        const sNombre = name === 'segundo_nombre' ? valLimpio : prev.segundo_nombre
         const pApellido = name === 'primer_apellido' ? valLimpio : prev.primer_apellido
+
         if (pNombre && pApellido) {
-          const cleanPN = pNombre.trim().toLowerCase().replace(/[^a-z0-9]/g, '')
-          const cleanPA = pApellido.trim().toLowerCase().replace(/[^a-z0-9]/g, '')
-          if (cleanPN && cleanPA) {
-            const nickSugerido = `${cleanPN}_${cleanPA}`
-            if (!prev.username || prev.username === `${cleanPN}` || prev.username.includes('_')) {
+          if (!usernameModificadoManualmente) {
+            const nickSugerido = generarUsernameSugerido(pNombre, sNombre, pApellido, usuariosExistentes, (usuario as any)?.id)
+            if (nickSugerido) {
               nextData.username = nickSugerido
             }
-            if (!prev.correo || prev.correo.includes('@domun.gt')) {
-              nextData.correo = `${cleanPN}.${cleanPA}@domun.gt`
+          }
+          if (!correoModificadoManualmente) {
+            const correoSugerido = generarCorreoSugerido(pNombre, sNombre, pApellido, usuariosExistentes, (usuario as any)?.id)
+            if (correoSugerido) {
+              nextData.correo = correoSugerido
             }
           }
         }
@@ -308,12 +465,12 @@ export function UsuarioFormularioDrawer({
 
   const handleFechaBlur = () => {
     if (formData.diaNacimiento && formData.mesNacimiento && formData.anoNacimiento.length === 4) {
-      const edad = calcularEdad(formData.diaNacimiento, formData.mesNacimiento, formData.anoNacimiento)
-      setFechaInvalida(edad < 18)
+      const res = validarFechaNacimiento(formData.diaNacimiento, formData.mesNacimiento, formData.anoNacimiento)
+      setFechaInvalida(!res.valida)
     }
   }
 
-  const handleGuardar = () => {
+  const handleGuardar = async () => {
     const newErrors: any = {}
 
     if (!formData.primer_nombre || formData.primer_nombre.trim().length < 2) newErrors.primer_nombre = true
@@ -330,16 +487,16 @@ export function UsuarioFormularioDrawer({
       if (!formData.diaNacimiento || !formData.mesNacimiento || formData.anoNacimiento.length !== 4) {
         errorFecha = true
       } else {
-        const edad = calcularEdad(formData.diaNacimiento, formData.mesNacimiento, formData.anoNacimiento)
-        if (edad < 18) errorFecha = true
+        const res = validarFechaNacimiento(formData.diaNacimiento, formData.mesNacimiento, formData.anoNacimiento)
+        if (!res.valida) errorFecha = true
       }
     }
 
     if (errorFecha) setFechaInvalida(true)
 
-    if (formData.rol.toLowerCase() === 'contratante' && !empresaContratistaId) {
+    if (!ocultarEmpresaContratista && formData.rol.toLowerCase() === 'contratista' && !empresaContratistaId) {
       newErrors.empresaContratistaId = true
-      showErrorToast('Debe seleccionar una Empresa Contratista para el rol Contratante')
+      showErrorToast('Debe seleccionar una Empresa Contratista para el rol Contratista')
     }
 
     if (Object.keys(newErrors).length > 0 || errorFecha) {
@@ -348,19 +505,70 @@ export function UsuarioFormularioDrawer({
       return
     }
 
-    if (onSave) {
-      onSave({
-        ...formData,
-        username: formData.username.trim(),
-        empresa_contratista_id: empresaContratistaId,
+    setIsSubmitting(true)
+    try {
+      const payload: any = {
+        primer_nombre: formatearNombrePropio(formData.primer_nombre.trim()),
+        segundo_nombre: formData.segundo_nombre?.trim() ? formatearNombrePropio(formData.segundo_nombre.trim()) : null,
+        primer_apellido: formatearNombrePropio(formData.primer_apellido.trim()),
+        segundo_apellido: formData.segundo_apellido?.trim() ? formatearNombrePropio(formData.segundo_apellido.trim()) : null,
+        correo: formData.correo.trim().toLowerCase(),
+        telefono: formData.telefono.trim(),
+        rol: formData.rol,
+        estado: formData.estado || 'Activo',
+        username: formData.username?.trim() || null,
+        empresa_contratista_id: empresaContratistaId || null,
+        direccion: formData.direccion?.trim() || null,
         fecha_nacimiento:
           formData.anoNacimiento && formData.mesNacimiento && formData.diaNacimiento
             ? `${formData.anoNacimiento}-${formData.mesNacimiento}-${formData.diaNacimiento}T00:00:00.000Z`
             : null,
-      })
-    }
+      }
 
-    onClose()
+      if (formData.password && formData.password.trim().length >= 6) {
+        payload.contrasena = formData.password.trim()
+      }
+
+      let resUser = null
+      if (usuario?.id) {
+        const res = await api.put(`/usuarios/${usuario.id}`, payload)
+        resUser = res.data?.data || res.data
+        showSuccessToast('Usuario actualizado correctamente')
+      } else {
+        const res = await api.post('/usuarios', payload)
+        resUser = res.data?.data || res.data
+        showSuccessToast('Usuario creado correctamente')
+      }
+
+      limpiarCacheMemoria('/usuarios')
+      limpiarCacheMemoria('/usuarios/delegados-residente')
+
+      if (onSave) {
+        const nomCalculado = formatearNombrePropio(`${payload.primer_nombre} ${payload.primer_apellido}`.trim())
+        const usuarioRetornado = {
+          ...(resUser || {}),
+          ...payload,
+          id: resUser?.id || undefined,
+          nombre: nomCalculado,
+          primer_nombre: payload.primer_nombre,
+          segundo_nombre: payload.segundo_nombre,
+          primer_apellido: payload.primer_apellido,
+          segundo_apellido: payload.segundo_apellido,
+          correo: payload.correo,
+          telefono: payload.telefono,
+          rol: payload.rol,
+          estado: payload.estado,
+        }
+        onSave(usuarioRetornado)
+      }
+
+      onClose()
+    } catch (err: any) {
+      console.error('Error al guardar usuario:', err)
+      showErrorToast(err.response?.data?.message || err.message || 'Error al guardar el usuario en el servidor')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -376,7 +584,7 @@ export function UsuarioFormularioDrawer({
 
         {/* Drawer */}
         <div
-          className={`fixed right-0 top-0 bottom-0 h-screen w-full max-w-[420px] bg-white shadow-2xl z-[10000] transform transition-transform duration-300 flex flex-col ${
+          className={`user-edit-drawer fixed right-0 top-0 bottom-0 h-screen w-full max-w-[420px] bg-white shadow-2xl z-[10000] transform transition-transform duration-300 flex flex-col ${
             isOpen ? 'translate-x-0' : 'translate-x-full'
           }`}
         >
@@ -404,7 +612,7 @@ export function UsuarioFormularioDrawer({
             {/* Nombres */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-[9.5px] font-bold text-gray-700 block mb-1 uppercase tracking-wide">
+                <label className="text-xs sm:text-[9.5px] font-bold text-gray-700 block mb-1 uppercase tracking-wide">
                   Primer Nombre *
                 </label>
                 <div className="relative">
@@ -419,16 +627,16 @@ export function UsuarioFormularioDrawer({
                   {statusPrimerNombre && (
                     <div className="absolute inset-y-0 right-0 flex items-center pr-2.5 pointer-events-none">
                       {statusPrimerNombre.state === 'valid' ? (
-                        <CheckCircle2 size={13} className="text-emerald-500" />
+                        <CheckCircle2 size={14} className="text-emerald-500" />
                       ) : (
-                        <AlertCircle size={13} className="text-red-500" />
+                        <AlertCircle size={14} className="text-red-500" />
                       )}
                     </div>
                   )}
                 </div>
                 {statusPrimerNombre && (
                   <p
-                    className={`mt-0.5 text-[9px] font-medium ${
+                    className={`mt-0.5 text-xs sm:text-[9px] font-medium ${
                       statusPrimerNombre.state === 'valid' ? 'text-emerald-600' : 'text-red-500'
                     }`}
                   >
@@ -438,7 +646,7 @@ export function UsuarioFormularioDrawer({
               </div>
 
               <div>
-                <label className="text-[9.5px] font-bold text-gray-700 block mb-1 uppercase tracking-wide">
+                <label className="text-xs sm:text-[9.5px] font-bold text-gray-700 block mb-1 uppercase tracking-wide">
                   Resto del Nombre
                 </label>
                 <input
@@ -447,7 +655,7 @@ export function UsuarioFormularioDrawer({
                   value={formData.segundo_nombre}
                   onChange={handleChange}
                   placeholder="Opcional"
-                  className="w-full h-8 border border-gray-200 rounded-lg px-2.5 text-[11px] text-gray-700 bg-white focus:outline-none focus:border-[#9B0F06] transition-colors"
+                  className="w-full h-10 sm:h-8 border border-gray-200 rounded-lg px-2.5 text-base sm:text-[11px] text-gray-700 bg-white focus:outline-none focus:border-[#9B0F06] transition-colors"
                 />
               </div>
             </div>
@@ -455,7 +663,7 @@ export function UsuarioFormularioDrawer({
             {/* Apellidos */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-[9.5px] font-bold text-gray-700 block mb-1 uppercase tracking-wide">
+                <label className="text-xs sm:text-[9.5px] font-bold text-gray-700 block mb-1 uppercase tracking-wide">
                   Primer Apellido *
                 </label>
                 <div className="relative">
@@ -470,16 +678,16 @@ export function UsuarioFormularioDrawer({
                   {statusPrimerApellido && (
                     <div className="absolute inset-y-0 right-0 flex items-center pr-2.5 pointer-events-none">
                       {statusPrimerApellido.state === 'valid' ? (
-                        <CheckCircle2 size={13} className="text-emerald-500" />
+                        <CheckCircle2 size={14} className="text-emerald-500" />
                       ) : (
-                        <AlertCircle size={13} className="text-red-500" />
+                        <AlertCircle size={14} className="text-red-500" />
                       )}
                     </div>
                   )}
                 </div>
                 {statusPrimerApellido && (
                   <p
-                    className={`mt-0.5 text-[9px] font-medium ${
+                    className={`mt-0.5 text-xs sm:text-[9px] font-medium ${
                       statusPrimerApellido.state === 'valid' ? 'text-emerald-600' : 'text-red-500'
                     }`}
                   >
@@ -489,7 +697,7 @@ export function UsuarioFormularioDrawer({
               </div>
 
               <div>
-                <label className="text-[9.5px] font-bold text-gray-700 block mb-1 uppercase tracking-wide">
+                <label className="text-xs sm:text-[9.5px] font-bold text-gray-700 block mb-1 uppercase tracking-wide">
                   Resto del Apellido
                 </label>
                 <input
@@ -498,14 +706,14 @@ export function UsuarioFormularioDrawer({
                   value={formData.segundo_apellido}
                   onChange={handleChange}
                   placeholder="Opcional"
-                  className="w-full h-8 border border-gray-200 rounded-lg px-2.5 text-[11px] text-gray-700 bg-white focus:outline-none focus:border-[#9B0F06] transition-colors"
+                  className="w-full h-10 sm:h-8 border border-gray-200 rounded-lg px-2.5 text-base sm:text-[11px] text-gray-700 bg-white focus:outline-none focus:border-[#9B0F06] transition-colors"
                 />
               </div>
             </div>
 
             {/* Username / Nick */}
             <div>
-              <label className="text-[9.5px] font-bold text-gray-700 block mb-1 uppercase tracking-wide">
+              <label className="text-xs sm:text-[9.5px] font-bold text-gray-700 block mb-1 uppercase tracking-wide">
                 Nombre de Usuario (Username / Nick) *
               </label>
               <div className="relative">
@@ -520,16 +728,16 @@ export function UsuarioFormularioDrawer({
                 {statusUsername && (
                   <div className="absolute inset-y-0 right-0 flex items-center pr-2.5 pointer-events-none">
                     {statusUsername.state === 'valid' ? (
-                      <CheckCircle2 size={13} className="text-emerald-500" />
+                      <CheckCircle2 size={14} className="text-emerald-500" />
                     ) : (
-                      <AlertCircle size={13} className="text-red-500" />
+                      <AlertCircle size={14} className="text-red-500" />
                     )}
                   </div>
                 )}
               </div>
               {statusUsername && (
                 <p
-                  className={`mt-0.5 text-[9px] font-medium ${
+                  className={`mt-0.5 text-xs sm:text-[9px] font-medium ${
                     statusUsername.state === 'valid' ? 'text-emerald-600' : 'text-red-500'
                   }`}
                 >
@@ -540,7 +748,7 @@ export function UsuarioFormularioDrawer({
 
             {/* Correo Electrónico */}
             <div>
-              <label className="text-[9.5px] font-bold text-gray-700 block mb-1 uppercase tracking-wide">
+              <label className="text-xs sm:text-[9.5px] font-bold text-gray-700 block mb-1 uppercase tracking-wide">
                 Correo Electrónico *
               </label>
               <div className="relative">
@@ -555,16 +763,16 @@ export function UsuarioFormularioDrawer({
                 {statusCorreo && (
                   <div className="absolute inset-y-0 right-0 flex items-center pr-2.5 pointer-events-none">
                     {statusCorreo.state === 'valid' ? (
-                      <CheckCircle2 size={13} className="text-emerald-500" />
+                      <CheckCircle2 size={14} className="text-emerald-500" />
                     ) : (
-                      <AlertCircle size={13} className="text-red-500" />
+                      <AlertCircle size={14} className="text-red-500" />
                     )}
                   </div>
                 )}
               </div>
               {statusCorreo && (
                 <p
-                  className={`mt-0.5 text-[9px] font-medium ${
+                  className={`mt-0.5 text-xs sm:text-[9px] font-medium ${
                     statusCorreo.state === 'valid' ? 'text-emerald-600' : 'text-red-500'
                   }`}
                 >
@@ -576,7 +784,7 @@ export function UsuarioFormularioDrawer({
             {/* Teléfono y Fecha de Nacimiento */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-[9.5px] font-bold text-gray-700 block mb-1 uppercase tracking-wide">
+                <label className="text-xs sm:text-[9.5px] font-bold text-gray-700 block mb-1 uppercase tracking-wide">
                   Teléfono *
                 </label>
                 <div className="relative">
@@ -592,16 +800,16 @@ export function UsuarioFormularioDrawer({
                   {statusTelefono && (
                     <div className="absolute inset-y-0 right-0 flex items-center pr-2.5 pointer-events-none">
                       {statusTelefono.state === 'valid' ? (
-                        <CheckCircle2 size={13} className="text-emerald-500" />
+                        <CheckCircle2 size={14} className="text-emerald-500" />
                       ) : (
-                        <AlertCircle size={13} className="text-red-500" />
+                        <AlertCircle size={14} className="text-red-500" />
                       )}
                     </div>
                   )}
                 </div>
                 {statusTelefono && (
                   <p
-                    className={`mt-0.5 text-[9px] font-medium ${
+                    className={`mt-0.5 text-xs sm:text-[9px] font-medium ${
                       statusTelefono.state === 'valid' ? 'text-emerald-600' : 'text-red-500'
                     }`}
                   >
@@ -612,9 +820,9 @@ export function UsuarioFormularioDrawer({
 
               <div>
                 <div className="flex items-center gap-1.5 mb-1">
-                  <Calendar size={11} className={statusFecha?.state === 'error' || fechaInvalida ? 'text-red-500' : statusFecha?.state === 'valid' ? 'text-emerald-500' : 'text-gray-500'} />
+                  <Calendar size={13} className={statusFecha?.state === 'error' || fechaInvalida ? 'text-red-500' : statusFecha?.state === 'valid' ? 'text-emerald-500' : 'text-gray-500'} />
                   <label
-                    className={`text-[9.5px] font-bold uppercase tracking-wide ${
+                    className={`text-xs sm:text-[9.5px] font-bold uppercase tracking-wide ${
                       statusFecha?.state === 'error' || fechaInvalida ? 'text-red-700' : statusFecha?.state === 'valid' ? 'text-emerald-700' : 'text-gray-700'
                     }`}
                   >
@@ -631,7 +839,7 @@ export function UsuarioFormularioDrawer({
                       if (/^\d{0,2}$/.test(val)) handleFechaChange('dia', val)
                     }}
                     onBlur={handleFechaBlur}
-                    className={`w-10 h-8 px-0 text-center text-[11px] border rounded-md focus:outline-none ${
+                    className={`w-12 sm:w-10 h-10 sm:h-8 px-0 text-center text-base sm:text-[11px] border rounded-md focus:outline-none ${
                       statusFecha?.state === 'error' || fechaInvalida
                         ? 'border-red-500 bg-red-50/40 text-red-900'
                         : statusFecha?.state === 'valid'
@@ -649,7 +857,7 @@ export function UsuarioFormularioDrawer({
                       if (/^\d{0,2}$/.test(val)) handleFechaChange('mes', val)
                     }}
                     onBlur={handleFechaBlur}
-                    className={`w-10 h-8 px-0 text-center text-[11px] border rounded-md focus:outline-none ${
+                    className={`w-12 sm:w-10 h-10 sm:h-8 px-0 text-center text-base sm:text-[11px] border rounded-md focus:outline-none ${
                       statusFecha?.state === 'error' || fechaInvalida
                         ? 'border-red-500 bg-red-50/40 text-red-900'
                         : statusFecha?.state === 'valid'
@@ -667,7 +875,7 @@ export function UsuarioFormularioDrawer({
                       if (/^\d{0,4}$/.test(val)) handleFechaChange('ano', val)
                     }}
                     onBlur={handleFechaBlur}
-                    className={`flex-1 min-w-[40px] h-8 px-0 text-center text-[11px] border rounded-md focus:outline-none ${
+                    className={`flex-1 min-w-[50px] sm:min-w-[40px] h-10 sm:h-8 px-0 text-center text-base sm:text-[11px] border rounded-md focus:outline-none ${
                       statusFecha?.state === 'error' || fechaInvalida
                         ? 'border-red-500 bg-red-50/40 text-red-900'
                         : statusFecha?.state === 'valid'
@@ -678,7 +886,7 @@ export function UsuarioFormularioDrawer({
                 </div>
                 {statusFecha ? (
                   <p
-                    className={`mt-0.5 text-[9px] font-medium ${
+                    className={`mt-0.5 text-xs sm:text-[9px] font-medium ${
                       statusFecha.state === 'valid'
                         ? 'text-emerald-600'
                         : statusFecha.state === 'error'
@@ -689,8 +897,8 @@ export function UsuarioFormularioDrawer({
                     {statusFecha.message}
                   </p>
                 ) : fechaInvalida && (
-                  <p className="text-[9px] text-red-600 font-medium mt-0.5">
-                    El usuario debe ser mayor de 18 años
+                  <p className="text-xs sm:text-[9px] text-red-600 font-medium mt-0.5">
+                    Fecha de nacimiento no válida
                   </p>
                 )}
               </div>
@@ -698,7 +906,7 @@ export function UsuarioFormularioDrawer({
 
             {/* Dirección */}
             <div>
-              <label className="text-[9.5px] font-bold text-gray-700 block mb-1 uppercase tracking-wide">
+              <label className="text-xs sm:text-[9.5px] font-bold text-gray-700 block mb-1 uppercase tracking-wide">
                 Dirección
               </label>
               <input
@@ -707,32 +915,40 @@ export function UsuarioFormularioDrawer({
                 value={formData.direccion}
                 onChange={handleChange}
                 placeholder="Ej: Ciudad de Guatemala"
-                className="w-full h-8 border border-gray-200 rounded-lg px-2.5 text-[11px] text-gray-700 bg-white focus:outline-none focus:border-[#9B0F06] transition-colors"
+                className="w-full h-10 sm:h-8 border border-gray-200 rounded-lg px-2.5 text-base sm:text-[11px] text-gray-700 bg-white focus:outline-none focus:border-[#9B0F06] transition-colors"
               />
             </div>
 
             {/* Rol y Estado */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-[9.5px] font-bold text-gray-700 block mb-1 uppercase tracking-wide">
+                <label className="text-xs sm:text-[9.5px] font-bold text-gray-700 block mb-1 uppercase tracking-wide">
                   Rol *
                 </label>
-                {esRestringidoPerfil ? (
+                {isRolBloqueado ? (
                   <input
                     type="text"
                     value={formData.rol || 'Sin rol asignado'}
                     readOnly
                     disabled
-                    className="w-full h-8 px-2.5 text-[11px] rounded-lg border border-gray-200 bg-gray-100 font-semibold text-gray-700 cursor-not-allowed"
+                    className="w-full h-10 sm:h-8 px-2.5 text-base sm:text-[11px] rounded-lg border border-gray-200 bg-gray-50/80 font-semibold text-gray-700 cursor-default select-none focus:outline-none"
                   />
                 ) : (
                   <select
                     name="rol"
                     value={formData.rol}
                     onChange={handleChange}
-                    disabled={Boolean(isPerfilEdit || (usuario && profile && (usuario.id === profile.id || usuario.correo?.toLowerCase() === profile.correo?.toLowerCase()))) || (!esAdmin && usuario?.rol === 'Administrador')}
-                    className={`w-full h-8 px-2.5 text-[11px] rounded-lg border bg-white focus:border-[#9B0F06] focus:outline-none transition-colors ${
-                      Boolean(isPerfilEdit || (usuario && profile && (usuario.id === profile.id || usuario.correo?.toLowerCase() === profile.correo?.toLowerCase()))) || (!esAdmin && usuario?.rol === 'Administrador') ? 'bg-gray-100 font-semibold text-gray-700 cursor-not-allowed' : ''
+                    disabled={
+                      bloquearRol ||
+                      Boolean(isPerfilEdit || (usuario && profile && (usuario.id === profile.id || usuario.correo?.toLowerCase() === profile.correo?.toLowerCase()))) ||
+                      (!esAdmin && usuario?.rol === 'Administrador')
+                    }
+                    className={`w-full h-10 sm:h-8 px-2.5 text-base sm:text-[11px] rounded-lg border bg-white focus:border-[#9B0F06] focus:outline-none transition-colors ${
+                      bloquearRol ||
+                      Boolean(isPerfilEdit || (usuario && profile && (usuario.id === profile.id || usuario.correo?.toLowerCase() === profile.correo?.toLowerCase()))) ||
+                      (!esAdmin && usuario?.rol === 'Administrador')
+                        ? 'bg-gray-100 font-semibold text-gray-700 cursor-not-allowed'
+                        : ''
                     }`}
                   >
                     <option value="">Sin rol asignado</option>
@@ -745,12 +961,19 @@ export function UsuarioFormularioDrawer({
                         { id: 'r5', nombre: 'AuxiliarDeCampo', estado: 'Activo' },
                         { id: 'r6', nombre: 'IngenieroResidente', estado: 'Activo' },
                         { id: 'r7', nombre: 'Laboratorista', estado: 'Activo' },
+                        { id: 'r8', nombre: 'Contratante', estado: 'Activo' },
+                        { id: 'r9', nombre: 'Contratista', estado: 'Activo' },
                       ]
-                      const listaBase = roles && roles.length > 0 ? roles : fallbackRoles
+                      const listaBase = [...(roles && roles.length > 0 ? roles : fallbackRoles)]
+                      if (formData.rol && !listaBase.some((r: any) => r.nombre?.toLowerCase().trim() === String(formData.rol).toLowerCase().trim())) {
+                        listaBase.push({ id: formData.rol, nombre: formData.rol, estado: 'Activo' })
+                      }
                       return listaBase
                         .filter((r: any) => {
                           if (!esAdmin && r.nombre === 'Administrador') return false
-                          if (r.nombre?.toLowerCase() === 'contratante') return false
+                          if (bloquearRol && formData.rol) {
+                            return r.nombre?.toLowerCase().trim() === String(formData.rol).toLowerCase().trim()
+                          }
                           if (rolesPermitidos && rolesPermitidos.length > 0) {
                             const norm = r.nombre.toLowerCase().replace(/\s+/g, '')
                             return rolesPermitidos.some((p) => {
@@ -771,23 +994,26 @@ export function UsuarioFormularioDrawer({
               </div>
 
               <div>
-                <label className="text-[9.5px] font-bold text-gray-700 block mb-1 uppercase tracking-wide">
+                <label className="text-xs sm:text-[9.5px] font-bold text-gray-700 block mb-1 uppercase tracking-wide">
                   Estado *
                 </label>
-                {esRestringidoPerfil || esRolInactivo ? (
+                {isEstadoBloqueado || esRolInactivo ? (
                   <input
                     type="text"
                     value={esRolInactivo ? 'Suspendido' : (formData.estado || 'Activo')}
                     readOnly
                     disabled
-                    className="w-full h-8 px-2.5 text-[11px] rounded-lg border border-gray-200 bg-gray-100 font-semibold text-gray-700 cursor-not-allowed"
+                    className="w-full h-10 sm:h-8 px-2.5 text-base sm:text-[11px] rounded-lg border border-gray-200 bg-gray-50/80 font-semibold text-gray-700 cursor-default select-none focus:outline-none"
                   />
                 ) : (
                   <select
                     name="estado"
-                    value={formData.estado}
+                    value={formData.estado || 'Activo'}
                     onChange={handleChange}
-                    className="w-full h-8 px-2.5 text-[11px] rounded-lg border border-gray-200 bg-white focus:border-[#9B0F06] focus:outline-none transition-colors"
+                    disabled={bloquearEstado}
+                    className={`w-full h-10 sm:h-8 px-2.5 text-base sm:text-[11px] rounded-lg border border-gray-200 bg-white focus:border-[#9B0F06] focus:outline-none transition-colors ${
+                      bloquearEstado ? 'bg-gray-100 font-semibold text-gray-700 cursor-not-allowed' : ''
+                    }`}
                   >
                     <option value="Activo">Activo</option>
                     <option value="Inactivo">Inactivo</option>
@@ -797,10 +1023,10 @@ export function UsuarioFormularioDrawer({
               </div>
             </div>
 
-            {/* Empresa Contratista (Si el rol es Contratante) */}
-            {formData.rol.toLowerCase() === 'contratante' && (
+            {/* Empresa Contratista (Solo para rol Contratista cuando no está oculto por contexto) */}
+            {!ocultarEmpresaContratista && formData.rol.toLowerCase() === 'contratista' && (
               <div>
-                <label className="text-[9.5px] font-bold text-gray-700 block mb-1 uppercase tracking-wide">
+                <label className="text-xs sm:text-[9.5px] font-bold text-gray-700 block mb-1 uppercase tracking-wide">
                   Empresa Contratista *
                 </label>
                 <select
@@ -809,7 +1035,7 @@ export function UsuarioFormularioDrawer({
                     setEmpresaContratistaId(e.target.value)
                     setErrors((prev) => ({ ...prev, empresaContratistaId: false }))
                   }}
-                  className={`w-full h-8 px-2.5 text-[11px] rounded-lg border bg-white focus:outline-none transition-colors ${
+                  className={`w-full h-10 sm:h-8 px-2.5 text-base sm:text-[11px] rounded-lg border bg-white focus:outline-none transition-colors ${
                     errors.empresaContratistaId
                       ? 'border-red-500 ring-1 ring-red-400 bg-red-50/20'
                       : 'border-gray-200 focus:border-[#9B0F06]'
@@ -828,7 +1054,7 @@ export function UsuarioFormularioDrawer({
             {/* Contraseña Temporal (Oculta para roles restringidos) */}
             {!esRestringidoPerfil && (
               <div>
-                <label className="text-[9.5px] font-bold text-gray-700 block mb-1 uppercase tracking-wide">
+                <label className="text-xs sm:text-[9.5px] font-bold text-gray-700 block mb-1 uppercase tracking-wide">
                   {usuario ? 'Contraseña Nueva (Opcional)' : 'Contraseña *'}
                 </label>
                 <div className="relative flex items-center">
@@ -838,21 +1064,21 @@ export function UsuarioFormularioDrawer({
                     value={formData.password}
                     onChange={handleChange}
                     placeholder="********"
-                    className={`w-full h-8 border rounded-lg pl-2.5 pr-9 text-[11px] text-gray-700 bg-white focus:outline-none transition-colors ${
+                    className={`w-full h-10 sm:h-8 border rounded-lg pl-2.5 pr-9 text-base sm:text-[11px] text-gray-700 bg-white focus:outline-none transition-colors ${
                       errors.password ? 'border-red-500 ring-1 ring-red-400 bg-red-50/20' : 'border-gray-200 focus:border-[#9B0F06]'
                     }`}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword((prev) => !prev)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 flex h-6 w-6 items-center justify-center rounded-md text-gray-600 hover:text-[#9B0F06] hover:bg-gray-100 transition-colors z-20 cursor-pointer focus:outline-none"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 flex h-7 w-7 sm:h-6 sm:w-6 items-center justify-center rounded-md text-gray-600 hover:text-[#9B0F06] hover:bg-gray-100 transition-colors z-20 cursor-pointer focus:outline-none"
                     title={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                     tabIndex={-1}
                   >
-                    {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
-                <p className="mt-0.5 text-[9px] text-gray-400">
+                <p className="mt-0.5 text-xs sm:text-[9px] text-gray-400">
                   Se requerirá al iniciar sesión (Mínimo 6 caracteres)
                 </p>
               </div>
@@ -864,16 +1090,19 @@ export function UsuarioFormularioDrawer({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-1.5 rounded-lg border border-gray-200 text-[11px] font-semibold text-gray-700 hover:bg-white transition-colors cursor-pointer"
+              disabled={isSubmitting}
+              className="px-4 py-2.5 sm:py-1.5 rounded-lg border border-gray-200 text-base sm:text-[11px] font-semibold text-gray-700 hover:bg-white transition-colors cursor-pointer disabled:opacity-50"
             >
               Cancelar
             </button>
             <button
               type="button"
+              disabled={isSubmitting}
               onClick={handleGuardar}
-              className="px-4 py-1.5 rounded-lg bg-[#9B0F06] text-[11px] font-bold text-white hover:bg-[#5E0006] transition-colors shadow-2xs cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-5 py-2.5 sm:py-1.5 rounded-lg bg-[#9B0F06] text-base sm:text-[11px] font-bold text-white hover:bg-[#5E0006] transition-colors shadow-2xs cursor-pointer disabled:opacity-50 active:scale-95"
             >
-              {usuario ? 'Guardar Cambios' : 'Crear Usuario'}
+              {isSubmitting && <div className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />}
+              <span>{usuario ? 'Guardar Cambios' : 'Crear Usuario'}</span>
             </button>
           </div>
         </div>

@@ -260,6 +260,7 @@ export function EmpresaRelacionadaDrawer({
   }
 
   const validarPaso1 = (): boolean => {
+    if (isViewMode) return true
     const nextErrors: Record<string, boolean> = {}
     const faltantes: string[] = []
 
@@ -314,6 +315,7 @@ export function EmpresaRelacionadaDrawer({
   }
 
   const validarPaso2 = (): boolean => {
+    if (isViewMode) return true
     const nextErrors: Record<string, boolean> = {}
     const faltantes: string[] = []
     const c = data.contacto
@@ -428,7 +430,8 @@ export function EmpresaRelacionadaDrawer({
   }
 
   const handleSiguiente = () => {
-    if (validarPaso1()) {
+    if (isViewMode || validarPaso1()) {
+      setErrors({})
       setPaso(2)
     }
   }
@@ -476,8 +479,14 @@ export function EmpresaRelacionadaDrawer({
 
   return (
     <Portal>
-      <div className="fixed inset-0 z-[100] flex justify-end bg-black/40 backdrop-blur-xs transition-opacity">
-        <aside className="h-screen max-h-screen w-[520px] max-w-[100vw] bg-white shadow-2xl flex flex-col font-[Poppins] overflow-hidden">
+      <div 
+        className="fixed inset-0 z-[100] flex justify-end bg-black/40 backdrop-blur-xs transition-opacity"
+        onClick={onClose}
+      >
+        <aside 
+          onClick={(e) => e.stopPropagation()}
+          className="h-screen max-h-screen w-[520px] max-w-[100vw] bg-white shadow-2xl flex flex-col font-[Poppins] overflow-hidden"
+        >
           {/* Header compacto */}
           <header className="flex-none border-b border-gray-100 p-4 py-3 flex items-center justify-between bg-white">
             <div className="flex items-center gap-2">

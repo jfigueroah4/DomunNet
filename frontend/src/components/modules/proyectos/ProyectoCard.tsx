@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { MapPin, User, MoreVertical, Calendar, Building2, ChevronRight } from 'lucide-react'
 import { Proyecto } from '@/types/proyecto'
 import ProyectoEstadoBadge from './ProyectoEstadoBadge'
+import { formatearRangoFechas, debeMostrarMontoYAvance, esProyectoEliminable } from '@/lib/utils/formatters'
 
 interface ProyectoCardProps {
   proyecto: Proyecto
@@ -18,6 +19,8 @@ export default function ProyectoCard({
   isSelected = false,
   onToggleSelect,
 }: ProyectoCardProps) {
+  const eliminableInfo = esProyectoEliminable(proyecto)
+
   const getInitials = (nombre: string) =>
     (nombre || 'U')
       .split(' ')
@@ -39,7 +42,9 @@ export default function ProyectoCard({
         if (modoSeleccion) {
           e.preventDefault()
           e.stopPropagation()
-          onToggleSelect?.()
+          if (eliminableInfo.puedeEliminar) {
+            onToggleSelect?.()
+          }
         }
       }}
       className={`group relative flex flex-col justify-between rounded-2xl border bg-white p-4 shadow-2xs transition-all duration-300 ease-out hover:shadow-md hover:-translate-y-0.5 font-[Poppins] ${
@@ -54,11 +59,17 @@ export default function ProyectoCard({
               <input
                 type="checkbox"
                 checked={isSelected}
+                disabled={!eliminableInfo.puedeEliminar}
+                title={!eliminableInfo.puedeEliminar ? eliminableInfo.motivo : 'Seleccionar para eliminar'}
                 onChange={(e) => {
                   e.stopPropagation()
-                  onToggleSelect?.()
+                  if (eliminableInfo.puedeEliminar) {
+                    onToggleSelect?.()
+                  }
                 }}
-                className="h-4 w-4 rounded border-gray-300 text-[#9B0F06] focus:ring-[#9B0F06] cursor-pointer"
+                className={`h-4 w-4 rounded border-gray-300 text-[#9B0F06] focus:ring-[#9B0F06] ${
+                  !eliminableInfo.puedeEliminar ? 'opacity-30 cursor-not-allowed bg-gray-100' : 'cursor-pointer'
+                }`}
               />
             )}
             <span className="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-[9px] font-bold text-gray-700 border border-gray-200">
@@ -69,16 +80,10 @@ export default function ProyectoCard({
           <MoreVertical size={14} className="text-gray-300 group-hover:text-gray-500 transition-colors" />
         </div>
 
-        {/* Título & Descripción */}
-        <h3 className="mb-1 text-xs font-black text-gray-900 leading-tight group-hover:text-[#9B0F06] transition-colors line-clamp-1">
+        {/* Título */}
+        <h3 className="mb-2 text-sm sm:text-xs font-normal text-gray-800 leading-tight group-hover:text-[#9B0F06] transition-colors line-clamp-1 font-[Poppins]">
           {proyecto.nombre}
         </h3>
-
-        {proyecto.descripcion && (
-          <p className="mb-2.5 line-clamp-2 text-[10px] text-gray-500 font-normal leading-relaxed">
-            {proyecto.descripcion}
-          </p>
-        )}
 
         {/* Ubicación, Depto/Muni y Responsable */}
         <div className="mb-3 space-y-1.5 border-t border-gray-100 pt-2.5 text-[10.5px]">
@@ -111,53 +116,62 @@ export default function ProyectoCard({
         </div>
 
         {/* Barra de Avance */}
-        <div className="mb-3 rounded-lg bg-gray-50/80 p-2 border border-gray-100">
-          <div className="mb-1 flex items-center justify-between text-[9.5px]">
-            <span className="font-bold uppercase tracking-wider text-gray-400">Avance de Obra</span>
-            <span className="font-black text-[#9B0F06]">{Math.round(proyecto.avance || 0)}%</span>
+        {debeMostrarMontoYAvance(proyecto) && (
+          <div className="mb-3 rounded-lg bg-gray-50/80 p-2 border border-gray-100">
+            <div className="mb-1 flex items-center justify-between text-[9.5px]">
+              <span className="font-bold uppercase tracking-wider text-gray-400">Avance de Obra</span>
+              <span className="font-bold text-[#9B0F06] font-[Poppins]">{Math.round(proyecto.avance || 0)}%</span>
+            </div>
+            <div className="h-1.5 overflow-hidden rounded-full bg-gray-200/70">
+              <div
+                className="h-full rounded-full bg-[#9B0F06] transition-all duration-500"
+                style={{ width: `${proyecto.avance || 0}%` }}
+              />
+            </div>
           </div>
-          <div className="h-1.5 overflow-hidden rounded-full bg-gray-200/70">
-            <div
-              className="h-full rounded-full bg-[#9B0F06] transition-all duration-500"
-              style={{ width: `${proyecto.avance || 0}%` }}
-            />
-          </div>
-        </div>
+        )}
       </div>
 
       {/* Footer Metrics */}
       <div className="border-t border-gray-100 pt-2.5">
         {/* Fechas de Ejecución */}
         <div className="mb-2.5 rounded-lg bg-gray-50 p-2 border border-gray-100 flex items-center justify-between text-[10px]">
-          <div className="flex items-center gap-1.5 text-gray-600 font-semibold">
+          <div className="flex items-center gap-1.5 text-gray-600 font-medium">
             <Calendar size={12} className="text-[#9B0F06]" />
             <span>Fechas de Ejecución:</span>
           </div>
-          <span className="font-bold text-gray-900 font-mono text-[9.5px]">
-            {proyecto.fechaInicio && proyecto.fechaFin
-              ? `${proyecto.fechaInicio} — ${proyecto.fechaFin}`
-              : proyecto.fechaInicio
-              ? `Desde ${proyecto.fechaInicio}`
-              : 'Por definir'}
+          <span className="font-medium text-gray-800 text-[9.5px] font-[Poppins] whitespace-nowrap">
+            {formatearRangoFechas(proyecto.fechaInicio, proyecto.fechaFin)}
           </span>
         </div>
 
-        <div className="mb-2.5 flex items-center justify-between text-[10px]">
-          <div>
-            <span className="block text-[8px] font-bold uppercase tracking-wider text-gray-400">Monto Contractual</span>
-            <span className="font-black text-gray-900">
-              Q {Number(proyecto.presupuesto || 0).toLocaleString('es-GT', { minimumFractionDigits: 2 })}
-            </span>
+        {debeMostrarMontoYAvance(proyecto) ? (
+          <div className="mb-2.5 flex items-center justify-between text-[10px]">
+            <div>
+              <span className="block text-[8px] font-bold uppercase tracking-wider text-gray-400">Monto Contractual</span>
+              <span className="font-bold text-gray-900 font-[Poppins]">
+                Q {Number(proyecto.presupuesto || 0).toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            </div>
+            {proyecto.departamentoNombre && (
+              <div className="text-right">
+                <span className="block text-[8px] font-bold uppercase tracking-wider text-gray-400">Ubicación Región</span>
+                <span className="font-medium text-gray-700 text-[9.5px]">
+                  {proyecto.departamentoNombre}
+                </span>
+              </div>
+            )}
           </div>
-          {proyecto.departamentoNombre && (
+        ) : proyecto.departamentoNombre ? (
+          <div className="mb-2.5 flex items-center justify-end text-[10px]">
             <div className="text-right">
               <span className="block text-[8px] font-bold uppercase tracking-wider text-gray-400">Ubicación Región</span>
-              <span className="font-bold text-gray-700 text-[9.5px]">
+              <span className="font-medium text-gray-700 text-[9.5px]">
                 {proyecto.departamentoNombre}
               </span>
             </div>
-          )}
-        </div>
+          </div>
+        ) : null}
 
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1">

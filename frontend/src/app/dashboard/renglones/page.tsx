@@ -15,6 +15,9 @@ import {
   Eye,
   ChevronLeft,
   ChevronRight,
+  ArrowUpDown,
+  ChevronUp,
+  ChevronDown,
   X,
   Save,
   AlertTriangle,
@@ -46,23 +49,7 @@ function formatQuantity(val: number, unit?: string | { abreviatura?: string; sim
     maximumFractionDigits: decimals,
   })
 }
-const CAPITULOS_LIBRO_AZUL = [
-  { id: 1, nombre: 'Capítulo I: Estudios, Mantenimiento y Trabajos Preliminares' },
-  { id: 2, nombre: 'Capítulo II: Movimiento de Tierras y Excavación' },
-  { id: 3, nombre: 'Capítulo III: Terraplenes Estructurales y Capas de Soporte' },
-  { id: 4, nombre: 'Capítulo IV: Subbases y Bases Granulares' },
-  { id: 5, nombre: 'Capítulo V: Pavimentos Asfálticos y Concreto' },
-  { id: 6, nombre: 'Capítulo VI: Estructuras de Drenaje Pluvial' },
-  { id: 7, nombre: 'Capítulo VII: Bóvedas Metálicas y Obras de Arte' },
-  { id: 8, nombre: 'Capítulo VIII: Construcciones Complementarias y Señalización' },
-  { id: 9, nombre: 'Capítulo IX: Aspectos Ambientales y Gestión de Riesgo' },
-]
-
-const CATALOGO_DETALLADO_88_RENGLONES = [
-  { id: 'dgc-1', capituloId: 1, capituloNombre: 'Capítulo I', codigoDGC: '101.01', descripcion: 'Mantenimiento del tránsito y construcción de desvíos provisionales', unidad: 'Glb', cantidadContratada: 1, cantidadAjustada: 1, costoUnitarioDirecto: 250000 },
-  { id: 'dgc-2', capituloId: 1, capituloNombre: 'Capítulo I', codigoDGC: '102.03', descripcion: 'Clechado, chapeo, destronque y limpieza del derecho de vía', unidad: 'Ha', cantidadContratada: 18.5, cantidadAjustada: 18.5, costoUnitarioDirecto: 18500 },
-  { id: 'dgc-3', capituloId: 2, capituloNombre: 'Capítulo II', codigoDGC: '201.01', descripcion: 'Excavación no clasificada para corte en vía', unidad: 'm³', cantidadContratada: 45000, cantidadAjustada: 48000, costoUnitarioDirecto: 68 },
-]
+import { CAPITULOS_LIBRO_AZUL, CATALOGO_DETALLADO_88_RENGLONES } from '@/mocks/proyectoMock'
 
 // --- DRAWER COMPONENTS ---
 
@@ -88,9 +75,7 @@ function RenglonDrawer({
     codigoDGC: '',
     descripcion: '',
     capituloId: 1,
-    unidad: 'm³',
-    cantidadContratada: 0,
-    costoUnitarioDirecto: 0,
+    unidad: 'u',
   })
 
   useEffect(() => {
@@ -100,18 +85,14 @@ function RenglonDrawer({
           codigoDGC: item.codigoDGC || '',
           descripcion: item.descripcion || '',
           capituloId: item.capituloId || 1,
-          unidad: item.unidad || 'm³',
-          cantidadContratada: item.cantidadContratada || 0,
-          costoUnitarioDirecto: item.costoUnitarioDirecto || 0,
+          unidad: item.unidad || 'u',
         })
       } else {
         setFormData({
           codigoDGC: '',
           descripcion: '',
           capituloId: 1,
-          unidad: 'm³',
-          cantidadContratada: 0,
-          costoUnitarioDirecto: 0,
+          unidad: 'u',
         })
       }
     }
@@ -135,8 +116,8 @@ function RenglonDrawer({
 
   return (
     <Portal>
-      <div className="fixed inset-0 z-[100] flex justify-end bg-black/40 backdrop-blur-xs transition-opacity">
-        <aside className="h-screen max-h-screen w-[480px] max-w-[100vw] overflow-y-auto bg-white p-5 shadow-2xl flex flex-col justify-between">
+      <div className="fixed inset-0 z-[100] flex justify-end bg-black/40 backdrop-blur-xs transition-opacity font-[Poppins]" onClick={onClose}>
+        <aside className="h-screen max-h-screen w-[480px] max-w-[100vw] overflow-y-auto bg-white p-5 shadow-2xl flex flex-col justify-between font-[Poppins]" onClick={(e) => e.stopPropagation()}>
           <div>
           <header className="mb-5 flex items-center justify-between border-b border-gray-100 pb-4">
             <div className="flex items-center gap-2">
@@ -148,7 +129,7 @@ function RenglonDrawer({
                 <p className="text-[10px] text-gray-400">Catálogo General de Renglones de Trabajo DGC</p>
               </div>
             </div>
-            <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1">
+            <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1 cursor-pointer">
               <X size={18} />
             </button>
           </header>
@@ -164,7 +145,7 @@ function RenglonDrawer({
                 value={formData.codigoDGC}
                 onChange={(e) => setFormData({ ...formData, codigoDGC: e.target.value })}
                 placeholder="Ej: 101.01"
-                className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-xs font-mono font-bold text-gray-900 outline-none focus:border-[#9B0F06] disabled:bg-gray-100"
+                className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-900 outline-none focus:border-[#9B0F06] disabled:bg-gray-100 font-[Poppins]"
               />
             </div>
 
@@ -213,32 +194,6 @@ function RenglonDrawer({
                     </option>
                   ))}
                 </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[10px] font-semibold text-gray-700">Cantidad Contratada</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  disabled={isView}
-                  value={formData.cantidadContratada}
-                  onChange={(e) => setFormData({ ...formData, cantidadContratada: Number(e.target.value) })}
-                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-xs font-mono text-gray-800 outline-none focus:border-[#9B0F06] disabled:bg-gray-100"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-semibold text-gray-700">Costo Unitario Directo (Q)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  disabled={isView}
-                  value={formData.costoUnitarioDirecto}
-                  onChange={(e) => setFormData({ ...formData, costoUnitarioDirecto: Number(e.target.value) })}
-                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-xs font-mono font-bold text-gray-900 outline-none focus:border-[#9B0F06] disabled:bg-gray-100"
-                />
               </div>
             </div>
           </form>
@@ -321,8 +276,8 @@ function UnidadDrawer({
 
   return (
     <Portal>
-      <div className="fixed inset-0 z-[100] flex justify-end bg-black/40 backdrop-blur-xs transition-opacity">
-        <aside className="h-screen max-h-screen w-[440px] max-w-[100vw] overflow-y-auto bg-white p-5 shadow-2xl flex flex-col justify-between">
+      <div className="fixed inset-0 z-[100] flex justify-end bg-black/40 backdrop-blur-xs transition-opacity font-[Poppins]" onClick={onClose}>
+        <aside className="h-screen max-h-screen w-[440px] max-w-[100vw] overflow-y-auto bg-white p-5 shadow-2xl flex flex-col justify-between font-[Poppins]" onClick={(e) => e.stopPropagation()}>
           <div>
           <header className="mb-5 flex items-center justify-between border-b border-gray-100 pb-4">
             <div className="flex items-center gap-2">
@@ -334,7 +289,7 @@ function UnidadDrawer({
                 <p className="text-[10px] text-gray-400">Catálogo Oficial de Unidades de Medida</p>
               </div>
             </div>
-            <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1">
+            <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1 cursor-pointer">
               <X size={18} />
             </button>
           </header>
@@ -350,7 +305,7 @@ function UnidadDrawer({
                 value={formData.simbolo}
                 onChange={(e) => setFormData({ ...formData, simbolo: e.target.value })}
                 placeholder="Ej: m³, m², Glb, ml"
-                className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-xs font-mono font-bold text-[#9B0F06] outline-none focus:border-[#9B0F06] disabled:bg-gray-100"
+                className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-[#9B0F06] outline-none focus:border-[#9B0F06] disabled:bg-gray-100 font-[Poppins]"
               />
             </div>
 
@@ -407,11 +362,25 @@ function UnidadDrawer({
   )
 }
 
+function getSiguienteNumeroCapitulo(listaCapitulos: any[]): number {
+  const idsOcupados = new Set(
+    (listaCapitulos || [])
+      .map((c) => Number(c?.id))
+      .filter((n) => !isNaN(n) && n > 0)
+  )
+  let siguiente = 1
+  while (idsOcupados.has(siguiente)) {
+    siguiente++
+  }
+  return siguiente
+}
+
 function CapituloDrawer({
   isOpen,
   onClose,
   onSave,
   item,
+  capitulos = [],
   todosRenglones = [],
   onActualizarRenglonesCapitulo,
   mode = 'create',
@@ -420,8 +389,9 @@ function CapituloDrawer({
   onClose: () => void
   onSave: (data: any) => Promise<void>
   item?: any
+  capitulos?: any[]
   todosRenglones?: any[]
-  onActualizarRenglonesCapitulo?: (capituloId: number, renglonesAsignadosIds: string[]) => void
+  onActualizarRenglonesCapitulo?: (capituloId: number, renglonesAsignadosIds: string[], capNombre?: string) => void
   mode?: 'create' | 'edit' | 'view'
 }) {
   const isView = mode === 'view'
@@ -431,6 +401,7 @@ function CapituloDrawer({
   })
   const [renglonSeleccionadoId, setRenglonSeleccionadoId] = useState('')
   const [assignedRenglonIds, setAssignedRenglonIds] = useState<string[]>([])
+  const [renglonPendienteConfirmar, setRenglonPendienteConfirmar] = useState<any | null>(null)
 
   useEffect(() => {
     if (isOpen) {
@@ -444,12 +415,14 @@ function CapituloDrawer({
           .map((r) => r.id)
         setAssignedRenglonIds(ids)
       } else {
-        setFormData({ id: 1, nombre: '' })
+        const siguienteId = getSiguienteNumeroCapitulo(capitulos)
+        setFormData({ id: siguienteId, nombre: '' })
         setAssignedRenglonIds([])
       }
       setRenglonSeleccionadoId('')
+      setRenglonPendienteConfirmar(null)
     }
-  }, [isOpen, item, todosRenglones])
+  }, [isOpen, item, capitulos, todosRenglones])
 
   if (!isOpen) return null
 
@@ -459,10 +432,29 @@ function CapituloDrawer({
 
   const handleAgregarRenglon = () => {
     if (!renglonSeleccionadoId) return
-    if (!assignedRenglonIds.includes(renglonSeleccionadoId)) {
-      setAssignedRenglonIds((prev) => [...prev, renglonSeleccionadoId])
+    const renglon = todosRenglones.find((r) => r.id === renglonSeleccionadoId)
+    if (!renglon) return
+
+    // Si pertenece a otro capítulo, solicitar confirmación con botón
+    if (renglon.capituloId && renglon.capituloId !== formData.id) {
+      setRenglonPendienteConfirmar(renglon)
+      return
+    }
+
+    if (!assignedRenglonIds.includes(renglon.id)) {
+      setAssignedRenglonIds((prev) => [...prev, renglon.id])
     }
     setRenglonSeleccionadoId('')
+    setRenglonPendienteConfirmar(null)
+  }
+
+  const handleConfirmarReasignacion = () => {
+    if (!renglonPendienteConfirmar) return
+    if (!assignedRenglonIds.includes(renglonPendienteConfirmar.id)) {
+      setAssignedRenglonIds((prev) => [...prev, renglonPendienteConfirmar.id])
+    }
+    setRenglonSeleccionadoId('')
+    setRenglonPendienteConfirmar(null)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -471,9 +463,10 @@ function CapituloDrawer({
       showErrorToast('El nombre del capítulo es requerido')
       return
     }
-    await onSave({ ...formData, id: item?.id || formData.id })
-    if (onActualizarRenglonesCapitulo && item?.id) {
-      onActualizarRenglonesCapitulo(item.id, assignedRenglonIds)
+    const targetCapId = item?.id || formData.id
+    await onSave({ ...formData, id: targetCapId })
+    if (onActualizarRenglonesCapitulo) {
+      onActualizarRenglonesCapitulo(targetCapId, assignedRenglonIds, formData.nombre)
     }
     onClose()
   }
@@ -483,132 +476,179 @@ function CapituloDrawer({
 
   return (
     <Portal>
-      <div className="fixed inset-0 z-[100] flex justify-end bg-black/40 backdrop-blur-xs transition-opacity">
-        <aside className="h-screen max-h-screen w-[480px] max-w-[100vw] overflow-y-auto bg-white p-5 shadow-2xl flex flex-col justify-between">
+      <div className="fixed inset-0 z-[100] flex justify-end bg-black/40 backdrop-blur-xs transition-opacity font-[Poppins]" onClick={onClose}>
+        <aside className="h-screen max-h-screen w-[480px] max-w-[100vw] overflow-y-auto bg-white p-5 shadow-2xl flex flex-col justify-between font-[Poppins]" onClick={(e) => e.stopPropagation()}>
           <div>
-          <header className="mb-5 flex items-center justify-between border-b border-gray-100 pb-4">
-            <div className="flex items-center gap-2">
-              <Layers size={18} className="text-[#9B0F06]" />
-              <div>
-                <h2 className="font-bold text-gray-800">
-                  {isView ? `Capítulo ${formData.id}: Detalle y Renglones` : item ? 'Editar Capítulo Sábana' : 'Nuevo Capítulo Sábana'}
-                </h2>
-                <p className="text-[10px] text-gray-400">Agrupación e Integración de Renglones de Obra</p>
-              </div>
-            </div>
-            <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1">
-              <X size={18} />
-            </button>
-          </header>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-[10px] font-semibold text-gray-700">Número de Capítulo</label>
-              <input
-                type="number"
-                disabled={isView || !!item}
-                value={formData.id}
-                onChange={(e) => setFormData({ ...formData, id: Number(e.target.value) })}
-                className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-xs font-mono font-bold text-gray-900 outline-none focus:border-[#9B0F06] disabled:bg-gray-100"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-semibold text-gray-700">
-                Nombre del Capítulo <span className="text-[#9B0F06]">*</span>
-              </label>
-              <input
-                type="text"
-                disabled={isView}
-                value={formData.nombre}
-                onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
-                placeholder="Ej: Trabajos Preliminares"
-                className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-800 outline-none focus:border-[#9B0F06] disabled:bg-gray-100"
-              />
-            </div>
-
-            {/* SECCIÓN DE RENGLONES ASIGNADOS */}
-            <div className="mt-4 pt-3 border-t border-gray-100 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-gray-800">
-                  Renglones en este Capítulo ({renglonesAsignadosActuales.length})
-                </span>
-              </div>
-
-              {!isView && (
-                <div className="flex gap-2">
-                  <select
-                    value={renglonSeleccionadoId}
-                    onChange={(e) => setRenglonSeleccionadoId(e.target.value)}
-                    className="flex-1 rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-800 outline-none focus:border-[#9B0F06]"
-                  >
-                    <option value="">-- Seleccionar renglón para agregar --</option>
-                    {renglonesDisponibles.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        [{r.codigoDGC}] {r.descripcion}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    onClick={handleAgregarRenglon}
-                    disabled={!renglonSeleccionadoId}
-                    className="rounded-lg bg-[#9B0F06] px-3 py-1.5 text-xs font-bold text-white hover:bg-[#5E0006] disabled:opacity-40 cursor-pointer"
-                  >
-                    + Agregar
-                  </button>
+            <header className="mb-5 flex items-center justify-between border-b border-gray-100 pb-4">
+              <div className="flex items-center gap-2">
+                <Layers size={18} className="text-[#9B0F06]" />
+                <div>
+                  <h2 className="font-bold text-gray-800">
+                    {isView ? `Capítulo ${formData.id}: Detalle y Renglones` : item ? 'Editar Capítulo Sábana' : 'Nuevo Capítulo Sábana'}
+                  </h2>
+                  <p className="text-[10px] text-gray-400">Agrupación e Integración de Renglones de Obra</p>
                 </div>
-              )}
-
-              <div className="max-h-60 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100 bg-gray-50/50">
-                {renglonesAsignadosActuales.length === 0 ? (
-                  <p className="p-3 text-center text-xs text-gray-400 italic">No hay renglones asignados a este capítulo.</p>
-                ) : (
-                  renglonesAsignadosActuales.map((r) => (
-                    <div key={r.id} className="p-2 flex items-center justify-between bg-white text-xs">
-                      <div>
-                        <span className="font-mono font-bold text-[#9B0F06] mr-2">[{r.codigoDGC}]</span>
-                        <span className="font-medium text-gray-800">{r.descripcion}</span>
-                      </div>
-                      {!isView && (
-                        <button
-                          type="button"
-                          onClick={() => handleQuitarRenglon(r.id)}
-                          className="text-red-600 hover:bg-red-50 p-1 rounded transition-colors"
-                          title="Quitar de este capítulo"
-                        >
-                          <X size={14} />
-                        </button>
-                      )}
-                    </div>
-                  ))
-                )}
               </div>
-            </div>
-          </form>
-        </div>
+              <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1 cursor-pointer">
+                <X size={18} />
+              </button>
+            </header>
 
-        <div className="pt-4 border-t border-gray-100 flex gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
-          >
-            {isView ? 'Cerrar' : 'Cancelar'}
-          </button>
-          {!isView && (
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-semibold text-gray-700">Número de Capítulo (Automático)</label>
+                <input
+                  type="number"
+                  disabled={true}
+                  readOnly
+                  value={formData.id}
+                  className="mt-1 w-full rounded-lg border border-gray-200 bg-gray-100 px-3 py-2 text-xs font-semibold text-gray-600 outline-none cursor-not-allowed select-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-semibold text-gray-700">
+                  Nombre del Capítulo <span className="text-[#9B0F06]">*</span>
+                </label>
+                <input
+                  type="text"
+                  disabled={isView}
+                  value={formData.nombre}
+                  onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+                  placeholder="Ej: Trabajos Preliminares"
+                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-800 outline-none focus:border-[#9B0F06] disabled:bg-gray-100"
+                />
+              </div>
+
+              {/* SECCIÓN DE RENGLONES ASIGNADOS */}
+              <div className="mt-4 pt-3 border-t border-gray-100 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-gray-800">
+                    Renglones en este Capítulo ({renglonesAsignadosActuales.length})
+                  </span>
+                </div>
+
+                {!isView && (
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <select
+                        value={renglonSeleccionadoId}
+                        onChange={(e) => {
+                          setRenglonSeleccionadoId(e.target.value)
+                          setRenglonPendienteConfirmar(null)
+                        }}
+                        className="flex-1 rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-800 outline-none focus:border-[#9B0F06]"
+                      >
+                        <option value="">-- Seleccionar renglón para agregar --</option>
+                        {renglonesDisponibles.map((r) => {
+                          const capOtro = r.capituloId && r.capituloId !== formData.id ? r.capituloId : null
+                          return (
+                            <option key={r.id} value={r.id}>
+                              [{r.codigoDGC}] {r.descripcion} {capOtro ? `(Pertenece a Cap. ${capOtro})` : ''}
+                            </option>
+                          )
+                        })}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={handleAgregarRenglon}
+                        disabled={!renglonSeleccionadoId}
+                        className="rounded-lg bg-[#9B0F06] px-3 py-1.5 text-xs font-bold text-white hover:bg-[#5E0006] disabled:opacity-40 cursor-pointer shadow-2xs"
+                      >
+                        + Agregar
+                      </button>
+                    </div>
+
+                    {/* CONFIRMACIÓN DE REASIGNACIÓN DE RENGLÓN DE OTRO CAPÍTULO */}
+                    {renglonPendienteConfirmar && (
+                      <div className="rounded-xl border border-amber-200 bg-amber-50/90 p-3 space-y-2 animate-in fade-in duration-200">
+                        <div className="flex items-start gap-2.5">
+                          <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                          <div className="text-xs text-amber-900">
+                            <p className="font-bold">¿Reasignar este renglón a este capítulo?</p>
+                            <p className="mt-0.5 text-[11px] text-amber-800 leading-relaxed">
+                              El renglón <span className="font-semibold">[{renglonPendienteConfirmar.codigoDGC}] {renglonPendienteConfirmar.descripcion}</span> pertenece actualmente al <span className="font-semibold">Capítulo {renglonPendienteConfirmar.capituloId}</span>. Al confirmar, será trasladado al Capítulo {formData.id}.
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-end gap-2 pt-1 border-t border-amber-200/60">
+                          <button
+                            type="button"
+                            onClick={() => setRenglonPendienteConfirmar(null)}
+                            className="px-2.5 py-1 text-[11px] font-medium text-gray-600 hover:text-gray-800 rounded-md hover:bg-amber-100/60 cursor-pointer"
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleConfirmarReasignacion}
+                            className="px-3 py-1 text-[11px] font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-md shadow-xs cursor-pointer flex items-center gap-1.5"
+                          >
+                            <span>Confirmar Traslado</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="max-h-60 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100 bg-gray-50/50">
+                  {renglonesAsignadosActuales.length === 0 ? (
+                    <p className="p-3 text-center text-xs text-gray-400 italic">No hay renglones asignados a este capítulo.</p>
+                  ) : (
+                    renglonesAsignadosActuales.map((r) => {
+                      const eraDeOtro = r.capituloId && r.capituloId !== formData.id
+                      return (
+                        <div key={r.id} className="p-2 flex items-center justify-between bg-white text-xs">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-semibold text-[#9B0F06]">[{r.codigoDGC}]</span>
+                            <span className="font-normal text-gray-800">{r.descripcion}</span>
+                            {eraDeOtro && (
+                              <span className="inline-block px-1.5 py-0.5 rounded text-[9.5px] font-medium bg-amber-100 text-amber-800 border border-amber-200">
+                                Reasignado de Cap. {r.capituloId}
+                              </span>
+                            )}
+                          </div>
+                          {!isView && (
+                            <button
+                              type="button"
+                              onClick={() => handleQuitarRenglon(r.id)}
+                              className="text-red-600 hover:bg-red-50 p-1 rounded transition-colors cursor-pointer shrink-0 ml-2"
+                              title="Quitar de este capítulo"
+                            >
+                              <X size={14} />
+                            </button>
+                          )}
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
+              </div>
+            </form>
+          </div>
+
+          <div className="pt-4 border-t border-gray-100 flex gap-2">
             <button
               type="button"
-              onClick={handleSubmit}
-              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#9B0F06] px-3 py-2 text-xs font-bold text-white hover:bg-[#5E0006] transition-colors"
+              onClick={onClose}
+              className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer"
             >
-              <Save size={13} />
-              <span>Guardar</span>
+              {isView ? 'Cerrar' : 'Cancelar'}
             </button>
-          )}
-        </div>
-      </aside>
-    </div>
+            {!isView && (
+              <button
+                type="button"
+                onClick={handleSubmit}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#9B0F06] px-3 py-2 text-xs font-bold text-white hover:bg-[#5E0006] transition-colors cursor-pointer shadow-2xs"
+              >
+                <Save size={13} />
+                <span>Guardar</span>
+              </button>
+            )}
+          </div>
+        </aside>
+      </div>
     </Portal>
   )
 }
@@ -642,8 +682,8 @@ function EliminarConfirmModal({
 
   return (
     <Portal>
-      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs transition-opacity animate-in fade-in duration-200">
-        <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl space-y-4 border border-gray-200 animate-in zoom-in-95 duration-200">
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs transition-opacity animate-in fade-in duration-200 font-[Poppins]" onClick={onClose}>
+        <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl space-y-4 border border-gray-200 animate-in zoom-in-95 duration-200 font-[Poppins]" onClick={(e) => e.stopPropagation()}>
           <header className="flex items-start justify-between border-b border-gray-100 pb-3">
             <div className="flex items-center gap-3">
               <div className="rounded-full bg-red-100 p-2.5 text-red-600">
@@ -654,7 +694,7 @@ function EliminarConfirmModal({
                 <p className="text-[10.5px] text-gray-500 font-medium">Confirmación de Eliminación</p>
               </div>
             </div>
-            <button type="button" onClick={onClose} className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+            <button type="button" onClick={onClose} className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 cursor-pointer">
               <X size={18} />
             </button>
           </header>
@@ -663,7 +703,7 @@ function EliminarConfirmModal({
             <p className="text-xs text-gray-800 leading-relaxed">
               ¿Está seguro de que desea eliminar el siguiente registro? Esta acción no se puede deshacer.
             </p>
-            <div className="rounded-lg bg-white p-2.5 border border-gray-200 font-mono text-xs font-bold text-gray-900 break-words">
+            <div className="rounded-lg bg-white p-2.5 border border-gray-200 text-xs font-semibold text-gray-900 break-words font-[Poppins]">
               {descripcionItem}
             </div>
           </div>
@@ -693,6 +733,17 @@ function EliminarConfirmModal({
   )
 }
 
+function SortIndicator({ activo, direccion }: { activo: boolean; direccion: 'asc' | 'desc' }) {
+  if (!activo) {
+    return <ArrowUpDown size={10} className="text-gray-400 opacity-50 shrink-0" />
+  }
+  return direccion === 'asc' ? (
+    <ChevronUp size={11} className="text-[#9B0F06] shrink-0" />
+  ) : (
+    <ChevronDown size={11} className="text-[#9B0F06] shrink-0" />
+  )
+}
+
 // --- MAIN PAGE COMPONENT ---
 
 export default function RenglonesPage() {
@@ -703,6 +754,41 @@ export default function RenglonesPage() {
   // Paginación
   const [paginaActual, setPaginaActual] = useState(1)
   const [registrosPorPagina, setRegistrosPorPagina] = useState(10)
+
+  // Estados de ordenamiento para las 3 tablas
+  const [sortRenglones, setSortRenglones] = useState<{ campo: string; direccion: 'asc' | 'desc' }>({
+    campo: 'codigoDGC',
+    direccion: 'asc',
+  })
+  const [sortUnidades, setSortUnidades] = useState<{ campo: string; direccion: 'asc' | 'desc' }>({
+    campo: 'simbolo',
+    direccion: 'asc',
+  })
+  const [sortCapitulos, setSortCapitulos] = useState<{ campo: string; direccion: 'asc' | 'desc' }>({
+    campo: 'id',
+    direccion: 'asc',
+  })
+
+  const toggleSortRenglones = (campo: string) => {
+    setSortRenglones((prev) => ({
+      campo,
+      direccion: prev.campo === campo && prev.direccion === 'asc' ? 'desc' : 'asc',
+    }))
+  }
+
+  const toggleSortUnidades = (campo: string) => {
+    setSortUnidades((prev) => ({
+      campo,
+      direccion: prev.campo === campo && prev.direccion === 'asc' ? 'desc' : 'asc',
+    }))
+  }
+
+  const toggleSortCapitulos = (campo: string) => {
+    setSortCapitulos((prev) => ({
+      campo,
+      direccion: prev.campo === campo && prev.direccion === 'asc' ? 'desc' : 'asc',
+    }))
+  }
 
   // Estados de datos
   const [renglones, setRenglones] = useState<any[]>([])
@@ -754,49 +840,61 @@ export default function RenglonesPage() {
         ])
 
         if (activo) {
+          const capMap = new Map()
           if (resCap.status === 'fulfilled' && resCap.value?.data?.data?.length > 0) {
-            setCapitulos(
-              resCap.value.data.data.map((c: any) => ({
-                id: Number(c.numero_capitulo) || Number(c.id) || 1,
-                nombre: c.nombre_capitulo || c.nombre || `Capítulo ${c.numero_capitulo || c.id}`,
+            const mappedCaps = resCap.value.data.data.map((c: any) => {
+              const num = Number(c.numero_capitulo) || Number(c.id) || 1
+              capMap.set(String(c.id), num)
+              return {
+                id: num,
+                nombre: c.nombre_capitulo || c.nombre || `Capítulo ${num}`,
                 uuid: c.id,
-              }))
-            )
+              }
+            })
+            setCapitulos(mappedCaps)
           }
 
+          const uniMap = new Map()
           if (resUni.status === 'fulfilled' && resUni.value?.data?.data?.length > 0) {
-            setUnidades(
-              resUni.value.data.data.map((u: any) => ({
+            const mappedUnits = resUni.value.data.data.map((u: any) => {
+              const sym = u.abreviatura || u.simbolo || u.nombre || 'u'
+              uniMap.set(String(u.id), sym)
+              return {
                 id: u.id,
-                simbolo: u.abreviatura || u.simbolo || u.nombre || 'U',
+                simbolo: sym,
                 nombre: u.nombre,
                 descripcion: u.descripcion || '',
                 es_discreta: u.es_discreta ?? false,
-              }))
-            )
+              }
+            })
+            setUnidades(mappedUnits)
           }
 
           if (resReng.status === 'fulfilled' && resReng.value?.data?.data?.length > 0) {
             setRenglones(
-              resReng.value.data.data.map((r: any, idx: number) => ({
-                id: r.id || `r-${idx}`,
-                codigoDGC: r.codigo || r.codigoDGC || `10${idx + 1}.01`,
-                descripcion: r.descripcion || 'Sin descripción',
-                capituloId: typeof r.capitulo_id === 'number' ? r.capitulo_id : (idx % 9) + 1,
-                unidad: r.unidad_id || r.unidad || 'm³',
-                costoUnitarioDirecto: Number(r.precio_unitario_directo || r.costoUnitarioDirecto || 0),
-                cantidadContratada: Number(r.cantidad_contractual || r.cantidadContratada || 0),
-                cantidadAjustada: Number(r.cantidad_ajustada || r.cantidadAjustada || 0),
-                estadoEjecucion: r.estado_ejecucion || 'En proceso',
-              }))
+              resReng.value.data.data.map((r: any, idx: number) => {
+                const capId = capMap.get(String(r.capitulo_id)) || (typeof r.capitulo_id === 'number' ? r.capitulo_id : (idx % 9) + 1)
+                const uniSimbolo = uniMap.get(String(r.unidad_id)) || r.unidad || 'u'
+                return {
+                  id: r.id || `r-${idx}`,
+                  codigoDGC: r.codigo || r.codigoDGC || `10${idx + 1}.01`,
+                  descripcion: r.descripcion || 'Sin descripción',
+                  capituloId: capId,
+                  unidad: uniSimbolo,
+                  costoUnitarioDirecto: 0,
+                  cantidadContratada: 0,
+                  cantidadAjustada: 0,
+                  estadoEjecucion: r.estado_ejecucion || 'No iniciado',
+                }
+              })
             )
           } else {
             setRenglones(
               CATALOGO_DETALLADO_88_RENGLONES.map((r) => ({
                 ...r,
-                costoUnitarioDirecto: r.costoUnitarioDirecto || 0,
-                cantidadContratada: r.cantidadContratada || 0,
-                cantidadAjustada: r.cantidadAjustada || 0,
+                costoUnitarioDirecto: 0,
+                cantidadContratada: 0,
+                cantidadAjustada: 0,
               }))
             )
           }
@@ -813,34 +911,96 @@ export default function RenglonesPage() {
   }, [])
 
   const formatearUnidadSymbol = (raw: string | undefined) => {
-    if (!raw) return 'm³'
+    if (!raw) return 'u'
     if (raw.length > 15 || raw.includes('-')) {
       const encontrada = unidades.find((u) => u.id === raw)
       if (encontrada && encontrada.simbolo) return encontrada.simbolo
-      return 'm³'
+      return raw
     }
     return raw
   }
 
   const renglonesFiltrados = useMemo(() => {
-    return (renglones || []).filter(
+    const list = (renglones || []).filter(
       (r) =>
         (r?.codigoDGC || '').toLowerCase().includes((busqueda || '').toLowerCase()) ||
         (r?.descripcion || '').toLowerCase().includes((busqueda || '').toLowerCase())
     )
-  }, [renglones, busqueda])
+    return [...list].sort((a, b) => {
+      let valA: any = a[sortRenglones.campo]
+      let valB: any = b[sortRenglones.campo]
+
+      if (sortRenglones.campo === 'capituloId') {
+        valA = Number(valA || 0)
+        valB = Number(valB || 0)
+      } else if (sortRenglones.campo === 'cantidadContratada' || sortRenglones.campo === 'costoUnitarioDirecto') {
+        valA = Number(valA || 0)
+        valB = Number(valB || 0)
+      } else if (typeof valA === 'string' && typeof valB === 'string') {
+        return sortRenglones.direccion === 'asc'
+          ? valA.localeCompare(valB, undefined, { numeric: true, sensitivity: 'base' })
+          : valB.localeCompare(valA, undefined, { numeric: true, sensitivity: 'base' })
+      }
+
+      if (valA < valB) return sortRenglones.direccion === 'asc' ? -1 : 1
+      if (valA > valB) return sortRenglones.direccion === 'asc' ? 1 : -1
+      return 0
+    })
+  }, [renglones, busqueda, sortRenglones])
 
   const unidadesFiltradas = useMemo(() => {
-    return (unidades || []).filter(
+    const list = (unidades || []).filter(
       (u) =>
         (u?.simbolo || '').toLowerCase().includes((busqueda || '').toLowerCase()) ||
         (u?.nombre || '').toLowerCase().includes((busqueda || '').toLowerCase())
     )
-  }, [unidades, busqueda])
+    return [...list].sort((a, b) => {
+      let valA: any = a[sortUnidades.campo]
+      let valB: any = b[sortUnidades.campo]
+
+      if (sortUnidades.campo === 'es_discreta') {
+        valA = valA ? 1 : 0
+        valB = valB ? 1 : 0
+      } else if (typeof valA === 'string' && typeof valB === 'string') {
+        return sortUnidades.direccion === 'asc'
+          ? valA.localeCompare(valB, undefined, { numeric: true, sensitivity: 'base' })
+          : valB.localeCompare(valA, undefined, { numeric: true, sensitivity: 'base' })
+      }
+
+      if (valA < valB) return sortUnidades.direccion === 'asc' ? -1 : 1
+      if (valA > valB) return sortUnidades.direccion === 'asc' ? 1 : -1
+      return 0
+    })
+  }, [unidades, busqueda, sortUnidades])
 
   const capitulosFiltrados = useMemo(() => {
-    return (capitulos || []).filter((c) => (c?.nombre || '').toLowerCase().includes((busqueda || '').toLowerCase()))
-  }, [capitulos, busqueda])
+    const list = (capitulos || []).filter((c) => {
+      const q = (busqueda || '').toLowerCase()
+      return (c?.nombre || '').toLowerCase().includes(q) || String(c?.id || '').includes(q)
+    })
+    return [...list].sort((a, b) => {
+      if (sortCapitulos.campo === 'renglones') {
+        const countA = (renglones || []).filter((r) => r.capituloId === a.id).length
+        const countB = (renglones || []).filter((r) => r.capituloId === b.id).length
+        return sortCapitulos.direccion === 'asc' ? countA - countB : countB - countA
+      }
+      let valA: any = a[sortCapitulos.campo]
+      let valB: any = b[sortCapitulos.campo]
+
+      if (sortCapitulos.campo === 'id') {
+        valA = Number(valA || 0)
+        valB = Number(valB || 0)
+      } else if (typeof valA === 'string' && typeof valB === 'string') {
+        return sortCapitulos.direccion === 'asc'
+          ? valA.localeCompare(valB, undefined, { numeric: true, sensitivity: 'base' })
+          : valB.localeCompare(valA, undefined, { numeric: true, sensitivity: 'base' })
+      }
+
+      if (valA < valB) return sortCapitulos.direccion === 'asc' ? -1 : 1
+      if (valA > valB) return sortCapitulos.direccion === 'asc' ? 1 : -1
+      return 0
+    })
+  }, [capitulos, busqueda, sortCapitulos, renglones])
 
   const itemsActuales = subTab === 'renglones' ? renglonesFiltrados : subTab === 'unidades' ? unidadesFiltradas : capitulosFiltrados
   const totalPaginas = Math.max(1, Math.ceil(itemsActuales.length / registrosPorPagina))
@@ -855,13 +1015,46 @@ export default function RenglonesPage() {
 
   // --- ACCIONES RENGLONES ---
   const handleGuardarRenglon = async (payload: any) => {
+    try {
+      const capObj = capitulos.find((c) => c.id === payload.capituloId || c.uuid === payload.capituloId)
+      const capId = capObj?.uuid || capObj?.id || payload.capituloId
+
+      const uniObj = unidades.find((u) => u.simbolo === payload.unidad || u.id === payload.unidad)
+      const uniId = uniObj?.id || payload.unidad
+
+      const backendPayload = {
+        codigo: payload.codigoDGC,
+        descripcion: payload.descripcion,
+        capitulo_id: capId,
+        unidad_id: uniId,
+        tipo_renglon: 'COSTO_DIRECTO',
+        aplica_indirectos: true,
+        aplica_iva: true,
+        activo: true,
+      }
+
+      if (payload.id && !String(payload.id).startsWith('r-') && !String(payload.id).startsWith('sab-')) {
+        await api.put(`/mantenimiento/renglon_trabajo_catalogo/${payload.id}`, backendPayload)
+      } else {
+        const res = await api.post('/mantenimiento/renglon_trabajo_catalogo', backendPayload)
+        if (res?.data?.data?.id) {
+          payload.id = res.data.data.id
+        }
+      }
+    } catch (e) {
+      console.warn('Error guardando en backend renglon_trabajo_catalogo, usando estado local:', e)
+    }
+
     if (payload.id && renglones.some((r) => r.id === payload.id)) {
       setRenglones((prev) => prev.map((r) => (r.id === payload.id ? { ...r, ...payload } : r)))
       showSuccessToast(`Renglón ${payload.codigoDGC} actualizado exitosamente`)
     } else {
       const nuevo = {
-        id: `r-${Date.now()}`,
+        id: payload.id || `r-${Date.now()}`,
         ...payload,
+        costoUnitarioDirecto: 0,
+        cantidadContratada: 0,
+        cantidadAjustada: 0,
         estadoEjecucion: 'No iniciado',
       }
       setRenglones((prev) => [nuevo, ...prev])
@@ -887,21 +1080,29 @@ export default function RenglonesPage() {
   // --- ACCIONES CAPÍTULOS ---
   const handleGuardarCapitulo = async (payload: any) => {
     if (payload.id && capitulos.some((c) => c.id === payload.id)) {
-      setCapitulos((prev) => prev.map((c) => (c.id === payload.id ? { ...c, ...payload } : c)))
+      setCapitulos((prev) =>
+        prev
+          .map((c) => (c.id === payload.id ? { ...c, ...payload } : c))
+          .sort((a, b) => Number(a.id) - Number(b.id))
+      )
       showSuccessToast(`Capítulo ${payload.id} actualizado exitosamente`)
     } else {
       const nuevo = {
-        id: payload.id || Math.max(0, ...capitulos.map((c) => c.id)) + 1,
+        id: payload.id || getSiguienteNumeroCapitulo(capitulos),
         nombre: payload.nombre,
       }
-      setCapitulos((prev) => [...prev, nuevo])
+      setCapitulos((prev) => [...prev, nuevo].sort((a, b) => Number(a.id) - Number(b.id)))
       showSuccessToast(`Capítulo ${nuevo.id} creado exitosamente`)
     }
   }
 
-  const handleActualizarRenglonesCapitulo = (capituloId: number, renglonesAsignadosIds: string[]) => {
+  const handleActualizarRenglonesCapitulo = (
+    capituloId: number,
+    renglonesAsignadosIds: string[],
+    capNombreParam?: string
+  ) => {
     const capObj = capitulos.find((c) => c.id === capituloId)
-    const capNombre = capObj?.nombre || `Capítulo ${capituloId}`
+    const capNombre = capNombreParam || capObj?.nombre || `Capítulo ${capituloId}`
     setRenglones((prev) =>
       prev.map((r) => {
         if (renglonesAsignadosIds.includes(r.id)) {
@@ -972,14 +1173,14 @@ export default function RenglonesPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-100 p-1 text-[11px]">
+        <div className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-100/90 p-1 text-[11px] font-[Poppins]">
           <button
             type="button"
             onClick={() => {
               setSubTab('renglones')
               setPaginaActual(1)
             }}
-            className={`flex items-center gap-1.5 px-3 py-1 rounded-md font-semibold transition-all cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-md font-medium transition-all cursor-pointer ${
               subTab === 'renglones' ? 'bg-white text-[#9B0F06] shadow-2xs font-bold' : 'text-gray-600 hover:text-gray-900'
             }`}
           >
@@ -992,7 +1193,7 @@ export default function RenglonesPage() {
               setSubTab('unidades')
               setPaginaActual(1)
             }}
-            className={`flex items-center gap-1.5 px-3 py-1 rounded-md font-semibold transition-all cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-md font-medium transition-all cursor-pointer ${
               subTab === 'unidades' ? 'bg-white text-[#9B0F06] shadow-2xs font-bold' : 'text-gray-600 hover:text-gray-900'
             }`}
           >
@@ -1005,7 +1206,7 @@ export default function RenglonesPage() {
               setSubTab('capitulos')
               setPaginaActual(1)
             }}
-            className={`flex items-center gap-1.5 px-3 py-1 rounded-md font-semibold transition-all cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-md font-medium transition-all cursor-pointer ${
               subTab === 'capitulos' ? 'bg-white text-[#9B0F06] shadow-2xs font-bold' : 'text-gray-600 hover:text-gray-900'
             }`}
           >
@@ -1085,34 +1286,58 @@ export default function RenglonesPage() {
       <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
         <div className="overflow-x-auto max-h-[calc(100vh-270px)] overflow-y-auto">
           {subTab === 'renglones' && (
-            <table className="w-full text-left text-[11px] border-collapse">
-              <thead className="sticky top-0 z-20 bg-gray-100 text-gray-700 font-semibold uppercase text-[9px] tracking-wider border-b border-gray-200 shadow-2xs">
+            <table className="w-full text-left text-[11px] border-collapse font-[Poppins]">
+              <thead className="sticky top-0 z-20 bg-gray-100 text-gray-700 font-semibold uppercase text-[9px] tracking-wider border-b border-gray-200 shadow-2xs font-[Poppins]">
                 <tr>
-                  <th className="px-3 py-2 w-24">Código DGC</th>
-                  <th className="px-3 py-2 min-w-[200px]">Descripción del Renglón</th>
-                  <th className="px-3 py-2">Capítulo</th>
-                  <th className="px-3 py-2 text-center w-20">C. UNID</th>
-                  <th className="px-3 py-2 text-right w-28">Cant. Contratada</th>
-                  <th className="px-3 py-2 text-right w-28">Costo Unit. (Q)</th>
+                  <th
+                    onClick={() => toggleSortRenglones('codigoDGC')}
+                    className="px-3 py-2 w-28 cursor-pointer select-none hover:bg-gray-200/70 transition-colors"
+                  >
+                    <div className="flex items-center gap-1">
+                      <span>Código DGC</span>
+                      <SortIndicator activo={sortRenglones.campo === 'codigoDGC'} direccion={sortRenglones.direccion} />
+                    </div>
+                  </th>
+                  <th
+                    onClick={() => toggleSortRenglones('descripcion')}
+                    className="px-3 py-2 min-w-[240px] cursor-pointer select-none hover:bg-gray-200/70 transition-colors"
+                  >
+                    <div className="flex items-center gap-1">
+                      <span>Descripción del Renglón</span>
+                      <SortIndicator activo={sortRenglones.campo === 'descripcion'} direccion={sortRenglones.direccion} />
+                    </div>
+                  </th>
+                  <th
+                    onClick={() => toggleSortRenglones('capituloId')}
+                    className="px-3 py-2 cursor-pointer select-none hover:bg-gray-200/70 transition-colors"
+                  >
+                    <div className="flex items-center gap-1">
+                      <span>Capítulo</span>
+                      <SortIndicator activo={sortRenglones.campo === 'capituloId'} direccion={sortRenglones.direccion} />
+                    </div>
+                  </th>
+                  <th
+                    onClick={() => toggleSortRenglones('unidad')}
+                    className="px-3 py-2 text-center w-24 cursor-pointer select-none hover:bg-gray-200/70 transition-colors"
+                  >
+                    <div className="flex items-center justify-center gap-1">
+                      <span>C. UNID</span>
+                      <SortIndicator activo={sortRenglones.campo === 'unidad'} direccion={sortRenglones.direccion} />
+                    </div>
+                  </th>
                   <th className="px-3 py-2 text-center w-24">Acciones</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100 font-sans">
+              <tbody className="divide-y divide-gray-100 font-[Poppins]">
                 {itemsPaginados.map((r) => (
                   <tr key={r.id} className="hover:bg-gray-50/80 transition-colors">
-                    <td className="px-3 py-2 font-mono font-normal text-[#9B0F06]">{r.codigoDGC}</td>
+                    <td className="px-3 py-2 font-medium text-[#9B0F06]">{r.codigoDGC}</td>
                     <td className="px-3 py-2 text-gray-800 font-normal">{r.descripcion}</td>
                     <td className="px-3 py-2 text-gray-600 text-[10.5px]">Capítulo {r.capituloId}</td>
-                    <td className="px-3 py-2 text-center font-mono font-normal text-gray-700">
+                    <td className="px-3 py-2 text-center font-normal text-gray-700">
                       <span className="inline-block px-1.5 py-0.5">
                         {formatearUnidadSymbol(r.unidad)}
                       </span>
-                    </td>
-                    <td className="px-3 py-2 text-right font-mono font-normal text-gray-700">
-                      {formatQuantity(r.cantidadContratada || 0, r.unidad)}
-                    </td>
-                    <td className="px-3 py-2 text-right font-mono font-normal text-gray-900">
-                      Q {Number(r.costoUnitarioDirecto || 0).toLocaleString('es-GT', { minimumFractionDigits: 2 })}
                     </td>
                     <td className="px-3 py-2 text-center">
                       <div className="flex items-center justify-center gap-1">
@@ -1160,19 +1385,43 @@ export default function RenglonesPage() {
           )}
 
           {subTab === 'unidades' && (
-            <table className="w-full text-left text-[11px] border-collapse">
-              <thead className="sticky top-0 z-20 bg-gray-100 text-gray-700 font-semibold uppercase text-[9px] tracking-wider border-b border-gray-200 shadow-2xs">
+            <table className="w-full text-left text-[11px] border-collapse font-[Poppins]">
+              <thead className="sticky top-0 z-20 bg-gray-100 text-gray-700 font-semibold uppercase text-[9px] tracking-wider border-b border-gray-200 shadow-2xs font-[Poppins]">
                 <tr>
-                  <th className="px-3 py-2 text-center w-20">Símbolo</th>
-                  <th className="px-3 py-2">Nombre Completo</th>
-                  <th className="px-3 py-2 text-center w-24">Discreta</th>
+                  <th
+                    onClick={() => toggleSortUnidades('simbolo')}
+                    className="px-3 py-2 text-center w-20 cursor-pointer select-none hover:bg-gray-200/70 transition-colors"
+                  >
+                    <div className="flex items-center justify-center gap-1">
+                      <span>Símbolo</span>
+                      <SortIndicator activo={sortUnidades.campo === 'simbolo'} direccion={sortUnidades.direccion} />
+                    </div>
+                  </th>
+                  <th
+                    onClick={() => toggleSortUnidades('nombre')}
+                    className="px-3 py-2 cursor-pointer select-none hover:bg-gray-200/70 transition-colors"
+                  >
+                    <div className="flex items-center gap-1">
+                      <span>Nombre Completo</span>
+                      <SortIndicator activo={sortUnidades.campo === 'nombre'} direccion={sortUnidades.direccion} />
+                    </div>
+                  </th>
+                  <th
+                    onClick={() => toggleSortUnidades('es_discreta')}
+                    className="px-3 py-2 text-center w-24 cursor-pointer select-none hover:bg-gray-200/70 transition-colors"
+                  >
+                    <div className="flex items-center justify-center gap-1">
+                      <span>Discreta</span>
+                      <SortIndicator activo={sortUnidades.campo === 'es_discreta'} direccion={sortUnidades.direccion} />
+                    </div>
+                  </th>
                   <th className="px-3 py-2 text-center w-24">Acciones</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100 font-sans">
+              <tbody className="divide-y divide-gray-100 font-[Poppins]">
                 {itemsPaginados.map((u) => (
                   <tr key={u.id} className="hover:bg-gray-50/80 transition-colors">
-                    <td className="px-3 py-2 text-center font-mono font-normal text-[#9B0F06]">{u.simbolo}</td>
+                    <td className="px-3 py-2 text-center font-medium text-[#9B0F06]">{u.simbolo}</td>
                     <td className="px-3 py-2 font-normal text-gray-900">{u.nombre}</td>
                     <td className="px-3 py-2 text-center font-normal text-black text-[11px]">
                       {u.es_discreta ? 'Sí' : 'No'}
@@ -1223,34 +1472,64 @@ export default function RenglonesPage() {
           )}
 
           {subTab === 'capitulos' && (
-            <table className="w-full text-left text-[11px] border-collapse">
-              <thead className="sticky top-0 z-20 bg-gray-100 text-gray-700 font-semibold uppercase text-[9px] tracking-wider border-b border-gray-200 shadow-2xs">
+            <table className="w-full text-left text-[11px] border-collapse font-[Poppins]">
+              <thead className="sticky top-0 z-20 bg-gray-100 text-gray-700 font-semibold uppercase text-[9px] tracking-wider border-b border-gray-200 shadow-2xs font-[Poppins]">
                 <tr>
-                  <th className="px-3 py-2 text-center w-16">N°</th>
-                  <th className="px-3 py-2">Nombre del Capítulo</th>
-                  <th className="px-3 py-2">Renglones Actualmente en este Capítulo</th>
+                  <th
+                    onClick={() => toggleSortCapitulos('id')}
+                    className="px-3 py-2 text-center w-16 cursor-pointer select-none hover:bg-gray-200/70 transition-colors"
+                  >
+                    <div className="flex items-center justify-center gap-1">
+                      <span>N°</span>
+                      <SortIndicator activo={sortCapitulos.campo === 'id'} direccion={sortCapitulos.direccion} />
+                    </div>
+                  </th>
+                  <th
+                    onClick={() => toggleSortCapitulos('nombre')}
+                    className="px-3 py-2 cursor-pointer select-none hover:bg-gray-200/70 transition-colors"
+                  >
+                    <div className="flex items-center gap-1">
+                      <span>Nombre del Capítulo</span>
+                      <SortIndicator activo={sortCapitulos.campo === 'nombre'} direccion={sortCapitulos.direccion} />
+                    </div>
+                  </th>
+                  <th
+                    onClick={() => toggleSortCapitulos('renglones')}
+                    className="px-3 py-2 cursor-pointer select-none hover:bg-gray-200/70 transition-colors"
+                  >
+                    <div className="flex items-center gap-1">
+                      <span>Renglones Actualmente en este Capítulo</span>
+                      <SortIndicator activo={sortCapitulos.campo === 'renglones'} direccion={sortCapitulos.direccion} />
+                    </div>
+                  </th>
                   <th className="px-3 py-2 text-center w-24">Acciones</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100 font-sans">
+              <tbody className="divide-y divide-gray-100 font-[Poppins]">
                 {itemsPaginados.map((c) => {
                   const renglonesEnCap = renglones.filter((r) => r.capituloId === c.id)
                   return (
                     <tr key={c.id} className="hover:bg-gray-50/80 transition-colors">
-                      <td className="px-3 py-2 text-center font-mono font-normal text-[#9B0F06]">Cap. {c.id}</td>
+                      <td className="px-3 py-2 text-center font-semibold text-[#9B0F06]">{c.id}</td>
                       <td className="px-3 py-2 font-normal text-gray-900">{c.nombre}</td>
                       <td className="px-3 py-2">
                         {renglonesEnCap.length === 0 ? (
                           <span className="text-[10px] text-gray-400 italic">No hay renglones asignados</span>
                         ) : (
                           <div className="flex flex-wrap items-center gap-1.5 max-h-16 overflow-y-auto">
-                            <span className="text-[9px] font-normal text-black px-1 py-0.5">
+                            <span className="text-[9px] font-medium text-gray-700 px-1 py-0.5">
                               Total: {renglonesEnCap.length}
                             </span>
                             {renglonesEnCap.map((r) => (
                               <span
                                 key={r.id}
-                                className="inline-block font-mono text-[9px] font-normal text-black px-1 py-0.5"
+                                title={`[${r.codigoDGC}] ${r.descripcion || 'Sin descripción'}${r.unidad ? ` • Unidad: ${r.unidad}` : ''}`}
+                                onClick={() => {
+                                  setSelectedItem(r)
+                                  setDrawerMode('view')
+                                  setOpenRenglonDrawer(true)
+                                }}
+                                className="inline-block text-[9.5px] font-medium text-gray-800 px-1.5 py-0.5 rounded transition-all hover:bg-red-50 hover:text-[#9B0F06] hover:border hover:border-red-200 cursor-pointer select-none"
                               >
                                 {r.codigoDGC}
                               </span>
@@ -1305,14 +1584,14 @@ export default function RenglonesPage() {
           )}
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-200 bg-gray-50 px-4 py-2 text-[11px] text-gray-600 font-[Poppins]">
-          <div>
+        <div data-paginacion="true" className="paginacion-control flex flex-wrap items-center justify-between gap-2 border-t border-gray-200 bg-gray-50 px-2.5 sm:px-4 py-2 text-[10px] text-gray-600 font-[Poppins]">
+          <div className="text-[10px]">
             Mostrando <span className="font-semibold text-gray-900">{itemsActuales.length === 0 ? 0 : (paginaActual - 1) * registrosPorPagina + 1}</span> a{' '}
             <span className="font-semibold text-gray-900">{Math.min(paginaActual * registrosPorPagina, itemsActuales.length)}</span> de{' '}
             <span className="font-semibold text-gray-900">{itemsActuales.length}</span> registros
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 text-[10px]">
             <div className="flex items-center gap-1">
               <span className="text-[10px]">Filas por página:</span>
               <select
@@ -1321,7 +1600,7 @@ export default function RenglonesPage() {
                   setRegistrosPorPagina(Number(e.target.value))
                   setPaginaActual(1)
                 }}
-                className="rounded border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] text-gray-800 focus:outline-none"
+                className="paginacion-control rounded border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] text-gray-800 focus:outline-none cursor-pointer"
               >
                 <option value={10}>10 / pág</option>
                 <option value={25}>25 / pág</option>
@@ -1329,14 +1608,14 @@ export default function RenglonesPage() {
               </select>
             </div>
 
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 text-[10px]">
               <button
                 type="button"
                 disabled={paginaActual === 1}
                 onClick={() => setPaginaActual((prev) => Math.max(1, prev - 1))}
                 className="inline-flex items-center gap-0.5 rounded border border-gray-200 bg-white px-2 py-0.5 text-[10px] text-gray-700 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
               >
-                <ChevronLeft size={12} /> Anterior
+                <ChevronLeft size={11} /> Anterior
               </button>
 
               <span className="px-2 font-semibold text-gray-800 text-[10px]">
@@ -1347,9 +1626,9 @@ export default function RenglonesPage() {
                 type="button"
                 disabled={paginaActual >= totalPaginas}
                 onClick={() => setPaginaActual((prev) => Math.min(totalPaginas, prev + 1))}
-                className="inline-flex items-center gap-0.5 rounded border border-gray-200 bg-[#9B0F06] px-2 py-1 text-[10px] text-white hover:bg-[#5E0006] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                className="inline-flex items-center gap-0.5 rounded border border-gray-200 bg-[#9B0F06] px-2 py-0.5 text-[10px] text-white hover:bg-[#5E0006] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
               >
-                Siguiente <ChevronRight size={12} />
+                Siguiente <ChevronRight size={11} />
               </button>
             </div>
           </div>
@@ -1380,6 +1659,7 @@ export default function RenglonesPage() {
         onClose={() => setOpenCapituloDrawer(false)}
         onSave={handleGuardarCapitulo}
         item={selectedItem}
+        capitulos={capitulos}
         todosRenglones={renglones}
         onActualizarRenglonesCapitulo={handleActualizarRenglonesCapitulo}
         mode={drawerMode}

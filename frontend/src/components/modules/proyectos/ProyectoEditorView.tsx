@@ -6,7 +6,7 @@ import { ArrowLeft, Lock } from 'lucide-react'
 import { useAuthStore } from '@/stores/useAuthStore'
 import type { ProyectoType } from '@/validations/proyecto.schema'
 import ProyectoFormulario from '@/components/modules/proyectos/ProyectoFormulario'
-import { api } from '@/lib/api/cliente'
+import { api, limpiarCacheMemoria } from '@/lib/api/cliente'
 import { toast } from 'sonner'
 import { proyectoService } from '@/services/proyectos/proyecto.service'
 import { useEffect, useState } from 'react'
@@ -143,8 +143,8 @@ export function ProyectoEditorView({
   }
 
   return (
-    <div className="space-y-3 font-[Poppins]">
-      <div className="flex flex-wrap items-start justify-between gap-3 py-0.5">
+    <div className="flex flex-col h-[calc(100vh-140px)] md:h-[calc(100vh-115px)] text-[#07152B] font-[Poppins] overflow-hidden">
+      <div className="flex flex-wrap items-start justify-between gap-3 shrink-0 pb-1.5">
         <div className="flex items-start gap-2.5">
           <button
             type="button"
@@ -161,7 +161,7 @@ export function ProyectoEditorView({
             <h1 className="m-0 text-base font-black leading-tight text-gray-900">
               {esEditar ? `Editar Proyecto: ${proyectoActual?.codigo || 'DOM-VIAL-001'}` : 'Nuevo Proyecto'}
             </h1>
-            <p className="mt-0.5 text-[11px] text-gray-500">
+            <p className="mt-0.5 text-[9px] sm:text-[11px] text-gray-500">
               {esEditar
                 ? 'Actualice la información contractual, plazos y montos del proyecto paso a paso.'
                 : 'Ingrese los datos contractuales iniciales para el alta del proyecto en DomunNet.'}
@@ -177,32 +177,49 @@ export function ProyectoEditorView({
         )}
       </div>
 
-      <ProyectoFormulario
-        key={proyectoActual?.id || 'nuevo'}
-        modo={modo}
-        proyectoInicial={proyectoActual as any}
-        onGuardar={async (proyectoData) => {
-          try {
-            if (modo === 'crear') {
-              const res = await api.post('/proyectos', proyectoData)
-              showSuccessToast('Proyecto creado exitosamente')
-              const nuevoId = res.data?.data?.id
-              if (nuevoId) {
-                router.push(`/dashboard/proyectos/${nuevoId}`)
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+        <ProyectoFormulario
+          key={proyectoActual?.id || 'nuevo'}
+          modo={modo}
+          proyectoInicial={proyectoActual as any}
+          onGuardar={async (proyectoData) => {
+            try {
+              if (modo === 'crear') {
+                const res = await api.post('/proyectos', proyectoData)
+                limpiarCacheMemoria()
+                try {
+                  sessionStorage.removeItem('domun_proyectos_cache')
+                } catch {}
+                showSuccessToast('Proyecto creado exitosamente')
+                const nuevoId = res.data?.data?.id
+                router.refresh()
+                if (nuevoId) {
+                  router.push(`/dashboard/proyectos/${nuevoId}`)
+                } else {
+                  router.push('/dashboard/proyectos')
+                }
               } else {
-                router.push('/dashboard/proyectos')
+                await api.put(`/proyectos/${proyectoActual?.id}`, proyectoData)
+                limpiarCacheMemoria()
+                try {
+                  sessionStorage.removeItem('domun_proyectos_cache')
+                  sessionStorage.removeItem(`domun_api_cache:/proyectos/${proyectoActual?.id}`)
+                } catch {}
+                showSuccessToast(
+                  proyectoData.estado === 'activo'
+                    ? '¡Proyecto actualizado y activado exitosamente!'
+                    : 'Proyecto actualizado exitosamente'
+                )
+                router.refresh()
+                router.push(`/dashboard/proyectos/${proyectoActual?.id}`)
               }
-            } else {
-              await api.put(`/proyectos/${proyectoActual?.id}`, proyectoData)
-              showSuccessToast('Proyecto actualizado exitosamente')
-              router.push(`/dashboard/proyectos/${proyectoActual?.id}`)
+            } catch (err: any) {
+              console.error(err)
+              showErrorToast(err.response?.data?.message || err.response?.data?.error || err.message || 'Error al guardar el proyecto')
             }
-          } catch (err: any) {
-            console.error(err)
-            showErrorToast(err.response?.data?.message || err.response?.data?.error || err.message || 'Error al guardar el proyecto')
-          }
-        }}
-      />
+          }}
+        />
+      </div>
     </div>
   )
 }

@@ -20,8 +20,9 @@ export default function FotografiasDetail() {
 
   const [cargando, setCargando] = useState(true)
   const [vistaActiva, setVistaActiva] = useState<'grid' | 'feed'>('grid')
+  const [columnasGrid, setColumnasGrid] = useState<2 | 3 | 4>(2)
   const [paginaActual, setPaginaActual] = useState(1)
-  const [porPagina, setPorPagina] = useState(10)
+  const [porPagina, setPorPagina] = useState(15)
   
   // Filtros
   const [busqueda, setBusqueda] = useState('')
@@ -34,6 +35,8 @@ export default function FotografiasDetail() {
 
   const [mostrarFormulario, setMostrarFormulario] = useState(false)
   const [proyectoApi, setProyectoApi] = useState<any>(null)
+  const [proyectosDisponibles, setProyectosDisponibles] = useState<any[]>([])
+  const [fotosCargadas, setFotosCargadas] = useState<any[]>([])
   const [fotoLightbox, setFotoLightbox] = useState<{ foto: any; index: number }>({
     foto: null,
     index: 0,
@@ -43,19 +46,181 @@ export default function FotografiasDetail() {
     let cancelado = false
     if (proyectoId) {
       setCargando(true)
-      apiGetDeduplicado(`/proyectos/${proyectoId}`)
-        .then((res) => {
-          if (!cancelado) {
-            if (res.data?.success && res.data.data) {
-              setProyectoApi(res.data.data)
-            }
-            setCargando(false)
+      Promise.allSettled([
+        apiGetDeduplicado(`/proyectos/${proyectoId}`),
+        apiGetDeduplicado('/mantenimiento/bitacora_entrada?limite=200'),
+        apiGetDeduplicado('/mantenimiento/evidencia_fotografica?limite=200'),
+        apiGetDeduplicado('/proyectos'),
+      ])
+        .then(([resProy, resBit, resEvid, resAllProy]) => {
+          if (cancelado) return
+
+          if (resAllProy.status === 'fulfilled') {
+            const data = resAllProy.value.data
+            const lista = Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : [])
+            if (lista.length > 0) setProyectosDisponibles(lista)
           }
+
+          let proyData: any = null
+          if (resProy.status === 'fulfilled' && resProy.value.data?.success && resProy.value.data.data) {
+            proyData = resProy.value.data.data
+            setProyectoApi(proyData)
+          }
+
+          const proyNombre = proyData?.nombre || proyData?.nombre_oficial || 'Proyecto de Obra Vial'
+
+          const matchProy = (pIdToCheck?: any) => {
+            if (!pIdToCheck || !proyectoId) return false
+            const t = String(pIdToCheck).toLowerCase().trim()
+            const p = String(proyectoId).toLowerCase().trim()
+            if (t === p) return true
+            if (proyData?.id && t === String(proyData.id).toLowerCase().trim()) return true
+            if (proyData?.codigo && t === String(proyData.codigo).toLowerCase().trim()) return true
+            if (p.startsWith('proj-') && (t === p.replace('proj-', '') || t === p.replace('proj-00', '').replace('proj-0', ''))) return true
+            if (t.startsWith('proj-') && (p === t.replace('proj-', '') || p === t.replace('proj-00', '').replace('proj-0', ''))) return true
+            return false
+          }
+
+          const fotosResult: any[] = []
+
+          // 1. Fotos desde evidencia_fotografica en BD
+          const bitacoras =
+            resBit.status === 'fulfilled' && Array.isArray(resBit.value.data?.data)
+              ? resBit.value.data.data
+              : []
+          const bitacorasDelProy = bitacoras.filter(
+            (b: any) => matchProy(b.proyecto_id || b.proyectoId)
+          )
+          const bitacoraIdsSet = new Set(bitacorasDelProy.map((b: any) => String(b.id)))
+
+          const evidencias =
+            resEvid.status === 'fulfilled' && Array.isArray(resEvid.value.data?.data)
+              ? resEvid.value.data.data
+              : []
+
+          evidencias.forEach((ev: any) => {
+            const bitEntry = bitacoras.find(
+              (b: any) => String(b.id) === String(ev.bitacora_entrada_id)
+            )
+            const matchesThisProject =
+              (ev.bitacora_entrada_id && bitacoraIdsSet.has(String(ev.bitacora_entrada_id))) ||
+              matchProy(ev.proyecto_id || ev.proyectoId) ||
+              (bitEntry && matchProy(bitEntry.proyecto_id || bitEntry.proyectoId))
+
+            if (matchesThisProject) {
+              const urlImg = ev.url_storage || ev.url || ev.url_archivo
+              if (urlImg && !fotosResult.some((f) => f.url === urlImg)) {
+                let catTipo = 'avance'
+                const catStr = (ev.categoria || '').toLowerCase()
+                if (catStr.includes('incid')) catTipo = 'incidente'
+                else if (catStr.includes('mat')) catTipo = 'material'
+                else if (catStr.includes('lab') || catStr.includes('inspec')) catTipo = 'inspeccion'
+                else if (catStr.includes('antes') || catStr.includes('desp')) catTipo = 'antes_despues'
+
+                const rawLat = Number(ev.latitud || ev.lat || bitEntry?.latitud || bitEntry?.lat || bitEntry?.coordenadas_gps?.lat || bitEntry?.coordenadasGps?.lat || proyData?.lat || 14.634915)
+                const rawLng = Number(ev.longitud || ev.lng || bitEntry?.longitud || bitEntry?.lng || bitEntry?.coordenadas_gps?.lng || bitEntry?.coordenadasGps?.lng || proyData?.lng || -90.506882)
+                const estIni = ev.estacion_inicio || ev.estacion_inicial || bitEntry?.estacion_inicio || bitEntry?.estacion_inicial || bitEntry?.estacionInicio || '0+000'
+                const estFi = ev.estacion_fin || ev.estacion_final || bitEntry?.estacion_fin || bitEntry?.estacion_final || bitEntry?.estacionFin || '0+500'
+                const ladoVal = ev.lado_via || ev.lado || bitEntry?.lado_via || bitEntry?.ladoVia || bitEntry?.lado || 'Ambos'
+
+                fotosResult.push({
+                  id: ev.id,
+                  titulo: ev.descripcion || `Evidencia ${ev.fecha_hora?.slice(0, 10) || ''}`,
+                  descripcion: ev.descripcion || bitEntry?.descripcion || 'Evidencia fotográfica en obra',
+                  url: urlImg,
+                  urlMiniatura: urlImg,
+                  fecha: ev.fecha_hora?.slice(0, 10) || bitEntry?.fecha || new Date().toISOString().slice(0, 10),
+                  creadoEn: ev.fecha_hora || new Date().toISOString(),
+                  tipo: catTipo,
+                  autor: ev.usuario?.nombre || bitEntry?.autor || 'Ingeniero Residente',
+                  proyectoId: String(proyectoId),
+                  proyectoNombre: proyNombre,
+                  ubicacionObra: bitEntry?.ubicacion || proyData?.ubicacion || 'Frente de Trabajo',
+                  etiquetas: [bitEntry?.renglon_nombre || 'Avance Físico', 'Bitácora'],
+                  tamanio: ev.tamanio || '245 KB',
+                  lat: rawLat,
+                  lng: rawLng,
+                  coordenadasGps: { lat: rawLat, lng: rawLng },
+                  estacionInicio: estIni,
+                  estacionFin: estFi,
+                  lado: ladoVal,
+                  renglon: bitEntry?.renglon_nombre || bitEntry?.renglonNombre || bitEntry?.categoriaTrabajo || 'Avance Físico',
+                  departamento: bitEntry?.departamento || proyData?.departamento_nombre || proyData?.departamento || 'Guatemala',
+                })
+              }
+            }
+          })
+
+          // 2. Fotos desde bitacora local y entradas de bitacora
+          let locales: any[] = []
+          try {
+            locales = JSON.parse(localStorage.getItem('domun_bitacora_locales') || '[]')
+          } catch (_) {}
+
+          const todosLosRegistrosBitacora = [...locales, ...bitacorasDelProy]
+
+          todosLosRegistrosBitacora
+            .filter((l: any) => matchProy(l.proyectoId || l.proyecto_id))
+            .forEach((l: any) => {
+              const listaAdjuntos = Array.isArray(l.adjuntos) ? [...l.adjuntos] : []
+              if (l.fotografiaPrincipal?.url) {
+                listaAdjuntos.push(l.fotografiaPrincipal)
+              }
+              if (l.firma_url) {
+                listaAdjuntos.push({ url: l.firma_url, nombre: 'Evidencia / Firma' })
+              }
+
+              listaAdjuntos.forEach((adj: any) => {
+                const url = typeof adj === 'string' ? adj : adj?.url
+                if (url && !fotosResult.some((f) => f.url === url)) {
+                  const rawLat = Number(adj.lat || adj.latitud || l.latitud || l.lat || l.coordenadas_gps?.lat || l.coordenadasGps?.lat || proyData?.lat || 14.634915)
+                  const rawLng = Number(adj.lng || adj.longitud || l.longitud || l.lng || l.coordenadas_gps?.lng || l.coordenadasGps?.lng || proyData?.lng || -90.506882)
+                  const estIni = adj.estacionInicio || l.estacionInicio || l.estacion_inicio || l.estacion_inicial || '0+000'
+                  const estFi = adj.estacionFin || l.estacionFin || l.estacion_fin || l.estacion_final || '0+500'
+                  const ladoVal = adj.lado || l.lado || l.lado_via || l.ladoVia || 'Ambos'
+
+                  fotosResult.push({
+                    id: adj.id || `loc-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+                    titulo: adj.nombre || l.titulo || 'Fotografía de Bitácora',
+                    descripcion: l.descripcion || 'Evidencia fotográfica de obra',
+                    url: url,
+                    urlMiniatura: url,
+                    fecha: l.fecha || new Date().toISOString().slice(0, 10),
+                    creadoEn: l.creadoEn || new Date().toISOString(),
+                    tipo: l.tipo === 'inspeccion' ? 'inspeccion' : 'avance',
+                    autor: l.autor || 'Ingeniero Residente',
+                    proyectoId: String(proyectoId),
+                    proyectoNombre: l.proyectoNombre || proyNombre,
+                    ubicacionObra: l.ubicacion || proyData?.ubicacion || 'Frente de Trabajo',
+                    etiquetas: [l.renglon_nombre || 'Terracería', 'Bitácora'],
+                    tamanio: adj.tamanio || '245 KB',
+                    lat: rawLat,
+                    lng: rawLng,
+                    coordenadasGps: { lat: rawLat, lng: rawLng },
+                    estacionInicio: estIni,
+                    estacionFin: estFi,
+                    lado: ladoVal,
+                    renglon: l.renglon_nombre || l.renglonNombre || l.categoriaTrabajo || 'Terracería',
+                    departamento: l.departamento || proyData?.departamento_nombre || proyData?.departamento || 'Guatemala',
+                  })
+                }
+              })
+            })
+
+          // 3. Fallback mock si es proyecto demo
+          if (fotosResult.length === 0 && (String(proyectoId).startsWith('proj-') || String(proyectoId) === '1' || String(proyectoId) === '2')) {
+            const proyIdStr = String(proyectoId).split('-')[0]
+            const mockFotos = FOTOGRAFIAS_MOCK.filter(
+              (foto) => foto.proyectoId === proyIdStr || foto.proyectoId === proyectoId || String(foto.proyectoId) === '1'
+            )
+            fotosResult.push(...mockFotos)
+          }
+
+          setFotosCargadas(fotosResult)
+          setCargando(false)
         })
         .catch(() => {
-          if (!cancelado) {
-            setCargando(false)
-          }
+          if (!cancelado) setCargando(false)
         })
     } else {
       setCargando(false)
@@ -71,23 +236,38 @@ export default function FotografiasDetail() {
     return PROYECTOS_MOCK.find((p) => String(p.id) === String(proyectoId)) || null
   }, [proyectoApi, proyectoId])
 
-  // Renglones disponibles según el plan de trabajo del proyecto
+  // Renglones disponibles según el plan de trabajo del proyecto y registros cargados
   const renglonesDisponibles = useMemo(() => {
+    const renglonMap = new Map<string, { id: string; codigo: string; descripcion: string }>()
+
     const list =
       proyectoApi?.planTrabajo ||
       proyectoApi?.renglones ||
       proyectoApi?.renglones_sabana ||
       proyectoApi?.parametro_proyecto?.planTrabajo ||
       []
-    if (Array.isArray(list) && list.length > 0) {
-      return list.map((item: any) => ({
-        id: String(item.codigoDGC || item.codigo || item.id || ''),
-        codigo: String(item.codigoDGC || item.codigo || item.id || ''),
-        descripcion: item.descripcion || item.desc || item.nombre || 'Renglón de trabajo',
-      }))
+    if (Array.isArray(list)) {
+      list.forEach((item: any) => {
+        const cod = String(item.codigoDGC || item.codigo || item.id || '').trim()
+        const desc = item.descripcion || item.desc || item.nombre || cod || 'Renglón de trabajo'
+        if (cod && !renglonMap.has(cod)) {
+          renglonMap.set(cod, { id: cod, codigo: cod, descripcion: desc })
+        }
+      })
     }
-    return []
-  }, [proyectoApi])
+
+    // Incluir renglones de las fotografías cargadas
+    fotosCargadas.forEach((f: any) => {
+      const rVal = f.renglon_nombre || f.renglonNombre || f.renglon || (f.etiquetas && f.etiquetas[0])
+      if (rVal && typeof rVal === 'string' && !['Campo', 'Bitácora', 'Avance Físico'].includes(rVal)) {
+        if (!renglonMap.has(rVal)) {
+          renglonMap.set(rVal, { id: rVal, codigo: '', descripcion: rVal })
+        }
+      }
+    })
+
+    return Array.from(renglonMap.values())
+  }, [proyectoApi, fotosCargadas])
 
   // Roles y Usuarios disponibles en el proyecto
   const { rolesDisponibles, usuariosDisponibles } = useMemo(() => {
@@ -112,31 +292,55 @@ export default function FotografiasDetail() {
       })
     })
 
+    // Incluir autores de las fotografías
+    fotosCargadas.forEach((f: any) => {
+      if (f.autor && !usuarios.some((u) => u.nombre.toLowerCase() === f.autor.toLowerCase())) {
+        usuarios.push({
+          id: f.autor,
+          nombre: f.autor,
+          rol: 'Autor de Evidencia',
+        })
+      }
+    })
+
     return {
       rolesDisponibles: Array.from(rolesSet),
       usuariosDisponibles: usuarios,
     }
-  }, [proyectoApi])
+  }, [proyectoApi, fotosCargadas])
+
+  const listaProyectosCombo = useMemo(() => {
+    const rawList = proyectosDisponibles.length > 0 ? proyectosDisponibles : PROYECTOS_MOCK
+    const list = rawList.filter((p: any) => {
+      const estadoNorm = (p.estado || p.estado_codigo || '').toLowerCase().trim()
+      return estadoNorm !== 'borrador'
+    })
+    if (proyectoApi && !list.some((p: any) => String(p.id).toLowerCase() === String(proyectoApi.id).toLowerCase())) {
+      const estadoApi = (proyectoApi.estado || proyectoApi.estado_codigo || '').toLowerCase().trim()
+      if (estadoApi !== 'borrador') {
+        return [proyectoApi, ...list]
+      }
+    }
+    return list
+  }, [proyectosDisponibles, proyectoApi])
 
   // Lista base de fotografías asociadas al proyecto
   const fotosBase = useMemo(() => {
+    if (fotosCargadas.length > 0) {
+      return fotosCargadas
+    }
     if (proyectoApi?.fotografias && Array.isArray(proyectoApi.fotografias)) {
       return proyectoApi.fotografias
     }
     if (proyectoApi?.evidencias && Array.isArray(proyectoApi.evidencias)) {
       return proyectoApi.evidencias
     }
-    // Si es un proyecto creado en BD, y no tiene fotos en el backend, es []
-    if (proyectoApi) {
-      return []
-    }
-    // Si no hay proyecto en API pero es ID de mock
     if (proyectoId && String(proyectoId).startsWith('proj-')) {
       const proyIdStr = String(proyectoId).split('-')[0]
       return FOTOGRAFIAS_MOCK.filter((foto) => foto.proyectoId === proyIdStr || foto.proyectoId === proyectoId)
     }
     return []
-  }, [proyectoApi, proyectoId])
+  }, [fotosCargadas, proyectoApi, proyectoId])
 
   const fotografiasFiltradas = useMemo(() => {
     if (!fotosBase || fotosBase.length === 0) return []
@@ -273,60 +477,107 @@ export default function FotografiasDetail() {
   }, [fotoLightbox.index, fotografiasFiltradas])
 
   return (
-    <div className="space-y-4 font-[Poppins]">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex-1">
-          {proyectoId && (
-            <button
-              type="button"
-              onClick={() => router.push('/dashboard/fotografias')}
-              className="inline-flex items-center gap-1 text-xs font-semibold text-[#9B0F06] hover:text-[#5E0006] mb-1.5 transition-colors cursor-pointer"
-            >
-              <ChevronLeft size={14} />
-              Volver a frentes viales
-            </button>
-          )}
-          <h1 className="text-base font-bold text-gray-800">Fotografías de obra vial</h1>
-          <p className="text-[10px] text-gray-400 mt-0.5">
-            {proyectoSeleccionado ? (
-              <>Evidencias de <strong>{proyectoSeleccionado.nombre || proyectoSeleccionado.nombre_oficial}</strong></>
-            ) : (
-              'Galería de avance, inspección y control de frentes carreteros'
+    <div className="space-y-3 font-[Poppins] w-full max-w-full overflow-x-hidden sm:overflow-visible touch-pan-y">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+        <div className="flex items-start justify-between gap-2 w-full sm:w-auto">
+          <div className="flex-1 min-w-0">
+            {proyectoId && (
+              <button
+                type="button"
+                onClick={() => router.push('/dashboard/fotografias')}
+                className="inline-flex items-center gap-1 text-xs font-semibold text-[#9B0F06] hover:text-[#5E0006] mb-1 transition-colors cursor-pointer"
+              >
+                <ChevronLeft size={14} />
+                Volver a frentes viales
+              </button>
             )}
-          </p>
-        </div>
-        
-        <div className="flex items-center gap-2.5">
-          {/* Botón en negrilla que envía directamente a la Bitácora del proyecto */}
+            <h1 className="text-base font-bold text-gray-800">Fotografías de obra vial</h1>
+            <p className="text-[10px] text-gray-400 mt-0.5 truncate">
+              {proyectoSeleccionado ? (
+                <>Evidencias de <strong>{proyectoSeleccionado.nombre || proyectoSeleccionado.nombre_oficial}</strong></>
+              ) : (
+                'Galería de avance, inspección y control de frentes carreteros'
+              )}
+            </p>
+          </div>
+
+          {/* Botón '+' Crear en la fila del título en móviles */}
           <button
             type="button"
             onClick={() => router.push(`/dashboard/bitacora?nuevo=true${proyectoId ? `&proyectoId=${proyectoId}` : ''}`)}
-            className="flex items-center gap-1.5 bg-[#9B0F06] text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-[#5E0006] transition-colors cursor-pointer shadow-xs"
+            className="flex sm:hidden items-center justify-center bg-[#9B0F06] text-white p-2 rounded-lg hover:bg-[#5E0006] transition-colors cursor-pointer shadow-xs shrink-0 self-center"
+            title="Nueva evidencia"
           >
-            <Plus size={14} />
-            Nueva evidencia
+            <Plus size={16} />
+          </button>
+        </div>
+        
+        <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+          {/* Select para ver fotos de otros proyectos */}
+          {listaProyectosCombo.length > 0 && (
+            <select
+              value={
+                listaProyectosCombo.find(
+                  (p: any) =>
+                    String(p.id).toLowerCase() === String(proyectoId).toLowerCase() ||
+                    String(p.codigo || '').toLowerCase() === String(proyectoId).toLowerCase()
+                )?.id || proyectoId
+              }
+              onChange={(e) => {
+                if (e.target.value) {
+                  router.push(`/dashboard/fotografias/${e.target.value}`)
+                }
+              }}
+              className="filtro-control h-[32px] sm:h-[34px] rounded-lg border border-gray-200 bg-white px-2 sm:px-2.5 text-[11px] sm:text-xs font-semibold text-gray-700 focus:border-[#9B0F06] focus:outline-none cursor-pointer flex-1 sm:flex-initial max-w-[260px] sm:max-w-[240px] truncate shadow-2xs"
+              title="Seleccionar proyecto"
+            >
+              {listaProyectosCombo.map((p: any) => (
+                <option key={p.id} value={p.id}>
+                  {p.codigo ? `${p.codigo} - ` : ''}
+                  {p.nombre || p.nombre_oficial || p.nombreOficial || 'Proyecto'}
+                </option>
+              ))}
+            </select>
+          )}
+
+          {/* Botón Nueva Evidencia para pantallas medianas/grandes */}
+          <button
+            type="button"
+            onClick={() => router.push(`/dashboard/bitacora?nuevo=true${proyectoId ? `&proyectoId=${proyectoId}` : ''}`)}
+            className="hidden sm:flex items-center justify-center gap-1.5 bg-[#9B0F06] text-white text-xs font-bold px-3.5 py-2 rounded-lg hover:bg-[#5E0006] transition-colors cursor-pointer shadow-xs whitespace-nowrap shrink-0"
+            title="Nueva evidencia"
+          >
+            <Plus size={16} className="shrink-0" />
+            <span>Nueva evidencia</span>
           </button>
 
-          <div className="flex gap-1 border border-gray-200 rounded-lg p-1 bg-white">
-            <button
-              type="button"
-              onClick={() => setVistaActiva('grid')}
-              className={`p-1.5 rounded transition-colors cursor-pointer ${
-                vistaActiva === 'grid'
-                  ? 'bg-[#9B0F06]/10 text-[#9B0F06]'
-                  : 'text-gray-400 hover:text-gray-600'
-              }`}
-              title="Vista de cuadrícula"
-            >
-              <Grid size={14} />
-            </button>
+          <div className="flex items-center gap-0.5 border border-gray-200 rounded-lg p-0.5 bg-white shrink-0 shadow-2xs font-[Poppins]">
+            {([2, 3, 4] as const).map((num) => (
+              <button
+                key={num}
+                type="button"
+                onClick={() => {
+                  setColumnasGrid(num)
+                  setVistaActiva('grid')
+                }}
+                className={`h-7 px-1.5 sm:px-2 rounded text-[10px] font-bold transition-all cursor-pointer ${
+                  vistaActiva === 'grid' && columnasGrid === num
+                    ? 'bg-[#9B0F06] text-white shadow-xs'
+                    : 'text-gray-500 hover:text-gray-800 hover:bg-gray-100'
+                }`}
+                title={`Ver ${num} columnas`}
+              >
+                {num}
+              </button>
+            ))}
+            <div className="w-px h-4 bg-gray-200 mx-0.5" />
             <button
               type="button"
               onClick={() => setVistaActiva('feed')}
-              className={`p-1.5 rounded transition-colors cursor-pointer ${
+              className={`h-7 w-7 flex items-center justify-center rounded text-[10px] font-bold transition-all cursor-pointer ${
                 vistaActiva === 'feed'
-                  ? 'bg-[#9B0F06]/10 text-[#9B0F06]'
-                  : 'text-gray-400 hover:text-gray-600'
+                  ? 'bg-[#9B0F06] text-white shadow-xs'
+                  : 'text-gray-500 hover:text-gray-800 hover:bg-gray-100'
               }`}
               title="Vista de lista"
             >
@@ -399,39 +650,40 @@ export default function FotografiasDetail() {
       ) : fotografiasFiltradas.length > 0 ? (
         <>
           {vistaActiva === 'grid' ? (
-            <FotografiaGrid fotos={fotosPaginadas} onFotoClick={handleSelectFoto} />
+            <FotografiaGrid fotos={fotosPaginadas} onFotoClick={handleSelectFoto} columnas={columnasGrid} />
           ) : (
             <FotografiaFeed fotos={fotosPaginadas} onFotoClick={(foto) => handleSelectFoto(foto, 0)} />
           )}
 
           {/* Barra de Paginación compartida */}
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-100 bg-white px-3 py-2.5 shadow-sm mt-4">
-            <div className="flex items-center gap-3">
-              <span className="text-[11px] text-gray-500 font-medium">Mostrar</span>
+          <div data-paginacion="true" className="paginacion-control font-[Poppins] flex flex-wrap items-center justify-between gap-2.5 rounded-xl border border-gray-100 bg-white px-3 py-2 shadow-2xs mt-3 text-[9.5px]">
+            <div className="flex items-center gap-1.5 sm:gap-2 text-[9.5px]">
+              <span className="text-gray-500 font-normal text-[9.5px]">Mostrar</span>
               <select 
                 value={porPagina} 
                 onChange={(e) => {
                   setPorPagina(Number(e.target.value))
                   setPaginaActual(1)
                 }}
-                className="h-6 rounded border border-gray-200 bg-gray-50 px-1 text-[11px] font-bold text-gray-700 focus:border-[#9B0F06] focus:outline-none cursor-pointer"
+                className="paginacion-control h-6 rounded border border-gray-200 bg-gray-50 px-1 text-[9.5px] font-normal text-gray-700 focus:border-[#9B0F06] focus:outline-none cursor-pointer font-[Poppins]"
               >
-                <option value={10}>10</option>
-                <option value={20}>20</option>
-                <option value={50}>50</option>
+                <option value={15} className="text-[9.5px] font-[Poppins]">15</option>
+                <option value={30} className="text-[9.5px] font-[Poppins]">30</option>
+                <option value={50} className="text-[9.5px] font-[Poppins]">50</option>
               </select>
-              <div className="h-4 w-px bg-gray-200 mx-1 hidden sm:block"></div>
-              <span className="text-[11px] font-semibold text-gray-600 hidden sm:inline">
-                Página {paginaActual} de {totalPaginas} ({fotografiasFiltradas.length} fotografías)
+              <div className="h-3 w-px bg-gray-200 mx-0.5"></div>
+              <span className="text-[9.5px] font-normal text-gray-600 font-[Poppins]">
+                Página {paginaActual} de {totalPaginas}
+                <span className="hidden sm:inline text-gray-400"> ({fotografiasFiltradas.length} fotografías)</span>
               </span>
             </div>
 
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 text-[9.5px]">
               <button
                 type="button"
                 onClick={() => setPaginaActual((p) => Math.max(1, p - 1))}
                 disabled={paginaActual === 1}
-                className="rounded-lg border border-gray-200 bg-white px-3 py-1 text-[11px] font-bold text-gray-600 transition-colors hover:border-[#9B0F06] hover:text-[#9B0F06] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+                className="rounded-lg border border-gray-200 bg-white px-2.5 py-0.5 text-[9.5px] font-normal text-gray-600 transition-colors hover:border-[#9B0F06] hover:text-[#9B0F06] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer font-[Poppins]"
               >
                 Anterior
               </button>
@@ -440,7 +692,7 @@ export default function FotografiasDetail() {
                 type="button"
                 onClick={() => setPaginaActual((p) => Math.min(totalPaginas, p + 1))}
                 disabled={paginaActual >= totalPaginas}
-                className="rounded-lg border border-gray-200 bg-white px-3 py-1 text-[11px] font-bold text-gray-600 transition-colors hover:border-[#9B0F06] hover:text-[#9B0F06] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+                className="rounded-lg border border-gray-200 bg-white px-2.5 py-0.5 text-[9.5px] font-normal text-gray-600 transition-colors hover:border-[#9B0F06] hover:text-[#9B0F06] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer font-[Poppins]"
               >
                 Siguiente
               </button>
@@ -478,4 +730,3 @@ export default function FotografiasDetail() {
     </div>
   )
 }
-

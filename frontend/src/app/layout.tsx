@@ -7,7 +7,7 @@ import CookieBanner from '@/components/ui/CookieBanner'
 
 const poppins = Poppins({
   subsets: ['latin'],
-  weight: ['400', '500', '600', '700', '800'],
+  weight: ['300', '400', '500', '600', '700', '800', '900'],
   display: 'swap',
   variable: '--font-poppins',
 })
@@ -15,19 +15,21 @@ const poppins = Poppins({
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
   themeColor: '#9B0F06',
 }
 
 export const metadata: Metadata = {
   title: {
-    default: 'DOMUN-Sistema | Control y Supervisión de Obras',
-    template: '%s | DOMUN-Sistema',
+    default: 'DOMUN | Sistema para la Gestión de Proyectos',
+    template: '%s - DOMUN',
   },
-  description: 'Plataforma integral de gestión de proyectos, estimaciones presupuestarias, bitácora de campo Libro Azul DGC y supervisión técnica de infraestructura.',
+  description: 'Plataforma integral para la gestión de proyectos, estimaciones presupuestarias, bitácora de campo Libro Azul DGC y supervisión técnica de infraestructura.',
   keywords: [
     'DOMUN',
-    'DOMUN-Sistema',
     'control de obras',
+    'gestión de proyectos',
     'supervisión de infraestructura',
     'hoja sábana DGC',
     'Libro Azul',
@@ -47,24 +49,25 @@ export const metadata: Metadata = {
     canonical: '/',
   },
   openGraph: {
-    title: 'DOMUN-Sistema | Control y Supervisión de Obras',
-    description: 'Plataforma integral de gestión de proyectos, estimaciones presupuestarias y supervisión técnica de infraestructura vial y civil.',
+    title: 'DOMUN | Sistema para la Gestión de Proyectos',
+    description: 'Plataforma integral para la gestión de proyectos, estimaciones presupuestarias y supervisión técnica de infraestructura.',
     url: 'https://domun.net',
-    siteName: 'DOMUN-Sistema',
+    siteName: 'DOMUN',
     locale: 'es_GT',
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'DOMUN-Sistema',
-    description: 'Sistema de control de obras y supervisión técnica DGC',
+    title: 'DOMUN',
+    description: 'Sistema para la gestión y supervisión de proyectos',
   },
   icons: {
     icon: [
-      { url: '/logo.ico' },
-      { url: '/icon.svg', type: 'image/svg+xml' },
+      { url: '/logo.png?v=3', type: 'image/png' },
+      { url: '/favicon.ico?v=3', type: 'image/x-icon' },
     ],
-    apple: '/logo.ico',
+    shortcut: '/logo.png?v=3',
+    apple: '/logo.png?v=3',
   },
   robots: {
     index: true,

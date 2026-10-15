@@ -13,16 +13,18 @@ interface IngenieroResponsableSelectProps {
   hasError?: boolean
   onAbrirCrearIngeniero?: () => void
   reloadTrigger?: number
+  excluirUsuarioId?: string
 }
 
 export function IngenieroResponsableSelect({
   value,
   onChange,
-  labelClass = 'block text-[9px] font-bold text-gray-700 uppercase tracking-wide',
+  labelClass = 'block text-[10px] md:text-[9px] font-bold text-gray-700 uppercase tracking-wide font-[Poppins]',
   className = '',
   hasError = false,
   onAbrirCrearIngeniero,
   reloadTrigger = 0,
+  excluirUsuarioId,
 }: IngenieroResponsableSelectProps) {
   const router = useRouter()
   const [ingenieros, setIngenieros] = useState<{ id: string; nombre: string; rol?: string }[]>([])
@@ -66,13 +68,15 @@ export function IngenieroResponsableSelect({
     cargarIngenieros()
   }, [reloadTrigger])
 
-  const options = ingenieros.map((d) => ({
-    value: d.id,
-    label: d.nombre,
-  }))
+  const options = ingenieros
+    .filter((d) => !excluirUsuarioId || d.id !== excluirUsuarioId)
+    .map((d) => ({
+      value: d.id,
+      label: d.nombre,
+    }))
 
   return (
-    <div className={className}>
+    <div className={`font-[Poppins] ${className}`}>
       <label className={labelClass}>Ingeniero Responsable / Director <span className="text-[#9B0F06]">*</span></label>
       <Combobox
         options={options}

@@ -1,10 +1,12 @@
 'use client';
 
-import { Mail, Phone, User, CreditCard, Building2, ChevronLeft } from 'lucide-react';
-import Link from 'next/link';
+import { ArrowLeft, Mail, GraduationCap } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 
 export default function SoportePage() {
+  const router = useRouter();
+
   const supportInfo = {
     name: 'Josue Daniel Figueroa Herrera',
     phone: '+502 56252922',
@@ -14,81 +16,139 @@ export default function SoportePage() {
     carneId: '5090-22-36',
   };
 
-  const contactItems = [
-    { label: 'Nombre', value: supportInfo.name, icon: User, color: 'red' },
-    { label: 'Telefono', value: supportInfo.phone, href: `tel:${supportInfo.phone}`, icon: Phone, color: 'blue' },
-    { label: 'Correo Personal', value: supportInfo.personalEmail, href: `mailto:${supportInfo.personalEmail}`, icon: Mail, color: 'purple' },
-    { label: 'Correo Universitario', value: supportInfo.universityEmail, href: `mailto:${supportInfo.universityEmail}`, icon: Mail, color: 'green' },
-    { label: 'Universidad', value: supportInfo.university, icon: Building2, color: 'yellow' },
-    { label: 'Carne', value: supportInfo.carneId, icon: CreditCard, color: 'indigo' },
-  ];
-
-  const colorClasses: Record<string, string> = {
-    red: 'bg-red-50 text-red-700',
-    blue: 'bg-blue-50 text-blue-700',
-    purple: 'bg-purple-50 text-purple-700',
-    green: 'bg-green-50 text-green-700',
-    yellow: 'bg-yellow-50 text-yellow-700',
-    indigo: 'bg-indigo-50 text-indigo-700',
-  };
-
   return (
-    <div className="h-full overflow-hidden bg-gray-50 px-6 py-6">
-      <div className="max-w-6xl">
-        <div className="mb-5">
-          <Link
-            href="/"
-            className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-red-700 transition-colors hover:text-red-800"
+    <div className="min-h-[calc(100vh-170px)] sm:min-h-[calc(100vh-140px)] flex flex-col justify-center py-4 sm:py-6 px-1.5 sm:px-3 max-w-[1200px] mx-auto font-[Poppins]">
+      {/* Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4 sm:mb-6">
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => router.back()}
+            className="p-2 hover:bg-gray-100 rounded-xl transition-colors text-gray-600 cursor-pointer"
+            title="Volver"
           >
-            <ChevronLeft size={16} />
-            Volver al inicio
-          </Link>
-          <h1 className="text-2xl font-bold text-gray-900">Soporte</h1>
-          <p className="mt-2 text-xs text-gray-500">Informacion de contacto y datos de perfil</p>
+            <ArrowLeft size={20} />
+          </button>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-extrabold text-gray-900 tracking-tight">Soporte</h1>
+            <p className="text-xs text-gray-500 font-medium">Información institucional y contacto del desarrollador</p>
+          </div>
         </div>
+      </div>
 
-        <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[1fr_320px]">
-          {/* Grid de datos del personal sin contenedor blanco ni borde exterior */}
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            {contactItems.map((item) => {
-              const Icon = item.icon;
-
-              return (
-                <div
-                  key={item.label}
-                  className="flex items-start gap-3 rounded-xl border border-gray-200/80 bg-white p-3.5 shadow-2xs transition-colors hover:border-gray-300"
-                >
-                  <div className={`rounded-lg p-2.5 shrink-0 ${colorClasses[item.color]}`}>
-                    <Icon size={17} />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{item.label}</p>
-                    {item.href ? (
-                      <a
-                        href={item.href}
-                        className="mt-0.5 block truncate text-sm font-semibold text-gray-900 transition-colors hover:text-red-700"
-                      >
-                        {item.value}
-                      </a>
-                    ) : (
-                      <p className="mt-0.5 text-sm font-semibold text-gray-900">{item.value}</p>
-                    )}
-                  </div>
+      {/* Grid: 2 cuadros apilados uno sobre el otro + Tarjeta con el Logo UMG en Grande al lado */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-stretch">
+        {/* Columna Izquierda: Los 2 cuadros de info uno encima del otro */}
+        <div className="lg:col-span-7 xl:col-span-8 flex flex-col gap-4 sm:gap-5 justify-between">
+          {/* Cuadro 1 - Información de Contacto */}
+          <div className="bg-white rounded-2xl p-5 sm:p-6 shadow-sm border border-gray-100 flex-1 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-2.5 mb-4 pb-3 border-b border-gray-100">
+                <div className="p-1.5 rounded-lg bg-red-50 text-[#9B0F06]">
+                  <Mail size={18} />
                 </div>
-              );
-            })}
+                <h3 className="text-base sm:text-[17px] font-bold text-gray-900">Información de Contacto</h3>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block">
+                    Teléfono
+                  </label>
+                  <a
+                    href={`tel:${supportInfo.phone}`}
+                    className="text-sm sm:text-base font-semibold text-gray-800 break-words mt-1 block hover:text-[#9B0F06] transition-colors"
+                  >
+                    {supportInfo.phone}
+                  </a>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block">
+                    Correo Personal
+                  </label>
+                  <a
+                    href={`mailto:${supportInfo.personalEmail}`}
+                    className="text-sm sm:text-base font-semibold text-gray-800 break-words mt-1 block hover:text-[#9B0F06] transition-colors"
+                  >
+                    {supportInfo.personalEmail}
+                  </a>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block">
+                    Correo Universitario
+                  </label>
+                  <a
+                    href={`mailto:${supportInfo.universityEmail}`}
+                    className="text-sm sm:text-base font-semibold text-gray-800 break-words mt-1 block hover:text-[#9B0F06] transition-colors"
+                  >
+                    {supportInfo.universityEmail}
+                  </a>
+                </div>
+              </div>
+            </div>
           </div>
 
-          {/* Logo UMG sin animación al pasar el cursor y un poco más pequeño */}
-          <div className="flex flex-col items-center justify-center p-4 min-h-[240px]">
-            <div className="relative w-44 h-44 md:w-48 md:h-48 drop-shadow-sm">
+          {/* Cuadro 2 - Información Institucional */}
+          <div className="bg-white rounded-2xl p-5 sm:p-6 shadow-sm border border-gray-100 flex-1 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-2.5 mb-4 pb-3 border-b border-gray-100">
+                <div className="p-1.5 rounded-lg bg-red-50 text-[#9B0F06]">
+                  <GraduationCap size={18} />
+                </div>
+                <h3 className="text-base sm:text-[17px] font-bold text-gray-900">Información Institucional</h3>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
+                <div className="sm:col-span-2">
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block">
+                    Universidad
+                  </label>
+                  <p className="text-sm sm:text-base font-semibold text-gray-800 break-words mt-1">
+                    {supportInfo.university}
+                  </p>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block">
+                    Carné
+                  </label>
+                  <p className="text-sm sm:text-base font-semibold text-gray-800 break-words mt-1">
+                    {supportInfo.carneId}
+                  </p>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block">
+                    Responsable
+                  </label>
+                  <p className="text-sm sm:text-base font-semibold text-gray-800 break-words mt-1">
+                    {supportInfo.name}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Columna Derecha: Tarjeta con el Logo UMG en Grande */}
+        <div className="lg:col-span-5 xl:col-span-4 flex">
+          <div className="w-full bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center relative overflow-hidden">
+            <div className="relative w-44 h-44 sm:w-52 sm:h-52 md:w-56 md:h-56">
               <Image
                 src="/logoumg.png"
                 alt="Logo UMG"
                 fill
+                sizes="(max-width: 768px) 220px, 260px"
                 style={{ objectFit: 'contain' }}
                 priority
               />
+            </div>
+            <div className="mt-4 text-center">
+              <h3 className="text-lg sm:text-xl font-bold text-gray-800">{supportInfo.name}</h3>
+              <p className="text-xs text-gray-500 mt-1 max-w-xs">
+                Universidad Mariano Gálvez de Guatemala
+              </p>
             </div>
           </div>
         </div>

@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { apiGetDeduplicado } from '@/lib/api/cliente'
+import { formatearNombrePropio } from '@/lib/utils/formatters'
 
 interface UserProfile {
   id: string
@@ -33,13 +34,60 @@ interface AuthState {
 // Global promise to prevent duplicate concurrent fetches
 let profilePromise: Promise<any> | null = null;
 
+const PERFIL_STORAGE_KEY = 'domun_user_profile'
+
+function normalizarPerfil(p: any): UserProfile | null {
+  if (!p) return null
+  return {
+    ...p,
+    nombre: formatearNombrePropio(p.nombre),
+    apellido: formatearNombrePropio(p.apellido),
+    primerNombre: formatearNombrePropio(p.primerNombre),
+    segundoNombre: formatearNombrePropio(p.segundoNombre),
+    primerApellido: formatearNombrePropio(p.primerApellido),
+    segundoApellido: formatearNombrePropio(p.segundoApellido),
+  }
+}
+
+function getInitialProfile(): UserProfile | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = localStorage.getItem(PERFIL_STORAGE_KEY)
+    if (raw) return normalizarPerfil(JSON.parse(raw))
+  } catch (_) {}
+  return null
+}
+
+const initialProfile = getInitialProfile()
+
 export const useAuthStore = create<AuthState>((set, get) => ({
-  profile: null,
-  loading: true,
+  profile: initialProfile,
+  loading: !initialProfile,
   error: null,
   fetchProfile: async (retries = 3, force = false) => {
+    // Si ya tenemos perfil en memoria/storage y no es forzado, no bloqueamos la interfaz
     if (!force && get().profile) {
       set({ loading: false })
+      // Validamos en background silenciosamente si no hay promesa previa
+      if (!profilePromise) {
+        profilePromise = (async () => {
+          try {
+            const res = await apiGetDeduplicado('/auth/perfil', { bypassCache: false })
+            if (res.data?.success && res.data?.data) {
+              const freshData = normalizarPerfil(res.data.data)!
+              try { localStorage.setItem(PERFIL_STORAGE_KEY, JSON.stringify(freshData)) } catch (_) {}
+              set({ profile: freshData, loading: false })
+            }
+          } catch (err: any) {
+            if (err.response?.status === 401 || err.response?.status === 403) {
+              try { localStorage.removeItem(PERFIL_STORAGE_KEY) } catch (_) {}
+              set({ profile: null, loading: false })
+            }
+          } finally {
+            profilePromise = null
+          }
+        })()
+      }
       return
     }
 
@@ -57,7 +105,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       try {
         const res = await apiGetDeduplicado('/auth/perfil', { bypassCache: force })
         if (res.data?.success && res.data?.data) {
-          return res.data.data
+          const freshData = normalizarPerfil(res.data.data)!
+          try { localStorage.setItem(PERFIL_STORAGE_KEY, JSON.stringify(freshData)) } catch (_) {}
+          return freshData
         }
         throw new Error('No profile data')
       } catch (err: any) {
@@ -67,6 +117,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         if (!isAuthError && attemptsLeft > 0) {
           console.warn(`[fetchProfile] Network/Timeout error, reintentando... (${attemptsLeft} intentos restantes)`)
           return fetchWithRetry(attemptsLeft - 1)
+        }
+        if (isAuthError) {
+          try {
+            localStorage.removeItem(PERFIL_STORAGE_KEY)
+            localStorage.removeItem('domun_notificaciones_borradas')
+            sessionStorage.removeItem('domun_notificaciones_borradas')
+          } catch (_) {}
         }
         throw err
       }
