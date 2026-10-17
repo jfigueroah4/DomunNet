@@ -79,7 +79,6 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [notificationsVisible, setNotificationsVisible] = useState(false)
   const [unreadCount, setUnreadCount] = useState<number>(0)
-  const [notificacionesTickets, setNotificacionesTickets] = useState<any[]>([])
   const [notificacionesSabana, setNotificacionesSabana] = useState<any[]>([])
   const [notificacionesBackup, setNotificacionesBackup] = useState<any[]>([])
   const [openTicketsCount, setOpenTicketsCount] = useState<number>(0)
@@ -258,8 +257,6 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
         if (notifsBorradas) {
           setNotificacionesBackup([])
           setNotificacionesSabana([])
-          setNotificacionesTickets([])
-          setOpenTicketsCount(0)
           setUnreadCount(0)
           return
         }
@@ -368,8 +365,7 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
 
         setNotificacionesSabana(sabanaNotifs)
 
-        // 3. TICKETS DE SOPORTE
-        let ticketsNotifs: any[] = []
+        // 3. CONTEO DE TICKETS DE SOPORTE (exclusivo para el botón de Tickets)
         let openTickets = 0
         const stored = localStorage.getItem('domun_support_tickets')
         if (stored) {
@@ -378,23 +374,12 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
             if (Array.isArray(rawTickets)) {
               const tickets = rawTickets.filter((t: any) => esReciente2Dias(t.createdAt))
               openTickets = tickets.filter((t: any) => t.status !== 'cerrado').length
-              ticketsNotifs = tickets.map((t: any) => ({
-                id: t.id,
-                title: t.status === 'abierto' ? `Nuevo ticket: ${t.title}` : `Ticket ${t.status.replace(/_/g, ' ')}: ${t.title}`,
-                author: t.createdBy,
-                status: t.status,
-                time: t.createdAt,
-                link: '/dashboard/tickets',
-                tipo: 'ticket',
-              }))
             }
           } catch {}
         }
         setOpenTicketsCount(openTickets)
-        setNotificacionesTickets(ticketsNotifs)
       } catch {
         setOpenTicketsCount(0)
-        setNotificacionesTickets([])
         setNotificacionesSabana([])
         setNotificacionesBackup([])
         setUnreadCount(0)
@@ -412,10 +397,10 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
     }
   }, [puedeVerBackupNotif, dynamicSearchItems, proyectosCargados, proyectosValidos])
 
-  // Desduplicación unificada de todas las fuentes de notificaciones
+  // Desduplicación unificada de alertas de sistema, obras y backup (tickets van en su propio botón)
   const notificacionesUnificadas = useMemo(() => {
     const mapa = new Map<string, any>()
-    const todas = [...notificacionesBackup, ...notificacionesSabana, ...notificacionesTickets]
+    const todas = [...notificacionesBackup, ...notificacionesSabana]
     for (const n of todas) {
       if (!n || !n.title) continue
       const proy = String(n.proyectoId || '').trim().toLowerCase()
@@ -431,7 +416,7 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
       }
     }
     return Array.from(mapa.values())
-  }, [notificacionesBackup, notificacionesSabana, notificacionesTickets])
+  }, [notificacionesBackup, notificacionesSabana])
 
   useEffect(() => {
     setUnreadCount(notificacionesUnificadas.length)
@@ -465,7 +450,6 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
       console.warn('Error borrando notificaciones:', err)
     }
     setNotificacionesSabana([])
-    setNotificacionesTickets([])
     setNotificacionesBackup([])
     setUnreadCount(0)
   }
@@ -658,23 +642,19 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
 
                 <div className="max-h-64 overflow-y-auto divide-y divide-gray-100">
                   {notificacionesUnificadas.length > 0 ? (
-                    notificacionesUnificadas.slice(0, 8).map((notif: any) => {
-                      const esVencimientoHoy = notif.tipo === 'vencimiento_hoy'
-                      return (
-                        <button
-                          key={notif.id}
+                    notificacionesUnificadas.slice(0, 8).map((notif: any) => (
+                      <button
+                        key={notif.id}
                           onClick={() => {
                             closeNotifications()
-                            router.push(notif.link || '/dashboard/tickets')
+                            router.push(notif.link || '/dashboard')
                           }}
                           className="w-full text-left p-3 hover:bg-gray-50 transition-colors flex items-start gap-2.5 cursor-pointer border-b border-gray-100 text-gray-800 bg-white"
                         >
                           {notif.tipo === 'backup_programado' ? (
                             <HardDrive size={15} className="text-[#9B0F06] shrink-0 mt-0.5" />
-                          ) : esVencimientoHoy || notif.tipo === 'hoja_sabana' ? (
-                            <AlertTriangle size={15} className="text-amber-500 shrink-0 mt-0.5" />
                           ) : (
-                            <Ticket size={15} className="text-[#9B0F06] shrink-0 mt-0.5" />
+                            <AlertTriangle size={15} className="text-amber-500 shrink-0 mt-0.5" />
                           )}
                           <div className="min-w-0 flex-1">
                             <p className="text-[10.5px] font-bold text-gray-800 leading-tight">
@@ -685,8 +665,7 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
                             </p>
                           </div>
                         </button>
-                      )
-                    })
+                    ))
                   ) : (
                     <div className="px-4 py-7 text-center flex flex-col items-center justify-center">
                       <Bell size={20} className="text-gray-300 mb-2 transition-transform duration-500 hover:rotate-12" />
