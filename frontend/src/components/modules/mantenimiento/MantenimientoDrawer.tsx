@@ -3210,8 +3210,6 @@ export default function MantenimientoDrawer({
     }
   }
 
-  if (!isOpen) return null
-
   const isReadOnly = mode === 'view'
   const tableTitle = tableFriendlyName || table.replace(/_/g, ' ')
 
@@ -3221,6 +3219,8 @@ export default function MantenimientoDrawer({
       .filter((ref): ref is string => Boolean(ref) && ref !== table)
     return Array.from(new Set(refs))
   }, [schema, table])
+
+  if (!isOpen) return null
 
   return (
     <>

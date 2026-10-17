@@ -18,13 +18,13 @@ export const USE_MOCK = false
 
 export const proyectoService = {
   getProyectoReal: async (slug: string) => {
-    const res = await apiGetDeduplicado(`/proyectos/${slug}`, { bypassCache: true })
+    const res = await apiGetDeduplicado(`/proyectos/${slug}`)
     return res?.data?.data
   },
 
   getProyectoBySlug: async (slug: string): Promise<ProyectoType | undefined> => {
     try {
-      const res = await apiGetDeduplicado(`/proyectos/${slug}`, { bypassCache: true })
+      const res = await apiGetDeduplicado(`/proyectos/${slug}`)
       const data = res?.data
       if (data && data.success && data.data) {
         const raw = data.data

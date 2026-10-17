@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useCustomToast } from '@/hooks/useCustomToast';
-import { Eye, EyeOff, User, Lock, Info, X, ChevronDown, Trash2 } from 'lucide-react';
+import { Eye, EyeOff, User, Lock, Info, X, ChevronDown, Trash2, ShieldAlert, Laptop, Smartphone } from 'lucide-react';
 import LoginInput from '@/components/ui/LoginInput';
 import LoginButton from '@/components/ui/LoginButton';
 import PasswordRecoveryModal from '@/components/modals/PasswordRecoveryModal';
@@ -12,6 +12,36 @@ import SupportModal from '@/components/modals/SupportModal';
 import { api } from '@/lib/api/cliente';
 
 import { useRef } from 'react';
+
+function getOrCreateDeviceId(): string {
+  if (typeof window === 'undefined') return 'dev_ssr';
+  let id = localStorage.getItem('domun_device_id');
+  if (!id) {
+    id = 'dev_' + Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+    localStorage.setItem('domun_device_id', id);
+  }
+  return id;
+}
+
+function detectarDispositivoCliente(): string {
+  if (typeof window === 'undefined') return 'Navegador Web';
+  const ua = navigator.userAgent.toLowerCase();
+  let so = 'Dispositivo';
+  if (ua.includes('iphone')) so = 'iPhone';
+  else if (ua.includes('ipad')) so = 'iPad';
+  else if (ua.includes('android')) so = 'Android';
+  else if (ua.includes('windows nt 10.0') || ua.includes('windows')) so = 'Windows PC';
+  else if (ua.includes('macintosh') || ua.includes('mac os')) so = 'Mac';
+  else if (ua.includes('linux')) so = 'Linux';
+
+  let nav = 'Navegador';
+  if (ua.includes('edg/')) nav = 'Edge';
+  else if (ua.includes('chrome/')) nav = 'Chrome';
+  else if (ua.includes('firefox/')) nav = 'Firefox';
+  else if (ua.includes('safari/')) nav = 'Safari';
+
+  return `${so} (${nav})`;
+}
 
 type AccesoRapido = {
   id: string
@@ -86,6 +116,13 @@ export default function LoginPage() {
   const [isSupportOpen, setIsSupportOpen] = useState(false);
   const [isQuickAccessOpen, setIsQuickAccessOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [modalLimiteDispositivosOpen, setModalLimiteDispositivosOpen] = useState(false);
+  const [dispositivosActivos, setDispositivosActivos] = useState<Array<{
+    id: string;
+    dispositivo: string;
+    ip: string;
+    fechaHora: string;
+  }>>([]);
   const [rememberedAccounts, setRememberedAccounts] = useState<SavedAccount[]>([]);
   const [showRememberedDropdown, setShowRememberedDropdown] = useState(false);
 
@@ -150,11 +187,28 @@ export default function LoginPage() {
     }, 50);
   };
 
-  const iniciarSesion = async (identificador: string, contrasena: string, formElement?: HTMLFormElement) => {
-    await api.post('/auth/iniciar-sesion', {
+  const iniciarSesion = async (
+    identificador: string,
+    contrasena: string,
+    formElement?: HTMLFormElement,
+    cerrarOtrasSesiones?: boolean
+  ) => {
+    const deviceId = getOrCreateDeviceId();
+    const dispositivo = detectarDispositivoCliente();
+
+    const res = await api.post('/auth/iniciar-sesion', {
       correo: identificador,
       contrasena,
+      deviceId,
+      dispositivo,
+      cerrarOtrasSesiones: Boolean(cerrarOtrasSesiones),
     });
+
+    const token = res.data?.data?.token;
+    if (token && typeof document !== 'undefined') {
+      const isHttps = window.location.protocol === 'https:';
+      document.cookie = `token=${token}; path=/; max-age=${8 * 60 * 60}; SameSite=Lax; ${isHttps ? 'Secure;' : ''}`;
+    }
 
     showSuccessToast("¡Sesión iniciada correctamente!");
     localStorage.removeItem('domun_failed_login_attempts');
@@ -284,6 +338,13 @@ export default function LoginPage() {
         return;
       }
 
+      if (status === 409 || error?.response?.data?.codigo === 'LIMITE_DISPOSITIVOS_ALCANZADO') {
+        const activos = error?.response?.data?.data?.dispositivosActivos || [];
+        setDispositivosActivos(activos);
+        setModalLimiteDispositivosOpen(true);
+        return;
+      }
+
       if (status === 403 || (serverMsg && serverMsg.toLowerCase().includes('desactivad'))) {
         showErrorToast(serverMsg || 'Su cuenta se encuentra desactivada. Contacte al administrador.');
         return;
@@ -318,6 +379,18 @@ export default function LoginPage() {
       } else {
         showErrorToast(serverMsg || 'Error al iniciar sesión. Intenta de nuevo.');
       }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleForzarInicioSesion = async () => {
+    setIsSubmitting(true);
+    try {
+      await iniciarSesion(username, password, undefined, true);
+      setModalLimiteDispositivosOpen(false);
+    } catch (err: any) {
+      showErrorToast(err?.response?.data?.mensaje || 'Error al iniciar sesión.');
     } finally {
       setIsSubmitting(false);
     }
@@ -777,6 +850,103 @@ export default function LoginPage() {
         isOpen={isSupportOpen}
         onClose={() => setIsSupportOpen(false)}
       />
+
+      {/* MODAL DE LÍMITE DE DISPOSITIVOS ALCANZADO (MÁXIMO 2) */}
+      {modalLimiteDispositivosOpen && (
+        <div
+          className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/75 p-4 backdrop-blur-xs font-[Poppins] animate-in fade-in duration-200"
+          onClick={() => setModalLimiteDispositivosOpen(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl bg-white p-5 sm:p-6 shadow-2xl border border-gray-100 space-y-4 animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start gap-3.5">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-100 text-amber-700 shrink-0">
+                <ShieldAlert size={24} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-extrabold text-gray-900 leading-tight">
+                    Límite de Dispositivos Alcanzado
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setModalLimiteDispositivosOpen(false)}
+                    className="p-1 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700 cursor-pointer"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+                <p className="text-[11px] text-gray-500 mt-0.5">
+                  Máximo <strong>2 dispositivos simultáneos</strong> permitidos por cuenta.
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs text-gray-600 leading-relaxed">
+              Tu cuenta ya tiene <strong>2 sesiones activas</strong> en otros dispositivos. Por políticas de seguridad, no es posible iniciar sesión en un tercer equipo sin cerrar una sesión previa:
+            </p>
+
+            {/* Listado de Dispositivos Activos */}
+            <div className="rounded-xl border border-gray-200 bg-gray-50/70 p-3 space-y-2">
+              <p className="text-[9.5px] font-bold uppercase tracking-wider text-gray-500">
+                Sesiones actualmente abiertas ({dispositivosActivos.length || 2} de 2):
+              </p>
+              {dispositivosActivos.length > 0 ? (
+                dispositivosActivos.map((d, idx) => (
+                  <div key={d.id || idx} className="flex items-center gap-2.5 bg-white p-2.5 rounded-lg border border-gray-200/80 shadow-2xs text-xs">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-red-50 text-[#9B0F06] shrink-0">
+                      {d.dispositivo?.toLowerCase().includes('iphone') || d.dispositivo?.toLowerCase().includes('android') ? (
+                        <Smartphone size={14} />
+                      ) : (
+                        <Laptop size={14} />
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-bold text-gray-800 text-[11px] truncate">
+                        {d.dispositivo || `Dispositivo ${idx + 1}`}
+                      </p>
+                      <p className="text-[9.5px] text-gray-400">
+                        IP: {d.ip || 'Red'} {d.fechaHora ? `· Conectado: ${new Date(d.fechaHora).toLocaleDateString([], { day: '2-digit', month: '2-digit' })} ${new Date(d.fechaHora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="flex items-center gap-2 bg-white p-2.5 rounded-lg border border-gray-200/80 text-xs text-gray-600">
+                  <Laptop size={14} className="text-[#9B0F06]" />
+                  <span>2 dispositivos remotos conectados</span>
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-xl bg-amber-50/80 border border-amber-200 p-2.5 text-[11px] text-amber-900 leading-snug">
+              ¿Deseas cerrar las sesiones en los otros dispositivos para poder ingresar inmediatamente en este equipo?
+            </div>
+
+            {/* Acciones */}
+            <div className="flex flex-col-reverse sm:flex-row items-center justify-end gap-2 pt-2 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setModalLimiteDispositivosOpen(false)}
+                className="w-full sm:w-auto px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer text-center"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleForzarInicioSesion}
+                disabled={isSubmitting}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-[#9B0F06] hover:bg-[#7a0c05] rounded-xl shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+              >
+                <ShieldAlert size={14} />
+                <span>Cerrar otras sesiones e ingresar</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

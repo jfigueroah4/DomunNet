@@ -94,7 +94,7 @@ export function debeMostrarMontoYAvance(proyecto: any): boolean {
 
 /**
  * Regla de negocio: En el módulo de proyectos, solo se pueden eliminar los proyectos
- * que estén en modo borrador y que no tengan ningún registro de bitácora vinculado.
+ * que estén en modo borrador. La eliminación limpia sus registros asociados.
  */
 export function esProyectoEliminable(proyecto: any): { puedeEliminar: boolean; motivo: string } {
   if (!proyecto) return { puedeEliminar: false, motivo: 'Proyecto no encontrado' }
@@ -105,15 +105,6 @@ export function esProyectoEliminable(proyecto: any): { puedeEliminar: boolean; m
       motivo: `Solo proyectos en modo Borrador pueden eliminarse (estado: ${estado || 'no definido'})`,
     }
   }
-  const totalBitacoras = Number(proyecto.totalBitacoras || 0)
-  const tieneBitacoras = Boolean(proyecto.tieneBitacoras || totalBitacoras > 0)
-  if (tieneBitacoras) {
-    return {
-      puedeEliminar: false,
-      motivo: `Tiene ${totalBitacoras > 0 ? totalBitacoras : ''} registro(s) de bitácora vinculado(s)`,
-    }
-  }
   return { puedeEliminar: true, motivo: '' }
 }
-
 

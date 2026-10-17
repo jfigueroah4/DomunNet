@@ -475,7 +475,8 @@ export function ProyectoTimeline({
 
   // Datos KPI Adaptados Dinámicamente al Proyecto
   const esBorrador = (proyecto?.estado || '').toLowerCase() === 'borrador'
-  const avanceGlobal = esBorrador ? 0 : (avanceGeneral ?? proyecto?.avance ?? 0)
+  const avanceCalculadoDirecto = Number(avanceGeneral ?? proyecto?.avance ?? (proyecto as any)?.avanceFisico ?? 0)
+  const avanceGlobal = avanceCalculadoDirecto > 0 ? avanceCalculadoDirecto : (esBorrador ? 0 : (avanceGeneral ?? proyecto?.avance ?? 0))
 
   // Parámetros de proyecto dinámicos con fallbacks (0.45, 0.12, 0.20)
   const paramsProj = (proyecto as any)?.parametro_proyecto || (proyecto as any)?.parametroProyecto || (proyecto as any)?.parametro || {}
@@ -818,9 +819,9 @@ export function ProyectoTimeline({
         {/* BARRAS DE PROGRESO POR CAPÍTULO */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[10px]">
           {CAPITULOS_LIBRO_AZUL.map((cap) => {
-            const renglonesCap = renglones.filter((r) => r.capituloId === cap.id)
-            const subtotalCap = renglonesCap.reduce((sum, r) => sum + (r.cantidadContratada || 0) * (r.costoUnitarioDirecto || 0), 0)
-            const pctAvanceCap = (esBorrador || avanceGlobal === 0) ? 0 : Math.min(100, Math.max(0, Math.round(avanceGlobal)))
+            const metaCap = renglonesCap.reduce((sum, r) => sum + (Number(r.cantidadAjustada && r.cantidadAjustada > 0 ? r.cantidadAjustada : (r.cantidadContratada || 0)) * (Number(r.costoUnitarioDirecto) || 0)), 0)
+            const ejecCap = renglonesCap.reduce((sum, r) => sum + (Math.min(Number(r.cantidadAjustada && r.cantidadAjustada > 0 ? r.cantidadAjustada : (r.cantidadContratada || 0)), Number((r as any).cantidadEjecutada || 0)) * (Number(r.costoUnitarioDirecto) || 0)), 0)
+            const pctAvanceCap = metaCap > 0 ? Math.min(100, Math.round((ejecCap / metaCap) * 100)) : (avanceGlobal > 0 ? Math.round(avanceGlobal) : 0)
 
             return (
               <div key={cap.id} className="rounded-lg border border-gray-200 bg-gray-50/60 p-2.5 space-y-1.5">

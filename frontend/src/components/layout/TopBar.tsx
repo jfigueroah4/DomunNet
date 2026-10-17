@@ -803,7 +803,12 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
                     try {
                       localStorage.removeItem('domun_notificaciones_borradas')
                       sessionStorage.removeItem('domun_notificaciones_borradas')
-                      await api.post('/auth/cerrar-sesion')
+                      localStorage.removeItem('domun_user_profile')
+                      if (typeof document !== 'undefined') {
+                        document.cookie = 'token=; path=/; max-age=0'
+                      }
+                      const devId = localStorage.getItem('domun_device_id')
+                      await api.post('/auth/cerrar-sesion', { deviceId: devId })
                     } catch (e) {
                       console.error('Error al cerrar sesión:', e)
                     }

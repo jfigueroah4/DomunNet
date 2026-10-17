@@ -75,6 +75,15 @@ function extraerCorreoDeTexto(tel?: string): string {
 function parseActaString(actaStr?: string): { numero: string; fecha: string } {
   if (!actaStr) return { numero: '', fecha: '' }
   const clean = actaStr.trim()
+  const fechaOnly = clean.match(/^Fecha\s*:?\s*([\d\-\/]+)$/i)
+  if (fechaOnly) {
+    let rawFecha = fechaOnly[1]
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(rawFecha)) {
+      const [d, mo, y] = rawFecha.split('/')
+      rawFecha = `${y}-${mo.padStart(2, '0')}-${d.padStart(2, '0')}`
+    }
+    return { numero: '', fecha: rawFecha }
+  }
   const m = clean.match(/(?:Acta\s*(?:No\.?)?\s*)?([A-Za-z0-9\-_./]+)\s+de\s+fecha\s+([\d\-\/]+)/i)
   if (m) {
     const rawNum = m[1].trim()
@@ -438,6 +447,7 @@ function EditableInfoField({
   placeholder,
   userOptions,
   onEmptyUserAction,
+  clamp,
 }: {
   label: string
   value?: string | number | null
@@ -452,6 +462,7 @@ function EditableInfoField({
   placeholder?: string
   userOptions?: { value: string; label: string }[]
   onEmptyUserAction?: () => void
+  clamp?: number
 }) {
   const [localInput, setLocalInput] = useState<string | null>(null)
 
@@ -578,6 +589,17 @@ function EditableInfoField({
         className={`mt-0.5 text-[11px] font-semibold leading-tight ${mono ? 'font-mono' : ''} ${
           highlight ? 'text-[#9B0F06]' : 'text-gray-800'
         }`}
+        style={
+          clamp
+            ? {
+                display: '-webkit-box',
+                WebkitLineClamp: clamp,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+              }
+            : undefined
+        }
+        title={clamp && value ? String(value) : undefined}
       >
         {value !== undefined && value !== null && value !== '' ? value : '-'}
       </p>
@@ -772,6 +794,7 @@ function obtenerValoresCompletosProyecto(p?: ProyectoType | any): Record<string,
     empresaContratista: p.empresaContratista || cEjec.empresaNombre || pAny.empresa_contratista || '',
     empresaSupervisora: p.empresaSupervisora || cSup.empresaNombre || pAny.empresa_supervisora || '',
     delegadoResidente: p.delegadoResidente || cSup.responsable || pAny.delegadoResidente || pAny.delegado_residente || '',
+    delegadoResidenteId: pAny.delegadoResidenteId || pAny.delegado_residente_id || '',
 
     // Contrato Resumen
     fechaAdjudicacion: p.fechaAdjudicacion || pAny.fecha_adjudicacion || '',
@@ -795,7 +818,7 @@ function obtenerValoresCompletosProyecto(p?: ProyectoType | any): Record<string,
     actaInicioNumeroEjecutora: pAny.actaInicioNumeroEjecutora || parsedActaEjec.numero,
     actaInicioFechaEjecutora: pAny.actaInicioFechaEjecutora || parsedActaEjec.fecha,
     superintendente: cEjec.responsable || pAny.superintendente || '',
-    colegiadoSuperintendente: pAny.colegiadoSuperintendente || '',
+    colegiadoSuperintendente: cEjec.colegiadoActivoSuperintendente || pAny.colegiadoActivoSuperintendente || pAny.colegiadoSuperintendente || '',
     telefonoContratista: limpiarTelefono(cEjec.telefono || pAny.telefonoContratista) || '',
     correoContratista: cEjec.correo || pAny.correoContratista || extraerCorreoDeTexto(cEjec.telefono || pAny.telefonoContratista) || '',
 
@@ -844,6 +867,56 @@ function obtenerValoresCompletosProyecto(p?: ProyectoType | any): Record<string,
     direccionFin: p.direccionFin || pAny.direccion_fin || '',
     kilometroInicio: pAny.kilometroInicio ?? pAny.kilometro_inicio ?? '',
     kilometroFin: pAny.kilometroFin ?? pAny.kilometro_fin ?? '',
+
+    // Contratos explícitos unificados
+    contratoEjecucion: {
+      ...cEjec,
+      licitacionNumero: cEjec.licitacionNumero || pAny.licitacionEjecutora || '',
+      registroMercantil: cEjec.registroMercantil || pAny.registroMercantilContratista || '',
+      empresaNombre: cEjec.empresaNombre || p.empresaContratista || pAny.empresa_contratista || '',
+      propietario: cEjec.propietario || pAny.propietarioContratista || '',
+      direccion: cEjec.direccion || pAny.direccionContratista || '',
+      telefono: cEjec.telefono || pAny.telefonoContratista || '',
+      correo: cEjec.correo || pAny.correoContratista || '',
+      responsable: cEjec.responsable || pAny.superintendente || '',
+      colegiadoActivoSuperintendente: cEjec.colegiadoActivoSuperintendente || pAny.colegiadoActivoSuperintendente || pAny.colegiadoSuperintendente || '',
+      actaInicioNumero: cEjec.actaInicioNumero || pAny.actaInicioEjecutora || '',
+      programa: cEjec.programa || pAny.programaObra || '',
+      subprograma: cEjec.subprograma || pAny.subprogramaObra || '',
+      fuenteFinanciamiento: cEjec.fuenteFinanciamiento || pAny.fuenteFinanciamientoObra || '',
+      partidaFondos: cEjec.partidaFondos || pAny.partidaFondosObra || '',
+      cdp: cEjec.cdp || pAny.cdpObra || '',
+      contratoNumero: cEjec.contratoNumero || pAny.numeroContratoOriginal || '',
+      acuerdoMinisterial: cEjec.acuerdoMinisterial || pAny.acuerdoMinisterialOriginal || '',
+      montoOriginal: montoObra,
+      porcentajeAnticipo: pctAnticipoObra,
+      plazoMesesDetalle: cEjec.plazoMesesDetalle || pAny.mesesContratadosObra || '',
+      fechaFin: cEjec.fechaFin || pAny.fechaTerminacionOriginalObra || '',
+    },
+    contratoSupervision: {
+      ...cSup,
+      licitacionNumero: cSup.licitacionNumero || pAny.licitacionSupervisora || '',
+      registroMercantil: cSup.registroMercantil || pAny.registroMercantilSupervisora || '',
+      empresaNombre: cSup.empresaNombre || p.empresaSupervisora || pAny.empresa_supervisora || '',
+      propietario: cSup.propietario || pAny.propietarioSupervisora || '',
+      direccion: cSup.direccion || pAny.direccionSupervisora || '',
+      telefono: cSup.telefono || pAny.telefonoSupervisora || '',
+      correo: cSup.correo || pAny.correoSupervisora || '',
+      responsable: cSup.responsable || pAny.responsableSupervisora || p.delegadoResidente || pAny.delegadoResidente || '',
+      actaInicioNumero: cSup.actaInicioNumero || pAny.actaInicioSupervisora || '',
+      programa: cSup.programa || pAny.programaSupervisora || '',
+      subprograma: cSup.subprograma || pAny.subprogramaSupervisora || '',
+      fuenteFinanciamiento: cSup.fuenteFinanciamiento || pAny.fuenteFinanciamientoSupervisora || '',
+      partidaFondos: cSup.partidaFondos || pAny.partidaFondosSupervisora || '',
+      cdp: cSup.cdp || pAny.cdpSupervisora || '',
+      contratoNumero: cSup.contratoNumero || pAny.contratoSupervisora || '',
+      acuerdoMinisterial: cSup.acuerdoMinisterial || pAny.acuerdoSupervisora || '',
+      montoOriginal: montoSup,
+      porcentajeAnticipo: pctAnticipoSup,
+      fechaInicio: cSup.fechaInicio || pAny.fechaInicioSupervisora || '',
+      plazoMesesDetalle: cSup.plazoMesesDetalle || pAny.mesesContratadosSupervisora || '',
+      fechaFin: cSup.fechaFin || pAny.fechaFinSupervisora || '',
+    },
   }
 }
 
@@ -870,26 +943,6 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
       setProyecto(initialProyecto)
     }
   }, [initialProyecto])
-
-  useEffect(() => {
-    const slug = initialProyecto?.id || (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('slug') : null)
-    if (!slug) return
-
-    api.get(`/proyectos/${slug}`)
-      .then((res) => {
-        if (res.data?.data) {
-          const raw = res.data.data
-          setProyecto((prev) => ({
-            ...(prev || {}),
-            ...raw,
-            estado: (raw.estado || 'activo').toLowerCase() as any,
-          }))
-        }
-      })
-      .catch((err) => {
-        console.warn('Error sincronizando proyecto en detalle:', err)
-      })
-  }, [initialProyecto?.id])
 
   const handleActivarProyectoDirecto = async () => {
     if (!proyecto?.id) return
@@ -939,8 +992,11 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
         unidad: r.unidad || 'm³',
         capituloId: r.capituloId || 1,
         capituloNombre: r.capituloNombre || '',
-        cantidadContratada: r.cantidadContratada ?? 1,
-        costoUnitarioDirecto: r.costoUnitarioDirecto ?? 0,
+        cantidadContratada: Number(r.cantidadContratada ?? r.cantidad_contractual ?? 1),
+        cantidadContractual: Number(r.cantidadContractual ?? r.cantidadContratada ?? r.cantidad_contractual ?? 1),
+        cantidadAjustada: Number(r.cantidadAjustada ?? r.cantidad_ajustada ?? r.cantidadContratada ?? 1),
+        cantidadEjecutada: Number(r.cantidadEjecutada ?? r.cantidad_ejecutada ?? 0),
+        costoUnitarioDirecto: Number(r.costoUnitarioDirecto ?? r.precio_unitario_directo ?? 0),
         esPersonalizado: Boolean(r.esPersonalizado),
         seleccionado: r.seleccionado !== false,
       }))
@@ -960,8 +1016,11 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
             unidad: r.unidad || 'm³',
             capituloId: r.capituloId || 1,
             capituloNombre: r.capituloNombre || '',
-            cantidadContratada: r.cantidadContratada ?? 1,
-            costoUnitarioDirecto: r.costoUnitarioDirecto ?? 0,
+            cantidadContratada: Number(r.cantidadContratada ?? r.cantidad_contractual ?? 1),
+            cantidadContractual: Number(r.cantidadContractual ?? r.cantidadContratada ?? r.cantidad_contractual ?? 1),
+            cantidadAjustada: Number(r.cantidadAjustada ?? r.cantidad_ajustada ?? r.cantidadContratada ?? 1),
+            cantidadEjecutada: Number(r.cantidadEjecutada ?? r.cantidad_ejecutada ?? 0),
+            costoUnitarioDirecto: Number(r.costoUnitarioDirecto ?? r.precio_unitario_directo ?? 0),
             esPersonalizado: Boolean(r.esPersonalizado),
             seleccionado: r.seleccionado !== false,
           }))
@@ -1061,10 +1120,10 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
   const [memberToDelete, setMemberToDelete] = useState<{ id: string; nombre: string; rol: string } | null>(null)
   const [isEquipoModalOpen, setIsEquipoModalOpen] = useState(false)
   const [usuariosDisponibles, setUsuariosDisponibles] = useState<any[]>([])
+  const [delegadosResidenteList, setDelegadosResidenteList] = useState<any[]>([])
   const [selectedUsuarioIdParaEquipo, setSelectedUsuarioIdParaEquipo] = useState('')
-  const [selectedRolParaEquipo, setSelectedRolParaEquipo] = useState('IngenieroResidente')
   const [isCrearUsuarioOpen, setIsCrearUsuarioOpen] = useState(false)
-  const { roles: rolesList, fetchRoles } = useRolesStore()
+  const { fetchRoles } = useRolesStore()
 
   const handleAbrirCrearUsuario = () => {
     setIsEquipoModalOpen(false)
@@ -1083,8 +1142,24 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
     }
   }
 
+  const cargarDelegadosResidente = async () => {
+    try {
+      const res = await apiGetDeduplicado('/usuarios/delegados-residente')
+      const data = res.data?.data || res.data || []
+      if (Array.isArray(data)) {
+        setDelegadosResidenteList(data)
+      }
+    } catch (e) {
+      console.warn('Error cargando delegados residentes:', e)
+    }
+  }
+
   useEffect(() => {
-    void cargarUsuarios()
+    const timer = setTimeout(() => {
+      void cargarUsuarios()
+      void cargarDelegadosResidente()
+    }, 300)
+    return () => clearTimeout(timer)
   }, [])
 
   const userOptionsGenerales = useMemo(() => {
@@ -1117,9 +1192,102 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
       })
   }, [usuariosDisponibles])
 
+  // Opciones completas para Delegado Residente (iguales al formulario de creación/edición de proyectos)
+  const userOptionsDelegadosResidente = useMemo(() => {
+    const list: { value: string; label: string; id?: string }[] = []
+    const seenNames = new Set<string>()
+
+    // 1. Delegados residentes de la API especializada del formulario (/usuarios/delegados-residente)
+    for (const d of delegadosResidenteList) {
+      const nombreCompleto = (d.nombreCompleto || d.nombre || '').trim()
+      if (!nombreCompleto) continue
+      const label = d.nombre || `${nombreCompleto} (Delegado Residente)`
+      list.push({
+        value: nombreCompleto,
+        label,
+        id: d.id,
+      })
+      seenNames.add(nombreCompleto.toLowerCase())
+    }
+
+    // 2. Usuarios con roles pertinentes (Ingeniero, Residente, Administrador, Supervisión)
+    for (const u of usuariosDisponibles) {
+      if (u.activo === false || u.estado === 'Suspendido' || u.estado === 'Desactivado') continue
+      const nombreCompleto = (u.nombre || `${u.primer_nombre || ''} ${u.primer_apellido || ''}`.trim() || u.correo || '').trim()
+      if (!nombreCompleto || seenNames.has(nombreCompleto.toLowerCase())) continue
+
+      const r = (u.rol || u.cargo || '').toLowerCase().replace(/\s+/g, '')
+      if (r.includes('ingeniero') || r.includes('residente') || r.includes('admin') || r.includes('supervis') || r.includes('geren')) {
+        const rolCargo = u.cargo || u.rol || 'Ingeniero Residente'
+        list.push({
+          value: nombreCompleto,
+          label: `${nombreCompleto} - ${rolCargo}`,
+          id: u.id,
+        })
+        seenNames.add(nombreCompleto.toLowerCase())
+      }
+    }
+
+    // 3. Fallback en caso de que no haya perfiles cargados aún
+    if (list.length === 0) {
+      for (const u of usuariosDisponibles) {
+        if (u.activo === false || u.estado === 'Suspendido' || u.estado === 'Desactivado') continue
+        const nombreCompleto = (u.nombre || `${u.primer_nombre || ''} ${u.primer_apellido || ''}`.trim() || u.correo || '').trim()
+        if (!nombreCompleto || seenNames.has(nombreCompleto.toLowerCase())) continue
+        list.push({
+          value: nombreCompleto,
+          label: `${nombreCompleto} - ${u.cargo || u.rol || 'Profesional'}`,
+          id: u.id,
+        })
+        seenNames.add(nombreCompleto.toLowerCase())
+      }
+    }
+
+    return list
+  }, [delegadosResidenteList, usuariosDisponibles])
+
+  const getDelegadoResidenteOptions = (currentValue = '') => {
+    const list = [...userOptionsDelegadosResidente]
+    const cur = (currentValue || '').trim()
+    if (cur) {
+      const match = list.find((item) =>
+        item.value.toLowerCase() === cur.toLowerCase() ||
+        item.label.toLowerCase() === cur.toLowerCase() ||
+        (item.id && item.id === cur)
+      )
+      if (!match) {
+        list.unshift({ value: cur, label: cur })
+      }
+    }
+    return list
+  }
+
+  const getUserOptionsForCompany = (empresa: string, currentValue = '') => {
+    const empresaNorm = String(empresa || '').toLowerCase().trim()
+    const opciones = usuariosDisponibles
+      .filter((u: any) => u.activo !== false && u.estado !== 'Suspendido' && u.estado !== 'Desactivado')
+      .filter((u: any) => {
+        if (!empresaNorm) return false
+        const empresaUsuario = String(
+          u.empresa_nombre || u.empresa || u.nombre_empresa || u.empresa_contratista || ''
+        ).toLowerCase().trim()
+        return !empresaUsuario || empresaUsuario === empresaNorm || empresaUsuario.includes(empresaNorm) || empresaNorm.includes(empresaUsuario)
+      })
+      .map((u: any) => {
+        const nombre = u.nombre || `${u.primer_nombre || ''} ${u.primer_apellido || ''}`.trim() || u.correo
+        return { value: nombre, label: `${nombre} - ${u.cargo || u.rol || 'Usuario'}` }
+      })
+
+    if (currentValue && !opciones.some((opcion) => opcion.value === currentValue)) {
+      opciones.unshift({ value: currentValue, label: currentValue })
+    }
+    return opciones.length > 0 ? opciones : userOptionsGenerales
+  }
+
   useEffect(() => {
     if (isEquipoModalOpen) {
       void cargarUsuarios()
+      void cargarDelegadosResidente()
       void fetchRoles({ bypassCache: true })
     }
   }, [isEquipoModalOpen, fetchRoles])
@@ -1130,10 +1298,11 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
     if (!userObj) return
 
     const nombreCompleto = userObj.nombre || `${userObj.primer_nombre || ''} ${userObj.primer_apellido || ''}`.trim() || userObj.correo
+    const rolUsuario = userObj.cargo || userObj.rol || (userObj as any).rol_principal?.nombre || 'Profesional'
     const nuevoMiembro = {
       id: userObj.id,
       nombre: nombreCompleto,
-      rol: selectedRolParaEquipo || userObj.cargo || userObj.rol || 'Profesional',
+      rol: rolUsuario,
     }
 
     const equipoActual = proyecto.equipo || []
@@ -1253,6 +1422,10 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
       ...prev,
     }))
     setEditingSection(sectionKey)
+    if (sectionKey === 'resumen_entidades' || sectionKey === 'marco_legal_supervisora') {
+      void cargarUsuarios()
+      void cargarDelegadosResidente()
+    }
   }
 
   // Cancelar edición
@@ -1390,6 +1563,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
           telefono: editFormData.telefonoContratista,
           correo: editFormData.correoContratista,
           responsable: editFormData.superintendente,
+          colegiadoActivoSuperintendente: editFormData.colegiadoSuperintendente || editFormData.colegiadoActivoSuperintendente,
           actaInicioNumero: actaStr,
         }
       }
@@ -1435,6 +1609,13 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
         editFormData.actaInicioSupervisora = actaStr
         if (!editFormData.contratoSupervision) editFormData.contratoSupervision = {}
         editFormData.contratoSupervision = {
+          programa: editFormData.programaSupervisora,
+          subprograma: editFormData.subprogramaSupervisora,
+          fuenteFinanciamiento: editFormData.fuenteFinanciamientoSupervisora,
+          partidaFondos: editFormData.partidaFondosSupervisora,
+          cdp: editFormData.cdpSupervisora,
+          contratoNumero: editFormData.contratoSupervisora,
+          acuerdoMinisterial: editFormData.acuerdoSupervisora,
           ...editFormData.contratoSupervision,
           licitacionNumero: editFormData.licitacionSupervisora,
           registroMercantil: editFormData.registroMercantilSupervisora,
@@ -1443,7 +1624,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
           direccion: editFormData.direccionSupervisora,
           telefono: editFormData.telefonoSupervisora,
           correo: editFormData.correoSupervisora,
-          responsable: editFormData.delegadoResidente,
+          responsable: editFormData.delegadoResidente || editFormData.responsableSupervisora,
           actaInicioNumero: actaStr,
         }
       }
@@ -1494,12 +1675,16 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
         if (!editFormData.contratoEjecucion) editFormData.contratoEjecucion = {}
         editFormData.contratoEjecucion = {
           ...editFormData.contratoEjecucion,
+          licitacionNumero: editFormData.licitacionEjecutora,
           empresaNombre: editFormData.empresaContratista,
           propietario: editFormData.propietarioContratista,
           registroMercantil: editFormData.registroMercantilContratista,
           direccion: editFormData.direccionContratista,
           telefono: editFormData.telefonoContratista,
+          correo: editFormData.correoContratista,
           responsable: editFormData.responsableNombre,
+          colegiadoActivoSuperintendente: editFormData.colegiadoSuperintendente,
+          actaInicioNumero: editFormData.actaInicioEjecutora,
           programa: editFormData.programaObra,
           subprograma: editFormData.subprogramaObra,
           fuenteFinanciamiento: editFormData.fuenteFinanciamientoObra,
@@ -1560,11 +1745,13 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
         if (!editFormData.contratoSupervision) editFormData.contratoSupervision = {}
         editFormData.contratoSupervision = {
           ...editFormData.contratoSupervision,
+          licitacionNumero: editFormData.licitacionSupervisora,
           empresaNombre: editFormData.empresaSupervisora,
           propietario: editFormData.propietarioSupervisora,
           registroMercantil: editFormData.registroMercantilSupervisora,
           direccion: editFormData.direccionSupervisora,
           telefono: editFormData.telefonoSupervisora,
+          correo: editFormData.correoSupervisora,
           responsable: editFormData.responsableSupervisora,
           programa: editFormData.programaSupervisora,
           subprograma: editFormData.subprogramaSupervisora,
@@ -1598,21 +1785,24 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
         editFormData.contratos = contratosParaActualizar
       }
 
+      const { documentos: _d, renglones: _r, planTrabajo: _p, ...datosBase } = editFormData
       const payloadParaEnviar = {
-        ...editFormData,
+        ...datosBase,
+        colegiadoSuperintendente: editFormData.colegiadoSuperintendente,
+        colegiadoActivoSuperintendente: editFormData.colegiadoSuperintendente,
         latitud: editFormData.latitud ?? editFormData.coordenadasMapa?.lat,
         longitud: editFormData.longitud ?? editFormData.coordenadasMapa?.lng,
       }
 
       await (proyectoService.actualizarProyecto as any)(proyecto.id, payloadParaEnviar)
-      setProyecto((prev) => (prev ? { ...prev, ...editFormData } : prev))
+      setProyecto((prev) => (prev ? { ...prev, ...editFormData, documentos: prev.documentos ?? [] } : prev))
       setEditingSection(null)
       showSuccessToast('Datos del proyecto actualizados correctamente')
     } catch (err: any) {
-      console.warn('Error al persistir en backend, actualizando localmente:', err)
-      setProyecto((prev) => (prev ? { ...prev, ...editFormData } : prev))
+      console.error('Error al persistir cambios del proyecto:', err)
+      setEditFormData(obtenerValoresCompletosProyecto(proyecto))
       setEditingSection(null)
-      showSuccessToast('Datos actualizados')
+      showErrorToast('No se pudieron guardar los cambios en el servidor. Verifica la conexión e inténtalo nuevamente.')
     } finally {
       setIsSaving(false)
     }
@@ -1628,6 +1818,53 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
   // Sincronización de métricas
   const fechaInicioDefault = proyecto?.fechaInicio || (proyecto as any)?.fechaInicioContractual || ''
   const diasActividad = useMemo(() => calcularDiasActividad(fechaInicioDefault), [fechaInicioDefault])
+
+  // Cálculo dinámico de Avance Físico Ponderado basado en el Plan de Trabajo (Modo Sábana)
+  const avanceFisicoDetallado = useMemo(() => {
+    const renglonesList = renglonesProyecto && renglonesProyecto.length > 0
+      ? renglonesProyecto
+      : (Array.isArray((proyecto as any)?.renglones) ? (proyecto as any).renglones : (Array.isArray((proyecto as any)?.planTrabajo) ? (proyecto as any).planTrabajo : []))
+
+    if (!Array.isArray(renglonesList) || renglonesList.length === 0) {
+      const pct = Number(proyecto?.avance ?? (proyecto as any)?.avanceFisico ?? 0)
+      const montoTotalPlan = Number(proyecto?.montoContractualOriginal || proyecto?.presupuesto || 0)
+      return {
+        porcentaje: pct,
+        montoPlanificado: montoTotalPlan,
+        montoEjecutado: (montoTotalPlan * pct) / 100,
+        renglonesConAvance: 0,
+        totalRenglones: 0,
+      }
+    }
+
+    let totalPlan = 0
+    let totalEjecPonderado = 0
+    let totalEjecReal = 0
+    let conAvance = 0
+
+    for (const r of renglonesList) {
+      const meta = Number(r.cantidadAjustada && r.cantidadAjustada > 0 ? r.cantidadAjustada : (r.cantidadContratada ?? r.cantidad_contractual ?? 0))
+      const ejec = Math.max(0, Number(r.cantidadEjecutada ?? r.cantidad_ejecutada ?? 0))
+      const pu = Number(r.costoUnitarioDirecto ?? r.precio_unitario_directo ?? 0)
+      const montoMeta = meta * pu
+      totalPlan += montoMeta
+      totalEjecReal += ejec * pu
+      totalEjecPonderado += Math.min(meta, ejec) * pu
+      if (ejec > 0) conAvance++
+    }
+
+    const pct = totalPlan > 0
+      ? Math.min(100, Math.round((totalEjecPonderado / totalPlan) * 10000) / 100)
+      : Number(proyecto?.avance ?? 0)
+
+    return {
+      porcentaje: pct,
+      montoPlanificado: totalPlan,
+      montoEjecutado: totalEjecReal,
+      renglonesConAvance: conAvance,
+      totalRenglones: renglonesList.length,
+    }
+  }, [renglonesProyecto, proyecto])
 
   if (!proyecto) {
     return (
@@ -1647,7 +1884,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
     )
   }
 
-  const pAny = useMemo(() => obtenerValoresCompletosProyecto(proyecto), [proyecto])
+  const pAny = obtenerValoresCompletosProyecto(proyecto)
   const equipoCompleto = proyecto.equipo || []
   const equipoVisible = equipoCompleto.slice(0, 3)
   const tieneMasDeTres = equipoCompleto.length > 3
@@ -1661,8 +1898,31 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
   const porcentajeAnticipoSupervision = Number(pAny.porcentajeAnticipoSupervision ?? 0)
   const montoAnticipoSupervision = (montoSupervisionOriginal * porcentajeAnticipoSupervision) / 100
 
+  const esMiembroInamovible = (miembro: { id?: string; nombre?: string; rol?: string } | null) => {
+    if (!proyecto || !miembro) return false
+    const rolNorm = (miembro.rol || '').toLowerCase().trim()
+    const nombreNorm = (miembro.nombre || '').toLowerCase().trim()
+    const idStr = String(miembro.id || '')
+
+    const delResId = String((proyecto as any).delegadoResidenteId || pAny.delegadoResidenteId || '')
+    const delResNombre = String(proyecto.delegadoResidente || pAny.delegadoResidente || pAny.delegadoResidenteNombre || pAny.supervisoraDelegadoResidente || '').toLowerCase().trim()
+    const supNombre = String(pAny.superintendenteNombre || pAny.nombreSuperintendente || '').toLowerCase().trim()
+
+    if (idStr && delResId && idStr === delResId) return true
+    if (delResNombre && nombreNorm && (nombreNorm === delResNombre || delResNombre.includes(nombreNorm) || nombreNorm.includes(delResNombre))) return true
+    if (supNombre && nombreNorm && (nombreNorm === supNombre || supNombre.includes(nombreNorm) || nombreNorm.includes(supNombre))) return true
+    if (rolNorm.includes('delegado') || rolNorm.includes('delegadoresidente')) return true
+
+    return false
+  }
+
   const handleConfirmEliminarMiembro = async () => {
     if (!proyecto || !memberToDelete) return
+    if (esMiembroInamovible(memberToDelete)) {
+      showErrorToast('No se puede eliminar al Delegado Residente o responsable asignado por contrato desde aquí. Modifícalo en la sección de Marco Legal.')
+      setMemberToDelete(null)
+      return
+    }
     const equipoCompletoActual = proyecto.equipo || []
     const nuevoEquipo = equipoCompletoActual.filter((m) => m.id !== memberToDelete.id)
     setProyecto({ ...proyecto, equipo: nuevoEquipo })
@@ -1949,6 +2209,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                       type="textarea"
                       placeholder="Descripción del alcance del proyecto..."
                       required
+                      clamp={3}
                     />
                   </div>
                 </InfoDetailCard>
@@ -1993,9 +2254,16 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                       label="Delegado Residente de Proyecto"
                       value={editingSection === 'resumen_entidades' ? editFormData.delegadoResidente : (proyecto.delegadoResidente || '')}
                       isEditing={editingSection === 'resumen_entidades'}
-                      onChange={(v) => handleFieldChange('delegadoResidente', v)}
+                      onChange={(v) => {
+                        handleFieldChange('delegadoResidente', v)
+                        const match = delegadosResidenteList.find((d) => (d.nombreCompleto || d.nombre) === v || d.id === v) ||
+                          usuariosDisponibles.find((u) => (u.nombre || `${u.primer_nombre || ''} ${u.primer_apellido || ''}`.trim()) === v || u.id === v)
+                        if (match?.id) {
+                          handleFieldChange('delegadoResidenteId', match.id)
+                        }
+                      }}
                       placeholder="Seleccionar Delegado Residente..."
-                      userOptions={userOptionsIngenieros.length > 0 ? userOptionsIngenieros : userOptionsGenerales}
+                      userOptions={getDelegadoResidenteOptions(editFormData.delegadoResidente || proyecto.delegadoResidente || '')}
                       onEmptyUserAction={handleAbrirCrearUsuario}
                       kind="nombre"
                       required
@@ -2112,6 +2380,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
               <div className="space-y-2.5">
                 {/* Avance y Días de Actividad en la misma fila (2 tarjetas pegadas) */}
                 <div className="grid grid-cols-2 gap-2">
+                  {!esModoManual && (
                   <section className="relative rounded-xl border border-gray-200 bg-white p-2.5 shadow-2xs flex flex-col justify-between">
                     <div>
                       <div className="flex items-start justify-between">
@@ -2119,16 +2388,37 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                           <span className="text-[7.5px] font-bold uppercase tracking-wider text-gray-400">
                             Avance Físico Actual
                           </span>
-                          <p className="mt-0.5 text-xl font-black text-[#9B0F06]">{Math.round(proyecto.avance || 0)}%</p>
+                          <div className="flex items-baseline gap-1 mt-0.5">
+                            <p className="text-xl font-black text-[#9B0F06]">
+                              {avanceFisicoDetallado.porcentaje % 1 === 0
+                                ? avanceFisicoDetallado.porcentaje
+                                : avanceFisicoDetallado.porcentaje.toFixed(1)}%
+                            </p>
+                            {avanceFisicoDetallado.totalRenglones > 0 && (
+                              <span className="text-[7.5px] font-semibold text-gray-500">
+                                ({avanceFisicoDetallado.renglonesConAvance}/{avanceFisicoDetallado.totalRenglones} renglones)
+                              </span>
+                            )}
+                          </div>
                         </div>
                         <div className="flex h-5 w-5 items-center justify-center rounded-full bg-red-50 text-[#9B0F06]">
                           <CheckCircle2 size={12} />
                         </div>
                       </div>
 
-                      <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-gray-100">
-                        <div className="h-full bg-[#9B0F06]" style={{ width: `${Math.min(100, Math.max(0, proyecto.avance || 0))}%` }} />
+                      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-gray-100">
+                        <div
+                          className="h-full bg-[#9B0F06] transition-all duration-500 rounded-full"
+                          style={{ width: `${Math.min(100, Math.max(0, avanceFisicoDetallado.porcentaje))}%` }}
+                        />
                       </div>
+
+                      {avanceFisicoDetallado.montoPlanificado > 0 && (
+                        <div className="mt-1 flex items-center justify-between text-[7px] text-gray-500 font-medium">
+                          <span>Ejecutado: Q {avanceFisicoDetallado.montoEjecutado.toLocaleString('es-GT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
+                          <span>Meta: Q {avanceFisicoDetallado.montoPlanificado.toLocaleString('es-GT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
+                        </div>
+                      )}
                     </div>
 
                     <div className="mt-2 grid grid-cols-2 gap-0.5 border-t border-gray-100 pt-1 text-[7.5px]">
@@ -2142,8 +2432,9 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                       </div>
                     </div>
                   </section>
+                  )}
 
-                  <section className="flex flex-col justify-between rounded-xl border border-gray-200 bg-white p-2.5 shadow-2xs">
+                  <section className={`flex flex-col justify-between rounded-xl border border-gray-200 bg-white p-2.5 shadow-2xs ${esModoManual ? 'col-span-2' : ''}`}>
                     <div className="flex items-center justify-between">
                       <span className="text-[7.5px] font-bold uppercase tracking-wider text-gray-400">
                         Días de Actividad
@@ -2351,6 +2642,8 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                       onChange={(v) => handleFieldChange('propietarioContratista', v)}
                       placeholder="Representante Legal"
                       kind="nombre"
+                      userOptions={getUserOptionsForCompany(editFormData.empresaContratista || proyecto.empresaContratista, editFormData.propietarioContratista || pAny.propietarioContratista)}
+                      onEmptyUserAction={handleAbrirCrearUsuario}
                       required
                     />
                     <EditableInfoField
@@ -2475,6 +2768,8 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                       onChange={(v) => handleFieldChange('propietarioSupervisora', v)}
                       placeholder="Propietario / Contacto"
                       kind="nombre"
+                      userOptions={getUserOptionsForCompany(editFormData.empresaSupervisora || proyecto.empresaSupervisora, editFormData.propietarioSupervisora || pAny.propietarioSupervisora)}
+                      onEmptyUserAction={handleAbrirCrearUsuario}
                       required
                     />
                     <EditableInfoField
@@ -2545,9 +2840,18 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                       label="Delegado Residente de Proyecto"
                       value={editingSection === 'marco_legal_supervisora' ? editFormData.delegadoResidente : (proyecto.delegadoResidente || '')}
                       isEditing={editingSection === 'marco_legal_supervisora'}
-                      onChange={(v) => handleFieldChange('delegadoResidente', v)}
+                      onChange={(v) => {
+                        handleFieldChange('delegadoResidente', v)
+                        const match = delegadosResidenteList.find((d) => (d.nombreCompleto || d.nombre) === v || d.id === v) ||
+                          usuariosDisponibles.find((u) => (u.nombre || `${u.primer_nombre || ''} ${u.primer_apellido || ''}`.trim()) === v || u.id === v)
+                        if (match?.id) {
+                          handleFieldChange('delegadoResidenteId', match.id)
+                        }
+                      }}
                       placeholder="Ing. Delegado Residente"
                       kind="nombre"
+                      userOptions={getDelegadoResidenteOptions(editFormData.delegadoResidente || proyecto.delegadoResidente || '')}
+                      onEmptyUserAction={handleAbrirCrearUsuario}
                       required
                     />
                   </div>
@@ -2725,7 +3029,25 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                             isEditing={editingSection === 'ficha_obra'}
                             onChange={(v) => handleFieldChange('propietarioContratista', v)}
                             kind="nombre"
+                            userOptions={getUserOptionsForCompany(editingSection === 'ficha_obra' ? editFormData.empresaContratista : proyecto.empresaContratista, editingSection === 'ficha_obra' ? editFormData.propietarioContratista : pAny.propietarioContratista)}
+                            onEmptyUserAction={handleAbrirCrearUsuario}
                             required
+                          />
+                          <EditableItemFichaTecnica
+                            label="Superintendente / Responsable de Obra"
+                            value={editingSection === 'ficha_obra' ? editFormData.superintendente : (pAny.superintendente || '')}
+                            isEditing={editingSection === 'ficha_obra'}
+                            onChange={(v) => handleFieldChange('superintendente', v)}
+                            kind="nombre"
+                            userOptions={getUserOptionsForCompany(editingSection === 'ficha_obra' ? editFormData.empresaContratista : proyecto.empresaContratista, editingSection === 'ficha_obra' ? editFormData.superintendente : pAny.superintendente)}
+                            onEmptyUserAction={handleAbrirCrearUsuario}
+                          />
+                          <EditableItemFichaTecnica
+                            label="Colegiado Activo de Superintendente"
+                            value={editingSection === 'ficha_obra' ? editFormData.colegiadoSuperintendente : (pAny.colegiadoSuperintendente || '')}
+                            isEditing={editingSection === 'ficha_obra'}
+                            onChange={(v) => handleFieldChange('colegiadoSuperintendente', v)}
+                            kind="codigo"
                           />
                           <EditableItemFichaTecnica
                             label="Registro Mercantil"
@@ -2748,6 +3070,13 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                             isEditing={editingSection === 'ficha_obra'}
                             onChange={(v) => handleFieldChange('telefonoContratista', v)}
                             kind="telefono"
+                          />
+                          <EditableItemFichaTecnica
+                            label="Correo Electrónico"
+                            value={editingSection === 'ficha_obra' ? editFormData.correoContratista : (pAny.correoContratista || '')}
+                            isEditing={editingSection === 'ficha_obra'}
+                            onChange={(v) => handleFieldChange('correoContratista', v)}
+                            kind="email"
                           />
                           <EditableItemFichaTecnica
                             label="Responsable del Proyecto"
@@ -2777,6 +3106,20 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                             value={editingSection === 'ficha_obra' ? editFormData.fuenteFinanciamientoObra : (pAny.fuenteFinanciamientoObra || '')}
                             isEditing={editingSection === 'ficha_obra'}
                             onChange={(v) => handleFieldChange('fuenteFinanciamientoObra', v)}
+                          />
+                          <EditableItemFichaTecnica
+                            label="Licitación Pública Nacional No."
+                            value={editingSection === 'ficha_obra' ? editFormData.licitacionEjecutora : (pAny.licitacionEjecutora || '')}
+                            isEditing={editingSection === 'ficha_obra'}
+                            onChange={(v) => handleFieldChange('licitacionEjecutora', v)}
+                            kind="codigo"
+                          />
+                          <EditableItemFichaTecnica
+                            label="Acta de Inicio"
+                            value={editingSection === 'ficha_obra' ? editFormData.actaInicioEjecutora : (pAny.actaInicioEjecutora || '')}
+                            isEditing={editingSection === 'ficha_obra'}
+                            onChange={(v) => handleFieldChange('actaInicioEjecutora', v)}
+                            kind="codigo"
                           />
                         </div>
 
@@ -2973,6 +3316,13 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                             kind="telefono"
                           />
                           <EditableItemFichaTecnica
+                            label="Correo Electrónico"
+                            value={editingSection === 'ficha_supervision' ? editFormData.correoSupervisora : (pAny.correoSupervisora || '')}
+                            isEditing={editingSection === 'ficha_supervision'}
+                            onChange={(v) => handleFieldChange('correoSupervisora', v)}
+                            kind="email"
+                          />
+                          <EditableItemFichaTecnica
                             codigo="3.1.2.6"
                             label="Responsable del Proyecto"
                             value={editingSection === 'ficha_supervision' ? editFormData.responsableSupervisora : (pAny.responsableSupervisora || '')}
@@ -3004,6 +3354,20 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                             value={editingSection === 'ficha_supervision' ? editFormData.fuenteFinanciamientoSupervisora : (pAny.fuenteFinanciamientoSupervisora || '')}
                             isEditing={editingSection === 'ficha_supervision'}
                             onChange={(v) => handleFieldChange('fuenteFinanciamientoSupervisora', v)}
+                          />
+                          <EditableItemFichaTecnica
+                            label="Licitación Pública Nacional No."
+                            value={editingSection === 'ficha_supervision' ? editFormData.licitacionSupervisora : (pAny.licitacionSupervisora || '')}
+                            isEditing={editingSection === 'ficha_supervision'}
+                            onChange={(v) => handleFieldChange('licitacionSupervisora', v)}
+                            kind="codigo"
+                          />
+                          <EditableItemFichaTecnica
+                            label="Acta de Inicio"
+                            value={editingSection === 'ficha_supervision' ? editFormData.actaInicioSupervisora : (pAny.actaInicioSupervisora || '')}
+                            isEditing={editingSection === 'ficha_supervision'}
+                            onChange={(v) => handleFieldChange('actaInicioSupervisora', v)}
+                            kind="codigo"
                           />
                         </div>
 
@@ -3218,7 +3582,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
         <div className="fixed inset-0 z-[9999] overflow-hidden bg-black/50 backdrop-blur-xs">
           <div className="absolute inset-0" onClick={() => setIsEquipoModalOpen(false)} />
           <div className="fixed inset-y-0 right-0 flex max-w-full h-full">
-            <div className="w-screen max-w-md transform bg-white shadow-2xl transition-transform duration-300 ease-in-out flex flex-col h-full">
+            <div className="w-screen max-w-lg transform bg-white shadow-2xl transition-transform duration-300 ease-in-out flex flex-col h-full">
               <div className="flex items-center justify-between border-b border-gray-100 p-4 bg-gray-50 shrink-0">
                 <div className="flex items-center gap-2">
                   <Users size={16} className="text-[#9B0F06]" />
@@ -3237,7 +3601,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
               </div>
 
               {/* Formulario para asignar y crear usuarios */}
-              <div className="border-b border-gray-100 bg-gray-50/70 p-3 space-y-2.5 shrink-0">
+              <div className="border-b border-gray-100 bg-gray-50/70 p-3 space-y-2 shrink-0">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-gray-600">
                     Asignar Usuario al Equipo
@@ -3252,71 +3616,36 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                   </button>
                 </div>
 
-                <div className="space-y-2">
-                  <div>
-                    <label className="block text-[9.5px] font-bold text-gray-500 mb-1">
-                      Seleccionar Usuario Existente:
-                    </label>
-                    <Combobox
-                      options={usuariosDisponibles.map((u: any) => ({
-                        value: u.id,
-                        label: `${u.nombre || (u.primer_nombre ? `${u.primer_nombre} ${u.primer_apellido || ''}` : u.correo)} — ${u.cargo || u.rol || 'Usuario'}`,
-                      }))}
-                      value={selectedUsuarioIdParaEquipo}
-                      onChange={(val) => setSelectedUsuarioIdParaEquipo(val)}
-                      placeholder="Buscar y seleccionar usuario..."
-                      emptyAction={{
-                        label: '+ Crear nuevo usuario',
-                        onClick: handleAbrirCrearUsuario,
-                      }}
-                      allowNumbers
-                    />
-                  </div>
-
+                <div>
+                  <label className="block text-[9.5px] font-bold text-gray-500 mb-1">
+                    Seleccionar Usuario Existente:
+                  </label>
                   <div className="flex items-center gap-2">
-                    <div className="flex-1">
-                      <label className="block text-[9.5px] font-bold text-gray-500 mb-1">
-                        Rol en el Proyecto:
-                      </label>
-                      <select
-                        value={selectedRolParaEquipo}
-                        onChange={(e) => setSelectedRolParaEquipo(e.target.value)}
-                        className="w-full rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-gray-800 focus:border-[#9B0F06] focus:outline-none focus:ring-1 focus:ring-[#9B0F06]"
-                      >
-                        {rolesList && rolesList.length > 0 ? (
-                          rolesList
-                            .filter((r) => r.estado !== 'Inactivo' && (r as any).activo !== false)
-                            .map((r) => (
-                              <option key={r.id || r.nombre} value={r.nombre}>
-                                {r.nombre}
-                              </option>
-                            ))
-                        ) : (
-                          <>
-                            <option value="IngenieroResidente">Ingeniero Residente</option>
-                            <option value="Supervisor">Supervisor</option>
-                            <option value="Inspector">Inspector</option>
-                            <option value="AuxiliarDeCampo">Auxiliar de Campo</option>
-                            <option value="Laboratorista">Laboratorista</option>
-                            <option value="Gerencia">Gerencia</option>
-                            <option value="Administrador">Administrador</option>
-                            <option value="Contratante">Contratante</option>
-                          </>
-                        )}
-                      </select>
+                    <div className="flex-1 min-w-0">
+                      <Combobox
+                        options={usuariosDisponibles.map((u: any) => ({
+                          value: u.id,
+                          label: `${u.nombre || (u.primer_nombre ? `${u.primer_nombre} ${u.primer_apellido || ''}` : u.correo)} — ${u.cargo || u.rol || 'Usuario'}`,
+                        }))}
+                        value={selectedUsuarioIdParaEquipo}
+                        onChange={(val) => setSelectedUsuarioIdParaEquipo(val)}
+                        placeholder="Buscar y seleccionar usuario..."
+                        emptyAction={{
+                          label: '+ Crear nuevo usuario',
+                          onClick: handleAbrirCrearUsuario,
+                        }}
+                        allowNumbers
+                      />
                     </div>
-
-                    <div className="self-end">
-                      <button
-                        type="button"
-                        disabled={!selectedUsuarioIdParaEquipo}
-                        onClick={handleAgregarMiembroAEquipo}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-[#9B0F06] px-3 py-1.5 text-[11px] font-bold text-white hover:bg-[#5E0006] transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-2xs"
-                      >
-                        <Plus size={13} />
-                        <span>Asignar</span>
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      disabled={!selectedUsuarioIdParaEquipo}
+                      onClick={handleAgregarMiembroAEquipo}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-[#9B0F06] px-3.5 py-2 text-xs font-bold text-white hover:bg-[#5E0006] transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-2xs shrink-0"
+                    >
+                      <Plus size={13} />
+                      <span>Asignar</span>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -3327,32 +3656,45 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                     No hay miembros asignados al equipo actualmente.
                   </div>
                 ) : (
-                  equipoCompleto.map((miembro) => (
-                    <div
-                      key={miembro.id}
-                      className="flex items-center justify-between rounded-xl border border-gray-100 bg-white p-2.5 shadow-2xs hover:border-gray-200 transition-colors"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-red-100 text-[10px] font-bold text-[#9B0F06]">
-                          {getInitials(miembro.nombre)}
+                  equipoCompleto.map((miembro) => {
+                    const inamovible = esMiembroInamovible(miembro)
+                    return (
+                      <div
+                        key={miembro.id}
+                        className="flex items-center justify-between rounded-xl border border-gray-100 bg-white p-2.5 shadow-2xs hover:border-gray-200 transition-colors"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-red-100 text-[10px] font-bold text-[#9B0F06]">
+                            {getInitials(miembro.nombre)}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-[11px] font-bold text-gray-900 truncate">{miembro.nombre}</p>
+                            <p className="text-[9px] font-medium text-gray-500 truncate">{miembro.rol}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-[11px] font-bold text-gray-900">{miembro.nombre}</p>
-                          <p className="text-[9px] font-medium text-gray-500">{miembro.rol}</p>
-                        </div>
+                        {canManageTeam && (
+                          inamovible ? (
+                            <span
+                              className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-1 text-[9px] font-bold text-amber-700 border border-amber-200 shrink-0 select-none"
+                              title="Asignado por formulario oficial / Marco Legal. Se reemplaza desde la edición del proyecto."
+                            >
+                              <Lock size={11} className="text-amber-600" />
+                              <span>Contrato</span>
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setMemberToDelete(miembro)}
+                              className="rounded-lg border border-red-200 bg-red-50 p-1.5 text-red-600 hover:bg-red-100 hover:text-red-700 transition-colors cursor-pointer shrink-0"
+                              title="Eliminar del equipo del proyecto"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )
+                        )}
                       </div>
-                      {canManageTeam && (
-                        <button
-                          type="button"
-                          onClick={() => setMemberToDelete(miembro)}
-                          className="rounded-lg border border-red-200 bg-red-50 p-1.5 text-red-600 hover:bg-red-100 hover:text-red-700 transition-colors cursor-pointer"
-                          title="Eliminar del equipo del proyecto"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      )}
-                    </div>
-                  ))
+                    )
+                  })
                 )}
               </div>
 
@@ -3428,16 +3770,28 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
       {/* Drawer para Crear Usuario desde Detalle de Proyecto */}
       <UsuarioFormularioDrawer
         isOpen={isCrearUsuarioOpen}
+        rolesExcluidos={['Contratante']}
         onClose={() => {
           setIsCrearUsuarioOpen(false)
           setIsEquipoModalOpen(true)
         }}
         onSave={(newUser: any) => {
-          cargarUsuarios()
+          void cargarUsuarios()
+          void cargarDelegadosResidente()
           setIsCrearUsuarioOpen(false)
-          setIsEquipoModalOpen(true)
-          if (newUser?.id) {
-            setSelectedUsuarioIdParaEquipo(newUser.id)
+          if (editingSection === 'resumen_entidades' || editingSection === 'marco_legal_supervisora') {
+            const nombreNuevo = newUser?.nombre || `${newUser?.primer_nombre || ''} ${newUser?.primer_apellido || ''}`.trim() || newUser?.correo
+            if (nombreNuevo) {
+              handleFieldChange('delegadoResidente', nombreNuevo)
+              if (newUser?.id) {
+                handleFieldChange('delegadoResidenteId', newUser.id)
+              }
+            }
+          } else {
+            setIsEquipoModalOpen(true)
+            if (newUser?.id) {
+              setSelectedUsuarioIdParaEquipo(newUser.id)
+            }
           }
         }}
         rolInicial="IngenieroResidente"

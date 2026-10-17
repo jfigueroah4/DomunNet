@@ -106,43 +106,27 @@ export function EstadisticasPlanificacion({
       }
     }
 
-    // Fallback a atributos directos del proyecto
-    const totalFallback = 28
-    const aprobFall = Math.round(totalFallback * (avanceBase / 100))
-    const enProcFall = Math.round(totalFallback * 0.25)
-    const pendFall = Math.max(0, totalFallback - aprobFall - enProcFall)
-
+    // Si no hay renglones en el proyecto, mantener métricas reales en 0
     return {
       avanceFisicoReal: avanceBase,
-      avanceProgramadoReal: progCalculado > 0 ? progCalculado : Math.min(100, avanceBase + 6),
-      totalRenglones: totalFallback,
-      renglonesAprobados: aprobFall,
-      renglonesEnProceso: enProcFall,
-      renglonesPendientes: pendFall,
+      avanceProgramadoReal: progCalculado,
+      totalRenglones: 0,
+      renglonesAprobados: 0,
+      renglonesEnProceso: 0,
+      renglonesPendientes: 0,
     }
   }, [proy, listaRenglones])
 
-  // Capítulos de obra vial dinámicos calculados a partir de los renglones reales del proyecto
+  // Capítulos de obra vial dinámicos calculados exclusivamente a partir de los renglones reales del proyecto
   const capitulosData = useMemo(() => {
-    const capsDefault = [
-      { id: '1', codigo: 'CAP-I', cap: 'Cap I: Trabajos Preliminares y Replanteo Topográfico' },
-      { id: '2', codigo: 'CAP-II', cap: 'Cap II: Movimiento de Tierras y Desmonte' },
-      { id: '3', codigo: 'CAP-III', cap: 'Cap III: Terraplenes y Estructura de Pavimento' },
-      { id: '4', codigo: 'CAP-IV', cap: 'Cap IV: Subbases y Bases Granulares Compactadas' },
-      { id: '5', codigo: 'CAP-V', cap: 'Cap V: Pavimentos de Concreto Asfáltico / Hidráulico' },
-      { id: '6', codigo: 'CAP-VI', cap: 'Cap VI: Drenaje Mayor, Menor y Bóvedas' },
-      { id: '7', codigo: 'CAP-VII', cap: 'Cap VII: Señalización Horizontal, Vertical y Seguridad Vial' },
-    ]
-
     // Si existen renglones reales, agruparlos por capítulo
     if (listaRenglones.length > 0) {
       const grupos: Record<string, { id: string; codigo: string; cap: string; renglones: any[] }> = {}
 
-      listaRenglones.forEach((r: any, idx: number) => {
-        const cId = String(r.capituloId || r.capitulo_id || Math.min(7, Math.floor(idx / 5) + 1))
-        const def = capsDefault.find((c) => c.id === cId)
-        const capNombre = r.capituloNombre || r.capitulo_nombre || def?.cap || `Capítulo ${cId}`
-        const capCod = def?.codigo || `CAP-${cId}`
+      listaRenglones.forEach((r: any) => {
+        const cId = String(r.capituloId || r.capitulo_id || 1)
+        const capNombre = r.capituloNombre || r.capitulo_nombre || `Capítulo ${cId}`
+        const capCod = r.capituloCodigo || `CAP-${cId}`
 
         if (!grupos[cId]) {
           grupos[cId] = { id: cId, codigo: capCod, cap: capNombre, renglones: [] }
@@ -161,8 +145,8 @@ export function EstadisticasPlanificacion({
           sumaEjec += ejec * pu
         })
 
-        const pctEjec = sumaCont > 0 ? Math.min(100, Math.round((sumaEjec / sumaCont) * 100)) : avanceFisicoReal
-        const pctProg = Math.min(100, Math.max(0, Math.round(avanceProgramadoReal * (Number(g.id) <= 3 ? 1.1 : 0.85))))
+        const pctEjec = sumaCont > 0 ? Math.min(100, Math.round((sumaEjec / sumaCont) * 100)) : 0
+        const pctProg = avanceProgramadoReal
 
         let estado = 'En tiempo'
         if (pctEjec >= 100) estado = 'Completado'
@@ -186,45 +170,29 @@ export function EstadisticasPlanificacion({
       }
     }
 
-    // Fallback proyectado realista basado en avance real del proyecto
-    return capsDefault.map((c, idx) => {
-      const factor = Math.max(0.1, 1 - idx * 0.15)
-      const ejec = Math.min(100, Math.max(0, Math.round(avanceFisicoReal * factor * 1.35)))
-      const prog = Math.min(100, Math.max(0, Math.round(avanceProgramadoReal * factor * 1.3)))
-      let estado = 'En tiempo'
-      if (ejec >= 100) estado = 'Completado'
-      else if (ejec > prog) estado = 'Adelantado'
-      else if (prog - ejec > 15) estado = 'Retraso leve'
-      else if (ejec === 0) estado = 'Por Iniciar'
-
-      return {
-        id: c.id,
-        codigo: c.codigo,
-        cap: c.cap,
-        total: Math.max(2, Math.round(totalRenglones / capsDefault.length)),
-        prog,
-        ejec,
-        estado,
-      }
-    })
-  }, [listaRenglones, avanceFisicoReal, avanceProgramadoReal, totalRenglones])
+    return []
+  }, [listaRenglones, avanceProgramadoReal])
 
   // Puntos mensuales de la Curva S dinámicos basados en la línea de tiempo real del proyecto
   const mesesCurvaS = useMemo(() => {
-    const fIniRaw = proy.fecha_inicio_contractual || proy.fecha_inicio || proy.fechaInicioContractual || '2026-01-01'
-    const fFinRaw = proy.fecha_finalizacion_real || proy.fecha_fin_estimada || proy.fecha_fin || proy.fechaFinContractualPlan || '2026-10-31'
+    const fIniRaw = proy.fecha_inicio_contractual || proy.fecha_inicio || proy.fechaInicioContractual
+    const fFinRaw = proy.fecha_finalizacion_real || proy.fecha_fin_estimada || proy.fecha_fin || proy.fechaFinContractualPlan
 
-    const dIni = new Date(fIniRaw)
-    const dFin = new Date(fFinRaw)
+    if (!fIniRaw || !fFinRaw) return []
+
+    const dIni = new Date(fIniRaw.length === 10 ? fIniRaw + 'T00:00:00' : fIniRaw)
+    const dFin = new Date(fFinRaw.length === 10 ? fFinRaw + 'T00:00:00' : fFinRaw)
+
+    if (isNaN(dIni.getTime()) || isNaN(dFin.getTime()) || dFin <= dIni) return []
 
     const mesesNombres = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
     const listaMeses: Array<{ mes: string; año: number; mesIdx: number }> = []
 
-    const cursor = !isNaN(dIni.getTime()) ? new Date(dIni.getFullYear(), dIni.getMonth(), 1) : new Date(2026, 0, 1)
-    const limite = !isNaN(dFin.getTime()) ? new Date(dFin.getFullYear(), dFin.getMonth(), 1) : new Date(2026, 9, 1)
+    const cursor = new Date(dIni.getFullYear(), dIni.getMonth(), 1)
+    const limite = new Date(dFin.getFullYear(), dFin.getMonth(), 1)
 
     let safety = 0
-    while (cursor <= limite && safety < 24) {
+    while (cursor <= limite && safety < 36) {
       listaMeses.push({
         mes: `${mesesNombres[cursor.getMonth()]} ${String(cursor.getFullYear()).slice(-2)}`,
         año: cursor.getFullYear(),
@@ -234,18 +202,17 @@ export function EstadisticasPlanificacion({
       safety++
     }
 
-    if (listaMeses.length < 3) {
-      listaMeses.push({ mes: 'M1', año: 2026, mesIdx: 0 })
-      listaMeses.push({ mes: 'M2', año: 2026, mesIdx: 1 })
-      listaMeses.push({ mes: 'M3', año: 2026, mesIdx: 2 })
-      listaMeses.push({ mes: 'M4', año: 2026, mesIdx: 3 })
-      listaMeses.push({ mes: 'M5', año: 2026, mesIdx: 4 })
-      listaMeses.push({ mes: 'M6', año: 2026, mesIdx: 5 })
-    }
+    if (listaMeses.length === 0) return []
 
     const total = listaMeses.length
-    // Determinar hasta qué mes hemos llegado en el calendario
-    const mesCorteIdx = Math.max(1, Math.min(total - 1, Math.round(total * (avanceFisicoReal / (avanceProgramadoReal || 100)))))
+    const dHoy = new Date()
+    const mesesTranscurridos = Math.max(
+      0,
+      Math.min(
+        total - 1,
+        (dHoy.getFullYear() - dIni.getFullYear()) * 12 + (dHoy.getMonth() - dIni.getMonth())
+      )
+    )
 
     return listaMeses.map((m, idx) => {
       // Función S-curve estándar: S(t) = 3t^2 - 2t^3
@@ -253,8 +220,8 @@ export function EstadisticasPlanificacion({
       const progVal = Math.min(100, Math.round((3 * t * t - 2 * t * t * t) * 100))
 
       let ejecVal = 0
-      if (idx <= mesCorteIdx) {
-        const factorAvance = idx / mesCorteIdx
+      if (idx <= mesesTranscurridos) {
+        const factorAvance = mesesTranscurridos > 0 ? idx / mesesTranscurridos : 0
         ejecVal = Math.min(100, Math.round(avanceFisicoReal * (3 * factorAvance * factorAvance - 2 * factorAvance * factorAvance * factorAvance)))
       }
 
@@ -323,22 +290,29 @@ export function EstadisticasPlanificacion({
             </button>
           </div>
 
-          <div className="h-44 w-full flex items-end justify-between gap-1.5 pt-4 pb-2 px-2 border-b border-gray-100 bg-gray-50/50 rounded-lg font-poppins">
-            {mesesCurvaS.map((item, i) => (
-              <div key={i} className="flex-1 flex flex-col items-center gap-1 h-full justify-end group relative">
-                <div className="opacity-0 group-hover:opacity-100 absolute -top-8 bg-gray-900 text-white text-[9px] py-0.5 px-1.5 rounded pointer-events-none transition-opacity font-poppins z-10 whitespace-nowrap shadow">
-                  Prog: {item.programado}% {item.ejecutado > 0 ? `· Ejec: ${item.ejecutado}%` : ''}
+          {mesesCurvaS.length === 0 ? (
+            <div className="h-44 w-full flex flex-col items-center justify-center p-4 text-center bg-gray-50/50 rounded-lg border border-dashed border-gray-200 text-gray-400 font-poppins">
+              <p className="text-xs font-semibold text-gray-500">Sin cronograma contractual</p>
+              <p className="text-[9.5px] mt-1 text-gray-400">Defina las fechas de inicio y terminación del proyecto para visualizar la Curva S.</p>
+            </div>
+          ) : (
+            <div className="h-44 w-full flex items-end justify-between gap-1.5 pt-4 pb-2 px-2 border-b border-gray-100 bg-gray-50/50 rounded-lg font-poppins">
+              {mesesCurvaS.map((item, i) => (
+                <div key={i} className="flex-1 flex flex-col items-center gap-1 h-full justify-end group relative">
+                  <div className="opacity-0 group-hover:opacity-100 absolute -top-8 bg-gray-900 text-white text-[9px] py-0.5 px-1.5 rounded pointer-events-none transition-opacity font-poppins z-10 whitespace-nowrap shadow">
+                    Prog: {item.programado}% {item.ejecutado > 0 ? `· Ejec: ${item.ejecutado}%` : ''}
+                  </div>
+                  <div className="w-full flex items-end justify-center gap-0.5 h-full">
+                    <div className="w-full max-w-[10px] bg-red-200 rounded-t transition-all" style={{ height: `${item.programado}%` }} />
+                    {item.ejecutado > 0 && (
+                      <div className="w-full max-w-[10px] bg-[#9B0F06] rounded-t transition-all" style={{ height: `${item.ejecutado}%` }} />
+                    )}
+                  </div>
+                  <span className="text-[8.5px] text-gray-500 font-poppins truncate max-w-[45px]">{item.mes}</span>
                 </div>
-                <div className="w-full flex items-end justify-center gap-0.5 h-full">
-                  <div className="w-full max-w-[10px] bg-red-200 rounded-t transition-all" style={{ height: `${item.programado}%` }} />
-                  {item.ejecutado > 0 && (
-                    <div className="w-full max-w-[10px] bg-[#9B0F06] rounded-t transition-all" style={{ height: `${item.ejecutado}%` }} />
-                  )}
-                </div>
-                <span className="text-[8.5px] text-gray-500 font-poppins truncate max-w-[45px]">{item.mes}</span>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
 
           <div className="flex justify-between text-[9.5px] text-gray-500 font-poppins pt-1">
             <span className="flex items-center gap-1.5 font-poppins">
@@ -368,17 +342,24 @@ export function EstadisticasPlanificacion({
           </div>
 
           <div className="space-y-2.5 text-[10px] font-poppins">
-            {capitulosData.slice(0, 5).map((c) => (
-              <div key={c.codigo} className="space-y-1">
-                <div className="flex justify-between text-[9.5px]">
-                  <span className="text-gray-700 font-medium truncate max-w-[200px] font-poppins">{c.cap}</span>
-                  <span className="font-bold text-gray-900 font-poppins">{c.ejec}%</span>
-                </div>
-                <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
-                  <div className="bg-[#9B0F06] h-full rounded-full transition-all" style={{ width: `${c.ejec}%` }} />
-                </div>
+            {capitulosData.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-36 text-center text-gray-400 font-poppins">
+                <p className="text-xs font-semibold text-gray-500">Sin capítulos registrados</p>
+                <p className="text-[9.5px] text-gray-400 mt-1">Este proyecto aún no tiene partidas ni capítulos configurados.</p>
               </div>
-            ))}
+            ) : (
+              capitulosData.slice(0, 5).map((c) => (
+                <div key={c.codigo} className="space-y-1">
+                  <div className="flex justify-between text-[9.5px]">
+                    <span className="text-gray-700 font-medium truncate max-w-[200px] font-poppins">{c.cap}</span>
+                    <span className="font-bold text-gray-900 font-poppins">{c.ejec}%</span>
+                  </div>
+                  <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+                    <div className="bg-[#9B0F06] h-full rounded-full transition-all" style={{ width: `${c.ejec}%` }} />
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
 
@@ -403,7 +384,9 @@ export function EstadisticasPlanificacion({
             <div
               className="relative w-28 h-28 rounded-full border-8 border-gray-100 flex items-center justify-center shadow-inner"
               style={{
-                background: `conic-gradient(#059669 0% ${Math.round((renglonesAprobados / (totalRenglones || 1)) * 100)}%, #E85D04 ${Math.round((renglonesAprobados / (totalRenglones || 1)) * 100)}% ${Math.round(((renglonesAprobados + renglonesEnProceso) / (totalRenglones || 1)) * 100)}%, #9B0F06 ${Math.round(((renglonesAprobados + renglonesEnProceso) / (totalRenglones || 1)) * 100)}% 100%)`,
+                background: totalRenglones > 0
+                  ? `conic-gradient(#059669 0% ${Math.round((renglonesAprobados / (totalRenglones || 1)) * 100)}%, #E85D04 ${Math.round((renglonesAprobados / (totalRenglones || 1)) * 100)}% ${Math.round(((renglonesAprobados + renglonesEnProceso) / (totalRenglones || 1)) * 100)}%, #9B0F06 ${Math.round(((renglonesAprobados + renglonesEnProceso) / (totalRenglones || 1)) * 100)}% 100%)`
+                  : '#F3F4F6',
               }}
             >
               <div className="w-16 h-16 bg-white rounded-full flex flex-col items-center justify-center shadow-xs">
@@ -516,8 +499,8 @@ export function EstadisticasPlanificacion({
               ))}
               {datosPaginados.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="p-6 text-center text-gray-400 text-xs font-poppins">
-                    No se encontraron capítulos que coincidan con la búsqueda.
+                  <td colSpan={6} className="p-8 text-center text-gray-400 text-xs font-poppins">
+                    No se encontraron capítulos ni renglones de trabajo para el proyecto seleccionado.
                   </td>
                 </tr>
               )}

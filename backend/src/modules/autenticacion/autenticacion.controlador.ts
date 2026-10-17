@@ -1,8 +1,13 @@
 import { Request, Response } from 'express'
 import { z } from 'zod'
+import jwt from 'jsonwebtoken'
 import { sendError, sendResponse } from '@/shared/response'
 import { SolicitudAutenticada } from '@/middlewares/autenticacion.middleware'
-import { iniciarSesion } from '@/modules/autenticacion/autenticacion.servicio'
+import {
+  iniciarSesion,
+  LimiteDispositivosError,
+  cerrarSesionUsuario,
+} from '@/modules/autenticacion/autenticacion.servicio'
 import { obtenerCookie } from '@/shared/utils/cookies'
 import { entorno } from '@/configuracion/entorno'
 import { clienteSupabase } from '@/configuracion/cliente-supabase'
@@ -14,6 +19,9 @@ const esquemaInicioSesion = z.object({
   username: z.string().min(1).optional(),
   contrasena: z.string().min(1).optional(),
   password: z.string().min(1).optional(),
+  deviceId: z.string().optional(),
+  dispositivo: z.string().optional(),
+  cerrarOtrasSesiones: z.boolean().optional(),
 }).refine((data) => Boolean(data.correo || data.identificador || data.username), {
   message: 'Debe ingresar correo o identificador',
   path: ['correo'],
@@ -41,16 +49,22 @@ export async function iniciarSesionControlador(req: Request, res: Response) {
       credIdentificador,
       credPassword,
       req.ip,
-      req.headers['user-agent'] as string
+      req.headers['user-agent'] as string,
+      {
+        deviceId: resultado.data.deviceId || (req.headers['x-device-id'] as string),
+        nombreDispositivo: resultado.data.dispositivo,
+        cerrarOtrasSesiones: Boolean(resultado.data.cerrarOtrasSesiones),
+      }
     )
     if (!acceso) {
       return sendError(res, 401, 'Credenciales incorrectas')
     }
 
+    const esHttps = req.secure || req.headers['x-forwarded-proto'] === 'https' || entorno.modo === 'production'
     res.cookie('token', acceso.token, {
       httpOnly: true,
-      secure: entorno.modo === 'production',
-      sameSite: 'strict',
+      secure: Boolean(esHttps),
+      sameSite: 'lax',
       maxAge: 8 * 60 * 60 * 1000 // 8 horas
     })
 
@@ -58,6 +72,17 @@ export async function iniciarSesionControlador(req: Request, res: Response) {
   } catch (error: unknown) {
     if (error instanceof Error && error.message === 'DESACTIVADO') {
       return sendError(res, 403, 'Su cuenta se encuentra desactivada. Contacte al administrador.')
+    }
+    if (error instanceof LimiteDispositivosError) {
+      return res.status(409).json({
+        success: false,
+        codigo: 'LIMITE_DISPOSITIVOS_ALCANZADO',
+        mensaje: 'Límite de dispositivos alcanzado (máximo 2). Tu cuenta ya tiene 2 sesiones activas en otros equipos.',
+        data: {
+          limite: 2,
+          dispositivosActivos: error.dispositivosActivos,
+        },
+      })
     }
     console.error('[autenticacion.controlador] Error no controlado en iniciarSesion', {
       identificador: resultado.success ? resultado.data.correo : req.body?.correo,
@@ -70,12 +95,37 @@ export async function iniciarSesionControlador(req: Request, res: Response) {
   }
 }
 
-
 export async function cerrarSesionControlador(req: Request, res: Response) {
-  const cookieHeader = req.headers.cookie
   try {
-    res.clearCookie('token')
-    res.clearCookie('refreshToken')
+    const cookieHeader = req.headers.cookie
+    let token = obtenerCookie(cookieHeader, 'token')
+    if (!token && req.headers.authorization?.startsWith('Bearer ')) {
+      token = req.headers.authorization.slice(7)
+    }
+
+    if (token) {
+      try {
+        const payload = jwt.decode(token) as any
+        if (payload?.sub) {
+          const deviceId = req.body?.deviceId || (req.headers['x-device-id'] as string) || payload.deviceId
+          await cerrarSesionUsuario(payload.sub, deviceId, payload.sessionId)
+        }
+      } catch (errLog) {
+        console.warn('[autenticacion.controlador] Error al procesar logout en seguridad_log:', errLog)
+      }
+    }
+
+    const esHttps = req.secure || req.headers['x-forwarded-proto'] === 'https' || entorno.modo === 'production'
+    res.clearCookie('token', {
+      httpOnly: true,
+      secure: Boolean(esHttps),
+      sameSite: 'lax',
+    })
+    res.clearCookie('refreshToken', {
+      httpOnly: true,
+      secure: Boolean(esHttps),
+      sameSite: 'lax',
+    })
 
     return sendResponse(res, 200, null, 'Sesión cerrada correctamente')
   } catch (error: any) {
@@ -89,6 +139,25 @@ export async function obtenerPerfilControlador(req: SolicitudAutenticada, res: R
   }
 
   try {
+    if (req.usuario.sessionId) {
+      const { data: sessionLog } = await clienteSupabase
+        .from('seguridad_log')
+        .select('detalles, exitoso')
+        .eq('usuario_id', req.usuario.sub)
+        .eq('accion', 'login')
+        .contains('detalles', { session_id: req.usuario.sessionId })
+        .maybeSingle()
+
+      if (sessionLog && ((sessionLog.detalles as any)?.estado === 'revocada' || !sessionLog.exitoso)) {
+        return sendError(
+          res,
+          401,
+          'Tu sesión ha expirado porque se inició sesión en otro dispositivo superando el límite de 2 equipos.',
+          'SESION_REVOCADA_LIMITE'
+        )
+      }
+    }
+
     const { data: usuario, error } = await clienteSupabase
       .from('usuario')
       .select('id, correo, rol_id, activo, ultimo_acceso, fecha_registro, dato_usuario(primer_nombre, segundo_nombre, primer_apellido, segundo_apellido, username, telefono, direccion, fecha_nacimiento)')

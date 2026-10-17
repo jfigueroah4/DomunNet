@@ -1,6 +1,13 @@
-import { ProyectoEditorView } from '@/components/modules/proyectos/ProyectoEditorView'
+import nextDynamic from 'next/dynamic'
 import { proyectoService } from '@/services/proyectos/proyecto.service'
 import { redirect } from 'next/navigation'
+
+const ProyectoEditorView = nextDynamic(
+  () => import('@/components/modules/proyectos/ProyectoEditorView').then((mod) => mod.ProyectoEditorView),
+  {
+    loading: () => <div className="min-h-[50vh] animate-pulse rounded-xl bg-gray-100" />,
+  }
+)
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
@@ -18,4 +25,4 @@ export default async function ProyectoEditarPage({
   const proyecto = await proyectoService.getProyectoBySlug(slug)
 
   return <ProyectoEditorView modo="editar" proyectoInicial={proyecto} />
-}
+}

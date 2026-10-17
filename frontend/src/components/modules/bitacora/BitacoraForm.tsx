@@ -23,6 +23,7 @@ import {
 import { RegistroBitacora } from '@/types/bitacora'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { api, apiGetDeduplicado } from '@/lib/api/cliente'
+import { esProyectoNoBorrador } from '@/lib/proyectos/estado'
 import { showSuccessToast, showErrorToast } from '@/components/ui/Toast'
 import { Portal } from '@/components/ui/Portal'
 import { Combobox } from '@/components/ui/Combobox'
@@ -316,7 +317,7 @@ export function BitacoraForm({
 
   const handleCambiarLado = (lado: 'Ambos' | 'Derecho' | 'Izquierdo' | '') => {
     setLadoRenglon(lado)
-    setErrors((p) => ({ ...p, renglones: '' }))
+    setErrors((p) => ({ ...p, lado: '', renglones: '' }))
   }
 
   const sanitizeEstacion = (val: string) => {
@@ -340,12 +341,12 @@ export function BitacoraForm({
 
   const handleCambiarEstInicio = (val: string) => {
     setEstInicioRenglon(sanitizeEstacion(val))
-    setErrors((p) => ({ ...p, renglones: '' }))
+    setErrors((p) => ({ ...p, estInicio: '', estaciones: '', renglones: '' }))
   }
 
   const handleCambiarEstFin = (val: string) => {
     setEstFinRenglon(sanitizeEstacion(val))
-    setErrors((p) => ({ ...p, renglones: '' }))
+    setErrors((p) => ({ ...p, estFin: '', estaciones: '', renglones: '' }))
   }
 
   const handleKeyDownEstacion = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -382,23 +383,24 @@ export function BitacoraForm({
   useEffect(() => {
     const cargarProyectos = async () => {
       try {
+        const rolStr = (user?.rol || '').toLowerCase()
+        const esAdmin = rolStr.includes('admin') || rolStr.includes('director') || rolStr.includes('gerencia')
+        const esResidente = rolStr.includes('residente')
+        const esRestringido = !esAdmin && !esResidente
+
         const [resProy, resPU] = await Promise.all([
           apiGetDeduplicado('/proyectos'),
-          apiGetDeduplicado('/mantenimiento/proyecto_usuario').catch(() => ({ data: { data: [] } })),
+          esRestringido && user?.id
+            ? apiGetDeduplicado('/mantenimiento/proyecto_usuario').catch(() => ({ data: { data: [] } }))
+            : Promise.resolve({ data: { data: [] } }),
         ])
 
         if (resProy.data?.success && Array.isArray(resProy.data.data)) {
           let activos = resProy.data.data.filter(
             (p: any) =>
               (p.estado === 'activo' || p.estado_codigo === 'activo') &&
-              p.estado !== 'borrador' &&
-              p.estado_codigo !== 'borrador'
+              esProyectoNoBorrador(p)
           )
-
-          const rolStr = (user?.rol || '').toLowerCase()
-          const esAdmin = rolStr.includes('admin') || rolStr.includes('director') || rolStr.includes('gerencia')
-          const esResidente = rolStr.includes('residente')
-          const esRestringido = !esAdmin && !esResidente
 
           if (esRestringido && user?.id) {
             const puList = Array.isArray(resPU.data?.data) ? resPU.data.data : []
@@ -481,7 +483,7 @@ export function BitacoraForm({
 
     Promise.allSettled([
       apiGetDeduplicado(`/proyectos/${proyId}`),
-      apiGetDeduplicado(`/mantenimiento/renglon_trabajo?limite=300`),
+      apiGetDeduplicado(`/mantenimiento/renglon_trabajo?limite=300&filtros=${encodeURIComponent(JSON.stringify({ proyecto_id: proyId }))}`),
       apiGetDeduplicado(`/hoja-sabana/${proyId}/mediciones`),
       apiGetDeduplicado(`/proyectos/${proyId}/pendientes`),
     ]).then(([resProy, resReng, resMed, resPend]) => {
@@ -538,15 +540,39 @@ export function BitacoraForm({
       const modoManual =
         proy?.modoGestionFinanciera === 'manual' ||
         proy?.modo_gestion_financiera === 'manual' ||
+        proy?.tipoObra === 'manual' ||
+        proy?.tipo_obra === 'manual' ||
         proy?.usarModoSabana === false ||
+        proy?.tieneSabana === false ||
         (Array.isArray(proy?.renglones_seleccionados) && proy.renglones_seleccionados.length > 0)
 
       let renglonesValidos: any[] = []
 
       if (modoManual) {
         // --- MODO MANUAL: Renglones seleccionados en el apartado / drawer ---
+        let localSel: any[] | null = null
+        let localRengs: any[] | null = null
+        if (proy?.id) {
+          try {
+            const sSel = localStorage.getItem(`domun_renglones_seleccionados_${proy.id}`)
+            if (sSel) {
+              const p = JSON.parse(sSel)
+              if (Array.isArray(p) && p.length > 0) localSel = p
+            }
+          } catch (_) {}
+          try {
+            const sRengs = localStorage.getItem(`domun_proyecto_renglones_${proy.id}`)
+            if (sRengs) {
+              const p = JSON.parse(sRengs)
+              if (Array.isArray(p) && p.length > 0) localRengs = p
+            }
+          } catch (_) {}
+        }
+
         const listaOrigen =
+          localSel ||
           (Array.isArray(proy?.renglones_seleccionados) && proy.renglones_seleccionados.length > 0 ? proy.renglones_seleccionados : null) ||
+          localRengs ||
           (Array.isArray(proy?.renglones) && proy.renglones.length > 0 ? proy.renglones : null) ||
           (Array.isArray(proy?.planTrabajo) && proy.planTrabajo.length > 0 ? proy.planTrabajo : null) ||
           []
@@ -636,11 +662,15 @@ export function BitacoraForm({
         renglonesValidos = Array.from(mapaConRegistro.values())
       }
 
+      if (renglonesValidos.length === 0) {
+        renglonesValidos = RENGLONES_FALLBACK_DEFAULT
+      }
+
       // Ordenar numéricamente por código
       renglonesValidos.sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }))
       setProyectoPlanTrabajo(renglonesValidos)
     }).catch(() => {
-      setProyectoPlanTrabajo([])
+      setProyectoPlanTrabajo(RENGLONES_FALLBACK_DEFAULT)
     })
   }, [fd.proyectoId])
 
@@ -809,6 +839,7 @@ export function BitacoraForm({
         municipio: geo?.municipio || prev.municipio || 'Guatemala',
         precisionGps: accuracy ?? null,
       }))
+      setErrors((p) => ({ ...p, ubicacionGps: '' }))
       setObteniendoGps(false)
       showSuccessToast('Ubicación obtenida correctamente')
     }
@@ -840,6 +871,7 @@ export function BitacoraForm({
           ...prev,
           ubicacionGps: nomUbic || 'Frente de Obra, Guatemala',
         }))
+        setErrors((p) => ({ ...p, ubicacionGps: '' }))
         setObteniendoGps(false)
         showSuccessToast('Ubicación establecida según el proyecto')
         return
@@ -891,30 +923,22 @@ export function BitacoraForm({
 
   // Renglones filtrados para el Combobox
   const renglonesFiltradosCombobox = useMemo(() => {
-    // 1. Si el proyecto tiene renglones activos/seleccionados
-    if (proyectoPlanTrabajo.length > 0) {
-      if (!busquedaCombobox.trim()) return proyectoPlanTrabajo
-      const q = busquedaCombobox.toLowerCase()
-      return proyectoPlanTrabajo.filter(
-        (r) =>
-          r.id.toLowerCase().includes(q) ||
-          r.desc.toLowerCase().includes(q) ||
-          r.unidad.toLowerCase().includes(q)
-      )
-    }
-
-    // 2. Si no hay renglones configurados para este proyecto y el usuario escribe en el buscador
-    if (busquedaCombobox.trim().length >= 1) {
-      const q = busquedaCombobox.toLowerCase()
-      return CATALOGO_COMPLETO_88_ITEMS.filter(
-        (r) =>
-          r.id.toLowerCase().includes(q) ||
-          r.desc.toLowerCase().includes(q) ||
-          r.unidad.toLowerCase().includes(q)
-      )
-    }
-
-    return []
+    const lista = proyectoPlanTrabajo.length > 0 ? proyectoPlanTrabajo : CATALOGO_COMPLETO_88_ITEMS
+    if (!busquedaCombobox.trim()) return lista
+    const q = busquedaCombobox.toLowerCase()
+    const filtrados = lista.filter(
+      (r) =>
+        r.id.toLowerCase().includes(q) ||
+        r.desc.toLowerCase().includes(q) ||
+        r.unidad.toLowerCase().includes(q)
+    )
+    if (filtrados.length > 0) return filtrados
+    return CATALOGO_COMPLETO_88_ITEMS.filter(
+      (r) =>
+        r.id.toLowerCase().includes(q) ||
+        r.desc.toLowerCase().includes(q) ||
+        r.unidad.toLowerCase().includes(q)
+    )
   }, [proyectoPlanTrabajo, busquedaCombobox])
 
   // Procesar Fotografía única con Compresión Automática (Reduce 2MB-10MB a ~180KB-350KB)
@@ -962,6 +986,7 @@ export function BitacoraForm({
   // Manejar cambio en preset de observaciones
   const handleCambiarObservacionPreset = (val: string) => {
     setObservacionPreset(val)
+    setErrors((p) => ({ ...p, observaciones: '' }))
     if (val !== 'Otra...') {
       set('observacionesGenerales', val)
     } else {
@@ -969,12 +994,89 @@ export function BitacoraForm({
     }
   }
 
-  // Validaciones del formulario
+  // Validaciones del formulario: todos los campos son obligatorios
   const validarFormulario = (): boolean => {
     const errs: Record<string, string> = {}
     if (!fd.proyectoId) errs.proyectoId = 'Selecciona un proyecto'
     if (!fd.fotografiaPrincipal) errs.foto = 'Adjunta la evidencia fotográfica de la jornada'
 
+    // 1. Ubicación / Coordenadas / Dirección (OBLIGATORIA)
+    if (!fd.ubicacionGps || !fd.ubicacionGps.trim()) {
+      errs.ubicacionGps = 'Ingresa la ubicación o presiona para detectar coordenadas GPS'
+    }
+
+    // 2. Selección de Renglón (OBLIGATORIO)
+    if (!renglonSeleccionadoId) {
+      errs.renglon = 'Selecciona un renglón de obra'
+    }
+
+    // 3. Lado de la vía (OBLIGATORIO)
+    if (!ladoRenglon) {
+      errs.lado = 'Selecciona el lado de la vía'
+    }
+
+    // 4. Estación de Inicio (OBLIGATORIA)
+    if (!estInicioRenglon || !estInicioRenglon.trim()) {
+      errs.estInicio = 'Ingresa la estación de inicio'
+    }
+
+    // 5. Estación de Fin (OBLIGATORIA)
+    if (!estFinRenglon || !estFinRenglon.trim()) {
+      errs.estFin = 'Ingresa la estación de fin'
+    }
+
+    // Validación detallada de formato y límites de estaciones si ambas están escritas
+    if (estInicioRenglon && estFinRenglon) {
+      const finalEstIni = estInicioRenglon.trim()
+      const finalEstFin = estFinRenglon.trim()
+
+      const mIniStr = (finalEstIni.split('+')[1] || '').trim()
+      const mFinStr = (finalEstFin.split('+')[1] || '').trim()
+
+      const mIni = parseMeters(finalEstIni)
+      const mFin = parseMeters(finalEstFin)
+
+      if (mIniStr && parseInt(mIniStr, 10) > 999) {
+        errs.estInicio = `Los metros después de '+' no pueden exceder 999 (+${mIniStr})`
+      } else if (mFinStr && parseInt(mFinStr, 10) > 999) {
+        errs.estFin = `Los metros después de '+' no pueden exceder 999 (+${mFinStr})`
+      } else if (mIni === null) {
+        errs.estInicio = 'Formato no válido (ej. 15+000)'
+      } else if (mFin === null) {
+        errs.estFin = 'Formato no válido (ej. 35+500)'
+      } else if (mFin < mIni) {
+        errs.estFin = `Est. Fin (${finalEstFin}) debe ser mayor o igual a Est. Inicio (${finalEstIni})`
+      } else {
+        const esFisicoValido =
+          (proyMinMeters === null || mIni >= proyMinMeters) &&
+          (proyMaxMeters === null || mFin <= proyMaxMeters)
+
+        const esRelativoValido =
+          longitudTramoMeters !== null &&
+          proyMinMeters > 0 &&
+          mIni >= 0 &&
+          mFin <= longitudTramoMeters
+
+        if (!esFisicoValido && !esRelativoValido) {
+          if (proyMinMeters > 0 && longitudTramoMeters !== null) {
+            errs.estaciones = `La estación debe estar en el rango físico (${proyMinEstacion} a ${proyMaxEstacion}) o en el tramo de obra (0+000 a ${formatMeters(longitudTramoMeters)})`
+          } else if (proyMinMeters !== null && proyMaxMeters !== null) {
+            errs.estaciones = `La estación debe estar dentro de los límites del proyecto (${proyMinEstacion} a ${proyMaxEstacion})`
+          } else if (proyMinMeters !== null && mIni < proyMinMeters) {
+            errs.estInicio = `Est. Inicio (${finalEstIni}) no puede ser menor a ${proyMinEstacion}`
+          }
+        }
+      }
+    }
+
+    // 6. Descripción u observaciones de la jornada (OBLIGATORIA)
+    if (!observacionPreset) {
+      errs.observaciones = 'Selecciona una observación o escribe en "Otra..."'
+    } else if (observacionPreset === 'Otra...' && !fd.observacionesGenerales?.trim()) {
+      errs.observaciones = 'Añade una descripción u observaciones detalladas de la jornada'
+    }
+
+    // 7. Suspensión de actividades
     if (fd.suspensionActividades) {
       const finalMotivo =
         motivoSuspensionPreset === 'Otra...' ? motivoSuspensionOtra.trim() : motivoSuspensionPreset.trim()
@@ -989,61 +1091,6 @@ export function BitacoraForm({
           errs.horaReanudacion = 'Ingresa la hora de reanudación'
         } else if (fd.horaReanudacion <= fd.horaSuspension) {
           errs.horaReanudacion = 'La hora de reanudación debe ser posterior a la de suspensión'
-        }
-      }
-    }
-
-    if (fd.tipoIngreso === 'Campo') {
-      if (!renglonSeleccionadoId) {
-        errs.renglones = 'Selecciona un renglón de obra'
-      } else {
-        if (!ladoRenglon) {
-          errs.renglones = 'Selecciona el lado de la vía (Ambos, Derecho o Izquierdo)'
-        } else {
-          const finalEstIni = estInicioRenglon?.trim() || proyMinEstacion || '0+000'
-          const finalEstFin =
-            estFinRenglon?.trim() ||
-            proyMaxEstacion ||
-            (proyMinMeters !== null ? formatMeters(proyMinMeters + 500) : '0+500')
-
-          const mIniStr = (finalEstIni.split('+')[1] || '').trim()
-          const mFinStr = (finalEstFin.split('+')[1] || '').trim()
-
-          const mIni = parseMeters(finalEstIni)
-          const mFin = parseMeters(finalEstFin)
-
-          if (mIniStr && parseInt(mIniStr, 10) > 999) {
-            errs.renglones = `Los metros después de '+' en Est. Inicio no pueden exceder 999 (+${mIniStr})`
-          } else if (mFinStr && parseInt(mFinStr, 10) > 999) {
-            errs.renglones = `Los metros después de '+' en Est. Fin no pueden exceder 999 (+${mFinStr})`
-          } else if (mIni === null || mFin === null) {
-            errs.renglones = 'Formato de estación no válido (ej. 0+000)'
-          } else if (mFin < mIni) {
-            errs.renglones = `Est. Fin (${finalEstFin}) debe ser mayor o igual a Est. Inicio (${finalEstIni})`
-          } else {
-            // Validación Híbrida / Flexible (Opción C):
-            // Modo A: Cadenamiento Físico DGC [proyMinMeters, proyMaxMeters]
-            // Modo B: Cadenamiento Relativo [0, longitudTramoMeters] (cuando proyMinMeters > 0)
-            const esFisicoValido =
-              (proyMinMeters === null || mIni >= proyMinMeters) &&
-              (proyMaxMeters === null || mFin <= proyMaxMeters)
-
-            const esRelativoValido =
-              longitudTramoMeters !== null &&
-              proyMinMeters > 0 &&
-              mIni >= 0 &&
-              mFin <= longitudTramoMeters
-
-            if (!esFisicoValido && !esRelativoValido) {
-              if (proyMinMeters > 0 && longitudTramoMeters !== null) {
-                errs.renglones = `La estación debe estar en el rango físico (${proyMinEstacion} a ${proyMaxEstacion}) o en el tramo de obra (0+000 a ${formatMeters(longitudTramoMeters)})`
-              } else if (proyMinMeters !== null && proyMaxMeters !== null) {
-                errs.renglones = `La estación debe estar dentro de los límites del proyecto (${proyMinEstacion} a ${proyMaxEstacion})`
-              } else if (proyMinMeters !== null && mIni < proyMinMeters) {
-                errs.renglones = `Est. Inicio (${finalEstIni}) no puede ser menor a ${proyMinEstacion}`
-              }
-            }
-          }
         }
       }
     }
@@ -1258,7 +1305,7 @@ export function BitacoraForm({
   }
 
   return (
-    <div className="font-[Poppins] w-full max-w-full overflow-x-hidden sm:overflow-visible min-h-[calc(100vh-65px)] bg-white flex flex-col touch-pan-y">
+    <div className="bitacora-form-mobile font-[Poppins] w-full max-w-full overflow-x-hidden sm:overflow-visible min-h-[calc(100vh-65px)] bg-white flex flex-col touch-pan-y">
       {/* Input de archivo oculto */}
       <input
         ref={fileInputFotoRef}
@@ -1314,9 +1361,9 @@ export function BitacoraForm({
           )}
         </div>
 
-        {/* Derecha: Selector de Proyecto con título a 9px */}
-        <div className="flex items-center gap-1.5 z-10 min-w-0">
-          <span className="text-[9px] uppercase font-black text-[#9B0F06] hidden md:inline shrink-0">
+        {/* Derecha: Selector de Proyecto con título a 9.5px y color neutro */}
+        <div className="flex items-center gap-1.5 z-10 min-w-0 flex-1 justify-end">
+          <span className="text-[9.5px] uppercase font-bold text-gray-700 hidden md:inline shrink-0" style={{ fontSize: '9.5px' }}>
             PROYECTO:
           </span>
           <div className="hidden sm:block w-[220px] md:w-[300px]">
@@ -1332,28 +1379,32 @@ export function BitacoraForm({
               }}
               placeholder={proyectosActivos.length === 0 ? 'Cargando proyectos...' : 'Seleccionar proyecto'}
               allowNumbers={true}
-              inputClassName="h-[26px] !py-0 !rounded-lg text-[9px] sm:text-[10px] font-bold text-[#9B0F06] border-[#9B0F06]/35"
-              dropdownClassName="z-[100] min-w-[320px] max-w-[min(520px,calc(100vw-2rem))] max-h-72"
+              inputClassName="h-[26px] !py-0 !rounded-lg text-[9.5px] font-semibold text-gray-700 border-gray-300"
+              dropdownClassName="z-[100] min-w-[320px] max-w-[min(520px,calc(100vw-2rem))] max-h-72 text-[9.5px]"
             />
           </div>
-          <select
-            value={fd.proyectoId}
-            onChange={(e) => {
-              set('proyectoId', e.target.value)
-              setErrors((p) => ({ ...p, proyectoId: '' }))
-            }}
-            className="sm:hidden rounded-lg border border-[#9B0F06]/35 text-[#9B0F06] font-bold bg-transparent px-2 py-0.5 h-[24px] text-[9px] focus:outline-none focus:ring-1 focus:ring-[#9B0F06] cursor-pointer max-w-[200px] truncate shadow-2xs"
-          >
-            {proyectosActivos.length === 0 ? (
-              <option value="">Cargando proyectos...</option>
-            ) : (
-              proyectosActivos.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.codigo || 'PROY'} · {p.nombreOficial || p.nombre || p.nombre_oficial}
-                </option>
-              ))
-            )}
-          </select>
+          <div className="sm:hidden relative flex items-center min-w-0 flex-1 max-w-[310px] xs:max-w-[350px]">
+            <select
+              value={fd.proyectoId}
+              onChange={(e) => {
+                set('proyectoId', e.target.value)
+                setErrors((p) => ({ ...p, proyectoId: '' }))
+              }}
+              style={{ fontSize: '10px', height: '26px' }}
+              className="bitacora-form-control appearance-none w-full rounded-lg border border-gray-300 text-gray-700 font-semibold bg-white pl-2 pr-6 py-0 h-[26px] !text-[10px] text-[10px] leading-tight focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 cursor-pointer truncate shadow-2xs"
+            >
+              {proyectosActivos.length === 0 ? (
+                <option value="" style={{ fontSize: '10px' }}>Cargando proyectos...</option>
+              ) : (
+                proyectosActivos.map((p) => (
+                  <option key={p.id} value={p.id} style={{ fontSize: '10px' }}>
+                    {p.codigo || 'PROY'} · {p.nombreOficial || p.nombre || p.nombre_oficial}
+                  </option>
+                ))
+              )}
+            </select>
+            <ChevronDown size={11} className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-500" />
+          </div>
         </div>
       </div>
 
@@ -1410,13 +1461,13 @@ export function BitacoraForm({
       {/* PASO 2: VISTA PREVIA COMPACTA EN MOBILE, EXPANDIDA EN DESKTOP             */}
       {/* ========================================================================= */}
       {paso === 2 && fd.fotografiaPrincipal && (
-        <div className="flex-1 bg-white flex flex-col items-center justify-between p-3 sm:p-10 pb-2 sm:pb-8 min-h-[calc(100dvh-175px)] sm:min-h-[calc(100vh-140px)] w-full max-w-full overflow-x-hidden">
-          <div className="w-full flex-1 flex items-center justify-center py-1 sm:py-0">
-            <div className="relative max-w-3xl w-full max-h-[38vh] sm:max-h-[65vh] flex items-center justify-center rounded-2xl overflow-hidden border border-gray-100 bg-gray-50 shadow-sm group">
+        <div className="flex-1 bg-white flex flex-col justify-between p-2 sm:p-6 pt-1 sm:pt-4 w-full max-w-full overflow-x-hidden min-h-[calc(100vh-140px)] pb-20 sm:pb-4">
+          <div className="w-full flex-1 flex items-center justify-center py-1 sm:py-2 min-h-0">
+            <div className="relative max-w-2xl w-full min-h-[220px] max-h-[58vh] sm:h-[72vh] sm:min-h-[380px] sm:max-h-[78vh] flex items-center justify-center rounded-2xl overflow-hidden border border-gray-100 bg-gray-50 shadow-sm group">
               <img
                 src={fd.fotografiaPrincipal.url}
                 alt="Vista previa evidencia"
-                className="w-full h-auto max-h-[34vh] sm:max-h-[62vh] object-contain rounded-xl sm:rounded-2xl cursor-pointer transition-transform active:scale-98"
+                className="w-full h-auto max-h-[56vh] sm:max-h-[70vh] object-contain rounded-xl sm:rounded-2xl cursor-pointer transition-transform active:scale-98"
                 onClick={() => setFotoModalUrl(fd.fotografiaPrincipal.url)}
               />
 
@@ -1444,8 +1495,8 @@ export function BitacoraForm({
             </div>
           </div>
 
-          {/* Botón Siguiente elevado con margen inferior amplio para que no lo tape el bottom navbar */}
-          <div className="w-full flex justify-end mt-2 sm:mt-4 mb-24 sm:mb-3 px-3 sm:px-12">
+          {/* Botón Siguiente posicionado correctamente elevado en mobile para no chocar con BottomNavbar */}
+          <div className="w-full max-w-2xl mx-auto flex justify-end pt-2 pb-6 sm:pb-3 px-1 sm:px-0 shrink-0">
             <button
               type="button"
               onClick={() => setPaso(3)}
@@ -1467,14 +1518,14 @@ export function BitacoraForm({
           <div className="lg:col-span-7 bg-white flex flex-col p-3 sm:p-5 pt-2 sm:pt-3 border-b lg:border-b-0 lg:border-r border-gray-100">
             {/* Barra superior con botón Cambiar */}
             <div className="w-full flex items-center justify-between pb-1.5 sm:pb-2 mb-1 sm:mb-2">
-              <span className="text-[11px] sm:text-[10px] font-medium text-gray-400 uppercase tracking-wide">
+              <span className="text-[11.5px] sm:text-[10.5px] font-medium text-gray-400 uppercase tracking-wide">
                 Evidencia Fotográfica
               </span>
               {fd.fotografiaPrincipal && (
                 <button
                   type="button"
                   onClick={() => fileInputFotoRef.current?.click()}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-white hover:bg-gray-50 text-gray-600 hover:text-gray-900 px-2 py-0.5 sm:px-2.5 sm:py-1 text-[11px] sm:text-[10.5px] font-normal transition-all cursor-pointer shadow-2xs border border-gray-200"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-white hover:bg-gray-50 text-gray-600 hover:text-gray-900 px-2 py-0.5 sm:px-2.5 sm:py-1 text-[11.5px] sm:text-[11px] font-normal transition-all cursor-pointer shadow-2xs border border-gray-200"
                   title="Cambiar fotografía"
                 >
                   <ArrowLeftRight size={12} className="text-gray-400" />
@@ -1493,7 +1544,7 @@ export function BitacoraForm({
                   <img
                     src={fd.fotografiaPrincipal.url}
                     alt={fd.fotografiaPrincipal.nombre}
-                    className="h-[180px] sm:h-[480px] lg:h-[520px] w-auto max-w-full object-contain rounded-xl sm:rounded-2xl shadow-2xs transition-transform group-hover:scale-[1.01]"
+                    className="w-full h-auto max-h-[220px] sm:h-[480px] lg:h-[520px] object-contain rounded-xl sm:rounded-2xl shadow-2xs transition-transform group-hover:scale-[1.01]"
                   />
                   {/* Solo ícono para ampliar con fondo blanco y corinto */}
                   <div className="absolute top-2.5 right-2.5 sm:top-3 sm:right-3 bg-white hover:bg-gray-50 text-[#9B0F06] p-1.5 rounded-xl border border-gray-200 shadow-md flex items-center justify-center transition-colors">
@@ -1513,82 +1564,104 @@ export function BitacoraForm({
             </div>
           </div>
 
-          {/* LADO DERECHO: Panel con líneas divisorias limpias y tipografía compacta (fuente 9.5px en selects y campos) */}
+          {/* LADO DERECHO: Panel con líneas divisorias limpias y tipografía compacta (selects/combos 9.5px, resto +0.5px) */}
           <div className="lg:col-span-5 p-3 sm:p-4 pt-2 sm:pt-3 bg-white flex flex-col justify-between">
             <div className="space-y-2.5 sm:space-y-3">
               {/* 1. Fila de Ubicación GPS (con geocodificación automática unificada sin emojis) */}
               <div className="border-b border-gray-100 pb-2 space-y-1">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <span className="text-[10px] font-bold text-gray-700 block mb-0.5">
-                      Ubicación / Coordenadas / Dirección
-                    </span>
-                    <input
-                      type="text"
-                      placeholder="Ingresa dirección o coordenadas, o presiona el botón para detectar en automático..."
-                      value={fd.ubicacionGps}
-                      onChange={(e) => {
-                        const val = e.target.value
-                        set('ubicacionGps', val)
-                        handleProcesarUbicacionOTexto(val)
-                      }}
-                      className="filtro-control w-full text-[9.5px] text-gray-800 placeholder-gray-400 outline-none bg-transparent truncate"
-                    />
-                  </div>
+                <div
+                  className={`p-1.5 rounded-lg border transition-colors ${
+                    errors.ubicacionGps
+                      ? 'border-[#9B0F06] ring-1 ring-[#9B0F06] bg-red-50/20'
+                      : 'border-gray-200 bg-white'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-1.5">
+                    <div className="min-w-0 flex-1">
+                      <span className="text-[10px] font-bold text-gray-700 block mb-1" style={{ fontSize: '10px' }}>
+                        Ubicación / Coordenadas / Dirección <span className="text-[#9B0F06]">*</span>
+                      </span>
+                      <textarea
+                        rows={2}
+                        placeholder="Ingresa dirección o coordenadas, o presiona el botón para detectar en automático..."
+                        value={fd.ubicacionGps}
+                        onChange={(e) => {
+                          const val = e.target.value
+                          set('ubicacionGps', val)
+                          setErrors((p) => ({ ...p, ubicacionGps: '' }))
+                          handleProcesarUbicacionOTexto(val)
+                        }}
+                        style={{ fontSize: '10px', lineHeight: '1.35' }}
+                        className="bitacora-form-control w-full text-[10px] placeholder:text-[10px] text-gray-800 placeholder-gray-400 outline-none bg-transparent resize-none font-normal"
+                      />
+                    </div>
 
-                  <div className="flex items-center gap-1 shrink-0">
-                    {/* Ícono de limpiar ubicación (solo visible cuando hay texto ingresado) */}
-                    {Boolean(fd.ubicacionGps && fd.ubicacionGps.trim().length > 0) && (
+                    <div className="flex items-center gap-0.5 shrink-0 pt-0.5">
+                      {/* Ícono de limpiar ubicación (solo visible cuando hay texto ingresado) */}
+                      {Boolean(fd.ubicacionGps && fd.ubicacionGps.trim().length > 0) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleLimpiarUbicacion()
+                            setErrors((p) => ({ ...p, ubicacionGps: '' }))
+                          }}
+                          className="p-1 text-gray-400 hover:text-gray-700 transition-colors cursor-pointer"
+                          title="Limpiar ubicación"
+                        >
+                          <Eraser size={13} />
+                        </button>
+                      )}
+
                       <button
                         type="button"
-                        onClick={handleLimpiarUbicacion}
-                        className="p-1 text-gray-400 hover:text-gray-700 transition-colors cursor-pointer"
-                        title="Limpiar ubicación"
+                        onClick={() => {
+                          setErrors((p) => ({ ...p, ubicacionGps: '' }))
+                          handleObtenerUbicacionGps()
+                        }}
+                        disabled={obteniendoGps}
+                        className="p-1.5 rounded-full hover:bg-gray-100 text-gray-500 hover:text-[#9B0F06] transition-colors cursor-pointer"
+                        title="Detectar ubicación GPS automáticamente"
                       >
-                        <Eraser size={13} />
+                        {obteniendoGps ? (
+                          <Loader2 size={15} className="animate-spin text-[#9B0F06]" />
+                        ) : (
+                          <MapPin size={15} />
+                        )}
                       </button>
-                    )}
-
-                    <button
-                      type="button"
-                      onClick={handleObtenerUbicacionGps}
-                      disabled={obteniendoGps}
-                      className="p-1.5 rounded-full hover:bg-gray-100 text-gray-500 hover:text-[#9B0F06] transition-colors cursor-pointer"
-                      title="Detectar ubicación GPS automáticamente"
-                    >
-                      {obteniendoGps ? (
-                        <Loader2 size={15} className="animate-spin text-[#9B0F06]" />
-                      ) : (
-                        <MapPin size={15} />
-                      )}
-                    </button>
+                    </div>
                   </div>
+
+                  {/* Badge de Auto-Detección */}
+                  {(fd.latitud || fd.departamento || fd.municipio) && (
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[9.5px] text-gray-500 font-mono pt-1 border-t border-gray-100 mt-1" style={{ fontSize: '9.5px' }}>
+                      <span className="text-gray-700 font-bold">Coordenada:</span>
+                      {fd.latitud && fd.longitud && (
+                        <span>Lat: {fd.latitud.toFixed(6)}, Lng: {fd.longitud.toFixed(6)}</span>
+                      )}
+                      {fd.departamento && (
+                        <span>· Dpto: <strong className="text-gray-800">{fd.departamento}</strong></span>
+                      )}
+                      {fd.municipio && (
+                        <span>· Mun: <strong className="text-gray-800">{fd.municipio}</strong></span>
+                      )}
+                    </div>
+                  )}
                 </div>
 
-                {/* Badge de Auto-Detección */}
-                {(fd.latitud || fd.departamento || fd.municipio) && (
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[9px] text-gray-500 font-mono pt-1">
-                    <span className="text-gray-700 font-bold">Coordenada:</span>
-                    {fd.latitud && fd.longitud && (
-                      <span>Lat: {fd.latitud.toFixed(6)}, Lng: {fd.longitud.toFixed(6)}</span>
-                    )}
-                    {fd.departamento && (
-                      <span>· Dpto: <strong className="text-gray-800">{fd.departamento}</strong></span>
-                    )}
-                    {fd.municipio && (
-                      <span>· Mun: <strong className="text-gray-800">{fd.municipio}</strong></span>
-                    )}
-                  </div>
+                {errors.ubicacionGps && (
+                  <p className="text-[9.5px] text-[#9B0F06] font-normal mt-0.5" style={{ fontSize: '9.5px' }}>
+                    {errors.ubicacionGps}
+                  </p>
                 )}
               </div>
 
-              {/* 2. Renglón de Trabajo (Combobox limpio con fuente 9px) */}
+              {/* 2. Renglón de Trabajo (Combobox con fuente 9.5px, resto +0.5px) */}
               <div className="space-y-1 sm:space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-gray-700">
-                    Selección de Renglón
+                  <span className="text-[10px] font-bold text-gray-700" style={{ fontSize: '10px' }}>
+                    Selección de Renglón <span className="text-[#9B0F06]">*</span>
                   </span>
-                  <span className="text-[9px] text-gray-400 font-mono">
+                  <span className="text-[10px] text-gray-400 font-mono text-right shrink-0 leading-tight" style={{ fontSize: '10px' }}>
                     {proyMinEstacion} ➔ {proyMaxEstacion || 'Fin'}
                     {longitudTramoMeters !== null && proyMinMeters > 0
                       ? ` · Long: ${(longitudTramoMeters / 1000).toFixed(1)} km`
@@ -1596,28 +1669,33 @@ export function BitacoraForm({
                   </span>
                 </div>
 
-                {/* Combobox interactivo con fuente 9.5px */}
+                {/* Combobox interactivo con fuente 10px */}
                 <div className="relative" ref={comboboxRef}>
                   <div
                     onClick={() => setComboboxAbierto((prev) => !prev)}
-                    className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-2 py-1 text-[9.5px] text-gray-800 cursor-pointer hover:border-gray-300 transition-colors shadow-2xs"
+                    style={{ fontSize: '10px' }}
+                    className={`bitacora-form-control flex items-center justify-between rounded-lg border px-2 py-1 !text-[10px] text-[10px] text-gray-800 cursor-pointer transition-colors shadow-2xs ${
+                      errors.renglon || errors.renglones
+                        ? 'border-[#9B0F06] ring-1 ring-[#9B0F06] bg-red-50/20'
+                        : 'border-gray-200 bg-white hover:border-gray-300'
+                    }`}
                   >
                     {renglonActualObj ? (
-                      <div className="flex items-center gap-1.5 min-w-0 flex-1 mr-2">
-                        <span className="font-mono text-[9px] font-medium text-gray-700 bg-gray-100 px-1 py-0.2 rounded shrink-0">
+                      <div className="flex items-center gap-1.5 min-w-0 flex-1 mr-2" style={{ fontSize: '10px' }}>
+                        <span className="font-mono text-[9px] font-medium text-gray-700 bg-gray-100 px-1 py-0.2 rounded shrink-0" style={{ fontSize: '9px' }}>
                           {renglonActualObj.id}
                         </span>
-                        <span className="text-[9.5px] font-normal text-gray-800 truncate">
+                        <span className="text-[10px] font-normal text-gray-800 truncate" style={{ fontSize: '10px' }}>
                           {limpiarDescripcionRenglon(renglonActualObj.desc, renglonActualObj.id)}
                         </span>
                         {renglonActualObj.unidad && (
-                          <span className="text-[9px] font-normal text-gray-400 font-mono bg-gray-50 px-1 py-0.2 rounded border border-gray-200 shrink-0">
+                          <span className="text-[9px] font-normal text-gray-400 font-mono bg-gray-50 px-1 py-0.2 rounded border border-gray-200 shrink-0" style={{ fontSize: '9px' }}>
                             {renglonActualObj.unidad}
                           </span>
                         )}
                       </div>
                     ) : (
-                      <span className="text-gray-400 text-[9.5px]">Selecciona un renglón...</span>
+                      <span className="text-gray-400 !text-[10px] text-[10px]" style={{ fontSize: '10px' }}>Selecciona un renglón...</span>
                     )}
 
                     <div className="flex items-center gap-1 shrink-0">
@@ -1646,7 +1724,7 @@ export function BitacoraForm({
                     </div>
                   </div>
 
-                  {/* Menú Desplegable del Combobox */}
+                  {/* Menú Desplegable del Combobox con fuente 10px */}
                   {comboboxAbierto && (
                     <div className="absolute top-full left-0 right-0 z-50 mt-1 max-h-[380px] overflow-y-auto rounded-xl border border-gray-200 bg-white p-2 shadow-2xl space-y-1">
                       <div className="sticky top-0 z-10 bg-white pb-2 pt-0.5 border-b border-gray-100 mb-1">
@@ -1657,7 +1735,8 @@ export function BitacoraForm({
                             value={busquedaCombobox}
                             onChange={(e) => setBusquedaCombobox(e.target.value)}
                             placeholder="Buscar renglón por código o descripción..."
-                            className="w-full rounded-lg border border-gray-200 bg-gray-50 py-1.5 pl-8 pr-2 text-[9.5px] sm:text-[10px] text-gray-800 placeholder-gray-400 focus:outline-none focus:border-gray-400 focus:bg-white"
+                            style={{ fontSize: '10px' }}
+                            className="bitacora-form-control w-full rounded-lg border border-gray-200 bg-gray-50 py-1.5 pl-8 pr-2 !text-[10px] text-[10px] placeholder:text-[10px] text-gray-800 placeholder-gray-400 focus:outline-none focus:border-gray-400 focus:bg-white"
                             autoFocus
                             onClick={(e) => e.stopPropagation()}
                           />
@@ -1667,14 +1746,14 @@ export function BitacoraForm({
                       {renglonesFiltradosCombobox.length === 0 ? (
                         <div className="py-4 px-3 text-center text-xs text-gray-400 space-y-1">
                           {busquedaCombobox.trim() ? (
-                            <p>No se encontraron renglones para "{busquedaCombobox}"</p>
+                            <p style={{ fontSize: '10px' }}>No se encontraron renglones para "{busquedaCombobox}"</p>
                           ) : proyectoPlanTrabajo.length === 0 ? (
                             <>
-                              <p className="font-semibold text-gray-500">Sin renglones con registros en la Hoja Sábana</p>
-                              <p className="text-[10px] text-gray-400">Escribe en el buscador superior para encontrar y asignar un renglón del catálogo.</p>
+                              <p className="font-semibold text-gray-500" style={{ fontSize: '10px' }}>Sin renglones con registros en la Hoja Sábana</p>
+                              <p className="text-[10px] text-gray-400" style={{ fontSize: '10px' }}>Escribe en el buscador superior para encontrar y asignar un renglón del catálogo.</p>
                             </>
                           ) : (
-                            <p>No se encontraron renglones</p>
+                            <p style={{ fontSize: '10px' }}>No se encontraron renglones</p>
                           )}
                         </div>
                       ) : (
@@ -1686,21 +1765,21 @@ export function BitacoraForm({
                               onClick={() => {
                                 setRenglonSeleccionadoId(renglon.id)
                                 setComboboxAbierto(false)
-                                setErrors((p) => ({ ...p, renglones: '' }))
+                                setErrors((p) => ({ ...p, renglon: '', renglones: '' }))
                               }}
                               className={`flex items-center justify-between gap-2 p-1.5 rounded-lg cursor-pointer transition-colors ${
                                 esSeleccionado ? 'bg-gray-100 font-bold text-gray-900' : 'hover:bg-gray-50 text-gray-700'
                               }`}
                             >
                               <div className="flex items-center gap-2 min-w-0 flex-1">
-                                <span className="font-mono text-[9px] font-bold px-1.5 py-0.2 rounded bg-gray-200 text-gray-800 shrink-0">
+                                <span className="font-mono text-[9px] font-bold px-1.5 py-0.2 rounded bg-gray-200 text-gray-800 shrink-0" style={{ fontSize: '9px' }}>
                                   {renglon.id}
                                 </span>
-                                <span className="text-[9.5px] font-medium truncate">
+                                <span className="text-[10px] font-medium truncate" style={{ fontSize: '10px' }}>
                                   {limpiarDescripcionRenglon(renglon.desc, renglon.id)}
                                 </span>
                                 {renglon.unidad && (
-                                  <span className="text-[9px] text-gray-400 font-mono shrink-0">
+                                  <span className="text-[9px] text-gray-400 font-mono shrink-0" style={{ fontSize: '9px' }}>
                                     ({renglon.unidad})
                                   </span>
                                 )}
@@ -1714,24 +1793,44 @@ export function BitacoraForm({
                   )}
                 </div>
 
-                {/* Campos de Lado, Est. Inicio, Est. Fin con títulos 10px y selects 9.5px */}
-                <div className="grid grid-cols-3 gap-1.5 sm:gap-2.5 pt-1 pb-2 border-b border-gray-100">
+                {(errors.renglon || errors.renglones) && (
+                  <p className="text-[9.5px] text-[#9B0F06] font-normal pt-0.5" style={{ fontSize: '9.5px' }}>
+                    {errors.renglon || errors.renglones}
+                  </p>
+                )}
+
+                {/* Campos de Lado, Est. Inicio, Est. Fin con títulos a 10px y select a 10px */}
+                <div className="grid grid-cols-3 gap-1.5 sm:gap-2.5 pt-1 pb-1 border-b border-gray-100">
                   <div>
-                    <span className="text-[10px] font-bold text-gray-700 uppercase block mb-1">LADO</span>
+                    <span className="text-[10px] font-bold text-gray-700 uppercase block mb-1" style={{ fontSize: '10px' }}>
+                      LADO <span className="text-[#9B0F06]">*</span>
+                    </span>
                     <select
                       value={ladoRenglon}
                       onChange={(e) => handleCambiarLado(e.target.value as any)}
-                      className="w-full rounded-lg border border-gray-200 bg-white px-1.5 py-1 text-[9.5px] text-gray-800 font-normal focus:outline-none focus:border-gray-400"
+                      style={{ fontSize: '10px' }}
+                      className={`bitacora-form-control w-full rounded-lg border px-1.5 py-1 !text-[10px] text-[10px] text-gray-800 font-normal focus:outline-none ${
+                        errors.lado
+                          ? 'border-[#9B0F06] ring-1 ring-[#9B0F06] bg-red-50/20'
+                          : 'border-gray-200 bg-white focus:border-gray-400'
+                      }`}
                     >
-                      <option value="">-- Selecc --</option>
-                      <option value="Ambos">Ambos</option>
-                      <option value="Derecho">Derecho</option>
-                      <option value="Izquierdo">Izquierdo</option>
+                      <option value="" style={{ fontSize: '10px' }}>-- Selecc --</option>
+                      <option value="Ambos" style={{ fontSize: '10px' }}>Ambos</option>
+                      <option value="Derecho" style={{ fontSize: '10px' }}>Derecho</option>
+                      <option value="Izquierdo" style={{ fontSize: '10px' }}>Izquierdo</option>
                     </select>
+                    {errors.lado && (
+                      <p className="text-[9px] text-[#9B0F06] font-normal mt-0.5 leading-tight" style={{ fontSize: '9px' }}>
+                        {errors.lado}
+                      </p>
+                    )}
                   </div>
                   <div>
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-[10px] font-bold text-gray-700 uppercase">EST. INICIO</span>
+                      <span className="text-[10px] font-bold text-gray-700 uppercase" style={{ fontSize: '10px' }}>
+                        EST. INICIO <span className="text-[#9B0F06]">*</span>
+                      </span>
                       <button
                         type="button"
                         onClick={() => {
@@ -1739,7 +1838,8 @@ export function BitacoraForm({
                             handleCambiarEstInicio((estInicioRenglon || '0') + '+')
                           }
                         }}
-                        className="p-0.5 bg-transparent hover:bg-transparent text-[#9B0F06] hover:text-[#5E0006] text-[11px] font-black transition-colors cursor-pointer leading-none"
+                        style={{ fontSize: '11.5px' }}
+                        className="p-0.5 bg-transparent hover:bg-transparent text-[#9B0F06] hover:text-[#5E0006] text-[11.5px] font-black transition-colors cursor-pointer leading-none"
                         title="Insertar signo +"
                       >
                         +
@@ -1754,13 +1854,25 @@ export function BitacoraForm({
                         onKeyDown={handleKeyDownEstacion}
                         placeholder={proyMinEstacion || '0+000'}
                         autoComplete="off"
-                        className="w-full rounded-lg border border-gray-200 bg-white px-2 py-1 font-mono text-[9.5px] text-gray-800 placeholder-gray-400 focus:outline-none focus:border-gray-400 font-normal"
+                        style={{ fontSize: '10px' }}
+                        className={`bitacora-form-control w-full rounded-lg border px-2 py-1 font-mono text-[10px] placeholder:text-[10px] text-gray-800 placeholder-gray-400 focus:outline-none font-normal ${
+                          errors.estInicio
+                            ? 'border-[#9B0F06] ring-1 ring-[#9B0F06] bg-red-50/20'
+                            : 'border-gray-200 bg-white focus:border-gray-400'
+                        }`}
                       />
                     </div>
+                    {errors.estInicio && (
+                      <p className="text-[9px] text-[#9B0F06] font-normal mt-0.5 leading-tight" style={{ fontSize: '9px' }}>
+                        {errors.estInicio}
+                      </p>
+                    )}
                   </div>
                   <div>
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-[10px] font-bold text-gray-700 uppercase">EST. FIN</span>
+                      <span className="text-[10px] font-bold text-gray-700 uppercase" style={{ fontSize: '10px' }}>
+                        EST. FIN <span className="text-[#9B0F06]">*</span>
+                      </span>
                       <button
                         type="button"
                         onClick={() => {
@@ -1768,7 +1880,8 @@ export function BitacoraForm({
                             handleCambiarEstFin((estFinRenglon || '0') + '+')
                           }
                         }}
-                        className="p-0.5 bg-transparent hover:bg-transparent text-[#9B0F06] hover:text-[#5E0006] text-[11px] font-black transition-colors cursor-pointer leading-none"
+                        style={{ fontSize: '11.5px' }}
+                        className="p-0.5 bg-transparent hover:bg-transparent text-[#9B0F06] hover:text-[#5E0006] text-[11.5px] font-black transition-colors cursor-pointer leading-none"
                         title="Insertar signo +"
                       >
                         +
@@ -1783,28 +1896,41 @@ export function BitacoraForm({
                         onKeyDown={handleKeyDownEstacion}
                         placeholder={proyMaxEstacion || (proyMinMeters !== null ? formatMeters(proyMinMeters + 500) : '0+500')}
                         autoComplete="off"
-                        className="w-full rounded-lg border border-gray-200 bg-white px-2 py-1 font-mono text-[9.5px] text-gray-800 placeholder-gray-400 focus:outline-none focus:border-gray-400 font-normal"
+                        style={{ fontSize: '10px' }}
+                        className={`bitacora-form-control w-full rounded-lg border px-2 py-1 font-mono text-[10px] placeholder:text-[10px] text-gray-800 placeholder-gray-400 focus:outline-none font-normal ${
+                          errors.estFin
+                            ? 'border-[#9B0F06] ring-1 ring-[#9B0F06] bg-red-50/20'
+                            : 'border-gray-200 bg-white focus:border-gray-400'
+                        }`}
                       />
                     </div>
+                    {errors.estFin && (
+                      <p className="text-[9px] text-[#9B0F06] font-normal mt-0.5 leading-tight" style={{ fontSize: '9px' }}>
+                        {errors.estFin}
+                      </p>
+                    )}
                   </div>
                 </div>
 
-                {infoEstacionHelper && !errors.renglones && (
+                {errors.estaciones && (
+                  <p className="text-[9.5px] text-[#9B0F06] font-normal pt-0.5" style={{ fontSize: '9.5px' }}>
+                    {errors.estaciones}
+                  </p>
+                )}
+
+                {infoEstacionHelper && !errors.estaciones && (
                   <div className="pt-0.5 pb-1">
-                    <span className="text-[8.5px] sm:text-[9px] text-gray-500 font-mono bg-gray-50 border border-gray-200 px-2 py-0.5 rounded-md inline-block leading-relaxed">
+                    <span className="text-[9px] sm:text-[9.5px] text-gray-500 font-mono bg-gray-50 border border-gray-200 px-2 py-0.5 rounded-md inline-block leading-relaxed" style={{ fontSize: '9px' }}>
                       {infoEstacionHelper.texto}
                     </span>
                   </div>
-                )}
-                {errors.renglones && (
-                  <p className="text-[9px] text-red-600 font-normal">{errors.renglones}</p>
                 )}
               </div>
 
               {/* 3. Suspensión Laboral */}
               <div className="border-b border-gray-100 pb-2 space-y-1">
                 <div className="flex items-center justify-between py-0.5">
-                  <span className="text-[10px] font-bold text-gray-700">
+                  <span className="text-[10px] font-bold text-gray-700" style={{ fontSize: '10px' }}>
                     ¿Se suspendieron labores hoy?
                   </span>
                   <button
@@ -1835,8 +1961,8 @@ export function BitacoraForm({
                 {fd.suspensionActividades && (
                   <div className="pt-1 border-t border-gray-100 space-y-1.5 text-xs">
                     <div>
-                      <span className="text-[10px] font-bold text-gray-700 uppercase tracking-wide block mb-1">
-                        Causa de suspensión *
+                      <span className="text-[10px] font-bold text-gray-700 uppercase tracking-wide block mb-1" style={{ fontSize: '10px' }}>
+                        Causa de suspensión <span className="text-[#9B0F06]">*</span>
                       </span>
                       <select
                         value={motivoSuspensionPreset}
@@ -1844,11 +1970,16 @@ export function BitacoraForm({
                           setMotivoSuspensionPreset(e.target.value)
                           setErrors((p) => ({ ...p, justSuspension: '' }))
                         }}
-                        className="w-full rounded-lg border border-gray-200 bg-white px-2 py-1 text-[9.5px] text-gray-800 font-normal focus:outline-none focus:border-gray-400"
+                        style={{ fontSize: '10px' }}
+                        className={`bitacora-form-control w-full rounded-lg border px-2 py-1 !text-[10px] text-[10px] text-gray-800 font-normal focus:outline-none ${
+                          errors.justSuspension
+                            ? 'border-[#9B0F06] ring-1 ring-[#9B0F06] bg-red-50/20'
+                            : 'border-gray-200 bg-white focus:border-gray-400'
+                        }`}
                       >
-                        <option value="">-- Seleccionar motivo --</option>
+                        <option value="" style={{ fontSize: '10px' }}>-- Seleccionar motivo --</option>
                         {JUSTIFICACION_SUSPENSION_PRESETS.map((p) => (
-                          <option key={p} value={p}>
+                          <option key={p} value={p} style={{ fontSize: '10px' }}>
                             {p}
                           </option>
                         ))}
@@ -1863,37 +1994,44 @@ export function BitacoraForm({
                             setMotivoSuspensionOtra(e.target.value)
                             setErrors((p) => ({ ...p, justSuspension: '' }))
                           }}
-                          className="w-full rounded-lg border border-gray-200 bg-white px-2 py-1 text-[9.5px] text-gray-800 placeholder-gray-400 mt-1 focus:outline-none focus:border-gray-400 font-normal"
+                          style={{ fontSize: '10px' }}
+                          className={`bitacora-form-control w-full rounded-lg border px-2 py-1 text-[10px] placeholder:text-[10px] text-gray-800 placeholder-gray-400 mt-1 focus:outline-none font-normal ${
+                            errors.justSuspension
+                              ? 'border-[#9B0F06] ring-1 ring-[#9B0F06] bg-red-50/20'
+                              : 'border-gray-200 bg-white focus:border-gray-400'
+                          }`}
                           autoFocus
                         />
                       )}
 
                       {errors.justSuspension && (
-                        <p className="text-[9px] text-red-600 font-normal">{errors.justSuspension}</p>
+                        <p className="text-[9.5px] text-[#9B0F06] font-normal mt-0.5" style={{ fontSize: '9.5px' }}>{errors.justSuspension}</p>
                       )}
                     </div>
 
                     <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <span className="text-[9.5px] font-medium text-gray-600 uppercase tracking-wide block mb-1">
+                        <span className="text-[10px] font-medium text-gray-600 uppercase tracking-wide block mb-1" style={{ fontSize: '10px' }}>
                           Hora inicio
                         </span>
                         <input
                           type="time"
                           value={fd.horaSuspension}
                           onChange={(e) => set('horaSuspension', e.target.value)}
-                          className="w-full rounded-lg border border-gray-200 px-2 py-1 text-[9.5px] text-gray-800 font-normal focus:outline-none focus:border-gray-400"
+                          style={{ fontSize: '10px' }}
+                          className="bitacora-form-control w-full rounded-lg border border-gray-200 px-2 py-1 text-[10px] text-gray-800 font-normal focus:outline-none focus:border-gray-400"
                         />
                       </div>
                       <div>
-                        <span className="text-[9.5px] font-medium text-gray-600 uppercase tracking-wide block mb-1">
+                        <span className="text-[10px] font-medium text-gray-600 uppercase tracking-wide block mb-1" style={{ fontSize: '10px' }}>
                           Hora reanudación
                         </span>
                         <input
                           type="time"
                           value={fd.horaReanudacion}
                           onChange={(e) => set('horaReanudacion', e.target.value)}
-                          className="w-full rounded-lg border border-gray-200 px-2 py-1 text-[9.5px] text-gray-800 font-normal focus:outline-none focus:border-gray-400"
+                          style={{ fontSize: '10px' }}
+                          className="bitacora-form-control w-full rounded-lg border border-gray-200 px-2 py-1 text-[10px] text-gray-800 font-normal focus:outline-none focus:border-gray-400"
                         />
                       </div>
                     </div>
@@ -1904,18 +2042,23 @@ export function BitacoraForm({
               {/* 4. Campo de Descripción / Observaciones de la Jornada */}
               <div className="relative pt-0.5 border-b border-gray-100 pb-2 space-y-1">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-gray-700">
-                    Descripción u observaciones de la jornada
+                  <span className="text-[10px] font-bold text-gray-700" style={{ fontSize: '10px' }}>
+                    Descripción u observaciones de la jornada <span className="text-[#9B0F06]">*</span>
                   </span>
                 </div>
 
                 <select
                   value={observacionPreset}
                   onChange={(e) => handleCambiarObservacionPreset(e.target.value)}
-                  className="w-full rounded-lg border border-gray-200 bg-white px-2 py-1 text-[9.5px] text-gray-800 font-normal focus:outline-none focus:border-gray-400"
+                  style={{ fontSize: '10px' }}
+                  className={`bitacora-form-control w-full rounded-lg border px-2 py-1 !text-[10px] text-[10px] text-gray-800 font-normal focus:outline-none ${
+                    errors.observaciones
+                      ? 'border-[#9B0F06] ring-1 ring-[#9B0F06] bg-red-50/20'
+                      : 'border-gray-200 bg-white focus:border-gray-400'
+                  }`}
                 >
                   {OBSERVACIONES_PRESETS.map((obs) => (
-                    <option key={obs} value={obs}>
+                    <option key={obs} value={obs} style={{ fontSize: '10px' }}>
                       {obs}
                     </option>
                   ))}
@@ -1926,24 +2069,38 @@ export function BitacoraForm({
                     <textarea
                       rows={3}
                       value={fd.observacionesGenerales}
-                      onChange={(e) => set('observacionesGenerales', e.target.value)}
+                      onChange={(e) => {
+                        set('observacionesGenerales', e.target.value)
+                        setErrors((p) => ({ ...p, observaciones: '' }))
+                      }}
                       placeholder="Añade una descripción u observaciones detalladas de la jornada..."
                       maxLength={2200}
-                      className="w-full text-[9.5px] text-gray-800 placeholder-gray-400 outline-none resize-none bg-transparent font-normal"
+                      style={{ fontSize: '10px' }}
+                      className={`bitacora-form-control w-full rounded-lg border p-2 text-[10px] placeholder:text-[10px] text-gray-800 placeholder-gray-400 outline-none resize-none font-normal ${
+                        errors.observaciones
+                          ? 'border-[#9B0F06] ring-1 ring-[#9B0F06] bg-red-50/20'
+                          : 'border-gray-200 bg-white focus:border-gray-400'
+                      }`}
                       autoFocus
                     />
                     <div className="flex items-center justify-end text-gray-400">
-                      <span className="text-[8.5px] text-gray-400 font-mono">
+                      <span className="text-[9px] text-gray-400 font-mono" style={{ fontSize: '9px' }}>
                         {fd.observacionesGenerales.length}/2200
                       </span>
                     </div>
                   </div>
                 )}
+
+                {errors.observaciones && (
+                  <p className="text-[9.5px] text-[#9B0F06] font-normal mt-0.5" style={{ fontSize: '9.5px' }}>
+                    {errors.observaciones}
+                  </p>
+                )}
               </div>
             </div>
 
-            {/* 5. Botón Guardar al final elevado para no ser tapado por el navbar */}
-            <div className="pt-2.5 mt-3 mb-24 sm:mb-3">
+            {/* 5. Botón Guardar al final elevado para no ser tapado por el navbar en mobile */}
+            <div className="pt-2 mt-2 pb-20 sm:pb-3">
               <button
                 type="button"
                 onClick={handleGuardarRegistroFinal}

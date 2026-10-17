@@ -107,6 +107,7 @@ export default function DashboardPage() {
             <Link
               key={module.name}
               href={module.href}
+              prefetch={true}
               className={`${module.bgColor} dashboard-module-card relative flex min-h-[148px] sm:min-h-[164px] flex-col justify-between overflow-hidden rounded-[18px] sm:rounded-[20px] p-4 sm:p-5 text-white`}
             >
               <div className="dashboard-module-icon absolute -bottom-2 -right-2 opacity-20 transition-transform duration-300">

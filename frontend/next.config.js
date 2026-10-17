@@ -30,7 +30,7 @@ const nextConfig = {
     formats: ['image/avif', 'image/webp'],
   },
   experimental: {
-    optimizePackageImports: ['lucide-react'],
+    optimizePackageImports: ['lucide-react', '@supabase/supabase-js', 'clsx', 'tailwind-merge', 'date-fns', 'decimal.js'],
     outputFileTracingRoot: path.join(__dirname, '..'),
   },
   webpack: (config, { dev }) => {

@@ -142,40 +142,37 @@ export async function subirDocumentoProyecto({
     }
   }
 
-  // Intentar subida a Supabase Storage si está configurado
-  if (isSupabaseConfigured() && supabase) {
-    try {
-      const sanitizedName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
-      const sanitizedCategoria = categoria.toLowerCase().replace(/[^a-z0-9_-]/g, '_')
-      const storagePath = `${proyectoId}/${sanitizedCategoria}/${sanitizedName}`
-
-      const { data, error } = await supabase.storage
-        .from(BUCKET_DOCUMENTOS)
-        .upload(storagePath, blobParaSubir, {
-          cacheControl: '3600',
-          upsert: true,
-          contentType: file.type || 'application/octet-stream',
-        })
-
-      if (error) {
-        console.warn(`[Supabase Storage] Error subiendo a bucket ${BUCKET_DOCUMENTOS}:`, error.message)
-      } else if (data?.path) {
-        const { data: publicUrlData } = supabase.storage
-          .from(BUCKET_DOCUMENTOS)
-          .getPublicUrl(data.path)
-
-        if (publicUrlData?.publicUrl) {
-          urlFinal = publicUrlData.publicUrl
-        }
-      }
-    } catch (storageErr) {
-      console.warn('[Supabase Storage] Excepción durante la subida:', storageErr)
-    }
+  if (!isSupabaseConfigured() || !supabase) {
+    throw new Error('Supabase Storage no está configurado; el documento no puede persistirse.')
   }
 
-  // Si no se obtuvo URL pública de Supabase, usar ObjectURL o DataURL para visualización local
-  if (!urlFinal) {
-    urlFinal = URL.createObjectURL(blobParaSubir)
+  try {
+    const sanitizedName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
+    const sanitizedCategoria = categoria.toLowerCase().replace(/[^a-z0-9_-]/g, '_')
+    const storagePath = `${proyectoId}/${sanitizedCategoria}/${sanitizedName}`
+
+    const { data, error } = await supabase.storage
+      .from(BUCKET_DOCUMENTOS)
+      .upload(storagePath, blobParaSubir, {
+        cacheControl: '3600',
+        upsert: true,
+        contentType: file.type || 'application/octet-stream',
+      })
+
+    if (error) {
+      throw new Error(`[Supabase Storage] Error subiendo al bucket ${BUCKET_DOCUMENTOS}: ${error.message}`)
+    }
+
+    const publicUrl = data?.path
+      ? supabase.storage.from(BUCKET_DOCUMENTOS).getPublicUrl(data.path).data.publicUrl
+      : ''
+    if (!publicUrl) {
+      throw new Error('[Supabase Storage] La subida no devolvió una URL pública.')
+    }
+    urlFinal = publicUrl
+  } catch (storageErr) {
+    console.error('[Supabase Storage] Excepción durante la subida:', storageErr)
+    throw storageErr
   }
 
   return {

@@ -34,12 +34,56 @@ export function obtenerNombreCompleto(dato: FilaUsuarioAutenticacion['dato_usuar
   return partes.filter(Boolean).join(' ').trim() || 'Usuario'
 }
 
+export class LimiteDispositivosError extends Error {
+  dispositivosActivos: Array<{
+    id: string
+    dispositivo: string
+    ip: string
+    fechaHora: string
+  }>
+
+  constructor(dispositivos: Array<{ id: string; dispositivo: string; ip: string; fechaHora: string }>) {
+    super('LIMITE_DISPOSITIVOS_ALCANZADO')
+    this.name = 'LimiteDispositivosError'
+    this.dispositivosActivos = dispositivos
+  }
+}
+
+export function detectarNombreDispositivo(userAgent?: string): string {
+  if (!userAgent) return 'Dispositivo Desconocido'
+  const ua = userAgent.toLowerCase()
+  let so = 'Dispositivo'
+  if (ua.includes('iphone')) so = 'iPhone'
+  else if (ua.includes('ipad')) so = 'iPad'
+  else if (ua.includes('android')) so = 'Android'
+  else if (ua.includes('windows nt 10.0') || ua.includes('windows')) so = 'Windows PC'
+  else if (ua.includes('macintosh') || ua.includes('mac os')) so = 'Mac'
+  else if (ua.includes('linux')) so = 'Linux'
+
+  let nav = 'Navegador Web'
+  if (ua.includes('edg/')) nav = 'Edge'
+  else if (ua.includes('chrome/')) nav = 'Chrome'
+  else if (ua.includes('firefox/')) nav = 'Firefox'
+  else if (ua.includes('safari/')) nav = 'Safari'
+
+  return `${so} (${nav})`
+}
+
 export function esCorreo(identificador: string): boolean {
   return identificador.includes('@')
 }
 
-
-export async function iniciarSesion(identificador: string, contrasena: string, ipAddress?: string, userAgent?: string) {
+export async function iniciarSesion(
+  identificador: string,
+  contrasena: string,
+  ipAddress?: string,
+  userAgent?: string,
+  opcionesDispositivo?: {
+    deviceId?: string
+    nombreDispositivo?: string
+    cerrarOtrasSesiones?: boolean
+  }
+) {
   let correo = identificador
 
   if (!esCorreo(identificador)) {
@@ -184,13 +228,19 @@ export async function iniciarSesion(identificador: string, contrasena: string, i
     }
   }
 
+  const sessionId = randomUUID()
+  const deviceIdActual = (opcionesDispositivo?.deviceId || '').trim() || `dev_${ipAddress || 'local'}_${(userAgent || '').substring(0, 30)}`
+  const nombreDispositivo = opcionesDispositivo?.nombreDispositivo || detectarNombreDispositivo(userAgent)
+
   const token = jwt.sign(
     {
       sub: usuarioFila.id,
       nombre: nombreCompleto,
       rol: rol.nombre,
-        permisos: rol.permisos,
-        nivel_permisos: rol.nivel_permisos,
+      permisos: rol.permisos,
+      nivel_permisos: rol.nivel_permisos,
+      deviceId: deviceIdActual,
+      sessionId,
     },
     entorno.jwtSecret,
     { expiresIn: '8h' }
@@ -213,26 +263,88 @@ export async function iniciarSesion(identificador: string, contrasena: string, i
     throw new Error(errorAcceso.message)
   }
 
-  // LÍMITE DE CONCURRENCIA: Máximo 2 equipos / sesiones activas simultáneamente por usuario
+  // LÍMITE DE CONCURRENCIA: Máximo 2 dispositivos activos simultáneamente por usuario
   const ochoHorasAtras = new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString()
-  const { data: sesionesActivas } = await clienteSupabase
+  const { data: logsRecientes } = await clienteSupabase
     .from('seguridad_log')
-    .select('id, created_at')
+    .select('id, ip, user_agent, exitoso, detalles, fecha_hora')
     .eq('usuario_id', usuarioFila.id)
     .eq('accion', 'login')
-    .eq('exitoso', true)
-    .gte('created_at', ochoHorasAtras)
-    .order('created_at', { ascending: true })
+    .gte('fecha_hora', ochoHorasAtras)
+    .order('fecha_hora', { ascending: false })
 
-  if (sesionesActivas && sesionesActivas.length >= 2) {
-    // Si ya existen 2 o más sesiones activas, invalidar la más antigua para mantener máximo 2
-    const exceso = sesionesActivas.length - 1
-    const idsAInactivar = sesionesActivas.slice(0, exceso).map((s) => s.id)
-    if (idsAInactivar.length > 0) {
+  // Agrupar por device_id los dispositivos actualmente activos
+  const mapaDispositivosActivos = new Map<string, { id: string; dispositivo: string; ip: string; fechaHora: string }>()
+  for (const log of logsRecientes || []) {
+    const d = (log.detalles as any) || {}
+    const estado = d.estado
+    const esActivo = log.exitoso && estado !== 'cerrada' && estado !== 'revocada'
+    if (esActivo) {
+      const devId = d.device_id || `legacy_${log.ip || 'ip'}_${(log.user_agent || '').substring(0, 30)}`
+      if (!mapaDispositivosActivos.has(devId)) {
+        mapaDispositivosActivos.set(devId, {
+          id: log.id,
+          dispositivo: d.dispositivo || detectarNombreDispositivo(log.user_agent),
+          ip: log.ip || 'Desconocida',
+          fechaHora: log.fecha_hora,
+        })
+      }
+    }
+  }
+
+  const esMismoDispositivo = mapaDispositivosActivos.has(deviceIdActual)
+  const otrosDispositivosActivos = Array.from(mapaDispositivosActivos.entries())
+    .filter(([devId]) => devId !== deviceIdActual)
+    .map(([_, info]) => info)
+
+  // Si ya existen 2 o más otros dispositivos con sesión abierta y este es un nuevo dispositivo:
+  if (!esMismoDispositivo && otrosDispositivosActivos.length >= 2) {
+    if (!opcionesDispositivo?.cerrarOtrasSesiones) {
+      throw new LimiteDispositivosError(otrosDispositivosActivos)
+    }
+
+    // Si el usuario autorizó cerrar las otras sesiones para ingresar en este equipo
+    const idsARevocar = (logsRecientes || [])
+      .filter((l) => {
+        const d = (l.detalles as any) || {}
+        return l.exitoso && d.estado !== 'cerrada' && d.estado !== 'revocada'
+      })
+      .map((l) => l.id)
+
+    if (idsARevocar.length > 0) {
       await clienteSupabase
         .from('seguridad_log')
-        .update({ exitoso: false, detalles: { estado: 'sesion_desplazada_limite_concurrencia_2_dispositivos' } })
-        .in('id', idsAInactivar)
+        .update({
+          exitoso: false,
+          detalles: {
+            estado: 'revocada',
+            motivo: 'cierre_remoto_por_limite_dispositivos',
+            cerrado_en: new Date().toISOString(),
+          },
+        })
+        .in('id', idsARevocar)
+    }
+  }
+
+  // Si es el mismo dispositivo, marcar sesiones anteriores de este mismo equipo como renovadas
+  if (esMismoDispositivo) {
+    const idsMismoDispositivo = (logsRecientes || [])
+      .filter((l) => {
+        const d = (l.detalles as any) || {}
+        return l.exitoso && d.device_id === deviceIdActual
+      })
+      .map((l) => l.id)
+    if (idsMismoDispositivo.length > 0) {
+      await clienteSupabase
+        .from('seguridad_log')
+        .update({
+          detalles: {
+            estado: 'cerrada',
+            motivo: 'renovacion_sesion_mismo_dispositivo',
+            cerrado_en: new Date().toISOString(),
+          },
+        })
+        .in('id', idsMismoDispositivo)
     }
   }
 
@@ -242,20 +354,21 @@ export async function iniciarSesion(identificador: string, contrasena: string, i
     ip: ipAddress || null,
     user_agent: userAgent || null,
     exitoso: true,
-    detalles: { limite_sesiones: 'max_2_equipos' },
+    fecha_hora: new Date().toISOString(),
+    detalles: {
+      device_id: deviceIdActual,
+      dispositivo: nombreDispositivo,
+      session_id: sessionId,
+      estado: 'activa',
+      limite_sesiones: 'max_2_equipos',
+    },
   })
 
   if (errorLog) {
     console.error('[autenticacion.servicio] Error insertando seguridad_log (login exitoso)', {
       usuarioId: usuarioFila.id,
-      supabaseError: {
-        message: errorLog.message,
-        code: errorLog.code,
-        details: errorLog.details,
-        hint: errorLog.hint,
-      },
+      supabaseError: errorLog,
     })
-    throw new Error(errorLog.message)
   }
 
   return {
@@ -265,8 +378,59 @@ export async function iniciarSesion(identificador: string, contrasena: string, i
       nombre: nombreCompleto,
       correo: usuarioFila.correo,
       rol: rol.nombre,
-        permisos: rol.permisos,
-        nivel_permisos: rol.nivel_permisos,
-      },
+      permisos: rol.permisos,
+      nivel_permisos: rol.nivel_permisos,
+    },
+  }
+}
+
+export async function cerrarSesionUsuario(usuarioId: string, deviceId?: string, sessionId?: string) {
+  try {
+    const ochoHorasAtras = new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString()
+    const { data: logs } = await clienteSupabase
+      .from('seguridad_log')
+      .select('id, detalles')
+      .eq('usuario_id', usuarioId)
+      .eq('accion', 'login')
+      .eq('exitoso', true)
+      .gte('fecha_hora', ochoHorasAtras)
+
+    if (logs && logs.length > 0) {
+      const idsACerrar: string[] = []
+      for (const log of logs) {
+        const d = (log.detalles as any) || {}
+        if (d.estado !== 'cerrada' && d.estado !== 'revocada') {
+          if (!deviceId && !sessionId) {
+            idsACerrar.push(log.id)
+          } else if (sessionId && d.session_id === sessionId) {
+            idsACerrar.push(log.id)
+          } else if (deviceId && d.device_id === deviceId) {
+            idsACerrar.push(log.id)
+          }
+        }
+      }
+      if (idsACerrar.length > 0) {
+        await clienteSupabase
+          .from('seguridad_log')
+          .update({
+            detalles: {
+              estado: 'cerrada',
+              motivo: 'cierre_sesion_usuario',
+              cerrado_en: new Date().toISOString(),
+            },
+          })
+          .in('id', idsACerrar)
+      }
+    }
+
+    await clienteSupabase.from('seguridad_log').insert({
+      usuario_id: usuarioId,
+      accion: 'logout',
+      exitoso: true,
+      fecha_hora: new Date().toISOString(),
+      detalles: { device_id: deviceId, session_id: sessionId },
+    })
+  } catch (error) {
+    console.error('[autenticacion.servicio] Error en cerrarSesionUsuario:', error)
   }
 }

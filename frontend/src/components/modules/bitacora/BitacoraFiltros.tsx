@@ -8,6 +8,7 @@ import { Combobox } from '@/components/ui/Combobox'
 
 import { useAuthStore } from '@/stores/useAuthStore'
 import { useUIStore } from '@/stores/useUIStore'
+import { esProyectoNoBorrador } from '@/lib/proyectos/estado'
 
 interface BitacoraFiltrosProps {
   busqueda: string
@@ -86,15 +87,16 @@ export function BitacoraFiltros({
       try {
         const [resProy, resPU] = await Promise.all([
           apiGetDeduplicado('/proyectos'),
-          apiGetDeduplicado('/mantenimiento/proyecto_usuario').catch(() => ({ data: { data: [] } }))
+          esRestringido && user?.id
+            ? apiGetDeduplicado('/mantenimiento/proyecto_usuario').catch(() => ({ data: { data: [] } }))
+            : Promise.resolve({ data: { data: [] } })
         ])
 
         if (resProy.data?.success && Array.isArray(resProy.data.data)) {
           let activos = resProy.data.data.filter(
             (p: any) =>
               (p.estado === 'activo' || p.estado_codigo === 'activo') &&
-              p.estado !== 'borrador' &&
-              p.estado_codigo !== 'borrador'
+              esProyectoNoBorrador(p)
           )
 
           if (esRestringido && user?.id) {

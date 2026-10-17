@@ -15,10 +15,10 @@ describe('Suite de Pruebas: Creación y Edición de Proyectos (6 Pasos & Contrat
   afterAll(async () => {
     // Limpieza de datos de prueba
     if (proyectoBorradorId) {
-      await eliminarProyecto(proyectoBorradorId).catch(() => {})
+      await eliminarProyecto(proyectoBorradorId, true).catch(() => {})
     }
     if (proyectoActivoId) {
-      await eliminarProyecto(proyectoActivoId).catch(() => {})
+      await eliminarProyecto(proyectoActivoId, true).catch(() => {})
     }
   })
 

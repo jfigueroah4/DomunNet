@@ -22,6 +22,8 @@ export interface JwtPayloadLike {
   rol: RolNombre
   permisos: string[]
   nivel_permisos: number
+  deviceId?: string
+  sessionId?: string
 }
 
 export interface UsuarioRegistro {

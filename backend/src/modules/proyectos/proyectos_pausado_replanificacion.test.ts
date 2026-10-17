@@ -4,6 +4,7 @@ import {
   iniciarReplanificacionProyecto,
   activarReplanificacionProyecto,
   actualizarEstadoProyecto,
+  eliminarProyecto,
   ValidationError
 } from './proyectos.servicio'
 import { clienteSupabase } from '../../configuracion/cliente-supabase'
@@ -52,8 +53,7 @@ describe('Módulo Proyectos: Comportamiento Real de Pausado y Replanificación',
   afterAll(async () => {
     // Limpieza de datos de prueba
     if (proyectoPruebaId) {
-      await clienteSupabase.from('suspension_plazo').delete().eq('proyecto_id', proyectoPruebaId)
-      await clienteSupabase.from('proyecto').delete().eq('id', proyectoPruebaId)
+      await eliminarProyecto(proyectoPruebaId, true).catch(() => {})
     }
   })
 

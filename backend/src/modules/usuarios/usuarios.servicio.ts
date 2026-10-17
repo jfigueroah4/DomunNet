@@ -119,10 +119,25 @@ async function obtenerRolPorNombre(nombre: string) {
   const { data, error } = await clienteSupabase
     .from('rol')
     .select('id, nombre_rol')
-    .ilike('nombre_rol', nombre)
+    .ilike('nombre_rol', nombre.trim())
     .maybeSingle()
   if (error) throw new Error(error.message)
-  return (data as FilaRol | null) || null
+  if (data) return (data as FilaRol | null) || null
+
+  // Fallback con normalización (sin espacios ni acentos, minúsculas)
+  const norm = nombre.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, '')
+  const { data: todosRoles, error: errTodos } = await clienteSupabase
+    .from('rol')
+    .select('id, nombre_rol')
+  if (!errTodos && todosRoles) {
+    const encontrado = todosRoles.find((r: any) => {
+      const rNorm = String(r.nombre_rol || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, '')
+      return rNorm === norm
+    })
+    if (encontrado) return encontrado as FilaRol
+  }
+
+  return null
 }
 
 async function obtenerRolesPorId() {

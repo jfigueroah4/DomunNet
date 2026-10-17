@@ -21,7 +21,7 @@ export async function listar(req: any, res: Response) {
   
   const query = paginationSchema.safeParse(req.query);
   if (!query.success) return sendError(res, 400, 'ParÃ¡metros invÃ¡lidos');
-  const maxLimit = config.limiteMaximo ?? 100;
+  const maxLimit = config.limiteMaximo ?? 500;
   const appliedLimit = Math.min(query.data.limite, maxLimit);
   
   let parsedFiltros = {};

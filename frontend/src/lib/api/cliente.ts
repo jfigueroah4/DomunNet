@@ -8,9 +8,17 @@ export const api = axios.create({
   },
 })
 
-// Interceptor de Petición para SSR (Node.js Server Components en Next.js)
+// Interceptor de Petición (Client y SSR)
 api.interceptors.request.use((config) => {
-  if (typeof window === 'undefined') {
+  if (typeof window !== 'undefined') {
+    try {
+      const devId = localStorage.getItem('domun_device_id')
+      if (devId) {
+        config.headers = config.headers || {}
+        config.headers['x-device-id'] = devId
+      }
+    } catch (_) {}
+  } else {
     const serverOrigin = process.env.BACKEND_URL || 'http://127.0.0.1:3001'
     if (config.url && !config.url.startsWith('http')) {
       let relativePath = config.url
@@ -147,6 +155,8 @@ export function limpiarCacheMemoria(url?: string) {
           }
         }
         sessionStorage.removeItem('domun_proyectos_cache')
+        sessionStorage.removeItem('domun_fotografias_cache')
+        sessionStorage.removeItem('domun_bitacora_cache')
       } catch {}
     }
   }

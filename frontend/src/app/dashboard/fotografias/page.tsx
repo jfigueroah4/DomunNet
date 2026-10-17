@@ -6,6 +6,7 @@ import { List, LayoutGrid, Image as ImageIcon } from 'lucide-react'
 import ProyectoFiltros from '@/components/modules/proyectos/ProyectoFiltros'
 import { EstadoProyecto } from '@/types/proyecto'
 import { apiGetDeduplicado } from '@/lib/api/cliente'
+import { esProyectoNoBorrador } from '@/lib/proyectos/estado'
 
 interface ProjectItemProps {
   proyecto: any
@@ -135,6 +136,29 @@ export default function FotografiasGaleria() {
   const [filtroFechaInicio, setFiltroFechaInicio] = useState('')
   const [filtroFechaFin, setFiltroFechaFin] = useState('')
 
+  // Hidratación instantánea desde caché local para eliminar tiempos de espera visual
+  useEffect(() => {
+    try {
+      const cached = sessionStorage.getItem('domun_fotografias_cache')
+      if (cached) {
+        const parsed = JSON.parse(cached)
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setProyectosApi(parsed)
+          setCargando(false)
+        }
+      } else {
+        const cachedProy = sessionStorage.getItem('domun_proyectos_cache')
+        if (cachedProy) {
+          const parsed = JSON.parse(cachedProy)
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setProyectosApi(parsed)
+            setCargando(false)
+          }
+        }
+      }
+    } catch (_) {}
+  }, [])
+
   useEffect(() => {
     let cancelado = false
     Promise.allSettled([
@@ -263,8 +287,7 @@ export default function FotografiasGaleria() {
 
   const proyectosSinBorrador = useMemo(() => {
     return proyectosApi.filter((p) => {
-      const estadoNorm = (p.estado || p.estado_codigo || '').toLowerCase().trim()
-      return estadoNorm !== 'borrador'
+      return esProyectoNoBorrador(p)
     })
   }, [proyectosApi])
 

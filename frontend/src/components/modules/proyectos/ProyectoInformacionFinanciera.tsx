@@ -15,6 +15,8 @@ import {
   Edit2,
   Eye,
   FileSpreadsheet,
+  FileText,
+  FolderPlus,
   Layers,
   Info,
   Lock,
@@ -30,9 +32,13 @@ import {
 import type { ProyectoType } from '@/validations/proyecto.schema'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { showErrorToast, showSuccessToast } from '@/hooks/useCustomToast'
+import { Portal } from '@/components/ui/Portal'
+import { apiGetDeduplicado } from '@/lib/api/cliente'
+import { proyectoService } from '@/services/proyectos/proyecto.service'
 
 export interface RenglonItemFinanciero {
   id: string
+  renglonId?: string
   capituloId: number
   capituloNombre: string
   codigoDGC: string
@@ -44,6 +50,8 @@ export interface RenglonItemFinanciero {
   cantidadEstePeriodo?: number
   cantidadAcumuladaAnterior?: number
   montoTotalContratado?: number
+  seleccionado?: boolean
+  esPersonalizado?: boolean
 }
 
 export interface EstimacionFinancieraItem {
@@ -93,8 +101,8 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
 
   // Perspectiva Doble en Control de Estimaciones: Empresa Ejecutora vs Supervisora
   const [perspectivaEstimacion, setPerspectivaEstimacion] = useState<'ejecutora' | 'supervisora'>('ejecutora')
-  const [fechaDesdeEstimacion, setFechaDesdeEstimacion] = useState('')
-  const [fechaHastaEstimacion, setFechaHastaEstimacion] = useState('')
+  const [fechaDesdeEstimacion, _setFechaDesdeEstimacion] = useState('')
+  const [fechaHastaEstimacion, _setFechaHastaEstimacion] = useState('')
   const [paginaEstimaciones, setPaginaEstimaciones] = useState(1)
   const itemsPorPaginaEstimaciones = 5
 
@@ -103,9 +111,9 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
   const [filtroRenglon, setFiltroRenglon] = useState<string>('todos')
   const [busquedaTexto, setBusquedaTexto] = useState('')
 
-  // Paginación en Programa de Trabajo (Selector de 8, 16, 24, 50, etc.)
+  // Paginación en Programa de Trabajo (Selector de 10, 20, 50, etc.)
   const [paginaRenglones, setPaginaRenglones] = useState(1)
-  const [itemsPorPagina, setItemsPorPagina] = useState(8)
+  const [itemsPorPagina, setItemsPorPagina] = useState(10)
 
   // Filtros interactivos para el Gráfico Financiero (Curva S)
   const [perspectivaCurva, setPerspectivaCurva] = useState<'ejecutora' | 'supervisora'>('ejecutora')
@@ -176,14 +184,47 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
 
   // Soporte de Modalidad Manual de Presupuesto y Estimaciones
   const modoManual =
-    pAny.modoGestionFinanciera === 'manual' || pAny.usarModoSabana === false
+    pAny.modoGestionFinanciera === 'manual' ||
+    pAny.modo_gestion_financiera === 'manual' ||
+    pAny.tipoObra === 'manual' ||
+    pAny.tipo_obra === 'manual' ||
+    pAny.usarModoSabana === false
   const ambitoPlanTrabajo = pAny.ambitoPlanTrabajo || pAny.ambito_plan_trabajo || 'obra'
-  const esModoSabana = pAny.modoGestionFinanciera === 'sabana' || pAny.usarModoSabana === true
+  const esModoSabana = (pAny.modoGestionFinanciera === 'sabana' || pAny.usarModoSabana === true) && !modoManual
   const perspectivaTieneSabana = esModoSabana && (
     (ambitoPlanTrabajo === 'obra' && perspectivaEstimacion === 'ejecutora') ||
     (ambitoPlanTrabajo === 'supervision' && perspectivaEstimacion === 'supervisora')
   )
   const perspectivaEsManual = !perspectivaTieneSabana
+
+  // Capítulos Libro Azul DGC + Capítulos personalizados creados en este proyecto
+  const [capitulosProyecto, setCapitulosProyecto] = useState<Array<{ id: number; nombre: string }>>(() => {
+    return CAPITULOS_LIBRO_AZUL_DGC.map((c) => ({ id: c.id, nombre: c.nombre }))
+  })
+
+  // Lista de renglones interna con sincronización y conteo en Bitácora
+  const [listaRenglones, setListaRenglones] = useState<RenglonItemFinanciero[]>([])
+  const [filtroEstadoBitacora] = useState<'todos' | 'en_bitacora' | 'ocultos'>('todos')
+  const [conteoBitacoraPorRenglon, setConteoBitacoraPorRenglon] = useState<Record<string, number>>({})
+
+  // Modales y Drawers para Gestión Renglón, Nuevo/Editar Renglón y Nuevo Capítulo
+  const [modalGestionRenglonesOpen, setModalGestionRenglonesOpen] = useState(false)
+  const [subTabGestion, setSubTabGestion] = useState<'renglones' | 'capitulos'>('renglones')
+
+  const [drawerRenglonOpen, setDrawerRenglonOpen] = useState(false)
+  const [renglonEnEdicion, setRenglonEnEdicion] = useState<RenglonItemFinanciero | null>(null)
+  const [formRenglonCodigo, setFormRenglonCodigo] = useState('')
+  const [formRenglonDescripcion, setFormRenglonDescripcion] = useState('')
+  const [formRenglonCapituloId, setFormRenglonCapituloId] = useState<number>(1)
+  const [formRenglonUnidad, setFormRenglonUnidad] = useState('m³')
+  const [formRenglonCantidad, setFormRenglonCantidad] = useState('1')
+  const [formRenglonPrecioUnitario, setFormRenglonPrecioUnitario] = useState('0')
+  const [formRenglonEnBitacora, setFormRenglonEnBitacora] = useState(true)
+
+  const [modalCapituloOpen, setModalCapituloOpen] = useState(false)
+  const [formCapituloNumero, setFormCapituloNumero] = useState('')
+  const [formCapituloNombre, setFormCapituloNombre] = useState('')
+
   const [estimacionesManuales, setEstimacionesManuales] = useState<EstimacionFinancieraItem[]>([])
   const [modalEstimacionManualOpen, setModalEstimacionManualOpen] = useState(false)
   const [estimacionEnEdicion, setEstimacionEnEdicion] = useState<EstimacionFinancieraItem | null>(null)
@@ -231,6 +272,278 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
       console.warn('Error cargando estimaciones manuales:', e)
     }
   }, [proyecto?.id, pAny.estimacionesManuales, pAny.estimaciones])
+
+  // Carga inicial y reactiva de los renglones del proyecto (con persistencia en localStorage y API)
+  useEffect(() => {
+    if (!proyecto?.id) return
+    let localRenglones: any[] | null = null
+    try {
+      const stored = localStorage.getItem(`domun_proyecto_renglones_${proyecto.id}`)
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          localRenglones = parsed
+        }
+      }
+    } catch (_) {}
+
+    const rawR = localRenglones || (proyecto as any)?.renglones || (proyecto as any)?.planTrabajo || (proyecto as any)?.renglones_sabana || []
+    if (Array.isArray(rawR) && rawR.length > 0) {
+      const mapeados: RenglonItemFinanciero[] = rawR.map((r: any, idx: number) => ({
+        id: String(r.id || r.codigoDGC || r.codigo || `r-${idx}`),
+        renglonId: r.renglonId || (typeof r.id === 'string' && r.id.length === 36 ? r.id : undefined),
+        capituloId: Number(r.capituloId || r.capitulo || 1),
+        capituloNombre: r.capituloNombre || `Capítulo ${r.capituloId || r.capitulo || 1}`,
+        codigoDGC: String(r.codigoDGC || r.codigo || `10${idx + 1}.01`),
+        descripcion: r.descripcion || '',
+        unidad: r.unidad || r.unidad_medida || 'm³',
+        cantidadContratada: Number(r.cantidadContratada ?? r.cantidad_contractual ?? r.cantidad ?? 1),
+        cantidadAjustada: Number(r.cantidadAjustada ?? r.cantidad_ajustada ?? r.cantidadContratada ?? 1),
+        costoUnitarioDirecto: Number(r.costoUnitarioDirecto ?? r.precio_unitario_directo ?? r.precioUnitario ?? 0),
+        cantidadEstePeriodo: Number(r.cantidadEstePeriodo || 0),
+        cantidadAcumuladaAnterior: Number(r.cantidadAcumuladaAnterior || 0),
+        seleccionado: r.seleccionado !== false,
+        esPersonalizado: Boolean(r.esPersonalizado),
+      }))
+      setListaRenglones(mapeados)
+    } else {
+      setListaRenglones([])
+    }
+
+    try {
+      const storedCaps = localStorage.getItem(`domun_proyecto_capitulos_${proyecto.id}`)
+      if (storedCaps) {
+        const parsedCaps = JSON.parse(storedCaps)
+        if (Array.isArray(parsedCaps) && parsedCaps.length > 0) {
+          setCapitulosProyecto(parsedCaps)
+        }
+      }
+    } catch (_) {}
+  }, [proyecto?.id, (proyecto as any)?.renglones, (proyecto as any)?.planTrabajo])
+
+  // Conteo de registros en bitácora por renglón
+  useEffect(() => {
+    if (!proyecto?.id) return
+    let cancelado = false
+
+    async function cargarConteoBitacoras() {
+      const conteos: Record<string, number> = {}
+
+      try {
+        const resPend = await apiGetDeduplicado(`/mantenimiento/bitacora_pendiente?proyecto_id=${proyecto?.id}&limite=500`).catch(() => null)
+        const items = Array.isArray(resPend?.data?.data) ? resPend.data.data : []
+        items.forEach((item: any) => {
+          if (item.renglon_id) conteos[item.renglon_id] = (conteos[item.renglon_id] || 0) + 1
+          if (item.codigoDGC) conteos[item.codigoDGC] = (conteos[item.codigoDGC] || 0) + 1
+          if (item.codigo) conteos[item.codigo] = (conteos[item.codigo] || 0) + 1
+        })
+      } catch (_) {}
+
+      try {
+        const resEnt = await apiGetDeduplicado(`/mantenimiento/bitacora_entrada?proyecto_id=${proyecto?.id}&limite=500`).catch(() => null)
+        const items = Array.isArray(resEnt?.data?.data) ? resEnt.data.data : []
+        items.forEach((item: any) => {
+          if (item.renglon_id) conteos[item.renglon_id] = (conteos[item.renglon_id] || 0) + 1
+          const desc = String(item.descripcion || '')
+          const match = desc.match(/Renglón\s*([0-9]+(?:\.[0-9]+)?(?:\([a-z]\))?)/i)
+          if (match && match[1]) {
+            conteos[match[1]] = (conteos[match[1]] || 0) + 1
+          }
+        })
+      } catch (_) {}
+
+      try {
+        const locales = JSON.parse(localStorage.getItem('domun_bitacora_locales') || '[]')
+        if (Array.isArray(locales)) {
+          locales.filter((l: any) => l.proyectoId === proyecto?.id).forEach((l: any) => {
+            const rId = l.renglonId || l.renglon_id || l.renglon?.id || l.renglon?.codigo || l.renglon?.codigoDGC
+            if (rId) conteos[rId] = (conteos[rId] || 0) + 1
+          })
+        }
+      } catch (_) {}
+
+      if (!cancelado) {
+        setConteoBitacoraPorRenglon(conteos)
+      }
+    }
+
+    cargarConteoBitacoras()
+    return () => {
+      cancelado = true
+    }
+  }, [proyecto?.id])
+
+  const guardarListaRenglones = async (nuevaLista: RenglonItemFinanciero[]) => {
+    setListaRenglones(nuevaLista)
+    if (!proyecto?.id) return
+    try {
+      localStorage.setItem(`domun_proyecto_renglones_${proyecto.id}`, JSON.stringify(nuevaLista))
+      localStorage.setItem(`domun_renglones_seleccionados_${proyecto.id}`, JSON.stringify(nuevaLista.filter((r) => r.seleccionado)))
+      await (proyectoService.actualizarProyecto as any)(proyecto.id, {
+        renglones: nuevaLista,
+        planTrabajo: nuevaLista,
+        renglones_seleccionados: nuevaLista.filter((r) => r.seleccionado),
+      })
+    } catch (e) {
+      console.warn('Error sincronizando renglones:', e)
+    }
+  }
+
+  const handleToggleBitacora = async (codigoDGC: string) => {
+    const base = listaRenglones.length > 0 ? listaRenglones : listaRenglonesFuente
+    const target = base.find((r) => r.codigoDGC === codigoDGC)
+    const nuevoEstado = !target?.seleccionado
+    const nuevaLista = base.map((r) =>
+      r.codigoDGC === codigoDGC ? { ...r, seleccionado: nuevoEstado } : r
+    )
+    await guardarListaRenglones(nuevaLista)
+    if (nuevoEstado) {
+      showSuccessToast(`Renglón ${codigoDGC} habilitado para Bitácora`)
+    } else {
+      showSuccessToast(`Renglón ${codigoDGC} ocultado de Bitácora`)
+    }
+  }
+
+  const handleSeleccionarTodosBitacora = async (valor: boolean) => {
+    const base = listaRenglones.length > 0 ? listaRenglones : listaRenglonesFuente
+    const nuevaLista = base.map((r) => ({ ...r, seleccionado: valor }))
+    await guardarListaRenglones(nuevaLista)
+    showSuccessToast(valor ? 'Todos los renglones habilitados para Bitácora' : 'Todos los renglones ocultados de Bitácora')
+  }
+
+  const handleAbrirCrearRenglon = () => {
+    setRenglonEnEdicion(null)
+    setFormRenglonCodigo('')
+    setFormRenglonDescripcion('')
+    setFormRenglonCapituloId(1)
+    setFormRenglonUnidad('m³')
+    setFormRenglonCantidad('1')
+    setFormRenglonPrecioUnitario('0.00')
+    setFormRenglonEnBitacora(true)
+    setDrawerRenglonOpen(true)
+  }
+
+  const handleAbrirEditarRenglon = (r: RenglonItemFinanciero) => {
+    setRenglonEnEdicion(r)
+    setFormRenglonCodigo(r.codigoDGC)
+    setFormRenglonDescripcion(r.descripcion)
+    setFormRenglonCapituloId(r.capituloId)
+    setFormRenglonUnidad(r.unidad)
+    setFormRenglonCantidad(String(r.cantidadContratada))
+    setFormRenglonPrecioUnitario(String(r.costoUnitarioDirecto))
+    setFormRenglonEnBitacora(r.seleccionado !== false)
+    setDrawerRenglonOpen(true)
+  }
+
+  const handleGuardarRenglonFormulario = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!formRenglonCodigo.trim()) {
+      showErrorToast('Ingresa el código DGC del renglón')
+      return
+    }
+    if (!formRenglonDescripcion.trim()) {
+      showErrorToast('Ingresa la descripción del renglón')
+      return
+    }
+
+    const codNormalizado = formRenglonCodigo.trim()
+    const cantNum = renglonEnEdicion?.cantidadContratada ?? (modoManual ? 1 : (parseFloat(formRenglonCantidad) || 1))
+    const precioNum = renglonEnEdicion?.costoUnitarioDirecto ?? (modoManual ? 0 : (parseFloat(formRenglonPrecioUnitario) || 0))
+    const enBitacora = modoManual ? true : formRenglonEnBitacora
+    const capObj = capitulosProyecto.find((c) => c.id === formRenglonCapituloId)
+    const capNom = capObj ? capObj.nombre : `Capítulo ${formRenglonCapituloId}`
+    const base = listaRenglones.length > 0 ? listaRenglones : listaRenglonesFuente
+
+    if (renglonEnEdicion) {
+      const nuevaLista = base.map((item) => {
+        if (item.codigoDGC === renglonEnEdicion.codigoDGC || item.id === renglonEnEdicion.id) {
+          return {
+            ...item,
+            codigoDGC: codNormalizado,
+            descripcion: formRenglonDescripcion.trim(),
+            capituloId: formRenglonCapituloId,
+            capituloNombre: capNom,
+            unidad: formRenglonUnidad.trim() || 'm³',
+            cantidadContratada: cantNum,
+            cantidadAjustada: cantNum,
+            costoUnitarioDirecto: precioNum,
+            seleccionado: enBitacora,
+          }
+        }
+        return item
+      })
+      await guardarListaRenglones(nuevaLista)
+      showSuccessToast(`Renglón ${codNormalizado} actualizado correctamente`)
+    } else {
+      const existe = base.some((r) => r.codigoDGC.toLowerCase() === codNormalizado.toLowerCase())
+      if (existe) {
+        showErrorToast(`El código "${codNormalizado}" ya existe en este proyecto`)
+        return
+      }
+
+      const nuevo: RenglonItemFinanciero = {
+        id: `renglon-${Date.now()}`,
+        codigoDGC: codNormalizado,
+        descripcion: formRenglonDescripcion.trim(),
+        capituloId: formRenglonCapituloId,
+        capituloNombre: capNom,
+        unidad: formRenglonUnidad.trim() || 'm³',
+        cantidadContratada: cantNum,
+        cantidadAjustada: cantNum,
+        costoUnitarioDirecto: precioNum,
+        seleccionado: enBitacora,
+        esPersonalizado: true,
+      }
+
+      const nuevaLista = [nuevo, ...base]
+      await guardarListaRenglones(nuevaLista)
+      showSuccessToast(`Renglón ${codNormalizado} creado exitosamente`)
+    }
+
+    setDrawerRenglonOpen(false)
+  }
+
+  const handleEliminarRenglonPersonalizado = async (codigoDGC: string) => {
+    const base = listaRenglones.length > 0 ? listaRenglones : listaRenglonesFuente
+    const nuevaLista = base.filter((r) => r.codigoDGC !== codigoDGC)
+    await guardarListaRenglones(nuevaLista)
+    showSuccessToast(`Renglón ${codigoDGC} eliminado del proyecto`)
+  }
+
+  const handleGuardarCapitulo = (e: React.FormEvent) => {
+    e.preventDefault()
+    const num = parseInt(formCapituloNumero.trim(), 10)
+    if (isNaN(num) || num <= 0) {
+      showErrorToast('Ingresa un número de capítulo válido (mayor a 0)')
+      return
+    }
+    if (!formCapituloNombre.trim()) {
+      showErrorToast('Ingresa el nombre del capítulo')
+      return
+    }
+
+    if (capitulosProyecto.some((c) => c.id === num)) {
+      showErrorToast(`El Capítulo ${num} ya existe`)
+      return
+    }
+
+    const nuevoCap = {
+      id: num,
+      nombre: `Capítulo ${num}: ${formCapituloNombre.trim()}`,
+    }
+
+    const nuevaListaCaps = [...capitulosProyecto, nuevoCap].sort((a, b) => a.id - b.id)
+    setCapitulosProyecto(nuevaListaCaps)
+    if (proyecto?.id) {
+      try {
+        localStorage.setItem(`domun_proyecto_capitulos_${proyecto.id}`, JSON.stringify(nuevaListaCaps))
+      } catch (_) {}
+    }
+    showSuccessToast(`Capítulo ${num} agregado exitosamente`)
+    setModalCapituloOpen(false)
+    setFormCapituloNumero('')
+    setFormCapituloNombre('')
+  }
 
   // Estimaciones Finales (Cargadas de la base de datos o registradas por el usuario; no genera datos falsos por defecto)
   const estimacionesGeneradas = useMemo<EstimacionFinancieraItem[]>(() => {
@@ -442,30 +755,30 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
   const listaRenglonesFuente = useMemo<RenglonItemFinanciero[]>(() => {
     const rawRenglones = (proyecto as any)?.renglones || (proyecto as any)?.renglones_sabana || (proyecto as any)?.planTrabajo
     if (Array.isArray(rawRenglones) && rawRenglones.length > 0) {
-      const seleccionados = rawRenglones.filter((r: any) => r.seleccionado !== false)
-      if (seleccionados.length > 0) {
-        return seleccionados.map((r: any, idx: number) => ({
-          id: r.id || `r-${idx}`,
-          capituloId: Number(r.capituloId || r.capitulo || 1),
-          capituloNombre: r.capituloNombre || `Capítulo ${r.capituloId || 1}`,
-          codigoDGC: r.codigoDGC || r.codigo || `10${idx + 1}.01`,
-          descripcion: r.descripcion || '',
-          unidad: r.unidad || 'm³',
-          cantidadContratada: Number(r.cantidadContratada || r.cantidad || 0),
-          cantidadAjustada: Number(r.cantidadAjustada || r.cantidadContratada || 0),
-          costoUnitarioDirecto: Number(r.costoUnitarioDirecto || r.costoUnitario || r.precioUnitario || 0),
-          cantidadEstePeriodo: Number(r.cantidadEstePeriodo || 0),
-          cantidadAcumuladaAnterior: Number(r.cantidadAcumuladaAnterior || 0),
-        }))
-      }
+      return rawRenglones.map((r: any, idx: number) => ({
+        id: r.id || r.codigoDGC || r.codigo || `r-${idx}`,
+        renglonId: r.renglonId || (typeof r.id === 'string' && r.id.length === 36 ? r.id : undefined),
+        capituloId: Number(r.capituloId || r.capitulo || 1),
+        capituloNombre: r.capituloNombre || `Capítulo ${r.capituloId || r.capitulo || 1}`,
+        codigoDGC: r.codigoDGC || r.codigo || `10${idx + 1}.01`,
+        descripcion: r.descripcion || '',
+        unidad: r.unidad || r.unidad_medida || 'm³',
+        cantidadContratada: Number(r.cantidadContratada ?? r.cantidad_contractual ?? r.cantidad ?? 1),
+        cantidadAjustada: Number(r.cantidadAjustada ?? r.cantidad_ajustada ?? r.cantidadContratada ?? 1),
+        costoUnitarioDirecto: Number(r.costoUnitarioDirecto ?? r.precio_unitario_directo ?? r.precioUnitario ?? 0),
+        cantidadEstePeriodo: Number(r.cantidadEstePeriodo || 0),
+        cantidadAcumuladaAnterior: Number(r.cantidadAcumuladaAnterior || 0),
+        seleccionado: r.seleccionado !== false,
+        esPersonalizado: Boolean(r.esPersonalizado),
+      }))
     }
-    // Si no se han establecido renglones en el proyecto, no deben salir renglones por defecto
     return []
   }, [proyecto])
 
-  // Filtrado de Renglones en Programa de Trabajo (Filtro por Capítulo + Filtro por Renglón / Búsqueda)
+  // Filtrado de Renglones en Programa de Trabajo (Filtro por Capítulo + Filtro por Renglón / Búsqueda + Filtro Estado Bitácora)
   const renglonesFiltrados = useMemo(() => {
-    return listaRenglonesFuente.filter((r) => {
+    const base = listaRenglones.length > 0 ? listaRenglones : listaRenglonesFuente
+    return base.filter((r) => {
       const matchCap = filtroCapitulo === 'todos' || r.capituloId === filtroCapitulo
       const matchRenglon = filtroRenglon === 'todos' || r.codigoDGC === filtroRenglon
       const matchTexto = busquedaTexto.trim() === '' ||
@@ -473,9 +786,13 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
         r.descripcion.toLowerCase().includes(busquedaTexto.toLowerCase()) ||
         r.capituloNombre.toLowerCase().includes(busquedaTexto.toLowerCase())
 
-      return matchCap && matchRenglon && matchTexto
+      let matchEstado = true
+      if (filtroEstadoBitacora === 'en_bitacora') matchEstado = r.seleccionado !== false
+      if (filtroEstadoBitacora === 'ocultos') matchEstado = r.seleccionado === false
+
+      return matchCap && matchRenglon && matchTexto && matchEstado
     })
-  }, [listaRenglonesFuente, filtroCapitulo, filtroRenglon, busquedaTexto])
+  }, [listaRenglones, listaRenglonesFuente, filtroCapitulo, filtroRenglon, busquedaTexto, filtroEstadoBitacora])
 
   // Paginación de Renglones
   const totalPaginasRenglones = Math.max(1, Math.ceil(renglonesFiltrados.length / itemsPorPagina))
@@ -486,11 +803,12 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
 
   // Lista de códigos de renglón únicos para el selector
   const listaCodigosRenglon = useMemo(() => {
+    const base = listaRenglones.length > 0 ? listaRenglones : listaRenglonesFuente
     const items = filtroCapitulo === 'todos'
-      ? listaRenglonesFuente
-      : listaRenglonesFuente.filter((r) => r.capituloId === filtroCapitulo)
+      ? base
+      : base.filter((r) => r.capituloId === filtroCapitulo)
     return items.map((r) => ({ codigo: r.codigoDGC, descripcion: r.descripcion }))
-  }, [listaRenglonesFuente, filtroCapitulo])
+  }, [listaRenglones, listaRenglonesFuente, filtroCapitulo])
 
   // Datos de la Curva S Financiera Dinámica basada en fechas reales y avance de estimaciones del proyecto
   const puntosCurvaS = useMemo(() => {
@@ -616,56 +934,43 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
     <div className="space-y-2.5 font-[Poppins] text-[10.5px]">
       {/* Banner Superior */}
       <div className="rounded-xl border border-gray-200 bg-white p-2.5 shadow-2xs">
-        <div className="flex flex-wrap items-center justify-between gap-2.5">
-          <div className="flex items-center gap-2.5">
-            <Banknote size={16} className="text-[#9B0F06] shrink-0" />
-            <div>
-              <p className="text-[8px] font-bold uppercase tracking-wider text-gray-400 font-sans">
-                Presupuesto / Monto Contractual Global
-              </p>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-[13px] font-black text-gray-900 leading-none font-sans">
-                  Q {montoContractualOriginal.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
-                </span>
-                <span className="text-[10px] text-gray-500 font-medium font-sans">
-                  · Anticipo: {(pctAnticipoEjec * 100).toFixed(0)}% (Q {anticipoOtorgado.toLocaleString('es-GT', { minimumFractionDigits: 2 })})
-                </span>
-                <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[8.5px] font-bold border font-sans ${
-                  modoManual
-                    ? 'bg-amber-50 text-amber-800 border-amber-300'
-                    : 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                }`}>
-                  {modoManual ? <Calculator size={10} /> : <FileSpreadsheet size={10} />}
-                  <span>{modoManual ? 'Modo Manual' : 'Modo Hoja Sábana'}</span>
-                </span>
+        <div className={`flex flex-wrap items-center ${modoManual ? 'justify-end' : 'justify-between'} gap-2.5`}>
+          {!modoManual && (
+            <div className="flex items-center gap-2.5">
+              <Banknote size={16} className="text-[#9B0F06] shrink-0" />
+              <div>
+                <p className="text-[8px] font-bold uppercase tracking-wider text-gray-400 font-sans">
+                  Presupuesto / Monto Contractual Global
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[13px] font-black text-gray-900 leading-none font-sans">
+                    Q {montoContractualOriginal.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                  </span>
+                  <span className="text-[10px] text-gray-500 font-medium font-sans">
+                    · Anticipo: {(pctAnticipoEjec * 100).toFixed(0)}% (Q {anticipoOtorgado.toLocaleString('es-GT', { minimumFractionDigits: 2 })})
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           <div className="flex items-center gap-3 font-sans">
-            <div className="text-right hidden sm:block">
-              <span className="text-[7.5px] font-bold uppercase tracking-wider text-gray-400 block">
-                Delegado Residente Autorizado:
-              </span>
-              <span className="text-[10px] font-bold text-gray-800">
-                {nombreDelegadoProyecto}
-              </span>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => navegarAHojaSabana({ tab: 'planificacion' })}
-              className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[10px] font-bold transition-all shadow-xs ${
-                tieneAccesoHojaSabana
-                  ? 'bg-[#9B0F06] text-white hover:bg-[#5E0006] cursor-pointer'
-                  : 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200'
-              }`}
-              title={tieneAccesoHojaSabana ? 'Abrir Hoja Sábana Analítica' : 'Solo el Delegado Residente o Administrador tiene acceso'}
-            >
-              {tieneAccesoHojaSabana ? <FileSpreadsheet size={11} /> : <Lock size={11} />}
-              <span>Hoja Sábana Analítica</span>
-              {tieneAccesoHojaSabana && <ArrowRight size={10} />}
-            </button>
+            {!modoManual && (
+              <button
+                type="button"
+                onClick={() => navegarAHojaSabana({ tab: 'planificacion' })}
+                className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[10px] font-bold transition-all shadow-xs ${
+                  tieneAccesoHojaSabana
+                    ? 'bg-[#9B0F06] text-white hover:bg-[#5E0006] cursor-pointer'
+                    : 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200'
+                }`}
+                title={tieneAccesoHojaSabana ? 'Abrir Hoja Sábana Analítica' : 'Solo el Delegado Residente o Administrador tiene acceso'}
+              >
+                {tieneAccesoHojaSabana ? <FileSpreadsheet size={11} /> : <Lock size={11} />}
+                <span>Hoja Sábana Analítica</span>
+                {tieneAccesoHojaSabana && <ArrowRight size={10} />}
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -683,7 +988,7 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
             }`}
           >
             <Layers size={12} className={subTab === 'resumen' ? 'text-[#9B0F06]' : 'text-gray-400'} />
-            <span>Resumen</span>
+            <span>{modoManual ? 'Renglones' : 'Resumen'}</span>
           </button>
 
           <button
@@ -725,21 +1030,25 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
             <div className="rounded-xl border border-gray-200 bg-white p-2.5 shadow-2xs flex flex-col justify-between">
               <div className="flex items-center justify-between">
                 <span className="text-[8px] font-extrabold uppercase tracking-wider text-gray-400 font-sans">
-                  Resumen Financiero
+                  {modoManual ? 'Monto contractual' : 'Resumen Financiero'}
                 </span>
-                <button
-                  type="button"
-                  onClick={() => setSubTab('estimaciones')}
-                  className="text-[8.5px] font-bold text-[#9B0F06] hover:underline flex items-center gap-0.5 font-sans cursor-pointer"
-                >
-                  <span>Ver detalle</span>
-                  <ChevronRight size={10} />
-                </button>
+                {!modoManual && (
+                  <button
+                    type="button"
+                    onClick={() => setSubTab('estimaciones')}
+                    className="text-[8.5px] font-bold text-[#9B0F06] hover:underline flex items-center gap-0.5 font-sans cursor-pointer"
+                  >
+                    <span>Ver detalle</span>
+                    <ChevronRight size={10} />
+                  </button>
+                )}
               </div>
               <div className="mt-1">
-                <span className="text-[7.5px] text-gray-400 block uppercase font-sans">Monto Líquido a Pagar</span>
+                <span className="text-[7.5px] text-gray-400 block uppercase font-sans">
+                  {modoManual ? 'Monto vigente del contrato' : 'Monto Líquido a Pagar'}
+                </span>
                 <p className="text-[13px] font-black text-gray-900 font-sans">
-                  Q {totalLiquidoAPagar.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                  Q {(modoManual ? montoContractualOriginal : totalLiquidoAPagar).toLocaleString('es-GT', { minimumFractionDigits: 2 })}
                 </p>
               </div>
             </div>
@@ -748,25 +1057,31 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
             <div className="rounded-xl border border-gray-200 bg-white p-2.5 shadow-2xs flex flex-col justify-between">
               <div className="flex items-center justify-between">
                 <span className="text-[8px] font-extrabold uppercase tracking-wider text-gray-400 font-sans">
-                  Control de Anticipo
+                  {modoManual ? 'Inicio contractual' : 'Control de Anticipo'}
                 </span>
-                <button
-                  type="button"
-                  onClick={() => navegarAHojaSabana({ tab: 'estimaciones' })}
-                  className="text-[8.5px] font-bold text-[#9B0F06] hover:underline flex items-center gap-0.5 font-sans cursor-pointer"
-                >
-                  <span>Ver detalle</span>
-                  <ChevronRight size={10} />
-                </button>
+                {!modoManual && (
+                  <button
+                    type="button"
+                    onClick={() => navegarAHojaSabana({ tab: 'estimaciones' })}
+                    className="text-[8.5px] font-bold text-[#9B0F06] hover:underline flex items-center gap-0.5 font-sans cursor-pointer"
+                  >
+                    <span>Ver detalle</span>
+                    <ChevronRight size={10} />
+                  </button>
+                )}
               </div>
               <div className="mt-1">
-                <span className="text-[7.5px] text-gray-400 block uppercase font-sans">% Amortizado a la Fecha</span>
+                <span className="text-[7.5px] text-gray-400 block uppercase font-sans">
+                  {modoManual ? 'Fecha de inicio' : '% Amortizado a la Fecha'}
+                </span>
                 <div className="flex items-baseline justify-between">
                   <p className="text-[13px] font-black text-gray-900 font-sans">
-                    {pctAmortizadoAnticipo.toFixed(1)}%
+                    {modoManual
+                      ? (pAny.fechaInicioContractual || pAny.fechaInicio || pAny.fecha_inicio || 'No definida')
+                      : `${pctAmortizadoAnticipo.toFixed(1)}%`}
                   </p>
                   <span className="text-[8px] text-gray-500 font-sans">
-                    Saldo: Q {saldoAnticipoPendiente.toLocaleString('es-GT', { minimumFractionDigits: 0 })}
+                    {modoManual ? 'Contrato vigente' : `Saldo: Q ${saldoAnticipoPendiente.toLocaleString('es-GT', { minimumFractionDigits: 0 })}`}
                   </span>
                 </div>
               </div>
@@ -776,36 +1091,43 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
             <div className="rounded-xl border border-gray-200 bg-white p-2.5 shadow-2xs flex flex-col justify-between">
               <div className="flex items-center justify-between">
                 <span className="text-[8px] font-extrabold uppercase tracking-wider text-gray-400 font-sans">
-                  Control de Plazo
+                  {modoManual ? 'Plazo contractual' : 'Control de Plazo'}
                 </span>
-                <button
-                  type="button"
-                  onClick={() => setSubTab('estimaciones')}
-                  className="text-[8.5px] font-bold text-[#9B0F06] hover:underline flex items-center gap-0.5 font-sans cursor-pointer"
-                >
-                  <span>Ver detalle</span>
-                  <ChevronRight size={10} />
-                </button>
+                {!modoManual && (
+                  <button
+                    type="button"
+                    onClick={() => setSubTab('estimaciones')}
+                    className="text-[8.5px] font-bold text-[#9B0F06] hover:underline flex items-center gap-0.5 font-sans cursor-pointer"
+                  >
+                    <span>Ver detalle</span>
+                    <ChevronRight size={10} />
+                  </button>
+                )}
               </div>
               <div className="mt-1">
-                <span className="text-[7.5px] text-gray-400 block uppercase font-sans">Días por Emplearse</span>
+                <span className="text-[7.5px] text-gray-400 block uppercase font-sans">
+                  {modoManual ? 'Duración establecida' : 'Días por Emplearse'}
+                </span>
                 <div className="flex items-baseline justify-between">
                   <p className="text-[13px] font-black text-gray-900 font-sans">
-                    {plazoDiasCalculados.diasRestantes} <span className="text-[9px] font-semibold text-gray-500">días</span>
+                    {modoManual
+                      ? `${plazoDiasCalculados.totalDias} días`
+                      : <>{plazoDiasCalculados.diasRestantes} <span className="text-[9px] font-semibold text-gray-500">días</span></>}
                   </p>
                   <span className="text-[8px] text-gray-500 font-sans">
-                    Plazo: {plazoDiasCalculados.totalDias}d
+                    {modoManual ? 'Según contrato' : `Plazo: ${plazoDiasCalculados.totalDias}d`}
                   </span>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Barra con los 2 Filtros Solicitados */}
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-gray-200 bg-white p-2 shadow-2xs">
-            <div className="flex flex-wrap items-center gap-2 flex-1">
+          {/* Barra de Filtros y Acciones de Gestión de Renglones */}
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-gray-200 bg-white p-2 shadow-2xs font-[Poppins]">
+            {/* Controles Desktop (>= sm) */}
+            <div className="hidden sm:flex flex-wrap items-center gap-2 flex-1">
               {/* Filtro 1: Todos los Capítulos */}
-              <div className="min-w-[170px]">
+              <div className="min-w-[160px]">
                 <select
                   value={filtroCapitulo}
                   onChange={(e) => {
@@ -815,17 +1137,17 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
                   }}
                   className="w-full rounded-md border border-gray-200 bg-white px-2 py-1 text-[9.5px] font-semibold text-gray-700 focus:border-[#9B0F06] focus:outline-none cursor-pointer"
                 >
-                  <option value="todos">Todos los Capítulos DGC</option>
-                  {CAPITULOS_LIBRO_AZUL_DGC.map((c) => (
+                  <option value="todos">Todos los Capítulos ({capitulosProyecto.length})</option>
+                  {capitulosProyecto.map((c) => (
                     <option key={c.id} value={c.id}>
-                      Capítulo {c.id}: {c.nombre.split(':')[1]?.trim() || c.nombre}
+                      Capítulo {c.id}: {c.nombre.includes(':') ? c.nombre.split(':')[1]?.trim() : c.nombre}
                     </option>
                   ))}
                 </select>
               </div>
 
               {/* Filtro 2: Según el Renglón */}
-              <div className="min-w-[170px]">
+              <div className="min-w-[150px] hidden md:block">
                 <select
                   value={filtroRenglon}
                   onChange={(e) => {
@@ -837,14 +1159,14 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
                   <option value="todos">Todos los Renglones</option>
                   {listaCodigosRenglon.map((r) => (
                     <option key={r.codigo} value={r.codigo}>
-                      {r.codigo} — {r.descripcion.length > 35 ? `${r.descripcion.substring(0, 35)}...` : r.descripcion}
+                      {r.codigo} — {r.descripcion.length > 30 ? `${r.descripcion.substring(0, 30)}...` : r.descripcion}
                     </option>
                   ))}
                 </select>
               </div>
 
               {/* Búsqueda rápida por texto */}
-              <div className="relative flex-1 min-w-[150px]">
+              <div className="relative flex-1 min-w-[140px]">
                 <Search size={11} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
                   type="text"
@@ -859,92 +1181,214 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
               </div>
             </div>
 
-            <div className="text-[9.5px] text-gray-500 font-medium whitespace-nowrap">
-              Mostrando <strong className="text-gray-900">{renglonesFiltrados.length}</strong> renglones
+            {/* Controles Móvil (< sm): Botón de Filtros y Búsqueda */}
+            <div className="flex sm:hidden items-center gap-1.5 flex-1 min-w-0">
+              <div className="relative flex-1 min-w-0">
+                <Search size={11} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Buscar renglón..."
+                  value={busquedaTexto}
+                  onChange={(e) => {
+                    setBusquedaTexto(e.target.value)
+                    setPaginaRenglones(1)
+                  }}
+                  className="w-full rounded-md border border-gray-200 bg-gray-50/50 pl-6 pr-2 py-1 text-[10px] text-gray-900 placeholder:text-gray-400 focus:border-[#9B0F06] focus:bg-white focus:outline-none"
+                />
+              </div>
+
+
+            </div>
+
+            {/* Acciones principales: Gestión Renglón en página completa */}
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  const targetId = proyecto?.id || pAny.id || ''
+                  if (targetId) {
+                    router.push(`/dashboard/proyectos/${targetId}/renglones`)
+                  }
+                }}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[#9B0F06] hover:bg-[#7A0C0D] text-white px-2.5 sm:px-3 py-1 sm:py-1.5 text-[11px] sm:text-xs font-bold transition-all shadow-xs cursor-pointer"
+                title="Abrir página dedicada de gestión de renglones y capítulos de este proyecto"
+              >
+                <Layers size={12} className="text-white" />
+                <span>Gestión Renglón</span>
+                <ArrowRight size={11} className="text-white/80" />
+              </button>
+
+              <div className="text-[9.5px] sm:text-[10px] text-gray-500 font-medium whitespace-nowrap pl-1">
+                <strong className="text-gray-900">{renglonesFiltrados.length}</strong> {renglonesFiltrados.length === 1 ? 'renglón' : 'renglones'}
+              </div>
             </div>
           </div>
 
-          {/* Tabla Resumida de Renglones con Paginación de 10 */}
+          {/* Tabla de Renglones Compacta con Paginación */}
           <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xs">
             <div className="overflow-x-auto">
-              <table className="w-full text-left font-sans text-[10px]">
+              <table className="w-full text-left font-sans text-xs">
                 <thead>
-                  <tr className="border-b border-gray-200 bg-gray-100/75 text-[8.5px] font-extrabold uppercase tracking-wider text-gray-600">
-                    <th className="px-2.5 py-1.5 w-20">Código</th>
-                    <th className="px-2.5 py-1.5 min-w-[220px]">Descripción del Renglón DGC</th>
-                    <th className="px-2.5 py-1.5 text-center w-16">Unidad</th>
-                    <th className="px-2.5 py-1.5 text-right w-24">Cantidad</th>
-                    <th className="px-2.5 py-1.5 text-right w-24">P. Unitario (Q)</th>
-                    <th className="px-2.5 py-1.5 text-right w-28">Total (Q)</th>
-                    <th className="px-2.5 py-1.5 text-center w-28">Acción</th>
+                  <tr className="border-b border-gray-200 bg-gray-100/80 text-[9.5px] font-extrabold uppercase tracking-wider text-gray-700">
+                    <th className="px-3 py-1.5 w-24 text-left">Código</th>
+                    <th className="px-3 py-1.5 min-w-[280px] text-left">Descripción del Renglón</th>
+                    {!modoManual ? (
+                      <>
+                        <th className="px-2.5 py-1.5 text-center w-20">Unidad</th>
+                        <th className="px-2.5 py-1.5 text-right w-24">Cantidad</th>
+                        <th className="px-2.5 py-1.5 text-right w-28">P. Unitario (Q)</th>
+                        <th className="px-2.5 py-1.5 text-right w-32">Total (Q)</th>
+                        <th className="px-2.5 py-1.5 text-center w-28">Acción</th>
+                      </>
+                    ) : (
+                      <>
+                        <th className="px-3 py-1.5 text-center w-36">Registros Bitácora</th>
+                        <th className="px-3 py-1.5 text-center w-24">Acción</th>
+                      </>
+                    )}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100 font-sans text-[10px]">
+                <tbody className="divide-y divide-gray-100 font-sans text-xs">
                   {renglonesPaginados.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="p-8 text-center text-[10.5px] text-gray-500 font-sans">
-                        <div className="flex flex-col items-center justify-center py-5 text-gray-400">
-                          <Layers size={26} className="text-gray-300 mb-2" />
+                      <td colSpan={modoManual ? 4 : 7} className="p-6 text-center text-xs text-gray-500 font-sans">
+                        <div className="flex flex-col items-center justify-center py-4 text-gray-400">
+                          <Layers size={28} className="text-gray-300 mb-1.5" />
                           <p className="font-bold text-gray-700 text-xs">
-                            {listaRenglonesFuente.length === 0
+                            {listaRenglones.length === 0 && listaRenglonesFuente.length === 0
                               ? 'No hay renglones asignados a este proyecto'
                               : 'No se encontraron renglones con los filtros seleccionados'}
                           </p>
-                          <p className="text-[10px] text-gray-400 mt-0.5">
-                            {listaRenglonesFuente.length === 0
-                              ? 'Aún no se han establecido renglones de trabajo para este proyecto.'
+                          <p className="text-[11px] text-gray-400 mt-0.5">
+                            {listaRenglones.length === 0 && listaRenglonesFuente.length === 0
+                              ? 'Puedes administrar y agregar renglones usando el botón "Gestión Renglón" arriba.'
                               : 'Prueba cambiando o limpiando los filtros de búsqueda.'}
                           </p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const targetId = proyecto?.id || pAny.id || ''
+                              if (targetId) router.push(`/dashboard/proyectos/${targetId}/renglones`)
+                            }}
+                            className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-[#9B0F06] hover:bg-[#7A0C0D] text-white px-3 py-1 text-xs font-bold shadow-xs cursor-pointer transition-colors"
+                          >
+                            <Layers size={12} />
+                            <span>Abrir Gestión de Renglones</span>
+                          </button>
                         </div>
                       </td>
                     </tr>
                   ) : (
                     renglonesPaginados.map((renglon) => {
                       const montoTotal = (renglon.cantidadContratada || 0) * (renglon.costoUnitarioDirecto || 0)
+                      const countBitacora =
+                        (conteoBitacoraPorRenglon[renglon.codigoDGC] || 0) +
+                        (conteoBitacoraPorRenglon[renglon.id] || 0) +
+                        (renglon.renglonId ? (conteoBitacoraPorRenglon[renglon.renglonId] || 0) : 0)
 
                       return (
                         <tr
-                          key={renglon.id}
-                          onClick={() => navegarAHojaSabana({ tab: 'planificacion', renglon: renglon.codigoDGC })}
+                          key={renglon.id || renglon.codigoDGC}
+                          onClick={() => {
+                            if (!modoManual) {
+                              navegarAHojaSabana({ tab: 'planificacion', renglon: renglon.codigoDGC })
+                            } else {
+                              handleAbrirEditarRenglon(renglon)
+                            }
+                          }}
                           className="hover:bg-red-50/40 transition-colors cursor-pointer group"
-                          title="Hacer clic para ampliar en la Hoja Sábana (Planificación)"
+                          title={modoManual ? 'Hacer clic para editar renglón de este proyecto' : 'Hacer clic para ampliar en Hoja Sábana'}
                         >
-                          <td className="px-2.5 py-1.5">
-                            <span className="rounded bg-gray-100 px-1 py-0.5 font-mono text-[9px] font-bold text-gray-800 border border-gray-200 group-hover:border-[#9B0F06] group-hover:text-[#9B0F06]">
+                          <td className="px-3 py-1.5 whitespace-nowrap">
+                            <span className="inline-block rounded bg-gray-100 px-1.5 py-0.5 font-mono text-[10px] font-bold text-gray-800 border border-gray-200 group-hover:border-[#9B0F06] group-hover:text-[#9B0F06] transition-colors">
                               {renglon.codigoDGC}
                             </span>
                           </td>
-                          <td className="px-2.5 py-1.5 font-sans font-medium text-gray-800 text-[10px]">
-                            <p className="line-clamp-1 group-hover:text-[#9B0F06]">{renglon.descripcion}</p>
-                            <span className="text-[8px] text-gray-400 font-normal">Capítulo {renglon.capituloId}</span>
+                          <td className="px-3 py-1.5 font-sans">
+                            <p className="font-semibold text-gray-900 text-[11px] sm:text-xs leading-tight group-hover:text-[#9B0F06] transition-colors">
+                              {renglon.descripcion}
+                            </p>
+                            <span className="text-[9.5px] text-gray-400 font-medium block">
+                              {renglon.capituloNombre || `Capítulo ${renglon.capituloId}`}
+                            </span>
                           </td>
-                          <td className="px-2.5 py-1.5 text-center font-bold text-gray-600">
-                            {renglon.unidad}
-                          </td>
-                          <td className="px-2.5 py-1.5 text-right font-bold text-gray-800">
-                            {renglon.cantidadContratada.toLocaleString('es-GT', {
-                              minimumFractionDigits: renglon.unidad.toLowerCase() === 'glb' || renglon.unidad.toLowerCase() === 'u' ? 0 : 2,
-                            })}
-                          </td>
-                          <td className="px-2.5 py-1.5 text-right font-semibold text-gray-700">
-                            Q {renglon.costoUnitarioDirecto.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
-                          </td>
-                          <td className="px-2.5 py-1.5 text-right font-black text-[#9B0F06]">
-                            Q {montoTotal.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
-                          </td>
-                          <td className="px-2.5 py-1.5 text-center font-sans">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                navegarAHojaSabana({ tab: 'planificacion', renglon: renglon.codigoDGC })
-                              }}
-                              className="inline-flex items-center gap-1 rounded bg-gray-50 border border-gray-200 px-1.5 py-0.5 text-[8.5px] font-bold text-gray-700 hover:bg-[#9B0F06] hover:text-white hover:border-[#9B0F06] transition-colors"
-                            >
-                              <Eye size={9} />
-                              <span>Planificación</span>
-                            </button>
-                          </td>
+                          {!modoManual && (
+                            <>
+                              <td className="px-2.5 py-1.5 text-center font-bold text-gray-700 text-[11px] whitespace-nowrap">
+                                {renglon.unidad}
+                              </td>
+                              <td className="px-2.5 py-1.5 text-right font-bold text-gray-900 text-[11px] whitespace-nowrap">
+                                {renglon.cantidadContratada.toLocaleString('es-GT', {
+                                  minimumFractionDigits: renglon.unidad.toLowerCase() === 'glb' || renglon.unidad.toLowerCase() === 'u' ? 0 : 2,
+                                })}
+                              </td>
+                              <td className="px-2.5 py-1.5 text-right font-semibold text-gray-700 text-[11px] whitespace-nowrap">
+                                Q {renglon.costoUnitarioDirecto.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                              </td>
+                              <td className="px-2.5 py-1.5 text-right font-black text-[#9B0F06] text-[11px] whitespace-nowrap">
+                                Q {montoTotal.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                              </td>
+                            </>
+                          )}
+
+                          {modoManual && (
+                            <>
+                              {/* Conteo de registros en Bitácora */}
+                              <td className="px-3 py-1.5 text-center whitespace-nowrap">
+                                <span
+                                  className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[9.5px] font-bold border ${
+                                    countBitacora > 0
+                                      ? 'bg-blue-50 text-blue-800 border-blue-200'
+                                      : 'bg-gray-50 text-gray-400 border-gray-200'
+                                  }`}
+                                  title={countBitacora > 0 ? `${countBitacora} registros vinculados en bitácora de obra` : 'Sin registros en bitácora'}
+                                >
+                                  <FileText size={11} className={countBitacora > 0 ? 'text-blue-600' : 'text-gray-400'} />
+                                  <span>{countBitacora} {countBitacora === 1 ? 'registro' : 'registros'}</span>
+                                </span>
+                              </td>
+
+                              {/* Acciones: Editar / Eliminar */}
+                              <td className="px-3 py-1.5 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                                <div className="flex items-center justify-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAbrirEditarRenglon(renglon)}
+                                    className="p-1 rounded-md text-gray-600 hover:bg-gray-100 hover:text-[#9B0F06] transition-colors cursor-pointer"
+                                    title="Editar renglón en este proyecto"
+                                  >
+                                    <Edit2 size={12} />
+                                  </button>
+                                  {renglon.esPersonalizado && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleEliminarRenglonPersonalizado(renglon.codigoDGC)}
+                                      className="p-1 rounded-md text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer"
+                                      title="Eliminar renglón personalizado de este proyecto"
+                                    >
+                                      <Trash2 size={12} />
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </>
+                          )}
+
+                          {!modoManual && (
+                            <td className="px-2.5 py-1.5 text-center font-sans whitespace-nowrap">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  navegarAHojaSabana({ tab: 'planificacion', renglon: renglon.codigoDGC })
+                                }}
+                                className="inline-flex items-center gap-1 rounded bg-gray-50 border border-gray-200 px-2 py-0.5 text-[9.5px] font-bold text-gray-700 hover:bg-[#9B0F06] hover:text-white hover:border-[#9B0F06] transition-colors cursor-pointer"
+                              >
+                                <Eye size={10} />
+                                <span>Planificación</span>
+                              </button>
+                            </td>
+                          )}
                         </tr>
                       )
                     })
@@ -953,7 +1397,7 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
               </table>
             </div>
 
-            {/* Paginación estilo Hoja Sábana con Selector de Cantidad (8, 16, 24, 50, etc.) */}
+            {/* Paginación estilo Hoja Sábana con Selector de Cantidad */}
             <div data-paginacion="true" className="paginacion-control flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 bg-gray-50/60 px-2.5 py-1 text-[8.5px] text-gray-600">
               <div className="flex items-center gap-2">
                 <span className="font-medium text-[8.5px]">
@@ -970,9 +1414,8 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
                     }}
                     className="paginacion-control h-5.5 rounded border border-gray-200 bg-white px-1.5 py-0.5 text-[8.5px] font-semibold text-gray-700 shadow-2xs focus:border-[#9B0F06] focus:outline-none cursor-pointer"
                   >
-                    <option value={8}>8</option>
-                    <option value={16}>16</option>
-                    <option value={24}>24</option>
+                    <option value={10}>10</option>
+                    <option value={20}>20</option>
                     <option value={50}>50</option>
                     <option value={100}>100</option>
                     <option value={500}>Todos</option>
@@ -1014,7 +1457,7 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
           {/* Selector de Perspectiva Doble y Filtros de Fecha */}
           <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-xl border border-gray-200 bg-white p-2.5 shadow-2xs">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[9px] font-extrabold uppercase tracking-wider text-gray-500">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-gray-500">
                 PERSPECTIVA:
               </span>
               <div className="inline-flex items-center gap-1 rounded-lg bg-gray-100/80 p-0.5 border border-gray-200/60 shadow-2xs">
@@ -1031,16 +1474,7 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
                   }`}
                 >
                   <Building2 size={11} className={perspectivaEstimacion === 'ejecutora' ? 'text-[#9B0F06]' : 'text-gray-500'} />
-                  <span>Empresa Ejecutora ({nombreEmpresaEjecutora})</span>
-                  {esModoSabana && (
-                    <span className={`text-[8px] px-1.5 py-0.5 rounded-full font-bold ml-1 ${
-                      ambitoPlanTrabajo === 'obra'
-                        ? 'bg-red-50 text-[#9B0F06] border border-red-200'
-                        : 'bg-amber-50 text-amber-800 border border-amber-300'
-                    }`}>
-                      {ambitoPlanTrabajo === 'obra' ? 'Plan de Trabajo' : 'Manual'}
-                    </span>
-                  )}
+                  <span className="text-[10px]">Empresa Ejecutora ({nombreEmpresaEjecutora})</span>
                 </button>
                 <button
                   type="button"
@@ -1055,75 +1489,25 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
                   }`}
                 >
                   <UserCheck size={11} className={perspectivaEstimacion === 'supervisora' ? 'text-[#9B0F06]' : 'text-gray-500'} />
-                  <span>Empresa Supervisora ({nombreEmpresaSupervisora})</span>
-                  {esModoSabana && (
-                    <span className={`text-[8px] px-1.5 py-0.5 rounded-full font-bold ml-1 ${
-                      ambitoPlanTrabajo === 'supervision'
-                        ? 'bg-orange-50 text-orange-800 border border-orange-200'
-                        : 'bg-amber-50 text-amber-800 border border-amber-300'
-                    }`}>
-                      {ambitoPlanTrabajo === 'supervision' ? 'Plan de Trabajo' : 'Manual'}
-                    </span>
-                  )}
+                  <span className="text-[10px]">Empresa Supervisora ({nombreEmpresaSupervisora})</span>
                 </button>
               </div>
             </div>
 
-            {/* Filtros de Rango de Fecha para Estimaciones */}
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-1 text-[9px] text-gray-500 font-medium">
-                <span>Desde:</span>
-                <input
-                  type="date"
-                  value={fechaDesdeEstimacion}
-                  onChange={(e) => {
-                    setFechaDesdeEstimacion(e.target.value)
-                    setPaginaEstimaciones(1)
-                  }}
-                  className="rounded-md border border-gray-200 bg-gray-50/60 px-2 py-0.5 text-[9px] font-medium text-gray-800 focus:border-[#9B0F06] focus:bg-white focus:outline-none"
-                />
-              </div>
-
-              <div className="flex items-center gap-1 text-[9px] text-gray-500 font-medium">
-                <span>Hasta:</span>
-                <input
-                  type="date"
-                  value={fechaHastaEstimacion}
-                  onChange={(e) => {
-                    setFechaHastaEstimacion(e.target.value)
-                    setPaginaEstimaciones(1)
-                  }}
-                  className="rounded-md border border-gray-200 bg-gray-50/60 px-2 py-0.5 text-[9px] font-medium text-gray-800 focus:border-[#9B0F06] focus:bg-white focus:outline-none"
-                />
-              </div>
-
-              {(fechaDesdeEstimacion || fechaHastaEstimacion) && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setFechaDesdeEstimacion('')
-                    setFechaHastaEstimacion('')
-                    setPaginaEstimaciones(1)
-                  }}
-                  className="text-[8.5px] font-bold text-[#9B0F06] hover:underline cursor-pointer"
-                >
-                  Limpiar
-                </button>
-              )}
-
-              {/* Botón para crear o agregar estimación manual */}
+            {/* Botón para crear o agregar estimación */}
+            <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={handleAbrirCrearEstimacionManual}
-                className="inline-flex items-center gap-1 rounded-md bg-[#9B0F06] px-2.5 py-1 text-[9px] font-bold text-white hover:bg-[#7a0c05] transition-colors cursor-pointer shadow-2xs"
-                title="Crear o registrar estimación manual"
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-[#9B0F06] px-2.5 py-1.5 text-[10px] font-bold text-white hover:bg-[#7a0c05] transition-colors cursor-pointer shadow-2xs whitespace-nowrap"
+                title="Crear o registrar estimación"
               >
-                <Plus size={11} />
-                <span>+ Nueva Estimación</span>
+                <Plus size={12} />
+                <span>Nueva Estimación</span>
               </button>
 
-              <div className="text-[8.5px] text-gray-400 font-medium pl-1">
-                {estimacionesFiltradas.length} estimaciones
+              <div className="text-[10px] text-gray-500 font-medium pl-1">
+                <strong className="text-gray-900">{estimacionesFiltradas.length}</strong> {estimacionesFiltradas.length === 1 ? 'estimación' : 'estimaciones'}
               </div>
             </div>
           </div>
@@ -1151,32 +1535,6 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
               >
                 <Plus size={12} />
                 <span>+ Ingresar Estimación Manual</span>
-              </button>
-            </div>
-          )}
-
-          {esModoSabana && !perspectivaEsManual && (
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50/60 p-3 shadow-2xs font-[Poppins]">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-100 text-emerald-800 shrink-0 border border-emerald-200">
-                  <FileSpreadsheet size={16} />
-                </div>
-                <div>
-                  <h4 className="text-[11px] font-bold text-emerald-900">
-                    Plan de Trabajo Implementado: {ambitoPlanTrabajo === 'obra' ? 'Contrato de Obra (Ejecución)' : 'Contrato de Supervisión'}
-                  </h4>
-                  <p className="text-[9.5px] text-emerald-800 leading-snug">
-                    Este apartado está vinculado a la Hoja Sábana Digital para el desglose analítico de renglones y estimaciones.
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => navegarAHojaSabana({ tab: 'sabana' })}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 px-3 py-1.5 text-[10px] font-bold text-white hover:bg-emerald-800 transition-colors shadow-2xs shrink-0 cursor-pointer"
-              >
-                <FileSpreadsheet size={12} />
-                <span>Abrir Hoja Sábana</span>
               </button>
             </div>
           )}
@@ -1403,50 +1761,56 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
       {/* ========================================================================= */}
       {subTab === 'curva' && (
         <div className="space-y-2.5 font-[Poppins]">
-          {/* Barra de Filtros del Gráfico Financiero (Perspectiva + Año + Métrica + Fechas) */}
-          <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-xl border border-gray-200 bg-white p-2.5 shadow-2xs">
-            {/* Perspectiva Doble con cápsula y animación (img1 / img3) */}
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[9px] font-extrabold uppercase tracking-wider text-gray-500">
-                PERSPECTIVA:
-              </span>
-              <div className="inline-flex items-center gap-1 rounded-lg bg-gray-100/80 p-0.5 border border-gray-200/60 shadow-2xs">
-                <button
-                  type="button"
-                  onClick={() => setPerspectivaCurva('ejecutora')}
-                  className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[10px] font-bold transition-all duration-200 cursor-pointer ${
-                    perspectivaCurva === 'ejecutora'
-                      ? 'bg-white text-[#9B0F06] border border-gray-200/80 shadow-xs'
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/50 font-medium'
-                  }`}
-                >
-                  <Building2 size={11} className={perspectivaCurva === 'ejecutora' ? 'text-[#9B0F06]' : 'text-gray-500'} />
-                  <span>Empresa Ejecutora ({nombreEmpresaEjecutora})</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPerspectivaCurva('supervisora')}
-                  className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[10px] font-bold transition-all duration-200 cursor-pointer ${
-                    perspectivaCurva === 'supervisora'
-                      ? 'bg-white text-[#9B0F06] border border-gray-200/80 shadow-xs'
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/50 font-medium'
-                  }`}
-                >
-                  <UserCheck size={11} className={perspectivaCurva === 'supervisora' ? 'text-[#9B0F06]' : 'text-gray-500'} />
-                  <span>Empresa Supervisora ({nombreEmpresaSupervisora})</span>
-                </button>
+          {/* Barra de Filtros del Gráfico Financiero en 2 Filas Independientes */}
+          <div className="flex flex-col gap-2 rounded-xl border border-gray-200 bg-white p-3 shadow-2xs">
+            {/* Fila 1: Perspectiva Doble */}
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-gray-500">
+                  PERSPECTIVA:
+                </span>
+                <div className="inline-flex items-center gap-1 rounded-lg bg-gray-100/80 p-0.5 border border-gray-200/60 shadow-2xs">
+                  <button
+                    type="button"
+                    onClick={() => setPerspectivaCurva('ejecutora')}
+                    className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-[10.5px] font-bold transition-all duration-200 cursor-pointer ${
+                      perspectivaCurva === 'ejecutora'
+                        ? 'bg-white text-[#9B0F06] border border-gray-200/80 shadow-xs'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/50 font-medium'
+                    }`}
+                  >
+                    <Building2 size={12} className={perspectivaCurva === 'ejecutora' ? 'text-[#9B0F06]' : 'text-gray-500'} />
+                    <span>Empresa Ejecutora ({nombreEmpresaEjecutora})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPerspectivaCurva('supervisora')}
+                    className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-[10.5px] font-bold transition-all duration-200 cursor-pointer ${
+                      perspectivaCurva === 'supervisora'
+                        ? 'bg-white text-[#9B0F06] border border-gray-200/80 shadow-xs'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/50 font-medium'
+                    }`}
+                  >
+                    <UserCheck size={12} className={perspectivaCurva === 'supervisora' ? 'text-[#9B0F06]' : 'text-gray-500'} />
+                    <span>Empresa Supervisora ({nombreEmpresaSupervisora})</span>
+                  </button>
+                </div>
               </div>
+
+              <span className="text-[10.5px] text-gray-400 font-medium hidden sm:inline">
+                {puntosCurvaSFiltrados.length} {puntosCurvaSFiltrados.length === 1 ? 'mes registrado' : 'meses registrados'}
+              </span>
             </div>
 
-            {/* Controles de Filtrado: Año, Métrica y Rango Temporal */}
-            <div className="flex flex-wrap items-center gap-2">
+            {/* Fila 2: Controles de Filtrado: Año, Métrica y Rango Temporal (Fila aparte como solicitado) */}
+            <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-gray-100 text-[10.5px]">
               {/* Filtro por Año */}
-              <div className="flex items-center gap-1">
-                <span className="text-[9px] text-gray-500 font-medium">Año:</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10.5px] text-gray-500 font-semibold">Año:</span>
                 <select
                   value={filtroAnioCurva}
                   onChange={(e) => setFiltroAnioCurva(e.target.value)}
-                  className="rounded-md border border-gray-200 bg-gray-50/60 px-2 py-0.5 text-[9px] font-semibold text-gray-800 focus:border-[#9B0F06] focus:bg-white focus:outline-none cursor-pointer"
+                  className="rounded-md border border-gray-200 bg-gray-50/60 px-2.5 py-1 text-[10.5px] font-semibold text-gray-800 focus:border-[#9B0F06] focus:bg-white focus:outline-none cursor-pointer"
                 >
                   <option value="todos">Todos los Años</option>
                   {aniosDisponiblesCurva.map((a) => (
@@ -1456,11 +1820,11 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
               </div>
 
               {/* Selector de Métrica (% vs Monto Q) */}
-              <div className="inline-flex items-center gap-0.5 rounded-md bg-gray-100 p-0.5 border border-gray-200 text-[9px]">
+              <div className="inline-flex items-center gap-0.5 rounded-md bg-gray-100 p-0.5 border border-gray-200">
                 <button
                   type="button"
                   onClick={() => setTipoMetricaCurva('porcentaje')}
-                  className={`px-2 py-0.5 rounded font-bold transition-all cursor-pointer ${
+                  className={`px-2.5 py-1 rounded text-[10px] font-bold transition-all cursor-pointer ${
                     tipoMetricaCurva === 'porcentaje'
                       ? 'bg-white text-[#9B0F06] shadow-2xs'
                       : 'text-gray-600 hover:text-gray-900'
@@ -1471,7 +1835,7 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
                 <button
                   type="button"
                   onClick={() => setTipoMetricaCurva('monto')}
-                  className={`px-2 py-0.5 rounded font-bold transition-all cursor-pointer ${
+                  className={`px-2.5 py-1 rounded text-[10px] font-bold transition-all cursor-pointer ${
                     tipoMetricaCurva === 'monto'
                       ? 'bg-white text-[#9B0F06] shadow-2xs'
                       : 'text-gray-600 hover:text-gray-900'
@@ -1482,22 +1846,22 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
               </div>
 
               {/* Rango Desde / Hasta */}
-              <div className="flex items-center gap-1 text-[9px] text-gray-500 font-medium">
-                <span>Desde:</span>
+              <div className="flex items-center gap-1.5 text-gray-500 font-medium">
+                <span className="text-[10.5px] font-semibold">Desde:</span>
                 <input
                   type="date"
                   value={fechaDesdeCurva}
                   onChange={(e) => setFechaDesdeCurva(e.target.value)}
-                  className="rounded-md border border-gray-200 bg-gray-50/60 px-1.5 py-0.5 text-[9px] font-medium text-gray-800 focus:border-[#9B0F06] focus:bg-white focus:outline-none"
+                  className="rounded-md border border-gray-200 bg-gray-50/60 px-2 py-1 text-[10.5px] font-medium text-gray-800 focus:border-[#9B0F06] focus:bg-white focus:outline-none"
                 />
               </div>
-              <div className="flex items-center gap-1 text-[9px] text-gray-500 font-medium">
-                <span>Hasta:</span>
+              <div className="flex items-center gap-1.5 text-gray-500 font-medium">
+                <span className="text-[10.5px] font-semibold">Hasta:</span>
                 <input
                   type="date"
                   value={fechaHastaCurva}
                   onChange={(e) => setFechaHastaCurva(e.target.value)}
-                  className="rounded-md border border-gray-200 bg-gray-50/60 px-1.5 py-0.5 text-[9px] font-medium text-gray-800 focus:border-[#9B0F06] focus:bg-white focus:outline-none"
+                  className="rounded-md border border-gray-200 bg-gray-50/60 px-2 py-1 text-[10.5px] font-medium text-gray-800 focus:border-[#9B0F06] focus:bg-white focus:outline-none"
                 />
               </div>
 
@@ -1509,13 +1873,13 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
                     setFechaDesdeCurva('')
                     setFechaHastaCurva('')
                   }}
-                  className="text-[8.5px] font-bold text-[#9B0F06] hover:underline cursor-pointer"
+                  className="text-[10.5px] font-bold text-[#9B0F06] hover:underline cursor-pointer ml-1"
                 >
-                  Limpiar
+                  Limpiar Filtros
                 </button>
               )}
 
-              <span className="text-[8.5px] text-gray-400 font-medium pl-1">
+              <span className="text-[10.5px] text-gray-400 font-medium sm:hidden">
                 {puntosCurvaSFiltrados.length} meses
               </span>
             </div>
@@ -2212,6 +2576,541 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
           </div>
         </div>
       )}
+
+      {/* MODAL PRINCIPAL: GESTIÓN DE RENGLONES Y CAPÍTULOS DEL PROYECTO */}
+      {modalGestionRenglonesOpen && (
+        <Portal>
+          <div
+            className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-xs font-[Poppins]"
+            onClick={() => setModalGestionRenglonesOpen(false)}
+          >
+            <div
+              className="w-full max-w-5xl rounded-2xl bg-white shadow-2xl border border-gray-200 overflow-hidden flex flex-col max-h-[90vh]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="bg-gradient-to-r from-gray-900 via-gray-800 to-[#9B0F06] px-5 py-3.5 text-white flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 text-white">
+                    <Layers size={18} />
+                  </div>
+                  <div>
+                    <h2 className="text-xs font-bold tracking-wide">Gestión de Renglones y Capítulos de Obra</h2>
+                    <p className="text-[10px] text-gray-300 font-normal">
+                      Configuración de catálogo para Bitácora y control contractual del proyecto
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setModalGestionRenglonesOpen(false)}
+                  className="p-1 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Subtabs del Modal */}
+              <div className="border-b border-gray-200 bg-gray-50 px-5 pt-2 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSubTabGestion('renglones')}
+                    className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[11px] font-semibold transition-colors cursor-pointer ${
+                      subTabGestion === 'renglones'
+                        ? 'border-[#9B0F06] text-[#9B0F06] bg-white rounded-t-lg'
+                        : 'border-transparent text-gray-500 hover:text-gray-800'
+                    }`}
+                  >
+                    <FileSpreadsheet size={13} />
+                    <span>Renglones ({listaRenglones.length || listaRenglonesFuente.length})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSubTabGestion('capitulos')}
+                    className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[11px] font-semibold transition-colors cursor-pointer ${
+                      subTabGestion === 'capitulos'
+                        ? 'border-[#9B0F06] text-[#9B0F06] bg-white rounded-t-lg'
+                        : 'border-transparent text-gray-500 hover:text-gray-800'
+                    }`}
+                  >
+                    <Layers size={13} />
+                    <span>Capítulos ({capitulosProyecto.length})</span>
+                  </button>
+                </div>
+
+                <div className="pb-1.5 flex items-center gap-2">
+                  {subTabGestion === 'renglones' && (() => {
+                    const baseR = (listaRenglones.length > 0 ? listaRenglones : listaRenglonesFuente) || []
+                    const totalHab = baseR.filter((r) => r.seleccionado !== false).length
+                    const todosHab = baseR.length > 0 && totalHab === baseR.length
+                    const algunoHab = totalHab > 0 && totalHab < baseR.length
+                    const ningunoHab = totalHab === 0
+
+                    return (
+                      <>
+                        <div className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2 py-1 text-[10px] sm:text-xs shadow-2xs hover:border-gray-300 transition-all">
+                          <input
+                            type="checkbox"
+                            ref={(el) => {
+                              if (el) el.indeterminate = algunoHab
+                            }}
+                            checked={todosHab}
+                            onChange={(e) => handleSeleccionarTodosBitacora(e.target.checked)}
+                            title={todosHab ? 'Ocultar todos en bitácora' : 'Habilitar todos en bitácora'}
+                            className="h-3.5 w-3.5 rounded border-gray-300 text-[#9B0F06] focus:ring-[#9B0F06] cursor-pointer"
+                          />
+                          <select
+                            value={todosHab ? 'todos' : ningunoHab ? 'ninguno' : 'parcial'}
+                            onChange={(e) => {
+                              if (e.target.value === 'todos') handleSeleccionarTodosBitacora(true)
+                              if (e.target.value === 'ninguno') handleSeleccionarTodosBitacora(false)
+                            }}
+                            className="bg-transparent text-[10px] sm:text-xs font-bold text-gray-700 focus:outline-none cursor-pointer"
+                          >
+                            <option value="todos">Bitácora: Habilitar Todos ({baseR.length})</option>
+                            <option value="ninguno">Bitácora: Ocultar Todos</option>
+                            {algunoHab && (
+                              <option value="parcial" disabled>
+                                Bitácora: {totalHab} de {baseR.length} activos
+                              </option>
+                            )}
+                          </select>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setModalGestionRenglonesOpen(false)
+                            handleAbrirCrearRenglon()
+                          }}
+                          className="inline-flex items-center gap-1 rounded-lg bg-[#9B0F06] px-3 py-1.5 text-[10px] font-medium text-white hover:bg-[#5E0006] transition-colors cursor-pointer shadow-2xs"
+                        >
+                          <Plus size={12} />
+                          <span>Nuevo Renglón</span>
+                        </button>
+                      </>
+                    )
+                  })()}
+                  {subTabGestion === 'capitulos' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormCapituloNumero(String(capitulosProyecto.length + 1))
+                        setFormCapituloNombre('')
+                        setModalCapituloOpen(true)
+                      }}
+                      className="inline-flex items-center gap-1 rounded-lg bg-[#9B0F06] px-3 py-1.5 text-[10px] font-medium text-white hover:bg-[#5E0006] transition-colors cursor-pointer shadow-2xs"
+                    >
+                      <Plus size={12} />
+                      <span>Nuevo Capítulo</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Contenido por pestaña */}
+              <div className="p-4 overflow-y-auto flex-1 bg-gray-50/50">
+                {subTabGestion === 'renglones' && (
+                  <div className="space-y-3 font-[Poppins]">
+                    <div className="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-2xs">
+                      <div className="overflow-x-auto max-h-[55vh]">
+                        <table className="w-full text-left text-[10.5px] border-collapse font-sans">
+                          <thead className="sticky top-0 z-10 bg-gray-100 text-gray-700 font-semibold uppercase text-[9px] tracking-wider border-b border-gray-200">
+                            <tr>
+                              <th className="px-3 py-2">Código DGC</th>
+                              <th className="px-3 py-2">Descripción del Renglón</th>
+                              <th className="px-3 py-2">Capítulo</th>
+                              {!modoManual && (
+                                <>
+                                  <th className="px-3 py-2 text-center">Unidad</th>
+                                  <th className="px-3 py-2 text-right">Cantidad</th>
+                                  <th className="px-3 py-2 text-right">P. Unitario (Q)</th>
+                                  <th className="px-3 py-2 text-center">En Bitácora</th>
+                                </>
+                              )}
+                              <th className="px-3 py-2 text-center">Registros</th>
+                              <th className="px-3 py-2 text-center">Acciones</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100 text-[10px]">
+                            {(listaRenglones.length > 0 ? listaRenglones : listaRenglonesFuente).map((r) => {
+                              const countBit =
+                                (conteoBitacoraPorRenglon[r.codigoDGC] || 0) +
+                                (conteoBitacoraPorRenglon[r.id] || 0) +
+                                (r.renglonId ? (conteoBitacoraPorRenglon[r.renglonId] || 0) : 0)
+
+                              return (
+                                <tr key={r.id || r.codigoDGC} className="hover:bg-red-50/30 transition-colors">
+                                  <td className="px-3 py-2 font-mono font-bold text-gray-900">
+                                    <span className="rounded bg-gray-100 px-1.5 py-0.5 border border-gray-200">
+                                      {r.codigoDGC}
+                                    </span>
+                                  </td>
+                                  <td className="px-3 py-2 font-medium text-gray-800">
+                                    {r.descripcion}
+                                  </td>
+                                  <td className="px-3 py-2 text-gray-500">
+                                    {r.capituloNombre || `Capítulo ${r.capituloId}`}
+                                  </td>
+                                  {!modoManual && (
+                                    <>
+                                      <td className="px-3 py-2 text-center font-bold text-gray-600">
+                                        {r.unidad}
+                                      </td>
+                                      <td className="px-3 py-2 text-right font-semibold text-gray-800">
+                                        {r.cantidadContratada.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                                      </td>
+                                      <td className="px-3 py-2 text-right font-semibold text-gray-700">
+                                        Q {r.costoUnitarioDirecto.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                                      </td>
+                                      <td className="px-3 py-2 text-center">
+                                        <button
+                                          type="button"
+                                          onClick={() => handleToggleBitacora(r.codigoDGC)}
+                                          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[8.5px] font-bold border cursor-pointer transition-all ${
+                                            r.seleccionado !== false
+                                              ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100'
+                                              : 'bg-gray-100 text-gray-500 border-gray-300 hover:bg-gray-200'
+                                          }`}
+                                        >
+                                          <span className={`h-1.5 w-1.5 rounded-full ${r.seleccionado !== false ? 'bg-emerald-600' : 'bg-gray-400'}`} />
+                                          <span>{r.seleccionado !== false ? 'Visible' : 'Oculto'}</span>
+                                        </button>
+                                      </td>
+                                    </>
+                                  )}
+                                  <td className="px-3 py-2 text-center">
+                                    <span
+                                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[8.5px] font-bold border ${
+                                        countBit > 0
+                                          ? 'bg-blue-50 text-blue-800 border-blue-200'
+                                          : 'bg-gray-50 text-gray-400 border-gray-200'
+                                      }`}
+                                    >
+                                      <FileText size={10} className={countBit > 0 ? 'text-blue-600' : 'text-gray-400'} />
+                                      <span>{countBit}</span>
+                                    </span>
+                                  </td>
+                                  <td className="px-3 py-2 text-center">
+                                    <div className="flex items-center justify-center gap-1">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setModalGestionRenglonesOpen(false)
+                                          handleAbrirEditarRenglon(r)
+                                        }}
+                                        className="p-1 rounded text-gray-600 hover:bg-gray-100 hover:text-[#9B0F06] transition-colors cursor-pointer"
+                                        title="Editar renglón"
+                                      >
+                                        <Edit2 size={11} />
+                                      </button>
+                                      {r.esPersonalizado && (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleEliminarRenglonPersonalizado(r.codigoDGC)}
+                                          className="p-1 rounded text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer"
+                                          title="Eliminar renglón"
+                                        >
+                                          <Trash2 size={11} />
+                                        </button>
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {subTabGestion === 'capitulos' && (
+                  <div className="space-y-3 font-[Poppins]">
+                    <div className="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-2xs">
+                      <div className="overflow-x-auto max-h-[55vh]">
+                        <table className="w-full text-left text-[10.5px] border-collapse font-sans">
+                          <thead className="sticky top-0 z-10 bg-gray-100 text-gray-700 font-semibold uppercase text-[9px] tracking-wider border-b border-gray-200">
+                            <tr>
+                              <th className="px-3 py-2 w-24">No. Capítulo</th>
+                              <th className="px-3 py-2">Nombre del Capítulo</th>
+                              <th className="px-3 py-2 text-center w-32">Renglones Asignados</th>
+                              <th className="px-3 py-2 text-center w-28">Tipo</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100 text-[10px]">
+                            {capitulosProyecto.map((c) => {
+                              const base = listaRenglones.length > 0 ? listaRenglones : listaRenglonesFuente
+                              const countEnCap = base.filter((r) => r.capituloId === c.id).length
+                              const esLibroAzul = c.id <= 9
+
+                              return (
+                                <tr key={c.id} className="hover:bg-gray-50 transition-colors">
+                                  <td className="px-3 py-2 font-mono font-bold text-gray-900">
+                                    Capítulo {c.id}
+                                  </td>
+                                  <td className="px-3 py-2 font-medium text-gray-800">
+                                    {c.nombre.includes(':') ? c.nombre.split(':')[1]?.trim() : c.nombre}
+                                  </td>
+                                  <td className="px-3 py-2 text-center">
+                                    <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[8.5px] font-bold bg-gray-100 text-gray-700 border border-gray-200">
+                                      {countEnCap} {countEnCap === 1 ? 'renglón' : 'renglones'}
+                                    </span>
+                                  </td>
+                                  <td className="px-3 py-2 text-center">
+                                    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[8px] font-bold ${
+                                      esLibroAzul ? 'bg-emerald-50 text-emerald-800' : 'bg-purple-50 text-purple-800'
+                                    }`}>
+                                      {esLibroAzul ? 'Libro Azul' : 'Personalizado'}
+                                    </span>
+                                  </td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="border-t border-gray-200 bg-white px-5 py-3 flex items-center justify-between text-[10px] text-gray-500">
+                <span>Modificaciones sincronizadas con la bitácora y presupuesto del proyecto</span>
+                <button
+                  type="button"
+                  onClick={() => setModalGestionRenglonesOpen(false)}
+                  className="rounded-lg bg-gray-800 hover:bg-gray-900 text-white px-4 py-1.5 text-xs font-semibold cursor-pointer transition-colors"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        </Portal>
+      )}
+
+      {/* DRAWER LATERAL: CREAR / EDITAR RENGLÓN DE OBRA */}
+      {drawerRenglonOpen && (
+        <Portal>
+          <div
+            className="fixed inset-0 z-[130] flex justify-end bg-black/60 backdrop-blur-xs font-[Poppins] animate-in fade-in duration-200"
+            onClick={() => setDrawerRenglonOpen(false)}
+          >
+            <div
+              className="relative flex h-full max-h-screen w-full max-w-md flex-col bg-white shadow-2xl border-l border-gray-200 overflow-hidden font-sans"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50/80 px-4 py-3 shrink-0">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-red-50 text-[#9B0F06]">
+                    {renglonEnEdicion ? <Edit2 size={14} /> : <Plus size={14} />}
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold text-gray-900 uppercase">
+                      {renglonEnEdicion ? `Editar Renglón [${renglonEnEdicion.codigoDGC}]` : 'Nuevo Renglón de Obra'}
+                    </h3>
+                    <p className="text-[9.5px] text-gray-500">
+                      {renglonEnEdicion ? 'Exclusivo de este proyecto: no afecta a otros proyectos' : 'Se vinculará únicamente a este proyecto para control y bitácora'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setDrawerRenglonOpen(false)}
+                  className="rounded p-1 text-gray-400 hover:bg-gray-200 hover:text-gray-700 cursor-pointer"
+                >
+                  <X size={15} />
+                </button>
+              </div>
+
+              {/* Formulario */}
+              <form onSubmit={handleGuardarRenglonFormulario} className="flex-1 overflow-y-auto p-4 space-y-3.5 text-xs">
+                <div>
+                  <label className="block text-[10.5px] font-bold text-gray-700 mb-1">
+                    Código DGC del Renglón <span className="text-[#9B0F06]">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formRenglonCodigo}
+                    onChange={(e) => setFormRenglonCodigo(e.target.value)}
+                    placeholder="Ej. 201.05, 302.01 (a) o CUSTOM-01"
+                    className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 font-mono text-xs text-gray-900 focus:border-[#9B0F06] focus:outline-none"
+                  />
+                  <p className="text-[8.5px] text-gray-400 mt-0.5">Identificador único del renglón en el proyecto</p>
+                </div>
+
+                <div>
+                  <label className="block text-[10.5px] font-bold text-gray-700 mb-1">
+                    Descripción del Renglón <span className="text-[#9B0F06]">*</span>
+                  </label>
+                  <textarea
+                    required
+                    rows={3}
+                    value={formRenglonDescripcion}
+                    onChange={(e) => setFormRenglonDescripcion(e.target.value)}
+                    placeholder="Ej. Excavación no clasificada de material de desperdicio..."
+                    className="w-full rounded-lg border border-gray-200 bg-white p-2.5 text-xs text-gray-900 focus:border-[#9B0F06] focus:outline-none"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10.5px] font-bold text-gray-700 mb-1">
+                      Capítulo
+                    </label>
+                    <select
+                      value={formRenglonCapituloId}
+                      onChange={(e) => setFormRenglonCapituloId(Number(e.target.value))}
+                      className="w-full rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs font-medium text-gray-800 focus:border-[#9B0F06] focus:outline-none cursor-pointer"
+                    >
+                      {capitulosProyecto.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          Capítulo {c.id}: {c.nombre.includes(':') ? c.nombre.split(':')[1]?.trim() : c.nombre}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10.5px] font-bold text-gray-700 mb-1">
+                      Unidad de Medida
+                    </label>
+                    <select
+                      value={formRenglonUnidad}
+                      onChange={(e) => setFormRenglonUnidad(e.target.value)}
+                      className="w-full rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs font-semibold text-gray-800 focus:border-[#9B0F06] focus:outline-none cursor-pointer"
+                    >
+                      {['m³', 'm²', 'm', 'km', 'ton', 'Glb', 'Ha', 'kg', 'u', 'mes', 'c/u', 'lote'].map((u) => (
+                        <option key={u} value={u}>
+                          {u}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Checkbox Habilitar en Bitácora */}
+                <div className="flex items-center gap-2 pt-1">
+                  <input
+                    type="checkbox"
+                    id="chkEnBitacora"
+                    checked={formRenglonEnBitacora}
+                    onChange={(e) => setFormRenglonEnBitacora(e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300 text-[#9B0F06] focus:ring-[#9B0F06] cursor-pointer"
+                  />
+                  <label htmlFor="chkEnBitacora" className="text-xs font-semibold text-gray-700 cursor-pointer select-none">
+                    Habilitar inmediatamente en Bitácora de Obra
+                  </label>
+                </div>
+
+                {/* Botones de acción */}
+                <div className="flex items-center justify-end gap-2 pt-4 border-t border-gray-100">
+                  <button
+                    type="button"
+                    onClick={() => setDrawerRenglonOpen(false)}
+                    className="rounded-lg border border-gray-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="rounded-lg bg-[#9B0F06] hover:bg-[#5E0006] text-white px-4 py-1.5 text-xs font-bold shadow-xs cursor-pointer transition-colors"
+                  >
+                    {renglonEnEdicion ? 'Actualizar Renglón' : 'Guardar Renglón'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </Portal>
+      )}
+
+      {/* MODAL: CREAR NUEVO CAPÍTULO */}
+      {modalCapituloOpen && (
+        <Portal>
+          <div
+            className="fixed inset-0 z-[130] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs font-[Poppins]"
+            onClick={() => setModalCapituloOpen(false)}
+          >
+            <div
+              className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl border border-gray-200 animate-fadeIn space-y-4 font-sans"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-50 text-[#9B0F06]">
+                    <FolderPlus size={16} />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold text-gray-900 uppercase">Nuevo Capítulo de Obra</h3>
+                    <p className="text-[10px] text-gray-500">Agrega un capítulo adicional para clasificar renglones</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setModalCapituloOpen(false)}
+                  className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 cursor-pointer"
+                >
+                  <X size={15} />
+                </button>
+              </div>
+
+              <form onSubmit={handleGuardarCapitulo} className="space-y-3 text-xs">
+                <div>
+                  <label className="block text-[10.5px] font-bold text-gray-700 mb-1">
+                    Número de Capítulo <span className="text-[#9B0F06]">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    required
+                    value={formCapituloNumero}
+                    onChange={(e) => setFormCapituloNumero(e.target.value)}
+                    placeholder="Ej. 10"
+                    className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 font-mono text-xs text-gray-900 focus:border-[#9B0F06] focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10.5px] font-bold text-gray-700 mb-1">
+                    Nombre del Capítulo <span className="text-[#9B0F06]">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formCapituloNombre}
+                    onChange={(e) => setFormCapituloNombre(e.target.value)}
+                    placeholder="Ej. Obras Complementarias de Mitigación"
+                    className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs text-gray-900 focus:border-[#9B0F06] focus:outline-none"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-3 border-t border-gray-100">
+                  <button
+                    type="button"
+                    onClick={() => setModalCapituloOpen(false)}
+                    className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="rounded-lg bg-[#9B0F06] hover:bg-[#5E0006] text-white px-4 py-1.5 text-xs font-bold shadow-xs cursor-pointer transition-colors"
+                  >
+                    Guardar Capítulo
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </Portal>
+      )}
+
     </div>
   )
 }

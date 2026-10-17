@@ -17,6 +17,7 @@ interface UsuarioFormularioDrawerProps {
   usuario?: Usuario
   onSave?: (data: any) => void
   rolesPermitidos?: string[]
+  rolesExcluidos?: string[]
   rolInicial?: string
   empresaContratistaIdInicial?: string
   ocultarEmpresaContratista?: boolean
@@ -156,6 +157,7 @@ export function UsuarioFormularioDrawer({
   usuario,
   onSave,
   rolesPermitidos,
+  rolesExcluidos,
   rolInicial,
   empresaContratistaIdInicial,
   ocultarEmpresaContratista = false,
@@ -971,6 +973,14 @@ export function UsuarioFormularioDrawer({
                       return listaBase
                         .filter((r: any) => {
                           if (!esAdmin && r.nombre === 'Administrador') return false
+                          if (
+                            rolesExcluidos &&
+                            rolesExcluidos.some(
+                              (x) => x.toLowerCase().replace(/\s+/g, '') === String(r.nombre || '').toLowerCase().replace(/\s+/g, '')
+                            )
+                          ) {
+                            return false
+                          }
                           if (bloquearRol && formData.rol) {
                             return r.nombre?.toLowerCase().trim() === String(formData.rol).toLowerCase().trim()
                           }

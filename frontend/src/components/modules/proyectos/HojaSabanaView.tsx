@@ -1498,12 +1498,25 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
     }
 
     try {
+      let totalPlan = 0
+      let totalEjecPond = 0
+      for (const r of renglones) {
+        const meta = Number(r.cantidadAjustada && r.cantidadAjustada > 0 ? r.cantidadAjustada : (r.cantidadContratada || 0))
+        const ejec = (r.cantidadEstePeriodo || 0) + (r.cantidadAcumuladaAnterior || 0)
+        const pu = Number(r.costoUnitarioDirecto) || 0
+        totalPlan += meta * pu
+        totalEjecPond += Math.min(meta, ejec) * pu
+      }
+      const avanceCalc = totalPlan > 0 ? Math.min(100, Math.round((totalEjecPond / totalPlan) * 10000) / 100) : 0
+
       // 1. Guardar objeto completo del proyecto en Supabase
       await api.put(`/proyectos/${targetId}`, {
         planTrabajo: renglones,
         renglones: renglones,
         montoPlanTrabajo: montoContractualOriginalTotal,
         monto_plan_trabajo: montoContractualOriginalTotal,
+        avance: avanceCalc,
+        avanceFisico: avanceCalc,
       })
 
       // 2. Guardar renglones individualmente en /mantenimiento/renglon_trabajo
@@ -1513,12 +1526,13 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
             proyecto_id: targetId,
             descripcion: r.descripcion,
             cantidad_contractual: r.cantidadContratada || 0,
-            cantidad_ajustada: r.cantidadAjustada || 0,
+            cantidad_ajustada: r.cantidadAjustada || r.cantidadContratada || 0,
             precio_unitario_directo: r.costoUnitarioDirecto || 0,
             cantidad_ejecutada: (r.cantidadEstePeriodo || 0) + (r.cantidadAcumuladaAnterior || 0),
           }
-          if (r.id && !r.id.startsWith('sab-') && !r.id.startsWith('r-') && !r.id.startsWith('dgc-')) {
-            return api.put(`/mantenimiento/renglon_trabajo/${r.id}`, payload)
+          const targetRenglonId = r.renglonId || (r.id && !r.id.startsWith('sab-') && !r.id.startsWith('r-') && !r.id.startsWith('dgc-') ? r.id : null)
+          if (targetRenglonId) {
+            return api.put(`/mantenimiento/renglon_trabajo/${targetRenglonId}`, payload)
           } else {
             return api.post(`/mantenimiento/renglon_trabajo`, payload)
           }
@@ -2505,18 +2519,18 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
   const handleFinalizarEstimacionConfirm = () => {
     if (!estimacionEnProgreso) return
 
-    setRenglones((prev) =>
-      prev.map((r) => {
-        const cantPeriodo = r.cantidadEstePeriodo || 0
-        const nuevoAcumulado = (r.cantidadAcumuladaAnterior || 0) + cantPeriodo
-        return {
-          ...r,
-          cantidadAcumuladaAnterior: nuevoAcumulado,
-          totalAFecha: nuevoAcumulado,
-          cantidadEstePeriodo: 0,
-        }
-      })
-    )
+    const nuevosRenglones = renglones.map((r) => {
+      const cantPeriodo = r.cantidadEstePeriodo || 0
+      const nuevoAcumulado = (r.cantidadAcumuladaAnterior || 0) + cantPeriodo
+      return {
+        ...r,
+        cantidadAcumuladaAnterior: nuevoAcumulado,
+        totalAFecha: nuevoAcumulado,
+        cantidadEstePeriodo: 0,
+      }
+    })
+
+    setRenglones(nuevosRenglones)
 
     setListaEstimaciones((prev) =>
       prev.map((e) => (e.id === estimacionEnProgreso.id || e.numero === estimacionEnProgreso.numero ? { ...e, estado: 'cerrada' } : e))
@@ -2524,8 +2538,49 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
 
     const numCerrado = estimacionEnProgreso.numero
     setEstimacionEnProgreso(null)
-    if (proyecto?.id) {
-      localStorage.removeItem(`domun_estimacion_activa_${proyecto.id}`)
+    const targetProjId = proyecto?.id || proyectoIdSeleccionado || id
+    if (targetProjId) {
+      localStorage.removeItem(`domun_estimacion_activa_${targetProjId}`)
+
+      // Persistir automáticamente el avance acumulado cerrado en el backend
+      let totalPlan = 0
+      let totalEjecPond = 0
+      for (const r of nuevosRenglones) {
+        const meta = Number(r.cantidadAjustada && r.cantidadAjustada > 0 ? r.cantidadAjustada : (r.cantidadContratada || 0))
+        const ejec = r.cantidadAcumuladaAnterior || 0
+        const pu = Number(r.costoUnitarioDirecto) || 0
+        totalPlan += meta * pu
+        totalEjecPond += Math.min(meta, ejec) * pu
+      }
+      const avanceCalc = totalPlan > 0 ? Math.min(100, Math.round((totalEjecPond / totalPlan) * 10000) / 100) : 0
+
+      api.put(`/proyectos/${targetProjId}`, {
+        planTrabajo: nuevosRenglones,
+        renglones: nuevosRenglones,
+        montoPlanTrabajo: montoContractualOriginalTotal,
+        monto_plan_trabajo: montoContractualOriginalTotal,
+        avance: avanceCalc,
+        avanceFisico: avanceCalc,
+      }).catch((e) => console.error('Error al persistir avances tras cierre de estimación:', e))
+
+      Promise.allSettled(
+        nuevosRenglones.map(async (r) => {
+          const payload = {
+            proyecto_id: targetProjId,
+            descripcion: r.descripcion,
+            cantidad_contractual: r.cantidadContratada || 0,
+            cantidad_ajustada: r.cantidadAjustada || r.cantidadContratada || 0,
+            precio_unitario_directo: r.costoUnitarioDirecto || 0,
+            cantidad_ejecutada: r.cantidadAcumuladaAnterior || 0,
+          }
+          const targetRenglonId = r.renglonId || (r.id && !r.id.startsWith('sab-') && !r.id.startsWith('r-') && !r.id.startsWith('dgc-') ? r.id : null)
+          if (targetRenglonId) {
+            return api.put(`/mantenimiento/renglon_trabajo/${targetRenglonId}`, payload)
+          } else {
+            return api.post(`/mantenimiento/renglon_trabajo`, payload)
+          }
+        })
+      ).catch((e) => console.error('Error al persistir renglones tras cierre:', e))
     }
 
     setModalFinalizarEstimacionOpen(false)

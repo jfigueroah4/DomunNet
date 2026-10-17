@@ -120,9 +120,19 @@ export async function obtenerRolPorId(id: string) {
 }
 
 export async function obtenerRolPorNombre(nombre: string) {
-  const { data, error } = await clienteSupabase.from('rol').select('*').ilike('nombre_rol', nombre).maybeSingle()
+  let { data, error } = await clienteSupabase.from('rol').select('*').ilike('nombre_rol', nombre.trim()).maybeSingle()
   if (error) {
     throw new Error(error.message)
+  }
+  if (!data) {
+    const norm = nombre.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, '')
+    const { data: todosRoles } = await clienteSupabase.from('rol').select('*')
+    if (todosRoles) {
+      data = todosRoles.find((r: any) => {
+        const rNorm = String(r.nombre_rol || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, '')
+        return rNorm === norm
+      }) || null
+    }
   }
   if (!data) {
     return null

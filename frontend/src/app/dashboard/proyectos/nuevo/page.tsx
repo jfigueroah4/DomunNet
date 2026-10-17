@@ -3,7 +3,14 @@
 import { useEffect } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import ProyectoFormulario from '@/components/modules/proyectos/ProyectoFormulario'
+import dynamic from 'next/dynamic'
+
+const ProyectoFormulario = dynamic(
+  () => import('@/components/modules/proyectos/ProyectoFormulario'),
+  {
+    loading: () => <div className="flex-1 animate-pulse rounded-xl bg-gray-100" />,
+  }
+)
 import { useAuthStore } from '@/stores/useAuthStore'
 import { useCustomToast } from '@/hooks/useCustomToast'
 

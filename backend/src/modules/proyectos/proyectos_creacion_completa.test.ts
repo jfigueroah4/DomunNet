@@ -11,7 +11,7 @@ describe('Prueba Integral E2E: Creación de Proyecto con el 100% de Campos (6 Pa
 
   afterAll(async () => {
     if (proyectoCreadoId) {
-      await eliminarProyecto(proyectoCreadoId).catch(() => {})
+      await eliminarProyecto(proyectoCreadoId, true).catch(() => {})
     }
   })
 

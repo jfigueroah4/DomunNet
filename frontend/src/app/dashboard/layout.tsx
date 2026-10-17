@@ -10,6 +10,7 @@ import { Loader2 } from 'lucide-react'
 import { tienePermiso, RUTAS_PERMISOS } from '@/lib/rutas-permisos'
 import AccessDenied from '@/components/layout/AccessDenied'
 import { useUIStore } from '@/stores/useUIStore'
+import { apiGetDeduplicado } from '@/lib/api/cliente'
 
 function getSectionTitle(pathname: string) {
   if (pathname === '/dashboard') return 'INICIO'
@@ -89,6 +90,35 @@ export default function DashboardLayout({
     const sectionName = getSectionDisplayTitle(pathname)
     document.title = `${sectionName} - DOMUN`
   }, [pathname])
+
+  // Precalentamiento en segundo plano de rutas Next.js y APIs principales para acelerar la primera entrada
+  useEffect(() => {
+    if (mounted && profile) {
+      const timer = setTimeout(() => {
+        const rutasClave = [
+          '/dashboard/proyectos',
+          '/dashboard/bitacora',
+          '/dashboard/fotografias',
+          '/dashboard/reportes',
+        ]
+        rutasClave.forEach((ruta) => {
+          try {
+            router.prefetch(ruta)
+          } catch (_) {}
+        })
+
+        // Precargar APIs compartidas para que estén en memoria al hacer clic
+        try {
+          void apiGetDeduplicado('/proyectos')
+          void apiGetDeduplicado('/mantenimiento/bitacora_entrada?limite=200')
+          void apiGetDeduplicado('/mantenimiento/evidencia_fotografica?limite=200')
+          void apiGetDeduplicado('/usuarios')
+        } catch (_) {}
+      }, 500)
+
+      return () => clearTimeout(timer)
+    }
+  }, [mounted, profile, router])
 
   
   const autorizado = useMemo(() => {

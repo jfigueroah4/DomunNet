@@ -22,7 +22,10 @@ import { RegistroBitacora, TipoBitacora, EstadoBitacora } from '@/types/bitacora
 import { BitacoraFiltros } from '@/components/modules/bitacora/BitacoraFiltros'
 import { BitacoraCard } from '@/components/modules/bitacora/BitacoraCard'
 import { BitacoraEstadoBadge } from '@/components/modules/bitacora/BitacoraEstadoBadge'
-import { BitacoraForm } from '@/components/modules/bitacora/BitacoraForm'
+const BitacoraForm = dynamic(
+  () => import('@/components/modules/bitacora/BitacoraForm').then((mod) => mod.BitacoraForm),
+  { ssr: false }
+)
 
 const BitacoraMapaInline = dynamic(
   () => import('@/components/modules/bitacora/BitacoraMapaInline').then((mod) => mod.BitacoraMapaInline),
@@ -33,6 +36,7 @@ import { useAuthStore } from '@/stores/useAuthStore'
 import { api, apiGetDeduplicado } from '@/lib/api/cliente'
 import { Portal } from '@/components/ui/Portal'
 import { showSuccessToast, showErrorToast } from '@/components/ui/Toast'
+import { esProyectoNoBorrador } from '@/lib/proyectos/estado'
 import { BITACORA_MOCK } from '@/data/bitacora.mock'
 import { useUIStore } from '@/stores/useUIStore'
 
@@ -53,8 +57,8 @@ export default function BitacoraPage() {
       const [resEntradas, resFotos, resProyectos, resUsuarios] = await Promise.allSettled([
         apiGetDeduplicado('/mantenimiento/bitacora_entrada?limite=200'),
         apiGetDeduplicado('/mantenimiento/evidencia_fotografica?limite=200'),
-        apiGetDeduplicado('/proyectos?limite=100'),
-        apiGetDeduplicado('/usuarios?limite=100'),
+        apiGetDeduplicado('/proyectos'),
+        apiGetDeduplicado('/usuarios'),
       ])
 
       const entradasBD =
@@ -77,9 +81,11 @@ export default function BitacoraPage() {
           ? resUsuarios.value.data.data
           : []
 
+      const proyectosOperativos = proysBD.filter(esProyectoNoBorrador)
+
       // Mapa de proyectos y usuarios
       const proyMap = new Map<string, { codigo: string; nombre: string }>()
-      proysBD.forEach((p: any) => {
+      proyectosOperativos.forEach((p: any) => {
         if (p.id) {
           proyMap.set(String(p.id), {
             codigo: String(p.codigo || p.codigo_proyecto || ''),
@@ -201,6 +207,12 @@ export default function BitacoraPage() {
 
     // 2. Sincronización en segundo plano con el servidor
     void cargarRegistros()
+
+    // 3. Precalentar el formulario de creación en segundo plano para apertura inmediata
+    const timer = setTimeout(() => {
+      import('@/components/modules/bitacora/BitacoraForm').catch(() => {})
+    }, 600)
+    return () => clearTimeout(timer)
   }, [])
 
   // Drawer lateral deslizable de detalle de registro y modales

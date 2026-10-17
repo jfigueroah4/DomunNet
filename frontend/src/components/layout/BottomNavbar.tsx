@@ -51,6 +51,7 @@ export default function BottomNavbar() {
           <Link
             key={item.label}
             href={item.href}
+            prefetch={true}
             className="relative flex flex-1 flex-col items-center justify-center py-1 transition-all min-w-0 active:scale-95 group"
           >
             {/* Pill de fondo para el elemento activo estilo iOS/Material You */}

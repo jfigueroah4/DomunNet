@@ -120,12 +120,14 @@ export default function ProyectoCard({
           <div className="mb-3 rounded-lg bg-gray-50/80 p-2 border border-gray-100">
             <div className="mb-1 flex items-center justify-between text-[9.5px]">
               <span className="font-bold uppercase tracking-wider text-gray-400">Avance de Obra</span>
-              <span className="font-bold text-[#9B0F06] font-[Poppins]">{Math.round(proyecto.avance || 0)}%</span>
+              <span className="font-bold text-[#9B0F06] font-[Poppins]">
+                {Number(proyecto.avance || 0) % 1 === 0 ? Math.round(proyecto.avance || 0) : Number(proyecto.avance || 0).toFixed(1)}%
+              </span>
             </div>
             <div className="h-1.5 overflow-hidden rounded-full bg-gray-200/70">
               <div
                 className="h-full rounded-full bg-[#9B0F06] transition-all duration-500"
-                style={{ width: `${proyecto.avance || 0}%` }}
+                style={{ width: `${Math.min(100, Math.max(0, proyecto.avance || 0))}%` }}
               />
             </div>
           </div>
@@ -204,5 +206,5 @@ export default function ProyectoCard({
     return content
   }
 
-  return <Link href={`/dashboard/proyectos/detalles?slug=${proyecto.id}`}>{content}</Link>
+  return <Link href={`/dashboard/proyectos/detalles?slug=${proyecto.id}`} prefetch={true}>{content}</Link>
 }

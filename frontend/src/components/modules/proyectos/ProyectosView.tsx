@@ -96,10 +96,12 @@ function ProyectoListItem({
         <div className="mx-6 hidden w-32 shrink-0 lg:block">
           <div className="mb-1 flex items-center justify-between">
             <span className="text-[9px] font-semibold text-gray-400">Avance</span>
-            <span className="text-[9px] font-bold text-gray-900">{Math.round(proyecto.avance)}%</span>
+            <span className="text-[9px] font-bold text-gray-900">
+              {Number(proyecto.avance || 0) % 1 === 0 ? Math.round(proyecto.avance || 0) : Number(proyecto.avance || 0).toFixed(1)}%
+            </span>
           </div>
           <div className="h-1 overflow-hidden rounded-full bg-gray-100">
-            <div className="h-full rounded-full bg-[#9B0F06]" style={{ width: `${proyecto.avance}%` }} />
+            <div className="h-full rounded-full bg-[#9B0F06]" style={{ width: `${Math.min(100, Math.max(0, proyecto.avance || 0))}%` }} />
           </div>
         </div>
       )}
@@ -123,17 +125,14 @@ function ProyectoListItem({
 
 function mapearProyectoApi(p: any): Proyecto {
   const totalBitacoras = Number(p.totalBitacoras || 0)
-  const tieneBitacoras = Boolean(p.tieneBitacoras || totalBitacoras > 0)
   const estadoNorm = (p.estado || p.estado_codigo || 'borrador').toLowerCase() as EstadoProyecto
   const esEliminable = typeof p.esEliminable === 'boolean'
     ? p.esEliminable
-    : (estadoNorm === 'borrador' && !tieneBitacoras)
+    : estadoNorm === 'borrador'
   const motivoNoEliminable = p.motivoNoEliminable || (
     estadoNorm !== 'borrador'
       ? `Solo proyectos en modo Borrador pueden eliminarse (estado actual: ${estadoNorm})`
-      : tieneBitacoras
-        ? `Tiene ${totalBitacoras} registro(s) de bitácora vinculado(s)`
-        : ''
+      : ''
   )
 
   return {
@@ -160,7 +159,6 @@ function mapearProyectoApi(p: any): Proyecto {
     modoGestionFinanciera: p.modoGestionFinanciera || (p.tieneSabana ? 'sabana' : 'manual'),
     totalRenglones: Number(p.totalRenglones || 0),
     totalBitacoras,
-    tieneBitacoras,
     esEliminable,
     motivoNoEliminable,
     equipo: Array.isArray(p.equipo) ? p.equipo : [],
@@ -263,7 +261,13 @@ export function ProyectosView() {
       if (cached) {
         const parsed = JSON.parse(cached)
         if (Array.isArray(parsed) && parsed.length > 0) {
-          setProyectosReales(parsed)
+          const mapa = new Map<string, Proyecto>()
+          for (const item of parsed) {
+            if (item && item.id && !mapa.has(String(item.id))) {
+              mapa.set(String(item.id), item)
+            }
+          }
+          setProyectosReales(Array.from(mapa.values()))
           setLoadingProyectos(false)
         }
       }
@@ -278,13 +282,20 @@ export function ProyectosView() {
       setLoadingProyectos(true)
     }
 
-    apiGetDeduplicado('/proyectos', { bypassCache: true })
+    apiGetDeduplicado('/proyectos')
       .then((res) => {
         if (res.data?.success && Array.isArray(res.data.data)) {
           const mapeados: Proyecto[] = res.data.data.map(mapearProyectoApi)
-          setProyectosReales(mapeados)
+          const mapa = new Map<string, Proyecto>()
+          for (const item of mapeados) {
+            if (item && item.id && !mapa.has(String(item.id))) {
+              mapa.set(String(item.id), item)
+            }
+          }
+          const deduplicados = Array.from(mapa.values())
+          setProyectosReales(deduplicados)
           try {
-            sessionStorage.setItem('domun_proyectos_cache', JSON.stringify(mapeados))
+            sessionStorage.setItem('domun_proyectos_cache', JSON.stringify(deduplicados))
           } catch (e) {}
         } else {
           setProyectosReales([])
@@ -442,6 +453,20 @@ export function ProyectosView() {
     return proyectosFiltrados.slice(inicio, inicio + porPagina)
   }, [pagina, porPagina, proyectosFiltrados])
 
+  // Precargar páginas de detalles en segundo plano para apertura inmediata al hacer clic
+  useEffect(() => {
+    if (proyectosPaginados.length > 0) {
+      const timer = setTimeout(() => {
+        proyectosPaginados.slice(0, 6).forEach((p) => {
+          try {
+            router.prefetch(`/dashboard/proyectos/detalles?slug=${p.id}`)
+          } catch (_) {}
+        })
+      }, 300)
+      return () => clearTimeout(timer)
+    }
+  }, [proyectosPaginados, router])
+
   const irAPagina = (nuevaPagina: number) => {
     const segura = Math.min(Math.max(1, nuevaPagina), totalPaginas)
     setPagina(segura)
@@ -469,22 +494,29 @@ export function ProyectosView() {
         <div className="flex flex-col md:items-end gap-2 w-full md:w-auto">
           <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
             {/* Toggle de Vistas */}
-            <div className="flex items-center overflow-hidden rounded-md border border-gray-200 bg-white shadow-sm shrink-0">
+            <div className="flex items-center gap-1 border-b border-gray-200 bg-white px-1 pt-1 shrink-0">
               <button
                 type="button"
                 onClick={() => handleVistaChange('lista')}
-                className={`flex h-8 items-center gap-1.5 px-2.5 sm:px-3 text-[10px] font-bold transition-colors ${vista === 'lista' ? 'bg-[#9B0F06] text-white' : 'text-gray-600 hover:bg-gray-50'}`}
+                className={`flex h-8 items-center gap-1.5 border-b-2 px-3 text-[10px] transition-all cursor-pointer ${
+                  vista === 'lista'
+                    ? 'border-[#9B0F06] text-[#9B0F06] font-bold bg-red-50/40 rounded-t-md shadow-2xs'
+                    : 'border-transparent text-gray-500 font-medium hover:text-gray-800 hover:bg-gray-50/80 rounded-t-md'
+                }`}
               >
-                <List size={13} />
+                <List size={13} className={vista === 'lista' ? 'text-[#9B0F06]' : 'text-gray-400'} />
                 <span>Lista</span>
               </button>
-              <div className="w-px h-4 bg-gray-200"></div>
               <button
                 type="button"
                 onClick={() => handleVistaChange('detalles')}
-                className={`flex h-8 items-center gap-1.5 px-2.5 sm:px-3 text-[10px] font-bold transition-colors ${vista === 'detalles' ? 'bg-[#9B0F06] text-white' : 'text-gray-600 hover:bg-gray-50'}`}
+                className={`flex h-8 items-center gap-1.5 border-b-2 px-3 text-[10px] transition-all cursor-pointer ${
+                  vista === 'detalles'
+                    ? 'border-[#9B0F06] text-[#9B0F06] font-bold bg-red-50/40 rounded-t-md shadow-2xs'
+                    : 'border-transparent text-gray-500 font-medium hover:text-gray-800 hover:bg-gray-50/80 rounded-t-md'
+                }`}
               >
-                <LayoutGrid size={13} />
+                <LayoutGrid size={13} className={vista === 'detalles' ? 'text-[#9B0F06]' : 'text-gray-400'} />
                 <span>Detalles</span>
               </button>
             </div>

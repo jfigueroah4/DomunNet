@@ -47,6 +47,16 @@ const rolConfig: Record<
     color: '#4F46E5',
     icono: CheckCircle,
   },
+  Topografo: {
+    label: 'Topógrafos',
+    color: '#0891B2',
+    icono: Shield,
+  },
+  Supervisor: {
+    label: 'Supervisores',
+    color: '#EA580C',
+    icono: Shield,
+  },
 }
 
 export function UsuarioCard({ rol, cantidad }: UsuarioCardProps) {

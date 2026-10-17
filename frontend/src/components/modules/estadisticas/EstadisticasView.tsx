@@ -14,7 +14,6 @@ import {
   RotateCcw,
 } from 'lucide-react'
 import { PROYECTOS_MOCK } from '@/data/proyectos.mock'
-import { BITACORA_MOCK } from '@/data/bitacora.mock'
 import { FOTOGRAFIAS_MOCK } from '@/data/fotografias.mock'
 import { Combobox } from '@/components/ui/Combobox'
 import { useUIStore } from '@/stores/useUIStore'
@@ -113,18 +112,36 @@ export function EstadisticasView() {
           return defaultId
         })
 
-        // Hidratar bitácora desde caché de sesión o base de datos
+        // Hidratar bitácora desde base de datos y registros locales
         let listBit = resBit.data?.data || []
         try {
           const cachedBit = sessionStorage.getItem('domun_bitacora_cache')
           if (cachedBit) {
             const parsed = JSON.parse(cachedBit)
             if (Array.isArray(parsed) && parsed.length > 0) {
-              listBit = parsed
+              const ids = new Set(listBit.map((x: any) => String(x.id)))
+              parsed.forEach((item: any) => {
+                if (item.id && !ids.has(String(item.id))) {
+                  listBit.push(item)
+                  ids.add(String(item.id))
+                }
+              })
             }
           }
         } catch {}
-        setBitacoraBD(listBit.length > 0 ? listBit : BITACORA_MOCK)
+        try {
+          const locales = JSON.parse(localStorage.getItem('domun_bitacora_locales') || '[]')
+          if (Array.isArray(locales) && locales.length > 0) {
+            const ids = new Set(listBit.map((x: any) => String(x.id)))
+            locales.forEach((loc: any) => {
+              if (loc.id && !ids.has(String(loc.id))) {
+                listBit.unshift(loc)
+                ids.add(String(loc.id))
+              }
+            })
+          }
+        } catch {}
+        setBitacoraBD(listBit)
 
         const listFotos = resFotos.data?.data || []
         setFotosBD(listFotos.length > 0 ? listFotos : FOTOGRAFIAS_MOCK)
@@ -140,8 +157,8 @@ export function EstadisticasView() {
           const fallbackProys = PROYECTOS_MOCK.filter((p) => p.estado !== 'borrador')
           setProyectos(fallbackProys)
           setProyectoId(String(fallbackProys[0]?.id || ''))
-          setBitacoraBD(BITACORA_MOCK)
-          setFotosBD(FOTOGRAFIAS_MOCK)
+          setBitacoraBD([])
+          setFotosBD([])
         }
       } finally {
         if (!cancelado) {
@@ -262,7 +279,7 @@ export function EstadisticasView() {
         (bPCod && bPCod === pCod) ||
         (bPNom && pNom && (bPNom.includes(pNom) || pNom.includes(bPNom)))
 
-      if (!matchProy && (b.proyecto_id || b.proyectoId)) return false
+      if (!matchProy) return false
 
       if (b.fecha) {
         if (fechaDesde && b.fecha < fechaDesde) return false
@@ -379,7 +396,7 @@ export function EstadisticasView() {
           </div>
 
           {/* Selector de Proyecto Combobox */}
-          <div className="w-[145px] shrink-0">
+          <div className="w-[170px] shrink-0">
             <Combobox
               options={opcionesProyectos}
               value={proyectoId}
@@ -435,7 +452,7 @@ export function EstadisticasView() {
 
               <div className="text-center">
                 <h3 className="text-xs font-bold text-gray-900 leading-tight font-[Poppins]">Filtros de Estadísticas</h3>
-                <span className="text-[9.5px] text-gray-400 font-normal">Personalizar fechas y categoría</span>
+                <span className="text-[9.5px] text-gray-400 font-normal">Personalizar rango de fechas</span>
               </div>
 
               <button
@@ -474,29 +491,6 @@ export function EstadisticasView() {
                     />
                   </div>
                 </div>
-              </div>
-
-              {/* Categoría de Análisis */}
-              <div className="space-y-1.5">
-                <label data-filtro-label="true" className="filtro-label !text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block font-[Poppins]">
-                  Categoría de Análisis
-                </label>
-                <select
-                  value={categoriaAnalisis}
-                  onChange={(e) => {
-                    setCategoriaAnalisis(e.target.value)
-                    if (e.target.value !== 'todas') {
-                      setTabActivo(e.target.value as any)
-                    }
-                  }}
-                  className="filtro-control w-full h-[34px] rounded-lg border border-gray-200 px-2 text-[11px] text-gray-800 bg-gray-50 focus:bg-white focus:border-[#9B0F06] focus:outline-none font-[Poppins] cursor-pointer"
-                >
-                  <option value="todas">Categoría: Todas</option>
-                  <option value="planificacion">Planificación Física</option>
-                  <option value="bitacora">Bitácora de Campo</option>
-                  <option value="registros">Evidencias Fotográficas</option>
-                  <option value="finanzas">Finanzas y Estimaciones</option>
-                </select>
               </div>
 
               {/* Botón Restablecer */}
@@ -538,19 +532,20 @@ export function EstadisticasView() {
             <span className="font-semibold text-gray-700 text-[11px] font-[Poppins]">Filtros:</span>
           </div>
 
+          {/* Selector de proyecto ampliado */}
           <select
             value={proyectoId}
             onChange={(e) => handleSeleccionarProyecto(e.target.value)}
-            className="bg-gray-50 border border-gray-200 rounded-md px-2 py-1 text-[11px] text-gray-800 focus:border-[#9B0F06] focus:outline-none cursor-pointer max-w-[260px] truncate font-medium font-[Poppins]"
+            className="bg-gray-50 border border-gray-200 rounded-md px-2.5 py-1 text-[11px] text-gray-800 focus:border-[#9B0F06] focus:outline-none cursor-pointer flex-1 min-w-[280px] max-w-[550px] truncate font-medium font-[Poppins]"
           >
             {proyectosDisponibles.map((p) => (
               <option key={p.id} value={p.id} className="font-[Poppins]">
-                {p.codigo || 'PROY'} · {p.nombre || p.nombre_oficial}
+                {p.codigo ? `${p.codigo} · ` : ''}{p.nombre || p.nombre_oficial}
               </option>
             ))}
           </select>
 
-          <div className="flex items-center gap-1 text-[10.5px] font-[Poppins]">
+          <div className="flex items-center gap-1 text-[10.5px] font-[Poppins] shrink-0">
             <span className="text-gray-500 font-[Poppins]">Desde:</span>
             <input
               type="date"
@@ -560,7 +555,7 @@ export function EstadisticasView() {
             />
           </div>
 
-          <div className="flex items-center gap-1 text-[10.5px] font-[Poppins]">
+          <div className="flex items-center gap-1 text-[10.5px] font-[Poppins] shrink-0">
             <span className="text-gray-500 font-[Poppins]">Hasta:</span>
             <input
               type="date"
@@ -569,23 +564,6 @@ export function EstadisticasView() {
               className="bg-gray-50 border border-gray-200 rounded-md px-1.5 py-1 text-[10.5px] text-gray-800 focus:border-[#9B0F06] focus:outline-none font-[Poppins]"
             />
           </div>
-
-          <select
-            value={categoriaAnalisis}
-            onChange={(e) => {
-              setCategoriaAnalisis(e.target.value)
-              if (e.target.value !== 'todas') {
-                setTabActivo(e.target.value as any)
-              }
-            }}
-            className="bg-gray-50 border border-gray-200 rounded-md px-2 py-1 text-[11px] text-gray-800 focus:border-[#9B0F06] focus:outline-none cursor-pointer font-medium font-[Poppins]"
-          >
-            <option value="todas">Categoría: Todas</option>
-            <option value="planificacion">Planificación Física</option>
-            <option value="bitacora">Bitácora de Campo</option>
-            <option value="registros">Evidencias Fotográficas</option>
-            <option value="finanzas">Finanzas y Estimaciones</option>
-          </select>
         </div>
       </div>
 

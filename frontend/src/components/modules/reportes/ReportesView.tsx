@@ -31,6 +31,7 @@ import { Portal } from '@/components/ui/Portal'
 import { showSuccessToast } from '@/hooks/useCustomToast'
 import { useUIStore } from '@/stores/useUIStore'
 import { useAuthStore } from '@/stores/useAuthStore'
+import { esProyectoNoBorrador } from '@/lib/proyectos/estado'
 
 export interface ReporteGeneradoRegistro {
   id: string
@@ -119,8 +120,8 @@ export default function ReportesView() {
     try {
       const [resProy, resEntradas, resFotos, resUsuarios] = await Promise.all([
         apiGetDeduplicado('/proyectos').catch(() => ({ data: { data: [] } })),
-        apiGetDeduplicado('/mantenimiento/bitacora_entrada').catch(() => ({ data: { data: [] } })),
-        apiGetDeduplicado('/mantenimiento/evidencia_fotografica').catch(() => ({ data: { data: [] } })),
+        apiGetDeduplicado('/mantenimiento/bitacora_entrada?limite=200').catch(() => ({ data: { data: [] } })),
+        apiGetDeduplicado('/mantenimiento/evidencia_fotografica?limite=200').catch(() => ({ data: { data: [] } })),
         apiGetDeduplicado('/usuarios').catch(() => ({ data: { data: [] } })),
       ])
 
@@ -128,17 +129,15 @@ export default function ReportesView() {
       const entradasBD = resEntradas.data?.data || []
       const fotosBD = resFotos.data?.data || []
       const usuariosBD = resUsuarios.data?.data || []
+      const proyectosOperativos = Array.isArray(proysBD) ? proysBD.filter(esProyectoNoBorrador) : []
 
-      if (Array.isArray(proysBD) && proysBD.length > 0) {
-        const validos = proysBD.filter(
-          (p: any) => p.estado !== 'borrador' && p.estado_codigo !== 'borrador'
-        )
-        setProyectosApi(validos)
+      if (proyectosOperativos.length > 0) {
+        setProyectosApi(proyectosOperativos)
       }
 
       // Mapas de ayuda
       const proyMap = new Map<string, { id: string; nombre: string; codigo: string }>()
-      ;(proysBD.length > 0 ? proysBD : PROYECTOS_MOCK).forEach((p: any) => {
+      ;(proyectosOperativos.length > 0 ? proyectosOperativos : PROYECTOS_MOCK.filter(esProyectoNoBorrador)).forEach((p: any) => {
         const nombre = p.nombre || p.nombre_oficial || 'Proyecto Vial'
         const cod = p.codigo || ''
         if (p.id) proyMap.set(String(p.id), { id: String(p.id), nombre, codigo: cod })
@@ -786,13 +785,13 @@ export default function ReportesView() {
         />
 
         {/* Selector de imagen de portada */}
-        <div className="mt-3 rounded-xl border border-gray-200 bg-gray-50/70 p-2.5 space-y-2">
-          <p className="text-[10px] font-bold text-gray-800">Imagen de portada del reporte</p>
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="mt-3 rounded-xl border border-gray-200 bg-gray-50/70 p-2.5 space-y-2 font-[Poppins]">
+          <p className="text-[10px] font-bold text-gray-800 font-[Poppins]">Imagen de portada del reporte</p>
+          <div className="flex flex-wrap items-center gap-2 font-[Poppins]">
             <select
               value={portadaSeleccion}
               onChange={(e) => setPortadaSeleccion(e.target.value)}
-              className="h-8 flex-1 min-w-[150px] max-w-full rounded-lg border border-gray-200 bg-white px-2 text-[10px] text-gray-700 font-medium focus:outline-none focus:border-[#9B0F06]"
+              className="filtro-control h-[32px] flex-1 min-w-[140px] max-w-full rounded-lg border border-gray-200 bg-white px-2 text-[10px] sm:text-[11px] text-gray-700 font-normal focus:outline-none focus:border-[#9B0F06] font-[Poppins]"
             >
               <option value="auto">Automática (primera imagen)</option>
               {portadaSubida && <option value="subida">Imagen subida</option>}
@@ -802,7 +801,7 @@ export default function ReportesView() {
                 </option>
               ))}
             </select>
-            <label className="inline-flex h-8 cursor-pointer items-center rounded-lg border border-gray-200 bg-white px-3 text-[10px] font-semibold text-gray-700 hover:border-[#9B0F06] hover:text-[#9B0F06] active:scale-95">
+            <label className="filtro-control inline-flex h-[32px] shrink-0 cursor-pointer items-center justify-center rounded-lg border border-gray-200 bg-white px-3 text-[10px] sm:text-[11px] font-semibold text-gray-700 hover:border-[#9B0F06] hover:text-[#9B0F06] active:scale-95 transition-colors font-[Poppins]">
               Subir imagen
               <input type="file" accept="image/*" className="hidden" onChange={handleSubirPortada} />
             </label>

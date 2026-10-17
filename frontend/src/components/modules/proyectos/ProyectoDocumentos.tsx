@@ -13,7 +13,8 @@ import {
   Loader2,
   CheckCircle2,
   Image as ImageIcon,
-  Lock,
+  Eye,
+  ExternalLink,
 } from 'lucide-react'
 import { DocumentoProyecto } from '@/types/proyecto'
 import { useCustomToast } from '@/hooks/useCustomToast'
@@ -74,6 +75,10 @@ export default function ProyectoDocumentos({
   const [isDragging, setIsDragging] = useState(false)
 
   const [docAEliminar, setDocAEliminar] = useState<DocumentoProyecto | null>(null)
+  const [textoConfirmacionEliminar, setTextoConfirmacionEliminar] = useState('')
+  const [eliminandoDoc, setEliminandoDoc] = useState(false)
+  const [docAPrevisualizar, setDocAPrevisualizar] = useState<DocumentoProyecto | null>(null)
+  const [cargandoVisor, setCargandoVisor] = useState(true)
 
   const getIconoDocumento = (tipo: string) => {
     switch (tipo?.toLowerCase()) {
@@ -125,14 +130,21 @@ export default function ProyectoDocumentos({
   }
 
   const persistirDocumentos = async (nuevaLista: DocumentoProyecto[]) => {
+    const listaAnterior = listaDocumentos
     setListaDocumentos(nuevaLista)
     onDocumentosChange?.(nuevaLista)
 
     if (proyectoId) {
       try {
-        await (proyectoService.actualizarProyecto as any)(proyectoId, { documentos: nuevaLista })
+        await (proyectoService.actualizarProyecto as any)(proyectoId, {
+          documentos: nuevaLista,
+          _actualizarDocumentos: true,
+        })
       } catch (err) {
-        console.warn('No se pudo sincronizar los documentos con el backend:', err)
+        setListaDocumentos(listaAnterior)
+        onDocumentosChange?.(listaAnterior)
+        console.error('No se pudo sincronizar los documentos con el backend:', err)
+        throw err
       }
     }
   }
@@ -180,6 +192,9 @@ export default function ProyectoDocumentos({
         subidoPor: uploader,
       })
       ;(nuevoDoc as any).origen = 'modulo_documentos'
+      if (user?.id) {
+        ;(nuevoDoc as any).subidoPorId = user.id
+      }
 
       const actualizada = [nuevoDoc, ...listaDocumentos]
       await persistirDocumentos(actualizada)
@@ -234,15 +249,20 @@ export default function ProyectoDocumentos({
 
   const handleConfirmarEliminar = async () => {
     if (!docAEliminar) return
-    if (esDocumentoDeFormulario(docAEliminar)) {
-      showErrorToast('Este documento proviene del formulario oficial del proyecto y no puede eliminarse desde aquí.')
+    if (textoConfirmacionEliminar.trim().toLowerCase() !== 'eliminar') return
+    try {
+      setEliminandoDoc(true)
+      const filtrada = listaDocumentos.filter((d) => d.id !== docAEliminar.id)
+      await persistirDocumentos(filtrada)
+      showSuccessToast(`El documento "${docAEliminar.nombre}" fue eliminado exitosamente`)
       setDocAEliminar(null)
-      return
+      setTextoConfirmacionEliminar('')
+    } catch (err) {
+      console.error('Error al eliminar documento:', err)
+      showErrorToast('Error al eliminar el documento')
+    } finally {
+      setEliminandoDoc(false)
     }
-    const filtrada = listaDocumentos.filter((d) => d.id !== docAEliminar.id)
-    await persistirDocumentos(filtrada)
-    showSuccessToast(`El documento "${docAEliminar.nombre}" fue eliminado`)
-    setDocAEliminar(null)
   }
 
   const handleDescargar = (doc: DocumentoProyecto) => {
@@ -325,7 +345,8 @@ export default function ProyectoDocumentos({
             return (
               <div
                 key={doc.id}
-                className="group flex items-center justify-between rounded-2xl border border-gray-100 bg-white p-3.5 shadow-2xs transition-all hover:border-gray-200 hover:shadow-xs"
+                onClick={() => setDocAPrevisualizar(doc)}
+                className="group flex items-center justify-between rounded-2xl border border-gray-100 bg-white p-3.5 shadow-2xs transition-all hover:border-[#9B0F06]/30 hover:shadow-xs hover:bg-gray-50/50 cursor-pointer"
               >
                 {/* Lado izquierdo con ícono y detalles */}
                 <div className="flex items-center gap-3 min-w-0 flex-1 pr-3">
@@ -335,7 +356,7 @@ export default function ProyectoDocumentos({
 
                   <div className="min-w-0 flex-1 space-y-0.5">
                     <h4
-                      className="truncate text-[12.5px] font-bold text-gray-800 leading-snug"
+                      className="truncate text-[12.5px] font-bold text-gray-800 leading-snug group-hover:text-[#9B0F06] transition-colors"
                       title={doc.nombre}
                     >
                       {doc.nombre}
@@ -351,38 +372,49 @@ export default function ProyectoDocumentos({
                   </div>
                 </div>
 
-                {/* Acciones del documento a la derecha (descargar / eliminar) */}
+                {/* Acciones del documento a la derecha (solo iconos: ver / descargar / eliminar) */}
                 <div className="flex items-center gap-1 shrink-0">
                   <button
                     type="button"
-                    onClick={() => handleDescargar(doc)}
-                    className="p-1.5 text-gray-400 hover:text-gray-700 transition-colors rounded-lg hover:bg-gray-100 cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setCargandoVisor(true)
+                      setDocAPrevisualizar(doc)
+                    }}
+                    className="p-1.5 text-gray-500 hover:text-[#9B0F06] hover:bg-red-50/70 transition-colors rounded-lg cursor-pointer"
+                    title="Ver vista previa"
+                    aria-label="Ver vista previa"
+                  >
+                    <Eye size={16} />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleDescargar(doc)
+                    }}
+                    className="p-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors rounded-lg cursor-pointer"
                     title="Descargar documento"
                     aria-label="Descargar"
                   >
-                    <Download size={15} />
+                    <Download size={16} />
                   </button>
 
                   {!readOnly && (
-                    esDocumentoDeFormulario(doc) ? (
-                      <span
-                        className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-1 text-[9.5px] font-bold text-amber-700 border border-amber-200 select-none"
-                        title="Documento contractual del formulario oficial. No se puede eliminar."
-                      >
-                        <Lock size={11} className="text-amber-600" />
-                        <span>Oficial</span>
-                      </span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setDocAEliminar(doc)}
-                        className="p-1.5 text-gray-400 hover:text-red-600 transition-colors rounded-lg hover:bg-red-50 cursor-pointer"
-                        title="Eliminar documento"
-                        aria-label="Eliminar"
-                      >
-                        <Trash2 size={15} />
-                      </button>
-                    )
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setTextoConfirmacionEliminar('')
+                        setDocAEliminar(doc)
+                      }}
+                      className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors rounded-lg cursor-pointer"
+                      title="Eliminar documento"
+                      aria-label="Eliminar"
+                    >
+                      <Trash2 size={16} />
+                    </button>
                   )}
                 </div>
               </div>
@@ -520,51 +552,246 @@ export default function ProyectoDocumentos({
         </Portal>
       )}
 
-      {/* Modal Confirmación de Eliminación */}
+      {/* Modal Confirmación de Eliminación con texto de seguridad */}
       {docAEliminar && (
         <Portal>
           <div className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
             <div
               className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity animate-in fade-in duration-200"
-              onClick={() => setDocAEliminar(null)}
+              onClick={() => {
+                if (!eliminandoDoc) {
+                  setDocAEliminar(null)
+                  setTextoConfirmacionEliminar('')
+                }
+              }}
             />
-            <div className="relative w-full max-w-sm rounded-2xl bg-white p-5 sm:p-6 shadow-2xl space-y-3 font-[Poppins] z-10 animate-in zoom-in-95 duration-200 my-auto">
-              <div className="flex items-center justify-between border-b border-gray-100 pb-2.5">
+            <div className="relative w-full max-w-md rounded-2xl bg-white p-5 sm:p-6 shadow-2xl space-y-4 font-[Poppins] z-10 animate-in zoom-in-95 duration-200 my-auto">
+              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
                 <div className="flex items-center gap-2.5">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-red-100 text-red-600">
-                    <Trash2 size={18} />
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-100 text-red-600">
+                    <Trash2 size={20} />
                   </div>
-                  <h3 className="text-sm font-extrabold text-gray-900">Eliminar Documento</h3>
+                  <div>
+                    <h3 className="text-sm font-extrabold text-gray-900">Eliminar Documento</h3>
+                    <p className="text-[11px] text-gray-400">Esta acción no se puede deshacer</p>
+                  </div>
                 </div>
                 <button
                   type="button"
-                  onClick={() => setDocAEliminar(null)}
-                  className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors cursor-pointer"
+                  disabled={eliminandoDoc}
+                  onClick={() => {
+                    setDocAEliminar(null)
+                    setTextoConfirmacionEliminar('')
+                  }}
+                  className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors cursor-pointer disabled:opacity-50"
                 >
-                  <X size={15} />
+                  <X size={16} />
                 </button>
               </div>
 
               <p className="text-xs text-gray-600 leading-relaxed">
-                ¿Estás seguro que deseas eliminar el documento{' '}
+                ¿Estás seguro que deseas eliminar permanentemente el documento{' '}
                 <span className="font-bold text-gray-900">&quot;{docAEliminar.nombre}&quot;</span>?
               </p>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-gray-100">
+              <div className="space-y-1.5 bg-gray-50/80 p-3 rounded-xl border border-gray-100">
+                <label className="block text-[11px] font-semibold text-gray-700">
+                  Para confirmar, escribe <span className="font-mono font-bold text-red-600 uppercase">eliminar</span> en el campo:
+                </label>
+                <input
+                  type="text"
+                  autoFocus
+                  disabled={eliminandoDoc}
+                  value={textoConfirmacionEliminar}
+                  onChange={(e) => setTextoConfirmacionEliminar(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && textoConfirmacionEliminar.trim().toLowerCase() === 'eliminar' && !eliminandoDoc) {
+                      void handleConfirmarEliminar()
+                    }
+                  }}
+                  placeholder="eliminar"
+                  className="w-full text-xs p-2.5 rounded-lg border border-gray-300 focus:outline-none focus:border-[#9B0F06] focus:ring-1 focus:ring-[#9B0F06] font-mono tracking-wider bg-white transition-colors"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
                 <button
                   type="button"
-                  onClick={() => setDocAEliminar(null)}
-                  className="rounded-xl border border-gray-300 bg-white px-3.5 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
+                  disabled={eliminandoDoc}
+                  onClick={() => {
+                    setDocAEliminar(null)
+                    setTextoConfirmacionEliminar('')
+                  }}
+                  className="rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-xs font-bold text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer disabled:opacity-50"
                 >
                   Cancelar
                 </button>
                 <button
                   type="button"
+                  disabled={eliminandoDoc || textoConfirmacionEliminar.trim().toLowerCase() !== 'eliminar'}
                   onClick={handleConfirmarEliminar}
-                  className="rounded-xl bg-red-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-red-700 shadow-2xs transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-red-600 hover:bg-red-700 px-4 py-2 text-xs font-bold text-white shadow-2xs transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  Eliminar definitivamente
+                  {eliminandoDoc ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                  <span>{eliminandoDoc ? 'Eliminando...' : 'Eliminar definitivamente'}</span>
                 </button>
+              </div>
+            </div>
+          </div>
+        </Portal>
+      )}
+
+      {/* Modal de Vista Previa de Documento (Ampliado y con Carga Rápida) */}
+      {docAPrevisualizar && (
+        <Portal>
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-2 sm:p-4 overflow-hidden">
+            {/* Backdrop */}
+            <div
+              className="fixed inset-0 bg-black/75 backdrop-blur-xs transition-opacity animate-in fade-in duration-200"
+              onClick={() => setDocAPrevisualizar(null)}
+            />
+
+            {/* Modal Container Ampliado */}
+            <div className="relative w-[96vw] max-w-6xl xl:max-w-7xl h-[92vh] max-h-[94vh] flex flex-col rounded-2xl bg-white shadow-2xl overflow-hidden font-[Poppins] z-10 animate-in zoom-in-95 duration-200">
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3 bg-gray-50/80 shrink-0">
+                <div className="flex items-center gap-2.5 min-w-0 pr-3">
+                  {(() => {
+                    const { icon: IconModal, bg: bgM, color: colorM } = getIconoDocumento(docAPrevisualizar.tipo)
+                    return (
+                      <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${bgM}`}>
+                        <IconModal size={16} className={colorM} />
+                      </div>
+                    )
+                  })()}
+                  <div className="min-w-0">
+                    <h3 className="text-xs sm:text-sm font-bold text-gray-900 truncate" title={docAPrevisualizar.nombre}>
+                      {docAPrevisualizar.nombre}
+                    </h3>
+                    <p className="text-[10px] text-gray-400 truncate">
+                      {docAPrevisualizar.tamanio ? `${docAPrevisualizar.tamanio} • ` : ''}
+                      {docAPrevisualizar.categoria || 'Documento'}
+                      {docAPrevisualizar.subidoPor ? ` • Subido por ${docAPrevisualizar.subidoPor}` : ''}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {docAPrevisualizar.url && docAPrevisualizar.url !== '#' && (
+                    <>
+                      <a
+                        href={docAPrevisualizar.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer"
+                        title="Abrir en pestaña nueva"
+                      >
+                        <ExternalLink size={13} />
+                        <span className="hidden sm:inline">Abrir en pestaña</span>
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => handleDescargar(docAPrevisualizar)}
+                        className="inline-flex items-center gap-1 rounded-lg bg-[#9B0F06] px-2.5 py-1 text-[11px] font-bold text-white hover:bg-[#5E0006] transition-colors cursor-pointer"
+                        title="Descargar archivo"
+                      >
+                        <Download size={13} />
+                        <span className="hidden sm:inline">Descargar</span>
+                      </button>
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setDocAPrevisualizar(null)}
+                    className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-200 hover:text-gray-700 transition-colors cursor-pointer ml-1"
+                    title="Cerrar vista previa"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Body / Visualizador con Spinner y Contenedor Full */}
+              <div className="flex-1 w-full h-full min-h-0 relative bg-gray-100/70 p-2 sm:p-3 overflow-hidden flex flex-col items-center justify-center">
+                {/* Spinner de Carga */}
+                {cargandoVisor && (
+                  <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-white/90 backdrop-blur-xs transition-opacity duration-300">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-50 text-[#9B0F06] ring-4 ring-red-50/50 mb-3 shadow-xs">
+                      <Loader2 size={24} className="animate-spin" />
+                    </div>
+                    <p className="text-xs font-bold text-gray-800">Cargando documento...</p>
+                    <p className="text-[10.5px] text-gray-400 mt-0.5">Preparando visualización</p>
+                  </div>
+                )}
+
+                {(() => {
+                  const url = docAPrevisualizar.url
+                  const tipo = (docAPrevisualizar.tipo || '').toLowerCase()
+                  const ext = (docAPrevisualizar.nombre || '').split('.').pop()?.toLowerCase() || ''
+                  const esImagen = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg'].includes(ext) || tipo === 'imagen'
+                  const esPdf = ext === 'pdf' || tipo === 'pdf'
+
+                  if (!url || url === '#') {
+                    return (
+                      <div className="flex flex-col items-center justify-center p-8 text-center bg-white rounded-xl border border-gray-200 max-w-md">
+                        <FileText size={40} className="text-gray-300 mb-2" />
+                        <p className="text-xs font-bold text-gray-700">Vista previa no disponible</p>
+                        <p className="text-[11px] text-gray-400 mt-1">
+                          Este archivo no cuenta con un enlace público o URL directa registrada.
+                        </p>
+                      </div>
+                    )
+                  }
+
+                  if (esImagen) {
+                    return (
+                      <div className="flex items-center justify-center w-full h-full overflow-auto">
+                        <img
+                          src={url}
+                          alt={docAPrevisualizar.nombre}
+                          onLoad={() => setCargandoVisor(false)}
+                          onError={() => setCargandoVisor(false)}
+                          className="max-h-full max-w-full object-contain rounded-xl shadow-md border border-gray-200/50 bg-white"
+                        />
+                      </div>
+                    )
+                  }
+
+                  if (esPdf) {
+                    const pdfUrl = url.includes('#') ? url : `${url}#toolbar=1&navpanes=0&view=FitH`
+                    return (
+                      <iframe
+                        src={pdfUrl}
+                        title={docAPrevisualizar.nombre}
+                        onLoad={() => setCargandoVisor(false)}
+                        className="w-full h-full flex-1 rounded-xl border border-gray-200 bg-white shadow-xs"
+                      />
+                    )
+                  }
+
+                  // Otros tipos (Word, Excel, Documentos genéricos)
+                  return (
+                    <div className="flex flex-col w-full h-full flex-1">
+                      <iframe
+                        src={`https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`}
+                        title={docAPrevisualizar.nombre}
+                        onLoad={() => setCargandoVisor(false)}
+                        className="w-full flex-1 rounded-xl border border-gray-200 bg-white shadow-xs"
+                      />
+                      <div className="mt-1.5 text-center text-[10.5px] text-gray-500 shrink-0">
+                        ¿El documento no se previsualiza?{' '}
+                        <a
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-bold text-[#9B0F06] hover:underline"
+                        >
+                          Haz clic aquí para abrirlo o descargarlo directamente
+                        </a>
+                      </div>
+                    </div>
+                  )
+                })()}
               </div>
             </div>
           </div>

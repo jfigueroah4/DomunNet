@@ -2,7 +2,6 @@
 
 import React, { useState, useMemo } from 'react'
 import { Download, FileSpreadsheet, Search, ChevronLeft, ChevronRight, CheckCircle2, Clock, AlertCircle } from 'lucide-react'
-import { BITACORA_MOCK } from '@/data/bitacora.mock'
 import { exportarElementoComoSvg, exportarTablaCsv } from './estadisticasExport'
 import { useCustomToast } from '@/hooks/useCustomToast'
 
@@ -16,6 +15,7 @@ interface EstadisticasBitacoraProps {
 export function EstadisticasBitacora({
   bitacoraData = [],
   proyectoSeleccionado,
+  usuarios = [],
 }: EstadisticasBitacoraProps) {
   const { showSuccessToast } = useCustomToast()
 
@@ -25,10 +25,9 @@ export function EstadisticasBitacora({
   const [paginaActual, setPaginaActual] = useState(1)
   const [registrosPorPagina, setRegistrosPorPagina] = useState(5)
 
-  // Usar datos reales de bitácora recibidos o mock de respaldo
+  // Usar exclusivamente los datos reales de bitácora del proyecto seleccionado
   const itemsBitacora = useMemo(() => {
-    if (bitacoraData && bitacoraData.length > 0) return bitacoraData
-    return BITACORA_MOCK
+    return Array.isArray(bitacoraData) ? bitacoraData : []
   }, [bitacoraData])
 
   // Métricas dinámicas calculadas de la bitácora
@@ -55,52 +54,50 @@ export function EstadisticasBitacora({
     const diasNombres = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
 
     itemsBitacora.forEach((item: any) => {
-      const tipo = String(item.tipo || item.tipo_actividad || item.categoria || '').toLowerCase()
+      const tipo = String(item.tipo || item.tipo_actividad || item.categoria || item.titulo || '').toLowerCase()
       if (tipo.includes('lab') || tipo.includes('ensayo')) lab++
-      else if (tipo.includes('insp') || tipo.includes('supervis')) insp++
+      else if (tipo.includes('insp') || tipo.includes('supervis') || tipo.includes('prueba')) insp++
       else if (tipo.includes('incid') || tipo.includes('clima') || tipo.includes('susp')) incidentes++
       else campo++
 
-      const est = String(item.estado || 'Aprobada').toLowerCase()
+      const est = String(item.estado || item.estado_codigo || 'aprobado').toLowerCase()
       if (est.includes('aprob') || est.includes('firmad')) aprobados++
       else if (est.includes('pend') || est.includes('revis')) pendientes++
       else observados++
 
       if (item.fecha) {
         try {
-          const d = new Date(item.fecha)
-          const diaSemana = diasNombres[d.getUTCDay()] || 'Lun'
-          diasMap[diaSemana] = (diasMap[diaSemana] || 0) + 1
-        } catch {
-          diasMap['Mié'] = (diasMap['Mié'] || 0) + 1
-        }
-      } else {
-        diasMap['Mié'] = (diasMap['Mié'] || 0) + 1
+          const d = new Date(item.fecha.length === 10 ? item.fecha + 'T00:00:00' : item.fecha)
+          if (!isNaN(d.getTime())) {
+            const diaSemana = diasNombres[d.getDay()] || 'Lun'
+            diasMap[diaSemana] = (diasMap[diaSemana] || 0) + 1
+          }
+        } catch {}
       }
     })
 
     const diasList = [
-      { d: 'Lun', cant: diasMap['Lun'] || 8 },
-      { d: 'Mar', cant: diasMap['Mar'] || 12 },
-      { d: 'Mié', cant: diasMap['Mié'] || 15 },
-      { d: 'Jue', cant: diasMap['Jue'] || 11 },
-      { d: 'Vie', cant: diasMap['Vie'] || 14 },
-      { d: 'Sáb', cant: diasMap['Sáb'] || 6 },
-      { d: 'Dom', cant: diasMap['Dom'] || 1 },
+      { d: 'Lun', cant: diasMap['Lun'] || 0 },
+      { d: 'Mar', cant: diasMap['Mar'] || 0 },
+      { d: 'Mié', cant: diasMap['Mié'] || 0 },
+      { d: 'Jue', cant: diasMap['Jue'] || 0 },
+      { d: 'Vie', cant: diasMap['Vie'] || 0 },
+      { d: 'Sáb', cant: diasMap['Sáb'] || 0 },
+      { d: 'Dom', cant: diasMap['Dom'] || 0 },
     ]
 
     return {
       conteoPorTipo: {
-        campo: campo || 42,
-        lab: lab || 18,
-        insp: insp || 12,
-        incidentes: incidentes || 5,
+        campo,
+        lab,
+        insp,
+        incidentes,
       },
       conteoPorDia: diasList,
       conteoPorEstado: {
-        aprobados: aprobados || 58,
-        pendientes: pendientes || 6,
-        observados: observados || 3,
+        aprobados,
+        pendientes,
+        observados,
       },
       totalNotas: itemsBitacora.length,
     }
@@ -141,11 +138,11 @@ export function EstadisticasBitacora({
   const handleExportCsv = () => {
     const headers = ['Folio / ID', 'Fecha', 'Tipo', 'Descripción de Actividad', 'Responsable', 'Estado']
     const rows = bitacoraFiltrada.map((b: any, idx: number) => [
-      b.folio || b.id || `FOL-${100 + idx}`,
-      b.fecha || '2026-01-20',
+      b.folio || b.numero_folio || b.folio_numero || b.codigo || (b.id ? `FOL-${String(b.id).slice(-4)}` : `#${idx + 1}`),
+      b.fecha || '-',
       b.tipo || b.tipo_actividad || 'Actividad de Campo',
-      b.descripcion || b.observaciones || 'Registro en bitácora de obra vial',
-      b.responsable || b.creadoPor || 'Ing. Residente',
+      b.descripcion || b.observaciones || b.actividad || b.titulo || '-',
+      b.responsable || b.creadoPor || b.autor || (usuarios && usuarios.find((u: any) => u.id === b.usuario_id)?.nombre) || 'Ing. Residente',
       b.estado || 'Aprobada',
     ])
     exportarTablaCsv(headers, rows, 'Estadisticas_Bitacora_Actividades')
@@ -153,6 +150,15 @@ export function EstadisticasBitacora({
   }
 
   const maxDiaVal = Math.max(...conteoPorDia.map((d) => d.cant), 1)
+
+  const diaMayorRegistro = useMemo(() => {
+    if (totalNotas === 0) return 'Sin registros en el período'
+    const diasConRegistros = conteoPorDia.filter((d) => d.cant > 0)
+    if (diasConRegistros.length === 0) return 'Sin registros en el período'
+    const maxCant = Math.max(...conteoPorDia.map((d) => d.cant))
+    const diasMax = conteoPorDia.filter((d) => d.cant === maxCant).map((d) => d.d)
+    return `Día${diasMax.length > 1 ? 's' : ''} de mayor registro: ${diasMax.join(' y ')} (${maxCant})`
+  }, [conteoPorDia, totalNotas])
 
   return (
     <div className="space-y-4 font-poppins">
@@ -218,15 +224,15 @@ export function EstadisticasBitacora({
                   {item.cant} notas
                 </div>
                 <span className="text-[8.5px] text-gray-500 font-poppins">{item.cant}</span>
-                <div className="w-full bg-[#9B0F06] rounded-t transition-all hover:brightness-110" style={{ height: `${(item.cant / maxDiaVal) * 100}%` }} />
+                <div className="w-full bg-[#9B0F06] rounded-t transition-all hover:brightness-110" style={{ height: `${maxDiaVal > 0 && item.cant > 0 ? (item.cant / maxDiaVal) * 100 : 0}%` }} />
                 <span className="text-[9px] text-gray-500 font-medium font-poppins">{item.d}</span>
               </div>
             ))}
           </div>
 
           <div className="flex justify-between text-[9px] text-gray-400 font-poppins">
-            <span>Días de mayor registro: Miércoles y Viernes</span>
-            <span>Total: {totalNotas} notas</span>
+            <span>{diaMayorRegistro}</span>
+            <span>Total: {totalNotas} {totalNotas === 1 ? 'nota' : 'notas'}</span>
           </div>
         </div>
 
@@ -354,11 +360,11 @@ export function EstadisticasBitacora({
             </thead>
             <tbody className="divide-y divide-gray-100 bg-white">
               {datosPaginados.map((row: any, idx: number) => {
-                const folio = row.folio || row.numero || `FOL-${100 + idx}`
-                const fecha = row.fecha || '2026-01-20'
-                const tipo = row.tipo || row.tipo_actividad || 'Actividad de Campo'
-                const desc = row.descripcion || row.observaciones || row.actividad || 'Registro técnico en libro azul'
-                const resp = row.responsable || row.creadoPor || 'Ing. Residente'
+                const folio = row.folio || row.numero_folio || row.folio_numero || row.codigo || (row.id ? `FOL-${String(row.id).slice(-4)}` : `#${(paginaActual - 1) * registrosPorPagina + idx + 1}`)
+                const fecha = row.fecha || '-'
+                const tipo = row.tipo || row.tipo_actividad || (row.titulo?.toLowerCase().includes('lab') ? 'Laboratorio' : 'Campo')
+                const desc = row.descripcion || row.observaciones || row.actividad || row.titulo || '-'
+                const resp = row.responsable || row.creadoPor || row.autor || (usuarios && usuarios.find((u: any) => u.id === row.usuario_id)?.nombre) || 'Ing. Residente'
                 const estado = row.estado || 'Aprobada'
 
                 return (
@@ -371,9 +377,9 @@ export function EstadisticasBitacora({
                     <td className="p-2.5 text-center font-poppins">
                       <span
                         className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-semibold border font-poppins ${
-                          estado.toLowerCase().includes('aprob')
+                          String(estado).toLowerCase().includes('aprob')
                             ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                            : estado.toLowerCase().includes('pend')
+                            : String(estado).toLowerCase().includes('pend')
                             ? 'bg-amber-50 text-amber-700 border-amber-200'
                             : 'bg-red-50 text-red-700 border-red-200'
                         }`}
@@ -386,8 +392,8 @@ export function EstadisticasBitacora({
               })}
               {datosPaginados.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="p-6 text-center text-gray-400 text-xs font-poppins">
-                    No se encontraron notas de bitácora que coincidan con la búsqueda.
+                  <td colSpan={6} className="p-8 text-center text-gray-400 text-xs font-poppins">
+                    No se encontraron notas de bitácora para el proyecto y filtros seleccionados.
                   </td>
                 </tr>
               )}

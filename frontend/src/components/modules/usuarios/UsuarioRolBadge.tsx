@@ -13,6 +13,8 @@ const rolLabels: Record<RolUsuario, string> = {
   Laboratorista: 'Laboratorista',
   AuxiliarDeCampo: 'Auxiliar de Campo',
   Contratante: 'Contratante',
+  Topografo: 'Topógrafo',
+  Supervisor: 'Supervisor',
 }
 
 export function UsuarioRolBadge({ rol }: UsuarioRolBadgeProps) {

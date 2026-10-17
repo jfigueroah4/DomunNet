@@ -194,24 +194,24 @@ textarea {
     min-height: 52px !important;
   }
 
-  /* Critical iOS Safari & Mobile Chrome: form inputs maintain 16px to prevent focus zoom, but filter controls, login fields, search bar, pagination controls and project form inputs are kept compact */
-  input:not([type="checkbox"]):not([type="radio"]):not(.filtro-control):not(.login-field):not(.search-bar-input):not(.paginacion-control):not(.project-form-control):not(.project-form-mobile *),
-  select:not(.filtro-control):not(.paginacion-control):not([data-paginacion="true"] select):not(.project-form-control):not(.project-form-mobile *),
-  textarea:not(.project-form-control):not(.project-form-mobile *) {
+  /* Critical iOS Safari & Mobile Chrome: form inputs maintain 16px to prevent focus zoom, but filter controls, login fields, search bar, pagination controls, project form and bitacora form inputs are kept compact */
+  input:not([type="checkbox"]):not([type="radio"]):not(.filtro-control):not(.login-field):not(.search-bar-input):not(.paginacion-control):not(.project-form-control):not(.bitacora-form-control),
+  select:not(.filtro-control):not(.paginacion-control):not([data-paginacion="true"] select):not(.project-form-control):not(.bitacora-form-control),
+  textarea:not(.project-form-control):not(.bitacora-form-control) {
     font-size: 16px !important;
     line-height: 1.4 !important;
     max-width: 100% !important;
   }
 
   /* Focus state explicitly maintaining 16px font to prevent focus zoom on form inputs */
-  input:not(.filtro-control):not(.login-field):not(.search-bar-input):not(.paginacion-control):not(.project-form-control):not(.project-form-mobile *):focus,
-  select:not(.filtro-control):not(.paginacion-control):not([data-paginacion="true"] select):not(.project-form-control):not(.project-form-mobile *):focus,
-  textarea:not(.project-form-control):not(.project-form-mobile *):focus {
+  input:not(.filtro-control):not(.login-field):not(.search-bar-input):not(.paginacion-control):not(.project-form-control):not(.bitacora-form-control):focus,
+  select:not(.filtro-control):not(.paginacion-control):not([data-paginacion="true"] select):not(.project-form-control):not(.bitacora-form-control):focus,
+  textarea:not(.project-form-control):not(.bitacora-form-control):focus {
     font-size: 16px !important;
   }
 
-  /* Labels with clear touch readability (excluyendo títulos de filtros, drawers compactos y proyecto) */
-  label:not(.filtro-label):not(.filtro-control):not([data-filtro-label="true"]):not(.project-form-label):not(.project-form-mobile *) {
+  /* Labels with clear touch readability (excluyendo títulos de filtros, drawers compactos, proyecto y bitácora) */
+  label:not(.filtro-label):not(.filtro-control):not([data-filtro-label="true"]):not(.project-form-label):not(.bitacora-form-label) {
     font-size: 13.5px !important;
     letter-spacing: 0.015em;
   }
@@ -266,6 +266,51 @@ textarea {
   .project-form-mobile span.text-\[9px\],
   .project-form-mobile .text-\[9px\] {
     font-size: 9px !important;
+  }
+
+  /* Formulario de Bitácora (Paso 1, 2, 3 y Encabezado) en móviles: todo el contenido a 10px con Poppins */
+  .bitacora-form-mobile,
+  .bitacora-form-mobile * {
+    font-family: 'Poppins', var(--font-poppins), sans-serif !important;
+  }
+
+  .bitacora-form-mobile input:not([type="checkbox"]):not([type="radio"]),
+  .bitacora-form-mobile select,
+  .bitacora-form-mobile textarea,
+  .bitacora-form-mobile label,
+  .bitacora-form-mobile option,
+  .bitacora-form-control,
+  select.bitacora-form-control,
+  input.bitacora-form-control,
+  textarea.bitacora-form-control {
+    font-size: 10px !important;
+    line-height: 1.35 !important;
+    font-family: 'Poppins', var(--font-poppins), sans-serif !important;
+  }
+
+  .bitacora-form-mobile input:focus,
+  .bitacora-form-mobile select:focus,
+  .bitacora-form-mobile textarea:focus,
+  .bitacora-form-control:focus {
+    font-size: 10px !important;
+  }
+
+  .bitacora-form-mobile textarea::placeholder,
+  .bitacora-form-mobile input::placeholder {
+    font-size: 10px !important;
+    font-family: 'Poppins', var(--font-poppins), sans-serif !important;
+  }
+
+  .bitacora-form-mobile label,
+  .bitacora-form-label {
+    font-size: 10px !important;
+    font-family: 'Poppins', var(--font-poppins), sans-serif !important;
+  }
+
+  .bitacora-form-mobile p,
+  .bitacora-form-mobile span,
+  .bitacora-form-mobile div {
+    font-family: 'Poppins', var(--font-poppins), sans-serif !important;
   }
 
   /* Títulos de sección de filtros compactos en móviles: igual al tamaño de los títulos de los selects (8.5px - 9px) */
@@ -418,12 +463,28 @@ textarea {
 /* Dispositivos táctiles (teléfonos en horizontal, tablets): evita el zoom al enfocar campos
    aunque el ancho supere 768px. Cubre inputs, selects, textareas y campos editables (Combobox, etc.) */
 @media (pointer: coarse) {
-  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not(.filtro-control):not(.login-field):not(.search-bar-input):not(.paginacion-control),
-  select:not(.filtro-control):not(.paginacion-control):not([data-paginacion="true"] select),
-  textarea,
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not(.filtro-control):not(.login-field):not(.search-bar-input):not(.paginacion-control):not(.project-form-control):not(.bitacora-form-control),
+  select:not(.filtro-control):not(.paginacion-control):not([data-paginacion="true"] select):not(.project-form-control):not(.bitacora-form-control),
+  textarea:not(.project-form-control):not(.bitacora-form-control),
   [contenteditable="true"],
-  [role="combobox"] {
+  [role="combobox"]:not(.project-form-control):not(.bitacora-form-control) {
     font-size: 16px !important;
+  }
+
+  /* Excepción explícita para controles de bitácora en móviles táctiles: 10px */
+  .bitacora-form-mobile,
+  .bitacora-form-mobile *,
+  .bitacora-form-mobile select,
+  .bitacora-form-mobile option,
+  .bitacora-form-mobile input,
+  .bitacora-form-mobile textarea,
+  .bitacora-form-mobile label,
+  .bitacora-form-control,
+  select.bitacora-form-control,
+  input.bitacora-form-control,
+  textarea.bitacora-form-control {
+    font-size: 10px !important;
+    line-height: normal !important;
   }
 
   /* Excepción explícita para controles de filtros y paginación en móviles táctiles: fuente compacta */

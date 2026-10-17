@@ -5,6 +5,7 @@ import { Search, SlidersHorizontal, RotateCcw } from 'lucide-react'
 import { PROYECTOS_MOCK } from '@/data/proyectos.mock'
 import { Combobox } from '@/components/ui/Combobox'
 import { useUIStore } from '@/stores/useUIStore'
+import { esProyectoNoBorrador } from '@/lib/proyectos/estado'
 
 interface ReportesSelectsProps {
   proyectoId: string
@@ -55,9 +56,7 @@ export function ReportesSelects({
     }
   }, [setOcultarBottomNav])
 
-  const listaProyectosValidos = (proyectosList || PROYECTOS_MOCK).filter(
-    (p: any) => p.estado !== 'borrador' && p.estado_codigo !== 'borrador'
-  )
+  const listaProyectosValidos = (proyectosList || PROYECTOS_MOCK).filter(esProyectoNoBorrador)
 
   const opcionesProyectos = [
     { value: 'todos', label: `Todos los proyectos (${listaProyectosValidos.length})` },

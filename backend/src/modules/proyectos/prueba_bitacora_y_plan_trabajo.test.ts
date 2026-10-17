@@ -9,7 +9,7 @@ describe('Suite de Pruebas: Registro de Bitácora de Obra y Plan de Trabajo (Lí
 
   afterAll(async () => {
     if (proyectoId) {
-      await eliminarProyecto(proyectoId).catch(() => {})
+      await eliminarProyecto(proyectoId, true).catch(() => {})
     }
   })
 

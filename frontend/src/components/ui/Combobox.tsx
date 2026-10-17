@@ -69,11 +69,21 @@ export function Combobox({
     }
   }, [open, placement])
 
+  const findMatchingOption = (val: string) => {
+    if (!val) return undefined
+    const valTrim = val.trim().toLowerCase()
+    return (
+      options.find((o) => o.value === val) ||
+      options.find((o) => o.value.trim().toLowerCase() === valTrim) ||
+      options.find((o) => o.label.trim().toLowerCase() === valTrim)
+    )
+  }
+
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
         setOpen(false)
-        const selectedLabel = options.find((o) => o.value === value)?.label || (allowCustomValue ? value : '')
+        const selectedLabel = findMatchingOption(value)?.label || (allowCustomValue ? value : '')
         setSearch(selectedLabel)
       }
     }
@@ -83,12 +93,14 @@ export function Combobox({
 
   useEffect(() => {
     if (!open) {
-      const selectedLabel = options.find((o) => o.value === value)?.label || (allowCustomValue ? value : '')
+      const selectedLabel = findMatchingOption(value)?.label || (allowCustomValue ? value : '')
       setSearch(selectedLabel)
     }
   }, [value, options, open])
 
-  const selectedLabel = options.find((o) => o.value === value)?.label || (allowCustomValue ? value : '')
+  const selectedMatchedOption = findMatchingOption(value)
+  const selectedLabel = selectedMatchedOption?.label || (allowCustomValue ? value : '')
+  const selectedOptionValue = selectedMatchedOption?.value || value
 
   // Show all options if search is exactly the selected label, otherwise filter
   const isSearchMatchingLabel = search === selectedLabel
@@ -158,10 +170,10 @@ export function Combobox({
                     setSearch(option.label)
                     setOpen(false)
                   }}
-                  className={`flex w-full items-start justify-between gap-2 rounded-lg px-2.5 py-1.5 text-left text-[10px] md:text-[11px] font-[Poppins] transition-colors hover:bg-gray-100 ${value === option.value ? 'bg-gray-50 font-bold text-[#9B0F06]' : 'text-gray-700'}`}
+                  className={`flex w-full items-start justify-between gap-2 rounded-lg px-2.5 py-1.5 text-left text-[10px] md:text-[11px] font-[Poppins] transition-colors hover:bg-gray-100 ${option.value === selectedOptionValue || option.value === value ? 'bg-gray-50 font-bold text-[#9B0F06]' : 'text-gray-700'}`}
                 >
                   <span className="whitespace-normal break-words leading-tight flex-1">{option.label}</span>
-                  {value === option.value && <Check size={12} className="text-[#9B0F06] shrink-0 mt-0.5" />}
+                  {(option.value === selectedOptionValue || option.value === value) && <Check size={12} className="text-[#9B0F06] shrink-0 mt-0.5" />}
                 </button>
               ))
             )}

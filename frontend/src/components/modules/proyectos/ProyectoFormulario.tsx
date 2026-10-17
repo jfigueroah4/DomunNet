@@ -1565,6 +1565,8 @@ export function ProyectoFormulario({
   const [pasoActual, setPasoActual] = useState<1 | 2 | 3 | 4 | 5 | 6>(1)
   const [errors, setErrors] = useState<Record<string, boolean>>({})
   const [errorMessages, setErrorMessages] = useState<Record<string, string>>({})
+  const [isGuardando, setIsGuardando] = useState(false)
+  const [idProyectoCreado, setIdProyectoCreado] = useState<string | null>(null)
   const contenidoScrollRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -1691,6 +1693,11 @@ export function ProyectoFormulario({
   const [contratistaTelefono, setContratistaTelefono] = useState(sanitizeTelefono(proyectoInicial?.contratoEjecucion?.telefono || (proyectoInicial as any)?.telefonoContratista || '', 8))
   const [contratistaCorreo, setContratistaCorreo] = useState(proyectoInicial?.contratoEjecucion?.correo || (proyectoInicial as any)?.correoContratista || '')
   const [contratistaSuperintendente, setContratistaSuperintendente] = useState(proyectoInicial?.contratoEjecucion?.responsable || (proyectoInicial as any)?.superintendente || '')
+  const [contratistaColegiadoActivo, setContratistaColegiadoActivo] = useState(
+    proyectoInicial?.contratoEjecucion?.colegiadoActivoSuperintendente ||
+    (proyectoInicial as any)?.colegiadoActivoSuperintendente ||
+    ''
+  )
   const [contratistaLicitacion, setContratistaLicitacion] = useState(proyectoInicial?.contratoEjecucion?.licitacionNumero || (proyectoInicial as any)?.licitacionEjecutora || '')
   
   const parsedActaEjec = parseActaString(proyectoInicial?.contratoEjecucion?.actaInicioNumero || (proyectoInicial as any)?.actaInicioEjecutora || '')
@@ -1886,7 +1893,7 @@ export function ProyectoFormulario({
       cantidadContratada: r.cantidadContratada || 1,
       costoUnitarioDirecto: r.costoUnitarioDirecto || 0,
       esPersonalizado: false,
-      seleccionado: esModoManualInicial ? false : false,
+      seleccionado: esModoManualInicial ? false : true,
     }))
   })
 
@@ -2413,6 +2420,8 @@ export function ProyectoFormulario({
 
   // Apertura directa del Plan de Trabajo (Hoja Sábana) desde Paso 5
   const handleAbrirPlanTrabajo = async () => {
+    if (isGuardando) return
+    setIsGuardando(true)
     try {
       const nom = (nombreOficial || nombre || '').trim() || 'Borrador de Proyecto'
       const tieneDireccionValida = Boolean(direccion && direccion.trim())
@@ -2430,6 +2439,7 @@ export function ProyectoFormulario({
         telefono: contratistaTelefono,
         correo: contratistaCorreo,
         responsable: contratistaSuperintendente,
+        colegiadoActivoSuperintendente: contratistaColegiadoActivo,
         licitacionNumero: contratistaLicitacion,
         actaInicioNumero: actaEjecFinal,
         programa: contratistaPrograma,
@@ -2498,6 +2508,7 @@ export function ProyectoFormulario({
         telefonoContratista: contratistaTelefono || null,
         correoContratista: contratistaCorreo || null,
         superintendente: contratistaSuperintendente || null,
+        colegiadoActivoSuperintendente: contratistaColegiadoActivo || null,
         actaInicioEjecutora: actaEjecFinal || null,
         programaObra: contratistaPrograma || null,
         subprogramaObra: contratistaSubprograma || null,
@@ -2561,12 +2572,13 @@ export function ProyectoFormulario({
         documentos: documentosProyecto.map((d) => ({ ...d, origen: d.origen || 'formulario' })),
       }
 
-      let targetId = proyectoInicial?.id
+      let targetId = proyectoInicial?.id || idProyectoCreado
       if (targetId) {
         await api.put(`/proyectos/${targetId}`, payloadDraft)
       } else {
         const res = await api.post('/proyectos', payloadDraft)
         targetId = res.data?.data?.id
+        if (targetId) setIdProyectoCreado(targetId)
       }
 
       if (targetId) {
@@ -2577,11 +2589,14 @@ export function ProyectoFormulario({
       }
     } catch (err: any) {
       showErrorToast(err?.response?.data?.message || err?.message || 'Error al guardar para abrir la Hoja Sábana')
+    } finally {
+      setIsGuardando(false)
     }
   }
 
   // Guardado principal
   const handleGuardarProyecto = async (forzarEstado?: EstadoProyecto) => {
+    if (isGuardando) return
     const estadoFinal = forzarEstado || estado
 
     // 1. REGLA PARA BORRADOR: Solo requiere Nombre Oficial
@@ -2686,6 +2701,7 @@ export function ProyectoFormulario({
       telefono: contratistaTelefono,
       correo: contratistaCorreo,
       responsable: contratistaSuperintendente,
+      colegiadoActivoSuperintendente: contratistaColegiadoActivo,
       licitacionNumero: contratistaLicitacion,
       actaInicioNumero: actaEjecFinal,
       programa: contratistaPrograma,
@@ -2757,6 +2773,7 @@ export function ProyectoFormulario({
       telefonoContratista: contratistaTelefono || null,
       correoContratista: contratistaCorreo || null,
       superintendente: contratistaSuperintendente || null,
+      colegiadoActivoSuperintendente: contratistaColegiadoActivo || null,
       actaInicioEjecutora: actaEjecFinal || null,
       programaObra: contratistaPrograma || null,
       subprogramaObra: contratistaSubprograma || null,
@@ -2827,19 +2844,26 @@ export function ProyectoFormulario({
     }
 
     if (onGuardar) {
-      onGuardar(payload)
+      setIsGuardando(true)
+      try {
+        await onGuardar(payload)
+      } finally {
+        setIsGuardando(false)
+      }
       return
     }
 
+    setIsGuardando(true)
     try {
-      if (esEditar && proyectoInicial?.id) {
-        await api.put(`/proyectos/${proyectoInicial.id}`, payload)
+      const idParaActualizar = (esEditar && proyectoInicial?.id) ? proyectoInicial.id : idProyectoCreado
+      if (idParaActualizar) {
+        await api.put(`/proyectos/${idParaActualizar}`, payload)
         limpiarCacheMemoria()
         try {
           sessionStorage.removeItem('domun_proyectos_cache')
         } catch {}
         showSuccessToast('Proyecto actualizado exitosamente')
-        router.push(`/dashboard/proyectos/${proyectoInicial.id}`)
+        router.push(`/dashboard/proyectos/${idParaActualizar}`)
       } else {
         const res = await api.post('/proyectos', payload)
         limpiarCacheMemoria()
@@ -2849,10 +2873,13 @@ export function ProyectoFormulario({
         const msj = estadoFinal === 'activo' ? 'Proyecto creado y activado exitosamente' : 'Proyecto guardado en Borrador'
         showSuccessToast(msj)
         const nuevoId = res.data?.data?.id
+        if (nuevoId) setIdProyectoCreado(nuevoId)
         router.push(nuevoId ? `/dashboard/proyectos/${nuevoId}` : '/dashboard/proyectos')
       }
     } catch (err: any) {
       showErrorToast(err.response?.data?.message || 'Error al guardar el proyecto')
+    } finally {
+      setIsGuardando(false)
     }
   }
 
@@ -3005,8 +3032,9 @@ export function ProyectoFormulario({
                     setFieldError('descripcion', null)
                   }
                 }}
-                rows={5}
-                className={errorInputClass(errors, 'descripcion', errorMessages)}
+                rows={14}
+                style={{ minHeight: '320px', height: '320px', maxHeight: 'none', resize: 'vertical' }}
+                className={`${errorInputClass(errors, 'descripcion', errorMessages)} !h-auto min-h-[320px] leading-relaxed`}
                 placeholder="Describe a detalle el alcance físico: longitud en kilómetros, número de carriles, estructura de pavimento, puentes, drenajes..."
               />
               {renderFieldError('descripcion')}
@@ -3294,7 +3322,7 @@ export function ProyectoFormulario({
                           contratistaBloqueado
                             ? 'text-gray-400 cursor-not-allowed pointer-events-none'
                             : 'text-[#9B0F06] hover:text-[#7a0c05] cursor-pointer'
-                        } flex items-center gap-0.5`}
+                        } flex items-center gap-0.5 shrink-0 whitespace-nowrap`}
                       >
                         <Plus size={10} />
                         <span>Crear Usuario</span>
@@ -3471,10 +3499,12 @@ export function ProyectoFormulario({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 pt-2 border-t border-gray-100 relative z-20">
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className={labelClass}>Superintendente / Responsable de Obra</label>
+                <div className="grid grid-cols-1 md:grid-cols-[1.5fr_1.1fr_1fr_0.95fr_0.75fr] gap-2.5 pt-2 border-t border-gray-100 relative z-20 items-start">
+                  <div className="min-w-0">
+                    <div className="min-h-[26px] flex items-end justify-between gap-1 mb-1.5">
+                      <label className="project-form-label text-[10px] md:text-[9px] font-extrabold uppercase tracking-wider text-gray-700 md:text-gray-600 font-[Poppins] truncate" title="Superintendente / Responsable de Obra">
+                        Superintendente / Responsable de Obra
+                      </label>
                       <button
                         type="button"
                         disabled={contratistaBloqueado}
@@ -3486,7 +3516,7 @@ export function ProyectoFormulario({
                           contratistaBloqueado
                             ? 'text-gray-400 cursor-not-allowed pointer-events-none'
                             : 'text-[#9B0F06] hover:text-[#7a0c05] cursor-pointer'
-                        } flex items-center gap-0.5`}
+                        } flex items-center gap-0.5 shrink-0 whitespace-nowrap`}
                       >
                         <Plus size={10} />
                         <span>Crear Usuario</span>
@@ -3514,8 +3544,29 @@ export function ProyectoFormulario({
                     />
                   </div>
 
-                  <div>
-                    <label className={labelClass}>Licitación Pública Nacional No.</label>
+                  <div className="min-w-0">
+                    <div className="min-h-[26px] flex items-end mb-1.5">
+                      <label className="project-form-label text-[10px] md:text-[9px] font-extrabold uppercase tracking-wider text-gray-700 md:text-gray-600 font-[Poppins] truncate" title="Colegiado Activo de Superintendente">
+                        Colegiado Activo de Superintendente
+                      </label>
+                    </div>
+                    <input
+                      type="text"
+                      disabled={contratistaBloqueado}
+                      maxLength={100}
+                      value={contratistaColegiadoActivo}
+                      onChange={(e) => setContratistaColegiadoActivo(e.target.value.slice(0, 100))}
+                      className={inputClass}
+                      placeholder="Ej: Colegiado activo No. 12345"
+                    />
+                  </div>
+
+                  <div className="min-w-0">
+                    <div className="min-h-[26px] flex items-end mb-1.5">
+                      <label className="project-form-label text-[10px] md:text-[9px] font-extrabold uppercase tracking-wider text-gray-700 md:text-gray-600 font-[Poppins] truncate" title="Licitación Pública Nacional No.">
+                        Licitación Pública Nacional No.
+                      </label>
+                    </div>
                     <input
                       type="text"
                       disabled={contratistaBloqueado}
@@ -3527,95 +3578,102 @@ export function ProyectoFormulario({
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <div>
-                      <label className={labelClass}>Número de Acta de Inicio</label>
-                      <div className="relative flex items-center">
-                        <input
-                          type="text"
-                          disabled={contratistaBloqueado}
-                          maxLength={40}
-                          value={contratistaActaNumero}
-                          onChange={(e) => {
-                            const val = e.target.value.slice(0, 40)
-                            setContratistaActaNumero(val)
-                            setContratistaActaInicio(formatActaString(val, contratistaActaFecha))
-                          }}
-                          className={`${inputClass} ${contratistaActaDoc ? 'pr-20' : 'pr-10'}`}
-                          placeholder="Ej: 26-2026"
-                        />
-                        <input
-                          type="file"
-                          ref={fileInputContratistaActaRef}
-                          onChange={(e) =>
-                            handleUploadPaso3Doc(
-                              e,
-                              'contratista-acta',
-                              'Acta de Inicio - Empresa Ejecutora',
-                              setContratistaActaDoc
-                            )
-                          }
-                          accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"
-                          className="hidden"
-                        />
+                  <div className="min-w-0">
+                    <div className="min-h-[26px] flex items-end mb-1.5">
+                      <label className="project-form-label text-[10px] md:text-[9px] font-extrabold uppercase tracking-wider text-gray-700 md:text-gray-600 font-[Poppins] truncate" title="Número de Acta de Inicio">
+                        Número de Acta de Inicio
+                      </label>
+                    </div>
+                    <div className="relative flex items-center">
+                      <input
+                        type="text"
+                        disabled={contratistaBloqueado}
+                        maxLength={40}
+                        value={contratistaActaNumero}
+                        onChange={(e) => {
+                          const val = e.target.value.slice(0, 40)
+                          setContratistaActaNumero(val)
+                          setContratistaActaInicio(formatActaString(val, contratistaActaFecha))
+                        }}
+                        className={`${inputClass} ${contratistaActaDoc ? 'pr-20' : 'pr-10'}`}
+                        placeholder="Ej: 26-2026"
+                      />
+                      <input
+                        type="file"
+                        ref={fileInputContratistaActaRef}
+                        onChange={(e) =>
+                          handleUploadPaso3Doc(
+                            e,
+                            'contratista-acta',
+                            'Acta de Inicio - Empresa Ejecutora',
+                            setContratistaActaDoc
+                          )
+                        }
+                        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"
+                        className="hidden"
+                      />
+                      <button
+                        type="button"
+                        disabled={contratistaBloqueado || subiendoDocKey === 'contratista-acta'}
+                        onClick={() => fileInputContratistaActaRef.current?.click()}
+                        className={`absolute right-1 top-1/2 -translate-y-1/2 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold transition-all ${
+                          contratistaBloqueado
+                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed pointer-events-none'
+                            : contratistaActaDoc
+                            ? 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300 cursor-pointer'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 cursor-pointer'
+                        }`}
+                        title={
+                          contratistaActaDoc
+                            ? `Archivo adjunto: ${contratistaActaDoc.nombre}. Haz clic para cambiar.`
+                            : 'Adjuntar documento de Acta de Inicio'
+                        }
+                      >
+                        {subiendoDocKey === 'contratista-acta' ? (
+                          <Loader2 size={11} className="animate-spin text-gray-500" />
+                        ) : (
+                          <Paperclip
+                            size={11}
+                            className="text-gray-600"
+                          />
+                        )}
+                        <span>{contratistaActaDoc ? 'Cambiar' : 'Adjuntar'}</span>
+                      </button>
+                    </div>
+                    {contratistaActaDoc && (
+                      <div className="mt-1 flex items-center justify-between rounded-md bg-gray-50 border border-gray-200 px-2 py-0.5 text-[9.5px] text-gray-700 font-medium">
+                        <span className="truncate max-w-[140px]" title={contratistaActaDoc.nombre}>
+                          📎 {contratistaActaDoc.nombre} ({contratistaActaDoc.tamanio})
+                        </span>
                         <button
                           type="button"
-                          disabled={contratistaBloqueado || subiendoDocKey === 'contratista-acta'}
-                          onClick={() => fileInputContratistaActaRef.current?.click()}
-                          className={`absolute right-1 top-1/2 -translate-y-1/2 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold transition-all ${
-                            contratistaBloqueado
-                              ? 'bg-gray-100 text-gray-400 cursor-not-allowed pointer-events-none'
-                              : contratistaActaDoc
-                              ? 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300 cursor-pointer'
-                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 cursor-pointer'
-                          }`}
-                          title={
-                            contratistaActaDoc
-                              ? `Archivo adjunto: ${contratistaActaDoc.nombre}. Haz clic para cambiar.`
-                              : 'Adjuntar documento de Acta de Inicio'
-                          }
+                          onClick={() => setContratistaActaDoc(null)}
+                          className="text-gray-400 hover:text-red-600 p-0.5 cursor-pointer"
+                          title="Quitar archivo adjunto"
                         >
-                          {subiendoDocKey === 'contratista-acta' ? (
-                            <Loader2 size={11} className="animate-spin text-gray-500" />
-                          ) : (
-                            <Paperclip
-                              size={11}
-                              className="text-gray-600"
-                            />
-                          )}
-                          <span>{contratistaActaDoc ? 'Cambiar' : 'Adjuntar'}</span>
+                          <X size={11} />
                         </button>
                       </div>
-                      {contratistaActaDoc && (
-                        <div className="mt-1 flex items-center justify-between rounded-md bg-gray-50 border border-gray-200 px-2 py-0.5 text-[9.5px] text-gray-700 font-medium">
-                          <span className="truncate max-w-[140px]" title={contratistaActaDoc.nombre}>
-                            📎 {contratistaActaDoc.nombre} ({contratistaActaDoc.tamanio})
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => setContratistaActaDoc(null)}
-                            className="text-gray-400 hover:text-red-600 p-0.5 cursor-pointer"
-                            title="Quitar archivo adjunto"
-                          >
-                            <X size={11} />
-                          </button>
-                        </div>
-                      )}
+                    )}
+                  </div>
+
+                  <div className="min-w-0">
+                    <div className="min-h-[26px] flex items-end mb-1.5">
+                      <label className="project-form-label text-[10px] md:text-[9px] font-extrabold uppercase tracking-wider text-gray-700 md:text-gray-600 font-[Poppins] truncate" title="Fecha de Acta">
+                        Fecha de Acta
+                      </label>
                     </div>
-                    <div>
-                      <label className={labelClass}>Fecha de Acta</label>
-                      <input
-                        type="date"
-                        disabled={contratistaBloqueado}
-                        value={contratistaActaFecha}
-                        onChange={(e) => {
-                          const val = e.target.value
-                          setContratistaActaFecha(val)
-                          setContratistaActaInicio(formatActaString(contratistaActaNumero, val))
-                        }}
-                        className={inputClass}
-                      />
-                    </div>
+                    <input
+                      type="date"
+                      disabled={contratistaBloqueado}
+                      value={contratistaActaFecha}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        setContratistaActaFecha(val)
+                        setContratistaActaInicio(formatActaString(contratistaActaNumero, val))
+                      }}
+                      className={inputClass}
+                    />
                   </div>
                 </div>
               </div>
@@ -3671,7 +3729,7 @@ export function ProyectoFormulario({
                           supervisoraBloqueado
                             ? 'text-gray-400 cursor-not-allowed pointer-events-none'
                             : 'text-[#9B0F06] hover:text-[#7a0c05] cursor-pointer'
-                        } flex items-center gap-0.5`}
+                        } flex items-center gap-0.5 shrink-0 whitespace-nowrap`}
                       >
                         <Plus size={10} />
                         <span>Crear Usuario</span>
@@ -3863,7 +3921,7 @@ export function ProyectoFormulario({
                           supervisoraBloqueado
                             ? 'text-gray-400 cursor-not-allowed pointer-events-none'
                             : 'text-[#9B0F06] hover:text-[#7a0c05] cursor-pointer'
-                        } flex items-center gap-0.5`}
+                        } flex items-center gap-0.5 shrink-0 whitespace-nowrap`}
                       >
                         <Plus size={10} />
                         <span>Crear Usuario</span>
@@ -5057,22 +5115,28 @@ export function ProyectoFormulario({
             {/* Botón Guardar como Borrador */}
             <button
               type="button"
+              disabled={isGuardando}
               onClick={() => handleGuardarProyecto('borrador')}
-              className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-[10px] md:text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors shadow-2xs cursor-pointer font-[Poppins]"
+              className={`inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-[10px] md:text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors shadow-2xs font-[Poppins] ${
+                isGuardando ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+              }`}
               title="Guardar como borrador preliminar"
             >
-              <Save size={12} className="text-gray-500" />
+              {isGuardando ? <Loader2 size={12} className="animate-spin text-gray-500" /> : <Save size={12} className="text-gray-500" />}
               <span><span className="sm:hidden">Borrador</span><span className="hidden sm:inline">Guardar como Borrador</span></span>
             </button>
 
             {/* Botón directo Guardar y Activar */}
             <button
               type="button"
+              disabled={isGuardando}
               onClick={() => handleGuardarProyecto('activo')}
-              className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 text-[10px] md:text-xs font-bold shadow-2xs transition-colors cursor-pointer font-[Poppins]"
+              className={`inline-flex items-center gap-1.5 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 text-[10px] md:text-xs font-bold shadow-2xs transition-colors font-[Poppins] ${
+                isGuardando ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+              }`}
               title="Guardar y activar inmediatamente el proyecto"
             >
-              <CheckCircle2 size={12} />
+              {isGuardando ? <Loader2 size={12} className="animate-spin text-white" /> : <CheckCircle2 size={12} />}
               <span><span className="sm:hidden">Activar</span><span className="hidden sm:inline">Guardar y Activar</span></span>
             </button>
 
@@ -5104,10 +5168,13 @@ export function ProyectoFormulario({
             ) : (
               <button
                 type="button"
+                disabled={isGuardando}
                 onClick={() => handleGuardarProyecto(estado)}
-                className="inline-flex items-center gap-1.5 rounded-md bg-[#9B0F06] px-4 py-1.5 text-[10px] md:text-xs font-bold text-white hover:bg-[#5E0006] transition-colors shadow-2xs cursor-pointer font-[Poppins]"
+                className={`inline-flex items-center gap-1.5 rounded-md bg-[#9B0F06] px-4 py-1.5 text-[10px] md:text-xs font-bold text-white hover:bg-[#5E0006] transition-colors shadow-2xs font-[Poppins] ${
+                  isGuardando ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                }`}
               >
-                <CheckCircle2 size={13} />
+                {isGuardando ? <Loader2 size={13} className="animate-spin text-white" /> : <CheckCircle2 size={13} />}
                 <span>
                   {esEditar
                     ? estado === 'activo'
@@ -5230,6 +5297,7 @@ export function ProyectoFormulario({
       <UsuarioFormularioDrawer
         isOpen={openCrearUsuarioDrawer}
         onClose={() => setOpenCrearUsuarioDrawer(false)}
+        rolesExcluidos={['Contratante']}
         ocultarEmpresaContratista={true}
         onSave={() => { setOpenCrearUsuarioDrawer(false); cargarUsuarios() }}
       />
@@ -5238,7 +5306,7 @@ export function ProyectoFormulario({
         onClose={() => setOpenCrearUsuarioContratistaDrawer(false)}
         rolInicial="Contratante"
         rolesPermitidos={['Contratante', 'IngenieroResidente', 'Supervisor']}
-        bloquearRol={true}
+        bloquearRol={false}
         bloquearEstado={true}
         empresaContratistaIdInicial={empresaContratistaId}
         ocultarEmpresaContratista={true}
@@ -5265,8 +5333,8 @@ export function ProyectoFormulario({
         isOpen={openCrearUsuarioSupervisoraDrawer}
         onClose={() => setOpenCrearUsuarioSupervisoraDrawer(false)}
         rolInicial="Supervisor"
-        rolesPermitidos={['Supervisor', 'IngenieroResidente', 'Ingeniero Residente', 'Director', 'Administrador']}
-        bloquearRol={true}
+        rolesPermitidos={['Supervisor', 'IngenieroResidente', 'Administrador', 'Gerencia']}
+        bloquearRol={false}
         bloquearEstado={true}
         ocultarEmpresaContratista={true}
         onSave={(u) => {

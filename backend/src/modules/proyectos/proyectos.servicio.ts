@@ -1,4 +1,5 @@
 import { clienteSupabase } from '../../configuracion/cliente-supabase'
+import { invalidarCacheMantenimiento } from '../mantenimiento/mantenimiento.servicio'
 import {
   procesarMedicionRenglon,
   calcularLiquidacionEstimacion,
@@ -89,6 +90,22 @@ export function esUuidValido(val: any): string | null {
   return uuidRegex.test(val.trim()) ? val.trim() : null
 }
 
+async function resolverUsuarioIdPorNombre(nombre: unknown): Promise<string | null> {
+  if (typeof nombre !== 'string' || !nombre.trim()) return null
+  const buscado = nombre.trim().toLowerCase()
+  const { data, error } = await clienteSupabase
+    .from('usuario')
+    .select('id, correo, dato_usuario(primer_nombre, primer_apellido)')
+  if (error || !data) return null
+
+  const encontrado = data.find((usuario: any) => {
+    const dato = Array.isArray(usuario.dato_usuario) ? usuario.dato_usuario[0] : usuario.dato_usuario
+    const nombreCompleto = `${dato?.primer_nombre || ''} ${dato?.primer_apellido || ''}`.trim().toLowerCase()
+    return nombreCompleto === buscado || usuario.correo?.toLowerCase() === buscado
+  })
+  return encontrado?.id || null
+}
+
 export async function validarOperacionProyectoPermitida(proyectoId: string, tipoOperacion: 'bitacora' | 'analitico' | 'fechas'): Promise<void> {
   const { data: proy } = await clienteSupabase
     .from('proyecto')
@@ -118,6 +135,9 @@ export async function validarOperacionProyectoPermitida(proyectoId: string, tipo
       throw new ValidationError(`Operación no permitida en Analítico para el estado '${estadoCodigo}'.`, 'estado')
     }
   } else if (tipoOperacion === 'fechas') {
+    if (enReplanificacion) {
+      throw new ValidationError('El proyecto se encuentra en ciclo de modificación de plazo / replanificación. Operación no permitida.', 'en_replanificacion')
+    }
     if (['pausado', 'inactivo', 'completado', 'en_revision'].includes(estadoCodigo)) {
       throw new ValidationError('No se pueden editar las fechas del proyecto mientras esté pausado, inactivo, completado o en revisión.', 'fechas')
     }
@@ -435,6 +455,8 @@ export function invalidarCacheProyectos(proyectoId?: string) {
   } else {
     cacheProyectoDetalleMap.clear()
   }
+  invalidarCacheMantenimiento('proyecto')
+  invalidarCacheMantenimiento('proyecto_detalle')
 }
 
 export async function obtenerProyectoPorId(proyectoId: string) {
@@ -453,7 +475,7 @@ export async function obtenerProyectoPorId(proyectoId: string) {
       .single(),
     clienteSupabase
       .from('proyecto_detalle')
-      .select('nombre_oficial, descripcion_proyecto, tramo, direccion, latitud, longitud, municipio_id, departamento_id, municipio_fin_id, departamento_fin_id, direccion_fin, kilometro_inicio, kilometro_fin, empresa_contratante_id, empresa_contratista_id, empresa_supervisora, delegado_residente_id, fecha_adjudicacion, fecha_inicio_contractual, numero_escritura_publica, monto_original, plazo_ejecucion_original, plazo_ejecucion_ampliado, fecha_finalizacion_real, monto_final')
+      .select('nombre_oficial, descripcion_proyecto, tramo, direccion, latitud, longitud, municipio_id, departamento_id, municipio_fin_id, departamento_fin_id, direccion_fin, kilometro_inicio, kilometro_fin, empresa_contratante_id, empresa_contratista_id, empresa_supervisora, delegado_residente_id, fecha_adjudicacion, fecha_inicio_contractual, numero_escritura_publica, monto_original, plazo_ejecucion_original, plazo_ejecucion_ampliado, fecha_finalizacion_real, monto_final, tipo_obra')
       .eq('proyecto_id', proyectoId)
       .maybeSingle(),
   ])
@@ -461,6 +483,20 @@ export async function obtenerProyectoPorId(proyectoId: string) {
   if (proyectoRes.error || !proyectoRes.data) throw new Error('Proyecto no encontrado')
   const proyecto = proyectoRes.data
   const detalle: any = detalleRes.data || {}
+  const [departamentoInicioRes, municipioInicioRes, departamentoFinRes, municipioFinRes] = await Promise.all([
+    detalle.departamento_id
+      ? clienteSupabase.from('departamento').select('nombre').eq('id', detalle.departamento_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    detalle.municipio_id
+      ? clienteSupabase.from('municipio').select('nombre').eq('id', detalle.municipio_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    detalle.departamento_fin_id
+      ? clienteSupabase.from('departamento').select('nombre').eq('id', detalle.departamento_fin_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    detalle.municipio_fin_id
+      ? clienteSupabase.from('municipio').select('nombre').eq('id', detalle.municipio_fin_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ])
 
   function extraerCodigoRenglon(desc?: string, codExplicit?: string | null): string | null {
     if (codExplicit) return codExplicit
@@ -474,6 +510,7 @@ export async function obtenerProyectoPorId(proyectoId: string) {
     paramRes,
     renglonesRes,
     contratosRes,
+    documentosRes,
     entidadContratanteNombre,
     empresaContratistaNombre,
     delegadoResidenteNombre,
@@ -512,6 +549,12 @@ export async function obtenerProyectoPorId(proyectoId: string) {
       .from('proyecto_contrato')
       .select('*')
       .eq('proyecto_id', proyectoId),
+
+    clienteSupabase
+      .from('documento_proyecto')
+      .select('id, nombre, tipo, url_storage, version, fecha_subida, subido_por, categoria, origen, usuario:subido_por(correo, dato_usuario(primer_nombre, primer_apellido))')
+      .eq('proyecto_id', proyectoId)
+      .order('fecha_subida', { ascending: false }),
 
     (async () => {
       if (!detalle.empresa_contratante_id) return ''
@@ -582,11 +625,33 @@ export async function obtenerProyectoPorId(proyectoId: string) {
       capituloId: capId,
       capituloNombre: `Capítulo ${capId}`,
       cantidadContratada: Number(r.cantidad_contractual) || 0,
+      cantidadContractual: Number(r.cantidad_contractual) || 0,
       cantidadAjustada: Number(r.cantidad_ajustada) || 0,
+      cantidadEjecutada: Number(r.cantidad_ejecutada) || 0,
       costoUnitarioDirecto: Number(r.precio_unitario_directo) || 0,
       seleccionado: true,
     }
   })
+
+  let montoPlanificadoTotal = 0
+  let montoEjecutadoPonderado = 0
+  let montoEjecutadoReal = 0
+  let renglonesConAvance = 0
+
+  for (const r of mappedRenglones) {
+    const meta = r.cantidadAjustada > 0 ? r.cantidadAjustada : r.cantidadContractual
+    const ejec = Math.max(0, r.cantidadEjecutada || 0)
+    const pu = r.costoUnitarioDirecto || 0
+    const montoMeta = meta * pu
+    montoPlanificadoTotal += montoMeta
+    montoEjecutadoReal += ejec * pu
+    montoEjecutadoPonderado += Math.min(meta, ejec) * pu
+    if (ejec > 0) renglonesConAvance++
+  }
+
+  const avanceFisicoCalculado = montoPlanificadoTotal > 0
+    ? Math.min(100, Math.round((montoEjecutadoPonderado / montoPlanificadoTotal) * 10000) / 100)
+    : 0
 
   const equipo = (equipoRes.data || []).map((row: any) => {
     const u = row.usuario
@@ -627,6 +692,7 @@ export async function obtenerProyectoPorId(proyectoId: string) {
     responsable: c.responsable,
     licitacionNumero: c.licitacion_numero,
     actaInicioNumero: c.acta_inicio_numero,
+    colegiadoActivoSuperintendente: c.colegiado_activo_superintendente,
     programa: c.programa,
     subprograma: c.subprograma,
     fuenteFinanciamiento: c.fuente_financiamiento,
@@ -644,6 +710,25 @@ export async function obtenerProyectoPorId(proyectoId: string) {
 
   const contratoEjecucion = contratos.find((c) => c.tipo === 'EJECUCION') || null
   const contratoSupervision = contratos.find((c) => c.tipo === 'SUPERVISION') || null
+  const documentos = (documentosRes.data || []).map((doc: any) => {
+    const u = doc.usuario
+    const dato = u?.dato_usuario
+    const nombreUsuario = dato
+      ? `${dato.primer_nombre || ''} ${dato.primer_apellido || ''}`.trim()
+      : (u?.correo || (typeof doc.subido_por === 'string' && !esUuidValido(doc.subido_por) ? doc.subido_por : ''))
+    return {
+      id: doc.id,
+      nombre: doc.nombre,
+      tipo: doc.tipo || 'otro',
+      tamanio: doc.tamanio || '',
+      fechaSubida: doc.fecha_subida || '',
+      subidoPor: nombreUsuario || 'Usuario Administrador',
+      subidoPorId: esUuidValido(doc.subido_por) || undefined,
+      url: doc.url_storage || '',
+      categoria: doc.categoria || 'Documentos Generales',
+      origen: doc.origen || 'modulo_documentos',
+    }
+  })
 
   const resultadoCompleto = {
     id: proyecto.id,
@@ -660,9 +745,13 @@ export async function obtenerProyectoPorId(proyectoId: string) {
       ? { lat: Number(detalle.latitud), lng: Number(detalle.longitud), puntoTexto: detalle.direccion ?? 'Punto de obra' }
       : undefined,
     municipioId: detalle.municipio_id,
+    municipioNombre: municipioInicioRes.data?.nombre || '',
     departamentoId: detalle.departamento_id,
+    departamentoNombre: departamentoInicioRes.data?.nombre || '',
     municipioFinId: detalle.municipio_fin_id,
+    municipioFinNombre: municipioFinRes.data?.nombre || '',
     departamentoFinId: detalle.departamento_fin_id,
+    departamentoFinNombre: departamentoFinRes.data?.nombre || '',
     direccionFin: detalle.direccion_fin ?? '',
     kilometroInicio: detalle.kilometro_inicio,
     kilometroFin: detalle.kilometro_fin,
@@ -701,13 +790,23 @@ export async function obtenerProyectoPorId(proyectoId: string) {
     parametroProyecto: paramRes.data || null,
     planTrabajo: mappedRenglones,
     renglones: mappedRenglones,
-    tieneSabana: mappedRenglones.length > 0,
-    usarModoSabana: mappedRenglones.length > 0,
-    modoGestionFinanciera: mappedRenglones.length > 0 ? 'sabana' : 'manual',
+    tipoObra: detalle.tipo_obra ? String(detalle.tipo_obra).toLowerCase().trim() : (mappedRenglones.length > 0 ? 'sabana' : 'manual'),
+    tipo_obra: detalle.tipo_obra ? String(detalle.tipo_obra).toLowerCase().trim() : (mappedRenglones.length > 0 ? 'sabana' : 'manual'),
+    tieneSabana: (detalle.tipo_obra ? String(detalle.tipo_obra).toLowerCase().trim() === 'sabana' : true) && mappedRenglones.length > 0,
+    usarModoSabana: detalle.tipo_obra ? String(detalle.tipo_obra).toLowerCase().trim() === 'sabana' : mappedRenglones.length > 0,
+    modoGestionFinanciera: detalle.tipo_obra ? String(detalle.tipo_obra).toLowerCase().trim() : (mappedRenglones.length > 0 ? 'sabana' : 'manual'),
     totalRenglones: mappedRenglones.length,
+    avance: avanceFisicoCalculado,
+    avanceFisico: avanceFisicoCalculado,
+    montoPlanificado: montoPlanificadoTotal,
+    montoEjecutado: montoEjecutadoReal,
+    montoPlanificadoTotal,
+    montoEjecutadoTotal: montoEjecutadoReal,
+    renglonesConAvance,
     contratoEjecucion,
     contratoSupervision,
     contratos,
+    documentos,
     licitacionEjecutora: contratoEjecucion?.licitacionNumero || null,
     propietarioContratista: contratoEjecucion?.propietario || null,
     registroMercantilContratista: contratoEjecucion?.registroMercantil || null,
@@ -715,6 +814,7 @@ export async function obtenerProyectoPorId(proyectoId: string) {
     telefonoContratista: contratoEjecucion?.telefono || null,
     correoContratista: contratoEjecucion?.correo || null,
     superintendente: contratoEjecucion?.responsable || null,
+    colegiadoActivoSuperintendente: contratoEjecucion?.colegiadoActivoSuperintendente || null,
     actaInicioEjecutora: contratoEjecucion?.actaInicioNumero || null,
     programaObra: contratoEjecucion?.programa || null,
     subprogramaObra: contratoEjecucion?.subprograma || null,
@@ -796,7 +896,7 @@ export async function obtenerProyectos() {
         fecha_inicio,
         fecha_fin_estimada,
         estado_id,
-        renglon_trabajo ( id ),
+        renglon_trabajo ( id, cantidad_contractual, cantidad_ajustada, cantidad_ejecutada, precio_unitario_directo ),
         bitacora_entrada ( id ),
         bitacora_avance ( id ),
         bitacora_pendiente ( id ),
@@ -821,7 +921,8 @@ export async function obtenerProyectos() {
           delegado_residente_id,
           fecha_adjudicacion,
           fecha_inicio_contractual,
-          fecha_finalizacion_real
+          fecha_finalizacion_real,
+          tipo_obra
         )
       `)
       .order('created_at', { ascending: false }),
@@ -879,7 +980,14 @@ export async function obtenerProyectos() {
     }
   }
 
-  const resultado = (proyectosRes.data || []).map((p: any) => {
+  const idsVistos = new Set<string>()
+  const filasUnicas = (proyectosRes.data || []).filter((p: any) => {
+    if (!p?.id || idsVistos.has(p.id)) return false
+    idsVistos.add(p.id)
+    return true
+  })
+
+  const resultado = filasUnicas.map((p: any) => {
     const d = Array.isArray(p.proyecto_detalle) ? p.proyecto_detalle[0] : p.proyecto_detalle || {}
     const fInicio = d.fecha_inicio_contractual || p.fecha_inicio || d.fecha_adjudicacion || ''
     const plazoNum = d.plazo_ejecucion_original || d.plazo_ejecucion_ampliado || null
@@ -895,20 +1003,39 @@ export async function obtenerProyectos() {
     const estadoCod = p.estado_id ? (estadoMapa.get(p.estado_id) || 'borrador') : 'borrador'
     const delegadoNombre = d.delegado_residente_id ? (delegadoMapa.get(d.delegado_residente_id) || '') : ''
     const ubicacionCalc = d.tramo || d.direccion || (d.departamento?.nombre ? (d.municipio?.nombre ? `${d.departamento.nombre}, ${d.municipio.nombre}` : d.departamento.nombre) : '') || p.ubicacion || ''
-    const tieneSabana = Array.isArray(p.renglon_trabajo) && p.renglon_trabajo.length > 0
     const totalRenglones = Array.isArray(p.renglon_trabajo) ? p.renglon_trabajo.length : 0
+    const tipoObraD = d.tipo_obra ? String(d.tipo_obra).toLowerCase().trim() : null
+    const modoGestionFinanciera = tipoObraD ? tipoObraD : (totalRenglones > 0 ? 'sabana' : 'manual')
+    const tieneSabana = modoGestionFinanciera === 'sabana' && totalRenglones > 0
+
+    let totalMontoPlanificado = 0
+    let totalMontoEjecutadoPonderado = 0
+    let totalMontoEjecutadoReal = 0
+    let totalRenglonesConAvance = 0
+    const renglonesList = Array.isArray(p.renglon_trabajo) ? p.renglon_trabajo : []
+    for (const r of renglonesList) {
+      const meta = Number(r.cantidad_ajustada) > 0 ? Number(r.cantidad_ajustada) : (Number(r.cantidad_contractual) || 0)
+      const ejec = Math.max(0, Number(r.cantidad_ejecutada) || 0)
+      const pu = Number(r.precio_unitario_directo) || 0
+      const montoMeta = meta * pu
+      totalMontoPlanificado += montoMeta
+      totalMontoEjecutadoReal += ejec * pu
+      totalMontoEjecutadoPonderado += Math.min(meta, ejec) * pu
+      if (ejec > 0) totalRenglonesConAvance++
+    }
+    const avanceCalculado = totalMontoPlanificado > 0
+      ? Math.min(100, Math.round((totalMontoEjecutadoPonderado / totalMontoPlanificado) * 10000) / 100)
+      : 0
 
     const totalBitacoras =
       (Array.isArray(p.bitacora_entrada) ? p.bitacora_entrada.length : 0) +
       (Array.isArray(p.bitacora_avance) ? p.bitacora_avance.length : 0) +
       (Array.isArray(p.bitacora_pendiente) ? p.bitacora_pendiente.length : 0)
     const tieneBitacoras = totalBitacoras > 0
-    const esEliminable = estadoCod === 'borrador' && totalBitacoras === 0
+    const esEliminable = estadoCod === 'borrador'
     let motivoNoEliminable = ''
     if (estadoCod !== 'borrador') {
       motivoNoEliminable = `Solo proyectos en Borrador pueden eliminarse (estado actual: ${estadoCod})`
-    } else if (tieneBitacoras) {
-      motivoNoEliminable = `Tiene ${totalBitacoras} registro(s) de bitácora vinculado(s)`
     }
 
     return {
@@ -953,8 +1080,17 @@ export async function obtenerProyectos() {
       empresa_contratista_id: d.empresa_contratista_id || null,
       tieneSabana,
       usarModoSabana: tieneSabana,
-      modoGestionFinanciera: tieneSabana ? 'sabana' : 'manual',
+      modoGestionFinanciera,
+      tipoObra: modoGestionFinanciera,
+      tipo_obra: modoGestionFinanciera,
       totalRenglones,
+      avance: avanceCalculado,
+      avanceFisico: avanceCalculado,
+      montoPlanificado: totalMontoPlanificado,
+      montoEjecutado: totalMontoEjecutadoReal,
+      montoPlanificadoTotal: totalMontoPlanificado,
+      montoEjecutadoTotal: totalMontoEjecutadoReal,
+      renglonesConAvance: totalRenglonesConAvance,
       totalBitacoras,
       tieneBitacoras,
       esEliminable,
@@ -973,8 +1109,49 @@ export async function crearProyecto(datosFormulario: any) {
   }
 
   const estadoCodigo = (datosFormulario.estado || 'borrador').toLowerCase()
-  const fechaInicio = datosFormulario.fechaInicioContractual || datosFormulario.fechaInicio || null
-  const fechaFinEstimada = datosFormulario.fechaFinContractualPlan || datosFormulario.fechaFin || null
+
+  // Protección contra duplicados accidentales (doble-click / peticiones concurrentes)
+  const codigoBuscado = datosFormulario.codigo ? String(datosFormulario.codigo).trim() : null
+  if (codigoBuscado) {
+    const { data: proyPorCodigo } = await clienteSupabase
+      .from('proyecto')
+      .select('id')
+      .eq('codigo', codigoBuscado)
+      .maybeSingle()
+    if (proyPorCodigo?.id) {
+      console.warn(`[Anti-Duplicidad] Proyecto con código "${codigoBuscado}" ya existe. Retornando ID existente: ${proyPorCodigo.id}`)
+      return proyPorCodigo.id
+    }
+  }
+
+  if (!codigoBuscado?.startsWith('TEST-') && !codigoBuscado?.startsWith('DOM-VIAL-FULL-') && !codigoBuscado?.startsWith('PROY-BIT-TEST-')) {
+    const { data: reciente } = await clienteSupabase
+      .from('proyecto')
+      .select('id, created_at')
+      .ilike('nombre', nombreFinal)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (reciente && reciente.created_at) {
+      const segundos = (Date.now() - new Date(reciente.created_at).getTime()) / 1000
+      if (segundos < 15) {
+        console.warn(`[Anti-Duplicidad] Petición duplicada detectada para "${nombreFinal}" creada hace ${Math.round(segundos)}s. Retornando ID: ${reciente.id}`)
+        return reciente.id
+      }
+    }
+  }
+
+  const fechaInicio = datosFormulario.fechaInicioContractual || datosFormulario.fechaInicio || new Date().toISOString().split('T')[0]
+  const fechaFinEstimada =
+    datosFormulario.fechaFinContractualPlan ||
+    datosFormulario.fechaFin ||
+    datosFormulario.fechaFinEstimada ||
+    (() => {
+      const f = new Date(fechaInicio)
+      f.setFullYear(f.getFullYear() + 1)
+      return f.toISOString().split('T')[0]
+    })()
 
   const contratoEjec = datosFormulario.contratoEjecucion || {}
   const contratoSup = datosFormulario.contratoSupervision || {}
@@ -1085,6 +1262,7 @@ export async function crearProyecto(datosFormulario: any) {
       plazo_ejecucion_original: datosFormulario.plazoEjecucionOriginal ? parseInt(datosFormulario.plazoEjecucionOriginal, 10) : null,
       plazo_ejecucion_ampliado: datosFormulario.plazoEjecucionRealAmpliado ? parseInt(datosFormulario.plazoEjecucionRealAmpliado, 10) : null,
       fecha_finalizacion_real: datosFormulario.fechaFinalizacionReal || null,
+      tipo_obra: datosFormulario.modoGestionFinanciera || datosFormulario.tipoObra || datosFormulario.tipo_obra || (datosFormulario.usarModoSabana === false ? 'manual' : 'sabana') || 'sabana',
     }),
     usuariosAInsertar.length > 0
       ? clienteSupabase.from('proyecto_usuario').insert(usuariosAInsertar)
@@ -1107,6 +1285,7 @@ export async function crearProyecto(datosFormulario: any) {
   }
   if (equipoRes.error) console.error('EQUIPO ERROR:', equipoRes.error)
   if (paramRes.error) console.error('PARAMETRO_PROYECTO AUTO-INSERT ERROR:', paramRes.error)
+  await guardarDocumentosProyecto(proyecto.id, datosFormulario, true)
 
   invalidarCacheProyectos()
 
@@ -1189,8 +1368,9 @@ export async function actualizarProyecto(proyectoId: string, datosFormulario: Re
       }
     )
   }
-  if ('delegadoResidenteId' in datosFormulario) {
-    const val = esUuidValido(datosFormulario.delegadoResidenteId)
+  if ('delegadoResidenteId' in datosFormulario || 'delegadoResidente' in datosFormulario) {
+    const rawVal = datosFormulario.delegadoResidenteId || datosFormulario.delegadoResidente
+    const val = esUuidValido(rawVal) || await resolverUsuarioIdPorNombre(rawVal)
     if (val) detalleUpdates.delegado_residente_id = val
   }
   if ('fechaAdjudicacion' in datosFormulario && datosFormulario.fechaAdjudicacion) {
@@ -1253,6 +1433,16 @@ export async function actualizarProyecto(proyectoId: string, datosFormulario: Re
   if ('montoFinancieroFinalEjecutado' in datosFormulario || 'montoFinal' in datosFormulario) {
     detalleUpdates.monto_final = datosFormulario.montoFinancieroFinalEjecutado || datosFormulario.montoFinal || null
   }
+  if ('tipoObra' in datosFormulario || 'tipo_obra' in datosFormulario || 'modoGestionFinanciera' in datosFormulario || 'usarModoSabana' in datosFormulario) {
+    const rawTipo = datosFormulario.modoGestionFinanciera || datosFormulario.tipoObra || datosFormulario.tipo_obra
+    if (rawTipo) {
+      detalleUpdates.tipo_obra = String(rawTipo).toLowerCase().trim()
+    } else if (datosFormulario.usarModoSabana === false) {
+      detalleUpdates.tipo_obra = 'manual'
+    } else if (datosFormulario.usarModoSabana === true) {
+      detalleUpdates.tipo_obra = 'sabana'
+    }
+  }
 
   if (Object.keys(proyectoUpdates).length > 0) {
     const { error } = await clienteSupabase.from('proyecto').update(proyectoUpdates).eq('id', proyectoId)
@@ -1282,10 +1472,65 @@ export async function actualizarProyecto(proyectoId: string, datosFormulario: Re
   await Promise.all([
     guardarContratosProyecto(proyectoId, datosFormulario, false),
     guardarRenglonesProyecto(proyectoId, datosFormulario, false),
+    guardarDocumentosProyecto(proyectoId, datosFormulario, false),
   ])
   invalidarCacheProyectos(proyectoId)
 
   return { id: proyectoId }
+}
+
+async function guardarDocumentosProyecto(proyectoId: string, datosFormulario: any, esNuevoProyecto = false) {
+  if (!('documentos' in datosFormulario)) return
+  if (!Array.isArray(datosFormulario?.documentos)) return
+
+  // En actualizaciones de proyecto, verificar si es una sincronización explícita de documentos
+  // o si es una actualización de otra sección (resumen, contratos, etc.)
+  const keys = Object.keys(datosFormulario)
+  const esActualizacionGeneral = keys.some((k) =>
+    k === 'nombre' || k === 'nombreOficial' || k === 'descripcion' || k === 'entidadContratante' ||
+    k === 'empresaContratista' || k === 'empresaSupervisora' || k === 'contratos' || k === 'contratoEjecucion' ||
+    k === 'contratoSupervision' || k === 'delegadoResidente'
+  )
+  const esSincronizacionExplicita = Boolean(datosFormulario._actualizarDocumentos || datosFormulario.actualizarDocumentos)
+  const soloVienenDocumentos = keys.length <= 2 && 'documentos' in datosFormulario
+
+  if (!esNuevoProyecto && esActualizacionGeneral && !esSincronizacionExplicita && !soloVienenDocumentos) {
+    if (datosFormulario.documentos.length === 0) {
+      // No borrar documentos existentes durante la edición de texto de otras secciones
+      return
+    }
+  }
+
+  const documentos = datosFormulario.documentos
+    .filter((doc: any) => doc?.nombre && (doc?.url || doc?.url_storage))
+    .map((doc: any) => ({
+      proyecto_id: proyectoId,
+      nombre: String(doc.nombre).slice(0, 255),
+      tipo: doc.tipo || 'otro',
+      url_storage: doc.url || doc.url_storage,
+      version: doc.version || '1.0',
+      fecha_subida: doc.fechaSubida || doc.fecha_subida || new Date().toISOString(),
+      subido_por: esUuidValido(doc.subidoPorId || doc.subido_por_id || doc.subidoPor || doc.subido_por) || null,
+      categoria: doc.categoria || 'Documentos Generales',
+      origen: doc.origen || 'modulo_documentos',
+    }))
+
+  const { error: deleteError } = await clienteSupabase
+    .from('documento_proyecto')
+    .delete()
+    .eq('proyecto_id', proyectoId)
+  if (deleteError) {
+    throw new Error(`No se pudieron reemplazar los documentos del proyecto: ${deleteError.message}`)
+  }
+
+  if (documentos.length > 0) {
+    const { error: insertError } = await clienteSupabase
+      .from('documento_proyecto')
+      .insert(documentos)
+    if (insertError) {
+      throw new Error(`No se pudieron guardar los documentos del proyecto: ${insertError.message}`)
+    }
+  }
 }
 
 async function guardarContratosProyecto(proyectoId: string, datosFormulario: any, esNuevoProyecto = false) {
@@ -1331,66 +1576,104 @@ async function guardarContratosProyecto(proyectoId: string, datosFormulario: any
         proyecto_id: proyectoId,
         tipo: c.tipo,
         empresa_nombre: c.empresaNombre || c.empresa_nombre || (esEjec ? datosFormulario.empresaContratista : datosFormulario.empresaSupervisora) || null,
-        propietario: c.propietario || (esEjec ? datosFormulario.propietarioContratista : datosFormulario.propietarioSupervisora) || null,
-        registro_mercantil: c.registroMercantil || c.registro_mercantil || (esEjec ? datosFormulario.registroMercantilContratista : datosFormulario.registroMercantilSupervisora) || null,
-        direccion: c.direccion || (esEjec ? datosFormulario.direccionContratista : datosFormulario.direccionSupervisora) || null,
-        telefono: c.telefono || (esEjec ? datosFormulario.telefonoContratista : datosFormulario.telefonoSupervisora) || null,
-        correo: c.correo || (esEjec ? datosFormulario.correoContratista : datosFormulario.correoSupervisora) || null,
-        responsable: c.responsable || (esEjec ? (datosFormulario.superintendente || datosFormulario.responsableNombre) : (datosFormulario.delegadoResidente || datosFormulario.responsableSupervisora)) || null,
-        licitacion_numero: c.licitacionNumero || c.licitacion_numero || (esEjec ? datosFormulario.licitacionEjecutora : datosFormulario.licitacionSupervisora) || null,
-        acta_inicio_numero: c.actaInicioNumero || c.acta_inicio_numero || (esEjec ? datosFormulario.actaInicioEjecutora : datosFormulario.actaInicioSupervisora) || null,
-        programa: c.programa || (esEjec ? datosFormulario.programaObra : datosFormulario.programaSupervisora) || null,
-        subprograma: c.subprograma || (esEjec ? datosFormulario.subprogramaObra : datosFormulario.subprogramaSupervisora) || null,
-        fuente_financiamiento: c.fuenteFinanciamiento || c.fuente_financiamiento || (esEjec ? datosFormulario.fuenteFinanciamientoObra : datosFormulario.fuenteFinanciamientoSupervisora) || null,
-        partida_fondos: c.partidaFondos || c.partida_fondos || (esEjec ? datosFormulario.partidaFondosObra : datosFormulario.partidaFondosSupervisora) || null,
-        cdp: c.cdp || (esEjec ? datosFormulario.cdpObra : datosFormulario.cdpSupervisora) || null,
-        contrato_numero: c.contratoNumero || c.contrato_numero || (esEjec ? datosFormulario.numeroContratoOriginal : datosFormulario.contratoSupervisora) || null,
-        acuerdo_ministerial: c.acuerdoMinisterial || c.acuerdo_ministerial || (esEjec ? datosFormulario.acuerdoMinisterialOriginal : datosFormulario.acuerdoSupervisora) || null,
-        monto_original: Number(c.montoOriginal || c.monto_original || (esEjec ? (datosFormulario.montoContractualOriginal || datosFormulario.presupuesto) : datosFormulario.supervisoraMontoOriginal)) || 0,
-        porcentaje_anticipo: Number(c.porcentajeAnticipo || c.porcentaje_anticipo || (esEjec ? datosFormulario.porcentajeAnticipoObra : datosFormulario.porcentajeAnticipoSupervision)) || 0,
-        monto_anticipo: Number(c.montoAnticipo || c.monto_anticipo || (esEjec ? datosFormulario.montoAnticipoObra : datosFormulario.montoAnticipoSupervision)) || 0,
-        fecha_inicio: c.fechaInicio || c.fecha_inicio || (esEjec ? (datosFormulario.fechaInicioContractual || datosFormulario.fechaInicio) : datosFormulario.fechaInicioSupervisora) || null,
-        plazo_meses_detalle: c.plazoMesesDetalle || c.plazo_meses_detalle || (esEjec ? datosFormulario.mesesContratadosObra : datosFormulario.mesesContratadosSupervisora) || null,
-        fecha_fin: c.fechaFin || c.fecha_fin || (esEjec ? (datosFormulario.fechaFinContractualPlan || datosFormulario.fechaFin || datosFormulario.fechaTerminacionOriginalObra) : datosFormulario.fechaFinSupervisora) || null,
+        propietario: c.propietario || (esEjec ? datosFormulario.propietarioContratista : (datosFormulario.propietarioSupervisora || datosFormulario.supervisoraPropietario)) || null,
+        registro_mercantil: c.registroMercantil || c.registro_mercantil || (esEjec ? (datosFormulario.registroMercantilContratista || datosFormulario.contratistaRegistroMercantil) : (datosFormulario.registroMercantilSupervisora || datosFormulario.supervisoraRegistroMercantil)) || null,
+        direccion: c.direccion || (esEjec ? (datosFormulario.direccionContratista || datosFormulario.contratistaDireccion) : (datosFormulario.direccionSupervisora || datosFormulario.supervisoraDireccion)) || null,
+        telefono: c.telefono || (esEjec ? (datosFormulario.telefonoContratista || datosFormulario.contratistaTelefono) : (datosFormulario.telefonoSupervisora || datosFormulario.supervisoraTelefono)) || null,
+        correo: c.correo || (esEjec ? (datosFormulario.correoContratista || datosFormulario.contratistaCorreo) : (datosFormulario.correoSupervisora || datosFormulario.supervisoraCorreo)) || null,
+        responsable: c.responsable || (esEjec ? (datosFormulario.superintendente || datosFormulario.responsableNombre) : (datosFormulario.delegadoResidente || datosFormulario.responsableSupervisora || datosFormulario.supervisoraResponsable)) || null,
+        colegiado_activo_superintendente: esEjec
+          ? (c.colegiadoActivoSuperintendente || c.colegiado_activo_superintendente || datosFormulario.colegiadoActivoSuperintendente || datosFormulario.colegiadoSuperintendente || datosFormulario.contratistaColegiadoActivo || null)
+          : null,
+        licitacion_numero: c.licitacionNumero || c.licitacion_numero || (esEjec ? (datosFormulario.licitacionEjecutora || datosFormulario.contratistaLicitacion) : (datosFormulario.licitacionSupervisora || datosFormulario.supervisoraLicitacion)) || null,
+        acta_inicio_numero: c.actaInicioNumero || c.acta_inicio_numero || (esEjec ? (datosFormulario.actaInicioEjecutora || datosFormulario.actaEjecFinal) : (datosFormulario.actaInicioSupervisora || datosFormulario.actaSupFinal)) || null,
+        programa: c.programa || (esEjec ? (datosFormulario.programaObra || datosFormulario.contratistaPrograma) : (datosFormulario.programaSupervisora || datosFormulario.supervisoraPrograma)) || null,
+        subprograma: c.subprograma || (esEjec ? (datosFormulario.subprogramaObra || datosFormulario.contratistaSubprograma) : (datosFormulario.subprogramaSupervisora || datosFormulario.supervisoraSubprograma)) || null,
+        fuente_financiamiento: c.fuenteFinanciamiento || c.fuente_financiamiento || (esEjec ? (datosFormulario.fuenteFinanciamientoObra || datosFormulario.contratistaFuenteFinanciamiento) : (datosFormulario.fuenteFinanciamientoSupervisora || datosFormulario.supervisoraFuenteFinanciamiento)) || null,
+        partida_fondos: c.partidaFondos || c.partida_fondos || (esEjec ? (datosFormulario.partidaFondosObra || datosFormulario.contratistaPartidaFondos) : (datosFormulario.partidaFondosSupervisora || datosFormulario.supervisoraPartidaFondos)) || null,
+        cdp: c.cdp || (esEjec ? (datosFormulario.cdpObra || datosFormulario.contratistaCdp) : (datosFormulario.cdpSupervisora || datosFormulario.supervisoraCdp)) || null,
+        contrato_numero: c.contratoNumero || c.contrato_numero || (esEjec ? (datosFormulario.numeroContratoOriginal || datosFormulario.contratistaContratoNumero) : (datosFormulario.contratoSupervisora || datosFormulario.supervisoraContratoNumero)) || null,
+        acuerdo_ministerial: c.acuerdoMinisterial || c.acuerdo_ministerial || (esEjec ? (datosFormulario.acuerdoMinisterialOriginal || datosFormulario.contratistaAcuerdoMinisterial) : (datosFormulario.acuerdoSupervisora || datosFormulario.supervisoraAcuerdoMinisterial)) || null,
+        monto_original: Number(c.montoOriginal || c.monto_original || (esEjec ? (datosFormulario.montoContractualOriginal || datosFormulario.presupuesto) : (datosFormulario.supervisoraMontoOriginal || datosFormulario.montoSupervisionOriginal))) || 0,
+        porcentaje_anticipo: Number(c.porcentajeAnticipo || c.porcentaje_anticipo || (esEjec ? (datosFormulario.porcentajeAnticipoObra || datosFormulario.contratistaPorcentajeAnticipo) : (datosFormulario.porcentajeAnticipoSupervision || datosFormulario.supervisoraPorcentajeAnticipo))) || 0,
+        monto_anticipo: Number(c.montoAnticipo || c.monto_anticipo || (esEjec ? (datosFormulario.montoAnticipoObra || datosFormulario.contratistaMontoAnticipoCalculado) : (datosFormulario.montoAnticipoSupervision || datosFormulario.supervisoraMontoAnticipoCalculado))) || 0,
+        fecha_inicio: c.fechaInicio || c.fecha_inicio || (esEjec ? (datosFormulario.fechaInicioContractual || datosFormulario.fechaInicio) : (datosFormulario.fechaInicioSupervisora || datosFormulario.supervisoraFechaInicio)) || null,
+        plazo_meses_detalle: c.plazoMesesDetalle || c.plazo_meses_detalle || (esEjec ? (datosFormulario.mesesContratadosObra || datosFormulario.contratistaMesesPlazo) : (datosFormulario.mesesContratadosSupervisora || datosFormulario.supervisoraMesesPlazo)) || null,
+        fecha_fin: c.fechaFin || c.fecha_fin || (esEjec ? (datosFormulario.fechaFinContractualPlan || datosFormulario.fechaFin || datosFormulario.fechaTerminacionOriginalObra) : (datosFormulario.fechaFinSupervisora || datosFormulario.supervisoraFechaFin)) || null,
         updated_at: new Date().toISOString(),
       }
     })
 
     if (esNuevoProyecto) {
-      await clienteSupabase.from('proyecto_contrato').insert(rows)
+      const { error } = await clienteSupabase.from('proyecto_contrato').insert(rows)
+      if (error) throw error
       return
     }
 
-    const { data: existentes } = await clienteSupabase
+    const { data: existentes, error: existentesError } = await clienteSupabase
       .from('proyecto_contrato')
-      .select('id, tipo')
+      .select('*')
       .eq('proyecto_id', proyectoId)
+    if (existentesError) throw existentesError
 
-    const mapaExistentes = new Map<string, string>()
+    const mapaExistentes = new Map<string, any>()
     for (const ex of existentes || []) {
-      mapaExistentes.set(ex.tipo, ex.id)
+      mapaExistentes.set(ex.tipo, ex)
     }
 
     const aInsertar: any[] = []
     const promesasUpdate: Promise<any>[] = []
 
     for (const row of rows) {
-      const exId = mapaExistentes.get(row.tipo)
-      if (exId) {
-        promesasUpdate.push(clienteSupabase.from('proyecto_contrato').update(row).eq('id', exId) as any)
+      const ex = mapaExistentes.get(row.tipo)
+      if (ex) {
+        // Preservar valores de columnas existentes si en este update vienen nulos o indefinidos
+        const mergedRow: any = { updated_at: new Date().toISOString() }
+        for (const [key, val] of Object.entries(row)) {
+          if (key === 'id' || key === 'created_at') continue
+          if (val !== null && val !== undefined && val !== '') {
+            mergedRow[key] = val
+          } else if (ex[key] !== null && ex[key] !== undefined && ex[key] !== '') {
+            mergedRow[key] = ex[key]
+          } else {
+            mergedRow[key] = null
+          }
+        }
+
+        promesasUpdate.push(
+          Promise.resolve(
+            clienteSupabase
+            .from('proyecto_contrato')
+            .update(mergedRow)
+            .eq('id', ex.id)
+            .then(({ error }) => {
+              if (error) throw error
+            })
+          )
+        )
       } else {
         aInsertar.push(row)
       }
     }
 
     if (aInsertar.length > 0) {
-      promesasUpdate.push(clienteSupabase.from('proyecto_contrato').insert(aInsertar) as any)
+      promesasUpdate.push(
+        Promise.resolve(
+          clienteSupabase
+          .from('proyecto_contrato')
+          .insert(aInsertar)
+          .then(({ error }) => {
+            if (error) throw error
+          })
+        )
+      )
     }
     if (promesasUpdate.length > 0) {
       await Promise.all(promesasUpdate)
     }
   } catch (err) {
     console.error('Error en guardarContratosProyecto:', err)
+    throw err
   }
 }
 
@@ -1399,8 +1682,19 @@ async function guardarRenglonesProyecto(proyectoId: string, datosFormulario: any
   if (!Array.isArray(listaRenglones) || listaRenglones.length === 0) return
 
   try {
-    // 1. Eliminar renglones anteriores del proyecto solo cuando es actualización
+    // 1. Respaldar cantidades ejecutadas y eliminar renglones anteriores del proyecto solo cuando es actualización
+    const mapaEjecutadas = new Map<string, number>()
     if (!esNuevoProyecto) {
+      const { data: existingRows } = await clienteSupabase
+        .from('renglon_trabajo')
+        .select('codigo, descripcion, cantidad_ejecutada')
+        .eq('proyecto_id', proyectoId)
+      if (Array.isArray(existingRows)) {
+        for (const ex of existingRows) {
+          if (ex.codigo) mapaEjecutadas.set(String(ex.codigo).trim().toLowerCase(), Number(ex.cantidad_ejecutada) || 0)
+          if (ex.descripcion) mapaEjecutadas.set(String(ex.descripcion).trim().toLowerCase(), Number(ex.cantidad_ejecutada) || 0)
+        }
+      }
       await clienteSupabase.from('renglon_trabajo').delete().eq('proyecto_id', proyectoId)
     }
 
@@ -1417,23 +1711,46 @@ async function guardarRenglonesProyecto(proyectoId: string, datosFormulario: any
       }
     }
 
+    // Resolver mapa de capítulos (capitulo_sabana) para vincular capitulo_id (UUID)
+    const { data: listaCaps } = await clienteSupabase.from('capitulo_sabana').select('id, numero_capitulo')
+    const mapCaps = new Map<number, string>()
+    if (Array.isArray(listaCaps)) {
+      for (const c of listaCaps) {
+        if (c.id && c.numero_capitulo != null) {
+          mapCaps.set(Number(c.numero_capitulo), c.id)
+        }
+      }
+    }
+
     // 2. Preparar registros para inserción
     const construirFilas = (forzarPrecioCero: boolean) =>
       listaRenglones.map((r: any) => {
         const cod = r.codigoDGC || r.codigo || r.id || '101.01'
         const desc = r.descripcion || r.desc || r.nombre || 'Renglón de trabajo'
-        const capId = Number(r.capituloId || r.capitulo_id || 1)
+        const capRaw = r.capituloId || r.capitulo_id || 1
+        const resolvedCapId = (typeof capRaw === 'string' && esUuidValido(capRaw))
+          ? capRaw
+          : mapCaps.get(Number(capRaw)) || (Array.isArray(listaCaps) && listaCaps[0]?.id ? listaCaps[0].id : null)
+
         const unidadRaw = String(r.unidad_id || r.unidad || r.unidad_medida || '').trim()
-        const resolvedUnidadId = mapUnidades.get(unidadRaw.toLowerCase()) || (unidadRaw.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i) ? unidadRaw : null)
+        const resolvedUnidadId = (typeof unidadRaw === 'string' && esUuidValido(unidadRaw))
+          ? unidadRaw
+          : mapUnidades.get(unidadRaw.toLowerCase()) || null
+
+        const ejecDirecta = r.cantidadEjecutada ?? r.cantidad_ejecutada ?? r.totalAFecha
+        const ejecPreservada = ejecDirecta != null
+          ? Number(ejecDirecta)
+          : (mapaEjecutadas.get(String(cod).trim().toLowerCase()) ?? mapaEjecutadas.get(String(desc).trim().toLowerCase()) ?? 0)
 
         return {
           proyecto_id: proyectoId,
           codigo: String(cod),
           descripcion: String(desc),
-          capitulo_id: isNaN(capId) ? 1 : capId,
+          capitulo_id: resolvedCapId,
           unidad_id: resolvedUnidadId,
           cantidad_contractual: Number(r.cantidadContratada ?? r.cantidadContractual ?? r.cantidad_contractual ?? 1),
           cantidad_ajustada: Number(r.cantidadAjustada ?? r.cantidadContratada ?? r.cantidad_ajustada ?? 1),
+          cantidad_ejecutada: Math.max(0, Number(ejecPreservada) || 0),
           precio_unitario_directo: forzarPrecioCero ? 0 : Number(r.costoUnitarioDirecto ?? r.precioUnitario ?? r.precio_unitario_directo ?? 0),
           aplica_indirectos: true,
           aplica_iva: true,
@@ -1445,10 +1762,9 @@ async function guardarRenglonesProyecto(proyectoId: string, datosFormulario: any
     if (aInsertar.length > 0) {
       const { error } = await clienteSupabase.from('renglon_trabajo').insert(aInsertar)
       if (error) {
-        if (error.code === 'P0001') {
-          await clienteSupabase.from('renglon_trabajo').insert(construirFilas(true))
-        } else {
-          console.error('Error al insertar renglones del proyecto:', error)
+        const { error: errRetry } = await clienteSupabase.from('renglon_trabajo').insert(construirFilas(true))
+        if (errRetry) {
+          console.error('Error al insertar renglones del proyecto con precio 0:', errRetry)
         }
       }
     }
@@ -1457,7 +1773,7 @@ async function guardarRenglonesProyecto(proyectoId: string, datosFormulario: any
   }
 }
 
-export async function eliminarProyecto(id: string) {
+export async function eliminarProyecto(id: string, forzar: boolean = false) {
   // 1. Obtener proyecto y estado
   const { data: proyecto, error: proyError } = await clienteSupabase
     .from('proyecto')
@@ -1476,45 +1792,66 @@ export async function eliminarProyecto(id: string) {
 
   // 2. Validar que esté en modo borrador
   const estadoCodigo = ((proyecto.catalogo_item as any)?.codigo || '').toLowerCase()
-  if (proyecto.estado_id && estadoCodigo && estadoCodigo !== 'borrador') {
+  if (!forzar && estadoCodigo !== 'borrador') {
     throw new ValidationError(
       `Solo se pueden eliminar proyectos en estado Borrador. El proyecto "${proyecto.nombre}" tiene estado "${estadoCodigo}".`,
       'estado'
     )
   }
 
-  // 3. Validar que no tenga ningún registro de bitácora vinculado
-  const [entradasRes, avancesRes, pendientesRes] = await Promise.all([
-    clienteSupabase.from('bitacora_entrada').select('id', { count: 'exact', head: true }).eq('proyecto_id', id),
-    clienteSupabase.from('bitacora_avance').select('id', { count: 'exact', head: true }).eq('proyecto_id', id),
-    clienteSupabase.from('bitacora_pendiente').select('id', { count: 'exact', head: true }).eq('proyecto_id', id),
+  // 3. Recopilar las claves indirectas antes de borrar sus registros padre.
+  const [entradasRes, pendientesRes, incidentesRes, renglonesRes] = await Promise.all([
+    clienteSupabase.from('bitacora_entrada').select('id').eq('proyecto_id', id),
+    clienteSupabase.from('bitacora_pendiente').select('id').eq('proyecto_id', id),
+    clienteSupabase.from('incidente_obra').select('id').eq('proyecto_id', id),
+    clienteSupabase.from('renglon_trabajo').select('id').eq('proyecto_id', id),
   ])
-
-  const totalBitacoras = (entradasRes.count || 0) + (avancesRes.count || 0) + (pendientesRes.count || 0)
-  if (totalBitacoras > 0) {
-    throw new ValidationError(
-      `No se puede eliminar el proyecto "${proyecto.nombre}" porque tiene ${totalBitacoras} registro(s) de bitácora vinculado(s).`,
-      'bitacora'
-    )
+  for (const result of [entradasRes, pendientesRes, incidentesRes, renglonesRes]) {
+    if (result.error) throw new Error(`No se pudieron consultar las dependencias del proyecto: ${result.error.message}`)
   }
 
-  // 4. Limpiar dependencias asociadas y eliminar proyecto
-  const { data: entradasIds } = await clienteSupabase.from('bitacora_entrada').select('id').eq('proyecto_id', id)
-  if (entradasIds && entradasIds.length > 0) {
-    const eIds = entradasIds.map((e) => e.id)
-    await clienteSupabase.from('evidencia_fotografica').delete().in('bitacora_entrada_id', eIds)
+  const entradaIds = (entradasRes.data || []).map((row) => row.id)
+  const pendienteIds = (pendientesRes.data || []).map((row) => row.id)
+  const incidenteIds = (incidentesRes.data || []).map((row) => row.id)
+  const renglonIds = (renglonesRes.data || []).map((row) => row.id)
+
+  const borrar = async (tabla: string, columna: string, valor: string | string[]) => {
+    const query = clienteSupabase.from(tabla).delete()
+    const result = Array.isArray(valor)
+      ? await query.in(columna, valor)
+      : await query.eq(columna, valor)
+    if (result.error) throw new Error(`No se pudo eliminar ${tabla}: ${result.error.message}`)
   }
-  await clienteSupabase.from('bitacora_pendiente').delete().eq('proyecto_id', id)
-  await clienteSupabase.from('bitacora_avance').delete().eq('proyecto_id', id)
-  await clienteSupabase.from('bitacora_entrada').delete().eq('proyecto_id', id)
-  await clienteSupabase.from('renglon_trabajo').delete().eq('proyecto_id', id)
-  await clienteSupabase.from('proyecto_detalle').delete().eq('proyecto_id', id)
-  await clienteSupabase.from('proyecto_usuario').delete().eq('proyecto_id', id)
-  await clienteSupabase.from('proyecto_contrato').delete().eq('proyecto_id', id)
-  await clienteSupabase.from('parametro_proyecto').delete().eq('proyecto_id', id)
-  await clienteSupabase.from('documento_proyecto').delete().eq('proyecto_id', id)
-  const { error } = await clienteSupabase.from('proyecto').delete().eq('id', id)
-  if (error) throw new Error(error.message)
+
+  // 4. Eliminar de hijos a padres para respetar las restricciones reales de FK.
+  if (entradaIds.length > 0) {
+    await borrar('evidencia_fotografica', 'bitacora_entrada_id', entradaIds)
+    await borrar('ensayo_laboratorio', 'bitacora_entrada_id', entradaIds)
+    await borrar('condicion_climatica', 'bitacora_entrada_id', entradaIds)
+    await borrar('estacion_kilometrica', 'bitacora_entrada_id', entradaIds)
+  }
+  if (incidenteIds.length > 0) await borrar('incidente_evidencia', 'incidente_id', incidenteIds)
+  if (pendienteIds.length > 0) await borrar('bitacora_pendiente_ajuste', 'bitacora_pendiente_id', pendienteIds)
+  if (renglonIds.length > 0) await borrar('modificativo_renglon', 'renglon_id', renglonIds)
+
+  await borrar('bitacora_avance', 'proyecto_id', id)
+  await borrar('bitacora_pendiente', 'proyecto_id', id)
+  await borrar('incidente_obra', 'proyecto_id', id)
+  await borrar('bitacora_entrada', 'proyecto_id', id)
+  await borrar('cronograma_planificado', 'proyecto_id', id)
+  await borrar('control_anticipo', 'proyecto_id', id)
+  await borrar('control_plazo', 'proyecto_id', id)
+  await borrar('suspension_plazo', 'proyecto_id', id)
+  await borrar('reporte', 'proyecto_id', id)
+  await borrar('auditoria_operativa', 'proyecto_id', id)
+  await borrar('renglon_trabajo', 'proyecto_id', id)
+  await borrar('fase_proyecto', 'proyecto_id', id)
+  await borrar('proyecto_detalle', 'proyecto_id', id)
+  await borrar('proyecto_usuario', 'proyecto_id', id)
+  await borrar('proyecto_contrato', 'proyecto_id', id)
+  await borrar('parametro_proyecto', 'proyecto_id', id)
+  await borrar('documento_proyecto', 'proyecto_id', id)
+  await borrar('proyecto', 'id', id)
   invalidarCacheProyectos()
   return true
 }
@@ -2021,6 +2358,3 @@ export async function registrarEstimacionBackend(params: {
     liquidacion: resLiq,
   };
 }
-
-
-

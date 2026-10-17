@@ -1,7 +1,33 @@
 import { clienteSupabase } from '@/configuracion/cliente-supabase'
 import { TablaConfig } from './mantenimiento.types'
 
+interface CacheMantenimientoEntry {
+  data: any;
+  timestamp: number;
+}
+
+const cacheMantenimiento = new Map<string, CacheMantenimientoEntry>();
+const TTL_CACHE_MANTENIMIENTO_MS = 60 * 1000; // 60 segundos de caché en memoria del backend
+
+export function invalidarCacheMantenimiento(nombreTabla?: string) {
+  if (nombreTabla) {
+    for (const key of cacheMantenimiento.keys()) {
+      if (key.startsWith(`${nombreTabla}:`)) {
+        cacheMantenimiento.delete(key);
+      }
+    }
+  } else {
+    cacheMantenimiento.clear();
+  }
+}
+
 export async function listarRegistros(config: TablaConfig, pagina: number, limite: number, busqueda?: string, columnaOrden?: string, direccionOrden: 'asc'|'desc' = 'asc', filtros: Record<string, any> = {}) {
+  const cacheKey = `${config.nombreTablaDb}:${pagina}:${limite}:${busqueda || ''}:${columnaOrden || ''}:${direccionOrden}:${JSON.stringify(filtros)}`;
+  const cached = cacheMantenimiento.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < TTL_CACHE_MANTENIMIENTO_MS) {
+    return cached.data;
+  }
+
   let query = clienteSupabase.from(config.nombreTablaDb).select(config.columnasVisibles, { count: 'exact' });
   
   // Validar filtros contra whitelist de menÃº
@@ -57,7 +83,7 @@ export async function listarRegistros(config: TablaConfig, pagina: number, limit
     }
   }
   
-  return { 
+  const resultado = { 
     data: enrichedData, 
     total: count || 0, 
     columnasVisibles: config.columnasVisibles, 
@@ -69,6 +95,8 @@ export async function listarRegistros(config: TablaConfig, pagina: number, limit
     mensajeBloqueo: config.mensajeBloqueo || null,
     descripcion: config.descripcion || null
   };
+  cacheMantenimiento.set(cacheKey, { data: resultado, timestamp: Date.now() });
+  return resultado;
 }
 
 export async function obtenerRegistro(config: TablaConfig, id: string) {
@@ -104,6 +132,10 @@ export async function crearRegistro(config: TablaConfig, payload: any, usuario_i
   }
   const { data, error } = await clienteSupabase.from(config.nombreTablaDb).insert([payload]).select().single();
   if (error) throw new Error(error.message);
+  invalidarCacheMantenimiento(config.nombreTablaDb);
+  if (config.nombreTablaDb === 'bitacora_avance') {
+    invalidarCacheMantenimiento('renglon_trabajo');
+  }
   return data;
 }
 
@@ -113,6 +145,10 @@ export async function actualizarRegistro(config: TablaConfig, id: string, payloa
   }
   const { data, error } = await clienteSupabase.from(config.nombreTablaDb).update(payload).eq('id', id).select().single();
   if (error) throw new Error(error.message);
+  invalidarCacheMantenimiento(config.nombreTablaDb);
+  if (config.nombreTablaDb === 'bitacora_avance') {
+    invalidarCacheMantenimiento('renglon_trabajo');
+  }
   return data;
 }
 
@@ -147,6 +183,10 @@ export async function eliminarRegistro(config: TablaConfig, id: string) {
 
   const { error } = await clienteSupabase.from(config.nombreTablaDb).delete().eq('id', id);
   if (error) throw new Error(error.message);
+  invalidarCacheMantenimiento(config.nombreTablaDb);
+  if (config.nombreTablaDb === 'bitacora_avance') {
+    invalidarCacheMantenimiento('renglon_trabajo');
+  }
   return true;
 }
 

@@ -3,6 +3,7 @@
 
 import React, { useMemo, useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import { ChevronLeft, Grid, List, Plus, Image as ImageIcon } from 'lucide-react'
 import { FOTOGRAFIAS_MOCK } from '@/data/fotografias.mock'
 import { PROYECTOS_MOCK } from '@/data/proyectos.mock'
@@ -10,8 +11,12 @@ import { FotografiaFiltros } from '@/components/modules/fotografias/FotografiaFi
 import { FotografiaGrid } from '@/components/modules/fotografias/FotografiaGrid'
 import { FotografiaFeed } from '@/components/modules/fotografias/FotografiaFeed'
 import { FotografiaLightbox } from '@/components/modules/fotografias/FotografiaLightbox'
-import { FotografiaFormulario } from '@/components/modules/fotografias/FotografiaFormulario'
+const FotografiaFormulario = dynamic(
+  () => import('@/components/modules/fotografias/FotografiaFormulario').then((mod) => mod.FotografiaFormulario),
+  { ssr: false }
+)
 import { apiGetDeduplicado } from '@/lib/api/cliente'
+import { esProyectoNoBorrador } from '@/lib/proyectos/estado'
 
 export default function FotografiasDetail() {
   const params = useParams()
@@ -42,10 +47,35 @@ export default function FotografiasDetail() {
     index: 0,
   })
 
+  // Hidratación instantánea desde caché de sesión
+  useEffect(() => {
+    if (!proyectoId) return
+    try {
+      const cachedFotos = sessionStorage.getItem(`domun_fotos_proy_${proyectoId}`)
+      if (cachedFotos) {
+        const parsed = JSON.parse(cachedFotos)
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setFotosCargadas(parsed)
+          setCargando(false)
+        }
+      }
+      const cachedProys = sessionStorage.getItem('domun_fotografias_cache') || sessionStorage.getItem('domun_proyectos_cache')
+      if (cachedProys) {
+        const proys = JSON.parse(cachedProys)
+        if (Array.isArray(proys)) {
+          const match = proys.find((p: any) => String(p.id) === String(proyectoId) || String(p.codigo) === String(proyectoId))
+          if (match) {
+            setProyectoApi(match)
+            setCargando(false)
+          }
+        }
+      }
+    } catch (_) {}
+  }, [proyectoId])
+
   useEffect(() => {
     let cancelado = false
     if (proyectoId) {
-      setCargando(true)
       Promise.allSettled([
         apiGetDeduplicado(`/proyectos/${proyectoId}`),
         apiGetDeduplicado('/mantenimiento/bitacora_entrada?limite=200'),
@@ -217,6 +247,9 @@ export default function FotografiasDetail() {
           }
 
           setFotosCargadas(fotosResult)
+          try {
+            sessionStorage.setItem(`domun_fotos_proy_${proyectoId}`, JSON.stringify(fotosResult))
+          } catch (_) {}
           setCargando(false)
         })
         .catch(() => {
@@ -311,13 +344,9 @@ export default function FotografiasDetail() {
 
   const listaProyectosCombo = useMemo(() => {
     const rawList = proyectosDisponibles.length > 0 ? proyectosDisponibles : PROYECTOS_MOCK
-    const list = rawList.filter((p: any) => {
-      const estadoNorm = (p.estado || p.estado_codigo || '').toLowerCase().trim()
-      return estadoNorm !== 'borrador'
-    })
+    const list = rawList.filter(esProyectoNoBorrador)
     if (proyectoApi && !list.some((p: any) => String(p.id).toLowerCase() === String(proyectoApi.id).toLowerCase())) {
-      const estadoApi = (proyectoApi.estado || proyectoApi.estado_codigo || '').toLowerCase().trim()
-      if (estadoApi !== 'borrador') {
+      if (esProyectoNoBorrador(proyectoApi)) {
         return [proyectoApi, ...list]
       }
     }

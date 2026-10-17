@@ -89,25 +89,43 @@ export default function ProyectoFiltros({
     }
   }, [modalFiltrosAbierto, setOcultarBottomNav])
 
-  const cargarUbicaciones = async () => {
-    if (locationsLoaded) return
+  useEffect(() => {
     try {
-      setLocationsLoaded(true)
+      const depCached = sessionStorage.getItem('domun_dep_cache')
+      const munCached = sessionStorage.getItem('domun_mun_cache')
+      if (depCached && munCached) {
+        setDepartamentos(JSON.parse(depCached))
+        setMunicipiosData(JSON.parse(munCached))
+        setLocationsLoaded(true)
+        return
+      }
+    } catch (_) {}
+    const timer = setTimeout(() => {
+      void cargarUbicaciones()
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [])
+
+  const cargarUbicaciones = async () => {
+    if (locationsLoaded && departamentos.length > 0) return
+    try {
       const [resDep, resMun] = await Promise.all([
         apiGetDeduplicado('/mantenimiento/departamento?limite=500'),
         apiGetDeduplicado('/mantenimiento/municipio?limite=500'),
       ])
-      if (resDep.data?.success) setDepartamentos(resDep.data.data)
-      if (resMun.data?.success) setMunicipiosData(resMun.data.data)
+      if (resDep.data?.success) {
+        setDepartamentos(resDep.data.data)
+        try { sessionStorage.setItem('domun_dep_cache', JSON.stringify(resDep.data.data)) } catch (_) {}
+      }
+      if (resMun.data?.success) {
+        setMunicipiosData(resMun.data.data)
+        try { sessionStorage.setItem('domun_mun_cache', JSON.stringify(resMun.data.data)) } catch (_) {}
+      }
+      setLocationsLoaded(true)
     } catch (error: any) {
       console.error('Error fetching locations:', error)
     }
   }
-
-  useEffect(() => {
-    // Cargar ubicaciones al montar o cuando se requieran
-    void cargarUbicaciones()
-  }, [])
 
   useEffect(() => {
     if (filtroDepa || modalFiltrosAbierto) {

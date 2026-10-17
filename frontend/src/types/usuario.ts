@@ -5,6 +5,8 @@ export type RolUsuario =
   | 'Laboratorista'
   | 'AuxiliarDeCampo'
   | 'Contratante'
+  | 'Topografo'
+  | 'Supervisor'
 
 export type EstadoUsuario = 'Activo' | 'Inactivo' | 'Suspendido'
 

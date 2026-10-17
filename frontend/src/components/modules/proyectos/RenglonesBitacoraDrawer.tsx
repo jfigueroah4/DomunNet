@@ -26,6 +26,9 @@ export interface RenglonItem {
   capituloId?: number
   capituloNombre?: string
   cantidadContratada?: number
+  cantidadContractual?: number
+  cantidadAjustada?: number
+  cantidadEjecutada?: number
   costoUnitarioDirecto?: number
   esPersonalizado?: boolean
   seleccionado?: boolean

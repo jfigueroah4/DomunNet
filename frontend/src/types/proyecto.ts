@@ -59,6 +59,7 @@ export interface ProyectoContrato {
   telefono?: string
   correo?: string
   responsable?: string
+  colegiadoActivoSuperintendente?: string
   licitacionNumero?: string
   actaInicioNumero?: string
   programa?: string

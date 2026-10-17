@@ -81,4 +81,26 @@ describe('Módulo Autenticación: Servicio', () => {
   it('esCorreo - solo @', () => {
     expect(esCorreo('@')).toBe(true)
   })
+
+  it('detectarNombreDispositivo - detecta navegadores y sistemas operativos', async () => {
+    const { detectarNombreDispositivo } = await import('./autenticacion.servicio')
+    expect(detectarNombreDispositivo('Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36')).toBe('Windows PC (Chrome)')
+    expect(detectarNombreDispositivo('Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 Safari/604.1')).toBe('iPhone (Safari)')
+    expect(detectarNombreDispositivo('Mozilla/5.0 (Linux; Android 13; SM-S908B) Chrome/120.0.0.0 Mobile Safari/537.36')).toBe('Android (Chrome)')
+    expect(detectarNombreDispositivo('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Safari/605.1.15')).toBe('Mac (Safari)')
+    expect(detectarNombreDispositivo('')).toBe('Dispositivo Desconocido')
+  })
+
+  it('LimiteDispositivosError - almacena lista de dispositivos activos correctamente', async () => {
+    const { LimiteDispositivosError } = await import('./autenticacion.servicio')
+    const dispositivos = [
+      { id: 'log-1', dispositivo: 'Windows PC (Chrome)', ip: '192.168.1.10', fechaHora: '2026-10-17T08:00:00Z' },
+      { id: 'log-2', dispositivo: 'iPhone (Safari)', ip: '192.168.1.20', fechaHora: '2026-10-17T09:00:00Z' },
+    ]
+    const err = new LimiteDispositivosError(dispositivos)
+    expect(err.message).toBe('LIMITE_DISPOSITIVOS_ALCANZADO')
+    expect(err.dispositivosActivos).toHaveLength(2)
+    expect(err.dispositivosActivos[0].dispositivo).toBe('Windows PC (Chrome)')
+    expect(err.dispositivosActivos[1].dispositivo).toBe('iPhone (Safari)')
+  })
 })

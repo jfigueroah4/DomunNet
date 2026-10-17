@@ -25,6 +25,7 @@ export function ProyectoEditorView({
   const esEditar = modo === 'editar'
   const [proyectoReal, setProyectoReal] = useState<any>(proyectoInicial)
   const [cargando, setCargando] = useState(!proyectoInicial && esEditar)
+  const [isGuardando, setIsGuardando] = useState(false)
 
   useEffect(() => {
     if (!esEditar) return
@@ -183,6 +184,8 @@ export function ProyectoEditorView({
           modo={modo}
           proyectoInicial={proyectoActual as any}
           onGuardar={async (proyectoData) => {
+            if (isGuardando) return
+            setIsGuardando(true)
             try {
               if (modo === 'crear') {
                 const res = await api.post('/proyectos', proyectoData)
@@ -216,6 +219,8 @@ export function ProyectoEditorView({
             } catch (err: any) {
               console.error(err)
               showErrorToast(err.response?.data?.message || err.response?.data?.error || err.message || 'Error al guardar el proyecto')
+            } finally {
+              setIsGuardando(false)
             }
           }}
         />
