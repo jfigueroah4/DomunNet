@@ -107,7 +107,7 @@ function ProyectoListItem({
       )}
 
       {debeMostrarMontoYAvance(proyecto) && (
-        <p className="hidden w-28 shrink-0 text-right text-[11px] font-bold text-gray-900 md:block font-[Poppins]">
+        <p className="hidden shrink-0 text-right text-[11px] font-bold text-gray-900 md:block font-[Poppins] whitespace-nowrap min-w-[130px]">
           Q {Number(proyecto.presupuesto).toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </p>
       )}

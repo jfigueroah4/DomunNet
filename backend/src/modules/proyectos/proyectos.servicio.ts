@@ -1671,9 +1671,138 @@ async function guardarContratosProyecto(proyectoId: string, datosFormulario: any
     if (promesasUpdate.length > 0) {
       await Promise.all(promesasUpdate)
     }
+
+    // Asegurar que los representantes y responsables asignados queden vinculados como contactos en la empresa
+    await asegurarContactosVinculadosAEmpresa(datosFormulario)
   } catch (err) {
     console.error('Error en guardarContratosProyecto:', err)
     throw err
+  }
+}
+
+async function buscarUsuarioPorNombre(nombreCompleto: string): Promise<{ id: string } | null> {
+  if (!nombreCompleto || typeof nombreCompleto !== 'string') return null
+  const limpio = nombreCompleto.trim().toLowerCase()
+  if (!limpio) return null
+
+  const { data: datos } = await clienteSupabase
+    .from('dato_usuario')
+    .select('usuario_id, primer_nombre, segundo_nombre, primer_apellido, segundo_apellido')
+
+  if (Array.isArray(datos)) {
+    const match = datos.find((d) => {
+      const full = `${d.primer_nombre || ''} ${d.segundo_nombre || ''} ${d.primer_apellido || ''} ${d.segundo_apellido || ''}`.replace(/\s+/g, ' ').trim().toLowerCase()
+      const short = `${d.primer_nombre || ''} ${d.primer_apellido || ''}`.replace(/\s+/g, ' ').trim().toLowerCase()
+      return full === limpio || short === limpio || full.includes(limpio) || (short && limpio.includes(short))
+    })
+    if (match?.usuario_id) return { id: match.usuario_id }
+  }
+
+  const { data: u } = await clienteSupabase
+    .from('usuario')
+    .select('id, username')
+    .ilike('username', limpio)
+    .maybeSingle()
+  if (u?.id) return { id: u.id }
+
+  return null
+}
+
+async function asegurarContactosVinculadosAEmpresa(datosFormulario: any) {
+  try {
+    // 1. Empresa Contratista
+    const empContratistaNombre = datosFormulario.empresaContratista || datosFormulario.contratistaNombre || datosFormulario.contratoEjecucion?.empresaNombre
+    let empContratistaId = datosFormulario.empresaContratistaId || datosFormulario.empresa_contratista_id || datosFormulario.contratoEjecucion?.empresaId
+
+    if (!empContratistaId && empContratistaNombre) {
+      const { data: ec } = await clienteSupabase
+        .from('empresa_contratista')
+        .select('id')
+        .ilike('nombre', String(empContratistaNombre).trim())
+        .maybeSingle()
+      if (ec?.id) empContratistaId = ec.id
+    }
+
+    if (empContratistaId) {
+      const prop = datosFormulario.propietarioContratista || datosFormulario.contratistaPropietario || datosFormulario.contratoEjecucion?.propietario
+      const superInt = datosFormulario.superintendente || datosFormulario.contratistaSuperintendente || datosFormulario.responsableNombre || datosFormulario.contratoEjecucion?.responsable
+
+      const nombres = [
+        { nombre: prop, cargo: 'Representante Legal' },
+        { nombre: superInt, cargo: 'Superintendente' },
+      ]
+
+      for (const item of nombres) {
+        if (!item.nombre || typeof item.nombre !== 'string' || !item.nombre.trim()) continue
+        const nom = item.nombre.trim()
+        const u = await buscarUsuarioPorNombre(nom)
+        if (u?.id) {
+          const { data: yaExiste } = await clienteSupabase
+            .from('contacto_contratista')
+            .select('id')
+            .eq('empresa_contratista_id', empContratistaId)
+            .eq('usuario_id', u.id)
+            .maybeSingle()
+
+          if (!yaExiste) {
+            await clienteSupabase.from('contacto_contratista').insert({
+              empresa_contratista_id: empContratistaId,
+              usuario_id: u.id,
+              nombre: nom,
+              cargo: item.cargo,
+            })
+          }
+        }
+      }
+    }
+
+    // 2. Empresa Supervisora (empresa_externa)
+    const empSupervisoraNombre = datosFormulario.empresaSupervisora || datosFormulario.supervisoraNombre || datosFormulario.contratoSupervision?.empresaNombre
+    let empSupervisoraId = datosFormulario.empresaSupervisoraId || datosFormulario.empresa_supervisora_id || datosFormulario.contratoSupervision?.empresaId
+
+    if (!empSupervisoraId && empSupervisoraNombre) {
+      const { data: es } = await clienteSupabase
+        .from('empresa_externa')
+        .select('id')
+        .ilike('nombre', String(empSupervisoraNombre).trim())
+        .maybeSingle()
+      if (es?.id) empSupervisoraId = es.id
+    }
+
+    if (empSupervisoraId) {
+      const propSup = datosFormulario.propietarioSupervisora || datosFormulario.supervisoraPropietario || datosFormulario.contratoSupervision?.propietario
+      const respSup = datosFormulario.supervisoraResponsable || datosFormulario.responsableSupervisora || datosFormulario.contratoSupervision?.responsable
+
+      const nombresSup = [
+        { nombre: propSup, cargo: 'Representante Legal' },
+        { nombre: respSup, cargo: 'Supervisor' },
+      ]
+
+      for (const item of nombresSup) {
+        if (!item.nombre || typeof item.nombre !== 'string' || !item.nombre.trim()) continue
+        const nom = item.nombre.trim()
+        const u = await buscarUsuarioPorNombre(nom)
+        if (u?.id) {
+          const { data: yaExiste } = await clienteSupabase
+            .from('contacto_empresa_externa')
+            .select('id')
+            .or(`empresa_externa_id.eq.${empSupervisoraId},empresa_id.eq.${empSupervisoraId}`)
+            .eq('usuario_id', u.id)
+            .maybeSingle()
+
+          if (!yaExiste) {
+            await clienteSupabase.from('contacto_empresa_externa').insert({
+              empresa_externa_id: empSupervisoraId,
+              usuario_id: u.id,
+              nombre: nom,
+              cargo: item.cargo,
+            })
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Error vinculando contactos de empresas en guardarContratosProyecto:', err)
   }
 }
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { obtenerNombreCompleto, esCorreo } from './autenticacion.servicio'
+import { obtenerNombreCompleto, esCorreo, detectarNombreDispositivo, LimiteDispositivosError } from './autenticacion.servicio'
 import type { FilaUsuarioAutenticacion } from './autenticacion.servicio'
 
 describe('Módulo Autenticación: Servicio', () => {
@@ -82,8 +82,7 @@ describe('Módulo Autenticación: Servicio', () => {
     expect(esCorreo('@')).toBe(true)
   })
 
-  it('detectarNombreDispositivo - detecta navegadores y sistemas operativos', async () => {
-    const { detectarNombreDispositivo } = await import('./autenticacion.servicio')
+  it('detectarNombreDispositivo - detecta navegadores y sistemas operativos', () => {
     expect(detectarNombreDispositivo('Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36')).toBe('Windows PC (Chrome)')
     expect(detectarNombreDispositivo('Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 Safari/604.1')).toBe('iPhone (Safari)')
     expect(detectarNombreDispositivo('Mozilla/5.0 (Linux; Android 13; SM-S908B) Chrome/120.0.0.0 Mobile Safari/537.36')).toBe('Android (Chrome)')
@@ -91,8 +90,7 @@ describe('Módulo Autenticación: Servicio', () => {
     expect(detectarNombreDispositivo('')).toBe('Dispositivo Desconocido')
   })
 
-  it('LimiteDispositivosError - almacena lista de dispositivos activos correctamente', async () => {
-    const { LimiteDispositivosError } = await import('./autenticacion.servicio')
+  it('LimiteDispositivosError - almacena lista de dispositivos activos correctamente', () => {
     const dispositivos = [
       { id: 'log-1', dispositivo: 'Windows PC (Chrome)', ip: '192.168.1.10', fechaHora: '2026-10-17T08:00:00Z' },
       { id: 'log-2', dispositivo: 'iPhone (Safari)', ip: '192.168.1.20', fechaHora: '2026-10-17T09:00:00Z' },

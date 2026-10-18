@@ -428,7 +428,9 @@ export function ProyectosVinculadosModal({
       onClick={onClose}
     >
       <div
-        className="relative flex flex-col w-full max-w-lg md:max-w-3xl lg:max-w-4xl max-h-[88vh] rounded-2xl bg-white shadow-2xl border border-gray-100 overflow-hidden animate-in zoom-in-95 duration-200"
+        className={`relative flex flex-col w-full ${
+          proyectos.length === 1 ? 'max-w-lg md:max-w-xl' : 'max-w-lg md:max-w-3xl lg:max-w-4xl'
+        } max-h-[88vh] rounded-2xl bg-white shadow-2xl border border-gray-100 overflow-hidden animate-in zoom-in-95 duration-200`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Encabezado del modal */}
@@ -502,7 +504,7 @@ export function ProyectosVinculadosModal({
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+            <div className={`grid gap-3.5 ${proyectos.length === 1 ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'}`}>
               {proyectos.map((proy) => {
                 const badge = obtenerBadgeEstado(proy.estado)
                 return (
@@ -569,7 +571,7 @@ export function ProyectosVinculadosModal({
                         type="button"
                         onClick={() => {
                           onClose()
-                          router.push(`/dashboard/proyectos`)
+                          router.push(`/dashboard/proyectos/detalles?slug=${proy.id}`)
                         }}
                         className="inline-flex items-center gap-1 text-[10.5px] font-bold text-[#9B0F06] hover:text-[#5E0006] transition-colors cursor-pointer group-hover:underline"
                       >

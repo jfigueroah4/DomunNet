@@ -1,5 +1,6 @@
 import { clienteSupabase } from '@/configuracion/cliente-supabase'
 import { crearUsuario, eliminarUsuario } from '@/modules/usuarios/usuarios.servicio'
+import type { DatosUsuario } from '@/modules/usuarios/usuarios.servicio'
 import { invalidarCacheProyectos } from '@/modules/proyectos/proyectos.servicio'
 import type { ContactoPayload, EntidadContratantePayload } from './entidad-contratante.schemas'
 
@@ -82,20 +83,20 @@ export async function obtenerEntidadContratante(id: string) {
   return { ...data, contactos, proyectos_vinculados: await contarProyectos(id, contactos.map(c => c.id)) }
 }
 
-function contactoUsuario(c: ContactoPayload) {
+function contactoUsuario(c: ContactoPayload): DatosUsuario {
   return {
-    primer_nombre: c.primer_nombre,
+    primer_nombre: c.primer_nombre || '',
     segundo_nombre: c.segundo_nombre || '',
-    primer_apellido: c.primer_apellido,
+    primer_apellido: c.primer_apellido || '',
     segundo_apellido: c.segundo_apellido || '',
-    correo: c.correo,
-    telefono: c.telefono,
+    correo: c.correo || '',
+    telefono: c.telefono || '',
     rol: 'Contratante',
-    estado: 'Activo' as const,
-    username: c.username,
+    estado: 'Activo',
+    username: c.username || undefined,
     contrasena: c.password || undefined,
-    fecha_nacimiento: c.fecha_nacimiento,
-    direccion: c.direccion,
+    fecha_nacimiento: c.fecha_nacimiento || undefined,
+    direccion: c.direccion || undefined,
   }
 }
 
@@ -187,17 +188,37 @@ export async function listarContactosDeEntidad(entidadId: string) {
 }
 
 export async function crearContactoDeEntidad(entidadId: string, payload: ContactoPayload) {
-  const usuario = await crearUsuario(contactoUsuario(payload))
-  if (!usuario) throw new Error('No se pudo crear el usuario del contacto')
+  let usuarioId = (payload as any).usuario_id
+  let nombreContacto = ''
+  if (!usuarioId) {
+    const usuario = await crearUsuario(contactoUsuario(payload))
+    if (!usuario) throw new Error('No se pudo crear el usuario del contacto')
+    usuarioId = usuario.id
+    nombreContacto = `${payload.primer_nombre || ''} ${payload.primer_apellido || ''}`.trim()
+  } else {
+    const { data: u } = await clienteSupabase.from('usuario').select('*, dato_usuario(*)').eq('id', usuarioId).single()
+    const du = Array.isArray(u?.dato_usuario) ? u.dato_usuario[0] : u?.dato_usuario || {}
+    nombreContacto = `${du.primer_nombre || u?.primer_nombre || ''} ${du.primer_apellido || u?.primer_apellido || ''}`.trim() || u?.username || ''
+  }
+
+  const { data: existente } = await clienteSupabase
+    .from('contacto_entidad')
+    .select(contactoSelect)
+    .eq('entidad_contratante_id', entidadId)
+    .eq('usuario_id', usuarioId)
+    .maybeSingle()
+
+  if (existente) return existente
 
   const { data, error } = await clienteSupabase.from('contacto_entidad').insert({
     entidad_contratante_id: entidadId,
-    usuario_id: usuario.id,
+    usuario_id: usuarioId,
+    nombre: nombreContacto || null,
     cargo: payload.cargo || 'Representante'
   }).select(contactoSelect).single()
 
   if (error) {
-    await eliminarUsuario(usuario.id)
+    if (!(payload as any).usuario_id) await eliminarUsuario(usuarioId)
     throw new Error(error.message)
   }
   return data

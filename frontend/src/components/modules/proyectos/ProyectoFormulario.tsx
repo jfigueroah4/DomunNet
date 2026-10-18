@@ -1550,6 +1550,14 @@ function cargarEmpresasGlobal() {
   return empresasPromiseGlobal
 }
 
+function recargarEmpresasGlobal() {
+  catalogoCacheGlobal.contratistas = null
+  catalogoCacheGlobal.supervisoras = null
+  empresasPromiseGlobal = null
+  return cargarEmpresasGlobal()
+}
+
+
 export function ProyectoFormulario({
   proyectoInicial,
   modo = 'crear',
@@ -5310,13 +5318,33 @@ export function ProyectoFormulario({
         bloquearEstado={true}
         empresaContratistaIdInicial={empresaContratistaId}
         ocultarEmpresaContratista={true}
-        onSave={(u) => {
+        onSave={async (u) => {
           setOpenCrearUsuarioContratistaDrawer(false)
           cargarUsuarios()
           if (u) {
             const nom = `${u.primer_nombre || ''} ${u.primer_apellido || ''}`.trim() || u.nombre || u.username
             if (nom) {
               registrarUsuarioEnEmpresa(empresaContratista, u)
+              const targetEmp = (empresasContratistas || []).find((e: any) =>
+                (e.nombre || e.razon_social || '').trim().toLowerCase() === (empresaContratista || '').trim().toLowerCase() || e.id === empresaContratistaId
+              )
+              const empId = targetEmp?.id || empresaContratistaId
+              if (empId && u.id) {
+                try {
+                  await api.post(`/empresas-contratistas/${empId}/contactos`, {
+                    usuario_id: u.id,
+                    cargo: drawerContextoUsuario === 'contratista_superintendente' ? 'Superintendente' : 'Representante Legal'
+                  })
+                  recargarEmpresasGlobal().then((e) => {
+                    if (e) {
+                      setEmpresasContratistas(e.contratistas || [])
+                      setEmpresasSupervisoras(e.supervisoras || [])
+                    }
+                  })
+                } catch (err) {
+                  console.warn('Error vinculando contacto a contratista:', err)
+                }
+              }
               if (drawerContextoUsuario === 'contratista_superintendente') {
                 setContratistaSuperintendente(nom)
                 if (!contratistaPropietario) setContratistaPropietario(nom)
@@ -5337,13 +5365,33 @@ export function ProyectoFormulario({
         bloquearRol={false}
         bloquearEstado={true}
         ocultarEmpresaContratista={true}
-        onSave={(u) => {
+        onSave={async (u) => {
           setOpenCrearUsuarioSupervisoraDrawer(false)
           cargarUsuarios()
           if (u) {
             const nom = `${u.primer_nombre || ''} ${u.primer_apellido || ''}`.trim() || u.nombre || u.username
             if (nom) {
               registrarUsuarioEnEmpresa(empresaSupervisora, u)
+              const targetEmp = (empresasSupervisoras || []).find((e: any) =>
+                (e.nombre || e.razon_social || '').trim().toLowerCase() === (empresaSupervisora || '').trim().toLowerCase() || e.id === empresaSupervisoraId
+              )
+              const empId = targetEmp?.id || empresaSupervisoraId
+              if (empId && u.id) {
+                try {
+                  await api.post(`/empresas/${empId}/contactos`, {
+                    usuario_id: u.id,
+                    cargo: drawerContextoUsuario === 'supervisora_responsable' ? 'Supervisor' : 'Representante Legal'
+                  })
+                  recargarEmpresasGlobal().then((e) => {
+                    if (e) {
+                      setEmpresasContratistas(e.contratistas || [])
+                      setEmpresasSupervisoras(e.supervisoras || [])
+                    }
+                  })
+                } catch (err) {
+                  console.warn('Error vinculando contacto a supervisora:', err)
+                }
+              }
               if (drawerContextoUsuario === 'supervisora_responsable') {
                 setSupervisoraResponsable(nom)
                 if (!supervisoraPropietario) setSupervisoraPropietario(nom)

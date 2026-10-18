@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { listarEmpresas, obtenerEmpresa, crearEmpresaWizard, eliminarEmpresa, actualizarEmpresa } from './empresas.servicio';
+import { listarEmpresas, obtenerEmpresa, crearEmpresaWizard, eliminarEmpresa, actualizarEmpresa, crearContactoDeEmpresaExterna } from './empresas.servicio';
 import { wizardEmpresaSchema } from './empresas.schemas';
 
 export async function getEmpresasControlador(req: Request, res: Response) {
@@ -55,6 +55,15 @@ export async function updateEmpresaControlador(req: Request, res: Response) {
   try {
     const data = await actualizarEmpresa(req.params.id, req.body);
     res.json({ data });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+}
+
+export async function crearContactoEmpresaControlador(req: Request, res: Response) {
+  try {
+    const contacto = await crearContactoDeEmpresaExterna(req.params.id, req.body);
+    res.status(201).json({ data: contacto });
   } catch (error: any) {
     res.status(400).json({ error: error.message });
   }

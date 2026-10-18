@@ -215,3 +215,57 @@ export async function actualizarEmpresa(id: string, payload: any) {
 
   return data;
 }
+
+export async function crearContactoDeEmpresaExterna(empresaId: string, payload: any) {
+  let usuarioId = payload.usuario_id;
+  let nombreContacto = '';
+  if (!usuarioId) {
+    const usuario = await crearUsuario({
+      primer_nombre: payload.primer_nombre,
+      segundo_nombre: payload.segundo_nombre || '',
+      primer_apellido: payload.primer_apellido,
+      segundo_apellido: payload.segundo_apellido || '',
+      correo: payload.correo,
+      telefono: payload.telefono,
+      rol: payload.rol || 'Supervisor',
+      estado: 'Activo',
+      username: payload.username,
+      contrasena: payload.password,
+      fecha_nacimiento: payload.fecha_nacimiento,
+      direccion: payload.direccion,
+    });
+    if (!usuario) throw new Error('No se pudo crear el usuario del contacto');
+    usuarioId = usuario.id;
+    nombreContacto = `${payload.primer_nombre || ''} ${payload.primer_apellido || ''}`.trim();
+  } else {
+    const { data: u } = await clienteSupabase.from('usuario').select('*, dato_usuario(*)').eq('id', usuarioId).single();
+    const du = Array.isArray(u?.dato_usuario) ? u.dato_usuario[0] : u?.dato_usuario || {};
+    nombreContacto = `${du.primer_nombre || u?.primer_nombre || ''} ${du.primer_apellido || u?.primer_apellido || ''}`.trim() || u?.username || '';
+  }
+
+  const { data: existente } = await clienteSupabase
+    .from('contacto_empresa_externa')
+    .select('*, usuario(*, dato_usuario(*))')
+    .or(`empresa_externa_id.eq.${empresaId},empresa_id.eq.${empresaId}`)
+    .eq('usuario_id', usuarioId)
+    .maybeSingle();
+
+  if (existente) return existente;
+
+  const { data, error } = await clienteSupabase
+    .from('contacto_empresa_externa')
+    .insert({
+      empresa_externa_id: empresaId,
+      usuario_id: usuarioId,
+      nombre: nombreContacto || null,
+      cargo: payload.cargo || 'Supervisor',
+    })
+    .select('*, usuario(*, dato_usuario(*))')
+    .single();
+
+  if (error) {
+    if (!payload.usuario_id) await eliminarUsuario(usuarioId);
+    throw new Error(error.message);
+  }
+  return data;
+}

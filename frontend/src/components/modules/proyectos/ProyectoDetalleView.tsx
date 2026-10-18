@@ -1121,13 +1121,37 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
   const [isEquipoModalOpen, setIsEquipoModalOpen] = useState(false)
   const [usuariosDisponibles, setUsuariosDisponibles] = useState<any[]>([])
   const [delegadosResidenteList, setDelegadosResidenteList] = useState<any[]>([])
+  const [empresasContratistas, setEmpresasContratistas] = useState<any[]>([])
+  const [empresasSupervisoras, setEmpresasSupervisoras] = useState<any[]>([])
   const [selectedUsuarioIdParaEquipo, setSelectedUsuarioIdParaEquipo] = useState('')
   const [isCrearUsuarioOpen, setIsCrearUsuarioOpen] = useState(false)
+  const [contextoCrearUsuario, setContextoCrearUsuario] = useState<{
+    tipo?: 'contratista' | 'supervisora' | 'delegado' | 'equipo'
+    campo?: string
+    empresaNombre?: string
+    cargo?: string
+  } | null>(null)
   const { fetchRoles } = useRolesStore()
 
-  const handleAbrirCrearUsuario = () => {
+  const handleAbrirCrearUsuario = (ctx?: any) => {
     setIsEquipoModalOpen(false)
+    setContextoCrearUsuario(ctx && typeof ctx === 'object' && 'tipo' in ctx ? ctx : null)
     setIsCrearUsuarioOpen(true)
+  }
+
+  const cargarEmpresas = async () => {
+    try {
+      const [resC, resS] = await Promise.all([
+        apiGetDeduplicado('/empresas-contratistas'),
+        apiGetDeduplicado('/empresas'),
+      ])
+      const dataC = resC.data?.data || resC.data || []
+      const dataS = resS.data?.data || resS.data || []
+      if (Array.isArray(dataC)) setEmpresasContratistas(dataC)
+      if (Array.isArray(dataS)) setEmpresasSupervisoras(dataS)
+    } catch (e) {
+      console.warn('Error cargando empresas en Detalle:', e)
+    }
   }
 
   const cargarUsuarios = async () => {
@@ -1158,6 +1182,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
     const timer = setTimeout(() => {
       void cargarUsuarios()
       void cargarDelegadosResidente()
+      void cargarEmpresas()
     }, 300)
     return () => clearTimeout(timer)
   }, [])
@@ -1263,25 +1288,118 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
   }
 
   const getUserOptionsForCompany = (empresa: string, currentValue = '') => {
-    const empresaNorm = String(empresa || '').toLowerCase().trim()
-    const opciones = usuariosDisponibles
-      .filter((u: any) => u.activo !== false && u.estado !== 'Suspendido' && u.estado !== 'Desactivado')
-      .filter((u: any) => {
-        if (!empresaNorm) return false
-        const empresaUsuario = String(
-          u.empresa_nombre || u.empresa || u.nombre_empresa || u.empresa_contratista || ''
-        ).toLowerCase().trim()
-        return !empresaUsuario || empresaUsuario === empresaNorm || empresaUsuario.includes(empresaNorm) || empresaNorm.includes(empresaUsuario)
-      })
-      .map((u: any) => {
-        const nombre = u.nombre || `${u.primer_nombre || ''} ${u.primer_apellido || ''}`.trim() || u.correo
-        return { value: nombre, label: `${nombre} - ${u.cargo || u.rol || 'Usuario'}` }
-      })
+    const norm = String(empresa || '').toLowerCase().trim()
+    if (!norm) return currentValue ? [{ value: currentValue, label: currentValue }] : []
 
-    if (currentValue && !opciones.some((opcion) => opcion.value === currentValue)) {
-      opciones.unshift({ value: currentValue, label: currentValue })
+    const esDomun = norm.includes('domun')
+    const esRolExcluido = (rolOCargo: string) => {
+      const r = (rolOCargo || '').toLowerCase().trim()
+      return (
+        r.includes('topografo') ||
+        r.includes('topógrafo') ||
+        r.includes('topografia') ||
+        r.includes('topografía') ||
+        r.includes('laboratorista') ||
+        r.includes('laboratorio') ||
+        r.includes('auxiliar') ||
+        r.includes('peon') ||
+        r.includes('peón') ||
+        r.includes('operador') ||
+        (r.includes('campo') && !r.includes('jefe') && !r.includes('ingeniero'))
+      )
     }
-    return opciones.length > 0 ? opciones : userOptionsGenerales
+
+    if (esDomun) {
+      const rolesDomunPermitidos = [
+        'admin',
+        'administrador',
+        'ingenieroresidente',
+        'ingeniero residente',
+        'residente',
+        'gerencia',
+        'gerente',
+        'director',
+        'supervisor',
+        'jefe de proyecto',
+        'jefe',
+        'coordinador',
+      ]
+
+      const opciones = (usuariosDisponibles || [])
+        .filter((u: any) => u.activo !== false && u.estado !== 'Suspendido' && u.estado !== 'Desactivado')
+        .filter((u: any) => {
+          const r = `${u.rol || ''} ${u.cargo || ''}`.toLowerCase().trim()
+          const tieneRol = rolesDomunPermitidos.some((p) => r.includes(p))
+          return tieneRol && !esRolExcluido(r)
+        })
+        .map((u: any) => {
+          const nombreCompleto = u.nombre || `${u.primer_nombre || ''} ${u.primer_apellido || ''}`.trim() || u.correo
+          let rolCargo = u.cargo || (u.rol ? u.rol.charAt(0).toUpperCase() + u.rol.slice(1) : 'Administrador')
+          if (rolCargo.toLowerCase() === 'ingenieroresidente') rolCargo = 'Ingeniero Residente'
+          return {
+            value: nombreCompleto,
+            label: `${nombreCompleto} - ${rolCargo}`,
+          }
+        })
+      if (currentValue && !opciones.some((op) => op.value.toLowerCase() === currentValue.toLowerCase())) {
+        opciones.unshift({ value: currentValue, label: currentValue })
+      }
+      return opciones
+    }
+
+    // Para empresas externas o contratistas no Domun:
+    const matchedEmp = (empresasSupervisoras || []).concat(empresasContratistas || []).find((e: any) => {
+      const eNom = (e.nombre || e.razon_social || '').toLowerCase().trim()
+      return eNom === norm
+    })
+
+    const listaOpciones: any[] = []
+
+    // 1. Contactos vinculados en la empresa (BD)
+    if (matchedEmp && Array.isArray(matchedEmp.contactos)) {
+      for (const c of matchedEmp.contactos) {
+        const u = c.usuario || {}
+        const du = u.dato_usuario || {}
+        const cNom = c.nombre || `${du.primer_nombre || ''} ${du.primer_apellido || ''}`.trim() || u.correo || du.username
+        const rCargo = `${c.cargo || ''} ${c.rol || ''} ${u.rol || ''} ${u.cargo || ''}`
+        if (cNom && !esRolExcluido(rCargo)) {
+          listaOpciones.push({
+            value: cNom,
+            label: `${cNom} - ${c.cargo || 'Representante'}`,
+          })
+        }
+      }
+    }
+
+    // 2. Usuarios con empresa_contratista_id o empresa_id coincidente
+    if (matchedEmp?.id && Array.isArray(usuariosDisponibles)) {
+      for (const u of usuariosDisponibles) {
+        if (
+          (u.empresa_contratista_id === matchedEmp.id || u.empresa_id === matchedEmp.id) &&
+          u.activo !== false &&
+          u.estado !== 'Suspendido' &&
+          u.estado !== 'Desactivado'
+        ) {
+          const rCargo = `${u.cargo || ''} ${u.rol || ''}`
+          if (!esRolExcluido(rCargo)) {
+            const uNom = u.nombre || `${u.primer_nombre || ''} ${u.primer_apellido || ''}`.trim() || u.username
+            if (uNom && !listaOpciones.some((opt) => opt.value.toLowerCase() === uNom.toLowerCase())) {
+              listaOpciones.push({
+                value: uNom,
+                label: `${uNom} - ${u.cargo || u.rol || 'Representante'}`,
+              })
+            }
+          }
+        }
+      }
+    }
+
+    // 3. Incluir valor actual si existe
+    if (currentValue && !listaOpciones.some((opt) => opt.value.toLowerCase() === currentValue.toLowerCase())) {
+      listaOpciones.unshift({ value: currentValue, label: currentValue })
+    }
+
+    return listaOpciones
   }
 
   useEffect(() => {
@@ -2643,7 +2761,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                       placeholder="Representante Legal"
                       kind="nombre"
                       userOptions={getUserOptionsForCompany(editFormData.empresaContratista || proyecto.empresaContratista, editFormData.propietarioContratista || pAny.propietarioContratista)}
-                      onEmptyUserAction={handleAbrirCrearUsuario}
+                      onEmptyUserAction={() => handleAbrirCrearUsuario({ tipo: 'contratista', campo: 'propietarioContratista', empresaNombre: editFormData.empresaContratista || proyecto.empresaContratista, cargo: 'Representante Legal' })}
                       required
                     />
                     <EditableInfoField
@@ -2769,7 +2887,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                       placeholder="Propietario / Contacto"
                       kind="nombre"
                       userOptions={getUserOptionsForCompany(editFormData.empresaSupervisora || proyecto.empresaSupervisora, editFormData.propietarioSupervisora || pAny.propietarioSupervisora)}
-                      onEmptyUserAction={handleAbrirCrearUsuario}
+                      onEmptyUserAction={() => handleAbrirCrearUsuario({ tipo: 'supervisora', campo: 'propietarioSupervisora', empresaNombre: editFormData.empresaSupervisora || proyecto.empresaSupervisora, cargo: 'Representante Legal' })}
                       required
                     />
                     <EditableInfoField
@@ -3030,7 +3148,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                             onChange={(v) => handleFieldChange('propietarioContratista', v)}
                             kind="nombre"
                             userOptions={getUserOptionsForCompany(editingSection === 'ficha_obra' ? editFormData.empresaContratista : proyecto.empresaContratista, editingSection === 'ficha_obra' ? editFormData.propietarioContratista : pAny.propietarioContratista)}
-                            onEmptyUserAction={handleAbrirCrearUsuario}
+                            onEmptyUserAction={() => handleAbrirCrearUsuario({ tipo: 'contratista', campo: 'propietarioContratista', empresaNombre: editingSection === 'ficha_obra' ? editFormData.empresaContratista : proyecto.empresaContratista, cargo: 'Representante Legal' })}
                             required
                           />
                           <EditableItemFichaTecnica
@@ -3040,7 +3158,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                             onChange={(v) => handleFieldChange('superintendente', v)}
                             kind="nombre"
                             userOptions={getUserOptionsForCompany(editingSection === 'ficha_obra' ? editFormData.empresaContratista : proyecto.empresaContratista, editingSection === 'ficha_obra' ? editFormData.superintendente : pAny.superintendente)}
-                            onEmptyUserAction={handleAbrirCrearUsuario}
+                            onEmptyUserAction={() => handleAbrirCrearUsuario({ tipo: 'contratista', campo: 'superintendente', empresaNombre: editingSection === 'ficha_obra' ? editFormData.empresaContratista : proyecto.empresaContratista, cargo: 'Superintendente' })}
                           />
                           <EditableItemFichaTecnica
                             label="Colegiado Activo de Superintendente"
@@ -3329,8 +3447,8 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                             isEditing={editingSection === 'ficha_supervision'}
                             onChange={(v) => handleFieldChange('responsableSupervisora', v)}
                             placeholder="Seleccionar o buscar responsable..."
-                            userOptions={userOptionsIngenieros.length > 0 ? userOptionsIngenieros : userOptionsGenerales}
-                            onEmptyUserAction={handleAbrirCrearUsuario}
+                            userOptions={getUserOptionsForCompany(editFormData.empresaSupervisora || proyecto.empresaSupervisora, editFormData.responsableSupervisora || pAny.responsableSupervisora)}
+                            onEmptyUserAction={() => handleAbrirCrearUsuario({ tipo: 'supervisora', campo: 'responsableSupervisora', empresaNombre: editFormData.empresaSupervisora || proyecto.empresaSupervisora, cargo: 'Supervisor' })}
                             kind="nombre"
                             required
                           />
@@ -3608,7 +3726,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                   </span>
                   <button
                     type="button"
-                    onClick={handleAbrirCrearUsuario}
+                    onClick={() => handleAbrirCrearUsuario()}
                     className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-100 hover:bg-gray-200 px-2.5 py-1 text-[10px] font-semibold text-gray-700 transition-colors cursor-pointer shadow-2xs"
                   >
                     <UserPlus size={12} className="text-gray-500" />
@@ -3632,7 +3750,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
                         placeholder="Buscar y seleccionar usuario..."
                         emptyAction={{
                           label: '+ Crear nuevo usuario',
-                          onClick: handleAbrirCrearUsuario,
+                          onClick: () => handleAbrirCrearUsuario(),
                         }}
                         allowNumbers
                       />
@@ -3770,17 +3888,61 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
       {/* Drawer para Crear Usuario desde Detalle de Proyecto */}
       <UsuarioFormularioDrawer
         isOpen={isCrearUsuarioOpen}
-        rolesExcluidos={['Contratante']}
+        rolesExcluidos={contextoCrearUsuario?.tipo === 'contratista' ? [] : ['Contratante']}
         onClose={() => {
           setIsCrearUsuarioOpen(false)
-          setIsEquipoModalOpen(true)
+          if (!contextoCrearUsuario || contextoCrearUsuario.tipo === 'equipo') {
+            setIsEquipoModalOpen(true)
+          }
+          setContextoCrearUsuario(null)
         }}
-        onSave={(newUser: any) => {
+        onSave={async (newUser: any) => {
           void cargarUsuarios()
           void cargarDelegadosResidente()
           setIsCrearUsuarioOpen(false)
-          if (editingSection === 'resumen_entidades' || editingSection === 'marco_legal_supervisora') {
-            const nombreNuevo = newUser?.nombre || `${newUser?.primer_nombre || ''} ${newUser?.primer_apellido || ''}`.trim() || newUser?.correo
+          const nombreNuevo = newUser?.nombre || `${newUser?.primer_nombre || ''} ${newUser?.primer_apellido || ''}`.trim() || newUser?.correo
+
+          if (contextoCrearUsuario?.tipo === 'contratista' && newUser?.id) {
+            const empNom = contextoCrearUsuario.empresaNombre || editFormData.empresaContratista || proyecto.empresaContratista
+            const targetEmp = (empresasContratistas || []).find((e: any) =>
+              (e.nombre || e.razon_social || '').trim().toLowerCase() === (empNom || '').trim().toLowerCase()
+            )
+            const empId = targetEmp?.id
+            if (empId) {
+              try {
+                await api.post(`/empresas-contratistas/${empId}/contactos`, {
+                  usuario_id: newUser.id,
+                  cargo: contextoCrearUsuario.cargo || 'Representante Legal',
+                })
+                void cargarEmpresas()
+              } catch (e) {
+                console.warn('Error vinculando contacto a contratista:', e)
+              }
+            }
+            if (contextoCrearUsuario.campo && nombreNuevo) {
+              handleFieldChange(contextoCrearUsuario.campo as any, nombreNuevo)
+            }
+          } else if (contextoCrearUsuario?.tipo === 'supervisora' && newUser?.id) {
+            const empNom = contextoCrearUsuario.empresaNombre || editFormData.empresaSupervisora || proyecto.empresaSupervisora
+            const targetEmp = (empresasSupervisoras || []).find((e: any) =>
+              (e.nombre || e.razon_social || '').trim().toLowerCase() === (empNom || '').trim().toLowerCase()
+            )
+            const empId = targetEmp?.id
+            if (empId) {
+              try {
+                await api.post(`/empresas/${empId}/contactos`, {
+                  usuario_id: newUser.id,
+                  cargo: contextoCrearUsuario.cargo || 'Supervisor',
+                })
+                void cargarEmpresas()
+              } catch (e) {
+                console.warn('Error vinculando contacto a supervisora:', e)
+              }
+            }
+            if (contextoCrearUsuario.campo && nombreNuevo) {
+              handleFieldChange(contextoCrearUsuario.campo as any, nombreNuevo)
+            }
+          } else if (editingSection === 'resumen_entidades' || editingSection === 'marco_legal_supervisora') {
             if (nombreNuevo) {
               handleFieldChange('delegadoResidente', nombreNuevo)
               if (newUser?.id) {
@@ -3793,8 +3955,9 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
               setSelectedUsuarioIdParaEquipo(newUser.id)
             }
           }
+          setContextoCrearUsuario(null)
         }}
-        rolInicial="IngenieroResidente"
+        rolInicial={contextoCrearUsuario?.tipo === 'contratista' ? 'Contratante' : 'IngenieroResidente'}
         ocultarEmpresaContratista={true}
       />
 
