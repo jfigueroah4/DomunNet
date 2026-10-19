@@ -189,8 +189,13 @@ export default function FotografiasGaleria() {
 
         // Indexar bitácoras y fotos por proyecto para resolución instantánea
         const bitacorasPorProyecto = new Map<string, any[]>()
+        const bitacoraIdAProyecto = new Map<string, string>()
         bitacoras.forEach((b: any) => {
           const pKey = String(b.proyecto_id || b.proyectoId || '').toLowerCase().trim()
+          const bId = String(b.id || '').toLowerCase().trim()
+          if (bId && pKey) {
+            bitacoraIdAProyecto.set(bId, pKey)
+          }
           if (pKey) {
             const list = bitacorasPorProyecto.get(pKey) || []
             list.push(b)
@@ -208,11 +213,31 @@ export default function FotografiasGaleria() {
           fotosMap.set(k, current)
         }
 
+        // Registrar fotos directas de bitácoras si vienen con adjuntos/foto principal
+        bitacoras.forEach((b: any) => {
+          const pKey = String(b.proyecto_id || b.proyectoId || '')
+          if (pKey) {
+            const fotoPrinc = b.fotografia_principal || b.fotografiaPrincipal || b.url_foto || b.foto_portada
+            const urlPrinc = typeof fotoPrinc === 'string' ? fotoPrinc : fotoPrinc?.url
+            if (urlPrinc) registrarFoto(pKey, urlPrinc)
+            if (Array.isArray(b.adjuntos)) {
+              b.adjuntos.forEach((adj: any) => {
+                const url = typeof adj === 'string' ? adj : adj?.url
+                if (url) registrarFoto(pKey, url)
+              })
+            }
+          }
+        })
+
         evidencias.forEach((ev: any) => {
           const url = ev.url_storage || ev.url || ev.url_archivo
           if (url) {
-            if (ev.proyecto_id || ev.proyectoId) {
-              registrarFoto(String(ev.proyecto_id || ev.proyectoId), url)
+            let pKey = ev.proyecto_id || ev.proyectoId
+            if (!pKey && ev.bitacora_entrada_id) {
+              pKey = bitacoraIdAProyecto.get(String(ev.bitacora_entrada_id).toLowerCase().trim())
+            }
+            if (pKey) {
+              registrarFoto(String(pKey), url)
             }
           }
         })
@@ -237,6 +262,15 @@ export default function FotografiasGaleria() {
           const pId = String(p.id).toLowerCase().trim()
           const pCod = String(p.codigo || '').toLowerCase().trim()
           const fData = fotosMap.get(pId) || (pCod ? fotosMap.get(pCod) : null) || { set: new Set<string>(), ultima: null }
+
+          if (p.foto_portada) {
+            fData.set.add(p.foto_portada)
+            if (!fData.ultima) fData.ultima = p.foto_portada
+          }
+          if (p.imagenUrl) {
+            fData.set.add(p.imagenUrl)
+            if (!fData.ultima) fData.ultima = p.imagenUrl
+          }
 
           if (Array.isArray(p.fotografias)) {
             p.fotografias.forEach((f: any) => {

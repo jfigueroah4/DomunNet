@@ -143,8 +143,16 @@ export async function eliminarUsuarioControlador(req: SolicitudAutenticada, res:
   try {
     
   try {
+    if (req.usuario?.sub === req.params.id) {
+      return sendError(res, 400, 'No puedes eliminar tu propia cuenta de usuario');
+    }
     const targetUser = await obtenerUsuarioPorId(req.params.id);
     if (targetUser) {
+      const isTargetOwner = (targetUser as any).correo?.toLowerCase().trim() === 'daniel.figueroa@domunnet.test' || (targetUser as any).username?.toLowerCase().trim() === 'dani';
+      if (isTargetOwner) {
+        return sendError(res, 403, 'No se puede eliminar la cuenta de administración principal');
+      }
+
       const isMyRoleAdmin = (req.usuario?.rol || '').toLowerCase().trim() === 'administrador' || (req.usuario?.rol || '').toLowerCase().trim() === 'admin';
       if (!isMyRoleAdmin) {
         const targetRole = await obtenerRolPorNombre(targetUser.rol);

@@ -934,6 +934,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
   const [fichaSupervisionAbierta, setFichaSupervisionAbierta] = useState(true)
 
   const [proyecto, setProyecto] = useState<ProyectoType | undefined>(initialProyecto)
+  const [cargandoProyecto, setCargandoProyecto] = useState(!initialProyecto)
   const [activandoProyecto, setActivandoProyecto] = useState(false)
   const canEdit = user?.rol !== 'contratante' && user?.rol !== 'contratista'
   const canManageTeam = String(user?.rol).toLowerCase() === 'administrador' || String(user?.rol).toLowerCase() === 'gerencia'
@@ -941,6 +942,35 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
   useEffect(() => {
     if (initialProyecto) {
       setProyecto(initialProyecto)
+      setCargandoProyecto(false)
+      return
+    }
+
+    let slugFromUrl = ''
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      slugFromUrl = params.get('slug') || ''
+      if (!slugFromUrl) {
+        const parts = window.location.pathname.split('/').filter(Boolean)
+        const proyIdx = parts.indexOf('proyectos')
+        if (proyIdx !== -1 && parts[proyIdx + 1] && parts[proyIdx + 1] !== 'detalles') {
+          slugFromUrl = parts[proyIdx + 1]
+        }
+      }
+    }
+
+    if (slugFromUrl) {
+      setCargandoProyecto(true)
+      proyectoService.getProyectoBySlug(slugFromUrl)
+        .then((data) => {
+          if (data) setProyecto(data)
+        })
+        .catch((err) => {
+          console.error('Error cargando proyecto en cliente:', err)
+        })
+        .finally(() => setCargandoProyecto(false))
+    } else {
+      setCargandoProyecto(false)
     }
   }, [initialProyecto])
 
@@ -1983,6 +2013,17 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
       totalRenglones: renglonesList.length,
     }
   }, [renglonesProyecto, proyecto])
+
+  if (cargandoProyecto) {
+    return (
+      <div className="space-y-4 animate-pulse">
+        <div className="h-4 w-20 bg-gray-200 rounded"></div>
+        <div className="rounded-xl bg-white p-12 text-center shadow-sm">
+          <p className="text-xs font-semibold text-gray-500">Cargando información del proyecto...</p>
+        </div>
+      </div>
+    )
+  }
 
   if (!proyecto) {
     return (

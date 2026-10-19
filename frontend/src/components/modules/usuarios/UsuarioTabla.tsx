@@ -96,14 +96,26 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
           const isSelf = (usuario.id && usuario.id === profile?.id) || (usuario.correo && profile?.correo && usuario.correo.toLowerCase() === profile?.correo.toLowerCase());
           const miRolNorm = String(miRolNombre || '').toLowerCase().trim();
           const targetRolNorm = String(usuario.rol || '').toLowerCase().trim();
+          const targetRole = roles.find(r => r.nombre === usuario.rol);
+          const targetNivel = targetRole?.nivel_permisos ?? (usuario.rol === 'Administrador' ? 100 : 0);
+          const isOwner = profile?.correo?.toLowerCase().trim() === 'daniel.figueroa@domunnet.test' || profile?.username?.toLowerCase().trim() === 'dani';
+          const targetIsOwner = usuario.correo?.toLowerCase().trim() === 'daniel.figueroa@domunnet.test' || (usuario as any).username?.toLowerCase().trim() === 'dani';
 
           let canDelete = true;
-          if (isSelf) canDelete = false;
-          else if (miRolNorm === 'administrador') canDelete = targetRolNorm !== 'administrador';
-          else if (miRolNorm === 'gerencia') canDelete = targetRolNorm !== 'gerencia' && targetRolNorm !== 'administrador';
+          if (isSelf) {
+            canDelete = false;
+          } else if (targetIsOwner) {
+            canDelete = false;
+          } else if (isOwner || miRolNorm === 'administrador' || miRolNorm === 'admin' || miNivel >= 100) {
+            canDelete = true;
+          } else if (miRolNorm === 'gerencia') {
+            canDelete = targetRolNorm !== 'gerencia' && targetRolNorm !== 'administrador' && targetRolNorm !== 'admin';
+          } else {
+            canDelete = targetNivel <= miNivel && targetRolNorm !== 'administrador' && targetRolNorm !== 'admin';
+          }
 
-          const canEdit = canDelete;
-          const canCloseSession = !isSelf && (miRolNorm === 'administrador' || miRolNorm === 'gerencia');
+          const canEdit = isOwner || miRolNorm === 'administrador' || miRolNorm === 'admin' || canDelete;
+          const canCloseSession = !isSelf && (isOwner || miRolNorm === 'administrador' || miRolNorm === 'gerencia');
           const esSuspendido = usuario.estado === 'Suspendido' || (usuario as any).activo === false;
 
           return (
@@ -193,17 +205,30 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
                     </button>
                   </>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => canDelete && onEliminar(usuario.id, 'suspender')}
-                    disabled={!canDelete}
-                    className={`p-1.5 rounded-lg border text-[9.5px] font-semibold active:scale-95 cursor-pointer shadow-2xs ${
-                      canDelete ? 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50' : 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed'
-                    }`}
-                    title="Suspender usuario"
-                  >
-                    <UserX size={12} className={canDelete ? 'text-gray-600' : 'text-gray-300'} />
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => canDelete && onEliminar(usuario.id, 'suspender')}
+                      disabled={!canDelete}
+                      className={`p-1.5 rounded-lg border text-[9.5px] font-semibold active:scale-95 cursor-pointer shadow-2xs ${
+                        canDelete ? 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50' : 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed'
+                      }`}
+                      title="Suspender usuario"
+                    >
+                      <UserX size={12} className={canDelete ? 'text-gray-600' : 'text-gray-300'} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => canDelete && onEliminar(usuario.id, 'eliminar')}
+                      disabled={!canDelete}
+                      className={`p-1.5 rounded-lg border text-[9.5px] font-semibold active:scale-95 cursor-pointer shadow-2xs ${
+                        canDelete ? 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50' : 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed'
+                      }`}
+                      title="Eliminar usuario definitivamente"
+                    >
+                      <Trash2 size={12} className={canDelete ? 'text-red-600' : 'text-gray-300'} />
+                    </button>
+                  </>
                 )}
               </div>
             </div>
@@ -256,25 +281,28 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
 
               const targetRole = roles.find(r => r.nombre === usuario.rol);
               const targetNivel = targetRole?.nivel_permisos ?? (usuario.rol === 'Administrador' ? 100 : 0);
-              const miRolNombre = profile?.rol;
+              const targetRolNorm = String(usuario.rol || '').toLowerCase().trim();
+              const miRolNorm = String(profile?.rol || '').toLowerCase().trim();
               const isSelf = (usuario.id && usuario.id === profile?.id) || (usuario.correo && profile?.correo && usuario.correo.toLowerCase() === profile?.correo.toLowerCase());
 
-              const miRolNorm = String(miRolNombre || '').toLowerCase().trim();
-              const targetRolNorm = String(usuario.rol || '').toLowerCase().trim();
+              const isOwner = profile?.correo?.toLowerCase().trim() === 'daniel.figueroa@domunnet.test' || profile?.username?.toLowerCase().trim() === 'dani';
+              const targetIsOwner = usuario.correo?.toLowerCase().trim() === 'daniel.figueroa@domunnet.test' || (usuario as any).username?.toLowerCase().trim() === 'dani';
 
               let canDelete = true;
               if (isSelf) {
                 canDelete = false;
-              } else if (miRolNorm === 'administrador') {
-                canDelete = targetRolNorm !== 'administrador';
+              } else if (targetIsOwner) {
+                canDelete = false;
+              } else if (isOwner || miRolNorm === 'administrador' || miRolNorm === 'admin' || miNivel >= 100) {
+                canDelete = true;
               } else if (miRolNorm === 'gerencia') {
-                canDelete = targetRolNorm !== 'gerencia' && targetRolNorm !== 'administrador';
+                canDelete = targetRolNorm !== 'gerencia' && targetRolNorm !== 'administrador' && targetRolNorm !== 'admin';
               } else {
-                canDelete = miNivel >= 100 ? true : (targetRolNorm !== 'administrador' && targetNivel <= miNivel);
+                canDelete = miNivel >= 100 ? true : (targetRolNorm !== 'administrador' && targetRolNorm !== 'admin' && targetNivel <= miNivel);
               }
 
-              const canEdit = true;
-              const canCloseSession = !isSelf && esGerenciaOAdmin && usuario.estado === 'Activo';
+              const canEdit = isOwner || miRolNorm === 'administrador' || miRolNorm === 'admin' || canDelete;
+              const canCloseSession = !isSelf && (isOwner || esGerenciaOAdmin) && usuario.estado === 'Activo';
 
               return (
                 <tr
@@ -362,14 +390,24 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
                           )
                         }
                         return (
-                          <button
-                            onClick={() => canDelete && onEliminar(usuario.id, 'suspender')}
-                            className={`p-1 transition-colors ${canDelete ? 'text-gray-400 hover:text-red-600 cursor-pointer' : 'text-gray-200 cursor-not-allowed'}`}
-                            title={isSelf ? 'No puedes desactivar tu propio usuario' : 'Desactivar / Suspender usuario'}
-                            disabled={!canDelete}
-                          >
-                            <UserX size={13} />
-                          </button>
+                          <div className="flex items-center gap-0.5">
+                            <button
+                              onClick={() => canDelete && onEliminar(usuario.id, 'suspender')}
+                              className={`p-1 transition-colors ${canDelete ? 'text-gray-400 hover:text-amber-600 cursor-pointer' : 'text-gray-200 cursor-not-allowed'}`}
+                              title={isSelf ? 'No puedes desactivar tu propio usuario' : 'Desactivar / Suspender usuario'}
+                              disabled={!canDelete}
+                            >
+                              <UserX size={13} />
+                            </button>
+                            <button
+                              onClick={() => canDelete && onEliminar(usuario.id, 'eliminar')}
+                              className={`p-1 transition-colors ${canDelete ? 'text-gray-400 hover:text-red-600 cursor-pointer' : 'text-gray-200 cursor-not-allowed'}`}
+                              title={isSelf ? 'No puedes eliminar tu propio usuario' : (targetIsOwner ? 'No se puede eliminar al usuario propietario' : 'Eliminar usuario definitivamente')}
+                              disabled={!canDelete}
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
                         )
                       })()}
                     </div>

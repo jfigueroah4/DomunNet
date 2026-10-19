@@ -1,7 +1,10 @@
 import axios from 'axios'
 
+const defaultBackendUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'https://domunnet-backend.onrender.com'
+const cleanBackendUrl = defaultBackendUrl.replace(/\/api\/?v1\/?$/, '').replace(/\/$/, '')
+
 export const api = axios.create({
-  baseURL: typeof window === 'undefined' ? (process.env.BACKEND_URL || 'http://127.0.0.1:3001/api/v1') : '/api/v1',
+  baseURL: typeof window === 'undefined' ? `${cleanBackendUrl}/api/v1` : '/api/v1',
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json; charset=utf-8',
@@ -19,7 +22,7 @@ api.interceptors.request.use((config) => {
       }
     } catch (_) {}
   } else {
-    const serverOrigin = process.env.BACKEND_URL || 'http://127.0.0.1:3001'
+    const serverOrigin = cleanBackendUrl
     if (config.url && !config.url.startsWith('http')) {
       let relativePath = config.url
       if (relativePath.startsWith('/api/v1')) {
