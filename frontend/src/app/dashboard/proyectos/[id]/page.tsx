@@ -12,5 +12,5 @@ export default async function ProyectosDetailPage({
   const id = params.id
   const proyecto = await proyectoService.getProyectoBySlug(id)
 
-  return <ProyectoDetalleView proyecto={proyecto} />
+  return <ProyectoDetalleView proyecto={proyecto} slugId={id} />
 }

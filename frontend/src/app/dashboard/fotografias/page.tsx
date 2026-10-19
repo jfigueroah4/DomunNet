@@ -203,14 +203,32 @@ export default function FotografiasGaleria() {
           }
         })
 
+        // Mapeo bidireccional entre id y codigo de proyecto para vincular fotos por cualquiera de los dos
+        const proyIdToCodigo = new Map<string, string>()
+        const proyCodigoToId = new Map<string, string>()
+        proys.forEach((p: any) => {
+          const id = String(p.id || '').toLowerCase().trim()
+          const cod = String(p.codigo || '').toLowerCase().trim()
+          if (id && cod) {
+            proyIdToCodigo.set(id, cod)
+            proyCodigoToId.set(cod, id)
+          }
+        })
+
         const fotosMap = new Map<string, { set: Set<string>; ultima: string | null }>()
         const registrarFoto = (pKey: string, url: string) => {
           if (!pKey || !url) return
           const k = pKey.toLowerCase().trim()
-          const current = fotosMap.get(k) || { set: new Set<string>(), ultima: null }
-          current.set.add(url)
-          if (!current.ultima) current.ultima = url
-          fotosMap.set(k, current)
+          const altKey = proyIdToCodigo.get(k) || proyCodigoToId.get(k)
+          const keys = [k]
+          if (altKey) keys.push(altKey)
+
+          keys.forEach((key) => {
+            const current = fotosMap.get(key) || { set: new Set<string>(), ultima: null }
+            current.set.add(url)
+            if (!current.ultima) current.ultima = url
+            fotosMap.set(key, current)
+          })
         }
 
         // Registrar fotos directas de bitácoras si vienen con adjuntos/foto principal

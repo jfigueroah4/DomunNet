@@ -920,7 +920,7 @@ function obtenerValoresCompletosProyecto(p?: ProyectoType | any): Record<string,
   }
 }
 
-export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: ProyectoType | undefined }) {
+export function ProyectoDetalleView({ proyecto: initialProyecto, slugId }: { proyecto?: ProyectoType; slugId?: string }) {
   const router = useRouter()
   const { profile: user } = useAuthStore()
 
@@ -946,8 +946,8 @@ export function ProyectoDetalleView({ proyecto: initialProyecto }: { proyecto: P
       return
     }
 
-    let slugFromUrl = ''
-    if (typeof window !== 'undefined') {
+    let slugFromUrl = slugId || ''
+    if (!slugFromUrl && typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search)
       slugFromUrl = params.get('slug') || ''
       if (!slugFromUrl) {

@@ -17,5 +17,5 @@ export default async function ProyectoDetallesPage({
 
   const proyecto = await proyectoService.getProyectoBySlug(slug)
 
-  return <ProyectoDetalleView proyecto={proyecto} />
+  return <ProyectoDetalleView proyecto={proyecto} slugId={slug} />
 }
