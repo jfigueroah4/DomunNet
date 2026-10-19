@@ -1,5 +1,7 @@
 import dynamic from 'next/dynamic'
 
+export const runtime = 'edge'
+
 const HojaSabanaView = dynamic(
   () => import('@/components/modules/proyectos/HojaSabanaView'),
   {

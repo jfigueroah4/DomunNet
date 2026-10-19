@@ -2,6 +2,8 @@ import { ProyectoDetalleView } from '@/components/modules/proyectos/ProyectoDeta
 import { proyectoService } from '@/services/proyectos/proyecto.service'
 import { redirect } from 'next/navigation'
 
+export const runtime = 'edge'
+
 export default async function ProyectoDetallesPage({
   searchParams,
 }: {

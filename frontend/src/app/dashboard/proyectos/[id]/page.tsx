@@ -1,5 +1,6 @@
 import { ProyectoDetalleView } from '@/components/modules/proyectos/ProyectoDetalleView'
 import { proyectoService } from '@/services/proyectos/proyecto.service'
+export const runtime = 'edge'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 

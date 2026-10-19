@@ -1,5 +1,7 @@
 'use client'
 
+export const runtime = 'edge'
+
 import { ChevronLeft, Download, RefreshCw, Share2 } from 'lucide-react'
 import { useRouter, useParams } from 'next/navigation'
 import { toast } from 'sonner'

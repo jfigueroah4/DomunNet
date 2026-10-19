@@ -1,6 +1,8 @@
 import dynamic from 'next/dynamic'
 import { proyectoService } from '@/services/proyectos/proyecto.service'
 
+export const runtime = 'edge'
+
 const ProyectoEditorView = dynamic(
   () => import('@/components/modules/proyectos/ProyectoEditorView').then((mod) => mod.ProyectoEditorView),
   {

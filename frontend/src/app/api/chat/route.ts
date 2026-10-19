@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { tienePermiso } from '@/lib/rutas-permisos';
 
+export const runtime = 'edge';
+
 export async function POST(req: Request) {
   try {
     const {

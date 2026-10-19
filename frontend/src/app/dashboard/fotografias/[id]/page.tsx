@@ -1,6 +1,8 @@
 // @ts-nocheck
 'use client'
 
+export const runtime = 'edge'
+
 import React, { useMemo, useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import dynamic from 'next/dynamic'

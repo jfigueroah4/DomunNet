@@ -8,6 +8,7 @@ const ProyectoEditorView = nextDynamic(
     loading: () => <div className="min-h-[50vh] animate-pulse rounded-xl bg-gray-100" />,
   }
 )
+export const runtime = 'edge'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
