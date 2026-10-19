@@ -1770,6 +1770,16 @@ export function ProyectoFormulario({
   const contratistaBloqueado = !empresaContratista?.trim()
   const supervisoraBloqueado = !empresaSupervisora?.trim()
 
+  // Verificación estricta de empresa Domun: Al menos una debe ser Domun (Ejecutora o Supervisora)
+  const esContratistaDomun = Boolean((empresaContratista || '').toLowerCase().trim().includes('domun'))
+  const esSupervisoraDomun = Boolean((empresaSupervisora || '').toLowerCase().trim().includes('domun'))
+  const tieneEmpresaDomun = esContratistaDomun || esSupervisoraDomun
+  const rolDomunActivo: 'ejecutora' | 'supervisora' = esContratistaDomun
+    ? 'ejecutora'
+    : esSupervisoraDomun
+    ? 'supervisora'
+    : 'ejecutora'
+
   // 3.3 Asignaciones de Personal
   const [delegadoResidenteId, setDelegadoResidenteId] = useState((proyectoInicial as any)?.delegadoResidenteId || (proyectoInicial as any)?.delegado_residente_id || '')
   const [delegadoResidente, setDelegadoResidente] = useState(proyectoInicial?.delegadoResidente || (proyectoInicial as any)?.delegado_residente || '')
@@ -2418,6 +2428,13 @@ export function ProyectoFormulario({
       newErrors.empresaSupervisora = true
       newErrorMessages.empresaSupervisora = 'La empresa supervisora es obligatoria.'
     }
+    if ((empresaContratista || '').trim() && (empresaSupervisora || '').trim() && !tieneEmpresaDomun) {
+      faltantes.push('Al menos una empresa debe ser Domun (Ejecutora o Supervisora)')
+      newErrors.empresaContratista = true
+      newErrors.empresaSupervisora = true
+      newErrorMessages.empresaContratista = 'Al menos una de las empresas (Ejecutora o Supervisora) debe ser Domun.'
+      newErrorMessages.empresaSupervisora = 'Al menos una de las empresas (Ejecutora o Supervisora) debe ser Domun.'
+    }
     if (!delegadoResidenteId) {
       faltantes.push('Delegado Residente')
       newErrors.delegadoResidenteId = true
@@ -2620,13 +2637,16 @@ export function ProyectoFormulario({
         modo_obra: modoObra,
         modoSupervision,
         modo_supervision: modoSupervision,
-        modoGestionFinanciera,
-        usarModoSabana: modoGestionFinanciera === 'sabana',
+        empresaDomunRol: rolDomunActivo,
+        modalidadDomun: rolDomunActivo === 'supervisora' ? modoSupervision : modoObra,
+        modoGestionFinanciera: rolDomunActivo === 'supervisora' ? modoSupervision : modoObra,
+        usarModoSabana: (rolDomunActivo === 'supervisora' ? modoSupervision : modoObra) === 'sabana',
         ambitoPlanTrabajo: ambito,
         ambito_plan_trabajo: ambito,
         montoPlanTrabajo: parseFloat(montoPlanTrabajo) || 0,
         monto_plan_trabajo: parseFloat(montoPlanTrabajo) || 0,
-        renglones: renglonesProyecto.filter((r) => r.seleccionado !== false),
+        renglones: renglonesProyecto,
+        renglones_seleccionados: renglonesProyecto.filter((r) => r.seleccionado !== false),
         estado: estado === 'activo' ? 'activo' : 'borrador',
         contratoEjecucion: contratoEjecucionData,
         contratoSupervision: contratoSupervisionData,
@@ -2891,13 +2911,16 @@ export function ProyectoFormulario({
       modo_obra: modoObra,
       modoSupervision,
       modo_supervision: modoSupervision,
-      modoGestionFinanciera,
-      usarModoSabana: modoGestionFinanciera === 'sabana',
+      empresaDomunRol: rolDomunActivo,
+      modalidadDomun: rolDomunActivo === 'supervisora' ? modoSupervision : modoObra,
+      modoGestionFinanciera: rolDomunActivo === 'supervisora' ? modoSupervision : modoObra,
+      usarModoSabana: (rolDomunActivo === 'supervisora' ? modoSupervision : modoObra) === 'sabana',
       ambitoPlanTrabajo,
       ambito_plan_trabajo: ambitoPlanTrabajo,
       montoPlanTrabajo: parseFloat(montoPlanTrabajo) || 0,
       monto_plan_trabajo: parseFloat(montoPlanTrabajo) || 0,
-      renglones: renglonesProyecto.filter((r) => r.seleccionado !== false),
+      renglones: renglonesProyecto,
+      renglones_seleccionados: renglonesProyecto.filter((r) => r.seleccionado !== false),
       estado: estadoFinal,
       contratoEjecucion: contratoEjecucionData,
       contratoSupervision: contratoSupervisionData,
@@ -2926,6 +2949,10 @@ export function ProyectoFormulario({
       const idParaActualizar = (esEditar && proyectoInicial?.id) ? proyectoInicial.id : idProyectoCreado
       if (idParaActualizar) {
         await api.put(`/proyectos/${idParaActualizar}`, payload)
+        try {
+          localStorage.setItem(`domun_proyecto_renglones_${idParaActualizar}`, JSON.stringify(renglonesProyecto))
+          localStorage.setItem(`domun_renglones_seleccionados_${idParaActualizar}`, JSON.stringify(renglonesProyecto.filter((r) => r.seleccionado !== false)))
+        } catch (_) {}
         limpiarCacheMemoria()
         try {
           sessionStorage.removeItem('domun_proyectos_cache')
@@ -2941,7 +2968,13 @@ export function ProyectoFormulario({
         const msj = estadoFinal === 'activo' ? 'Proyecto creado y activado exitosamente' : 'Proyecto guardado en Borrador'
         showSuccessToast(msj)
         const nuevoId = res.data?.data?.id
-        if (nuevoId) setIdProyectoCreado(nuevoId)
+        if (nuevoId) {
+          setIdProyectoCreado(nuevoId)
+          try {
+            localStorage.setItem(`domun_proyecto_renglones_${nuevoId}`, JSON.stringify(renglonesProyecto))
+            localStorage.setItem(`domun_renglones_seleccionados_${nuevoId}`, JSON.stringify(renglonesProyecto.filter((r) => r.seleccionado !== false)))
+          } catch (_) {}
+        }
         router.push(nuevoId ? `/dashboard/proyectos/${nuevoId}` : '/dashboard/proyectos')
       }
     } catch (err: any) {
@@ -2976,7 +3009,7 @@ export function ProyectoFormulario({
         )
       }
       case 3:
-        return Boolean(entidadContratante?.trim() && empresaContratista?.trim() && empresaSupervisora?.trim())
+        return Boolean(entidadContratante?.trim() && empresaContratista?.trim() && empresaSupervisora?.trim() && tieneEmpresaDomun)
       case 4:
         return Boolean(fechaAdjudicacion?.trim())
       case 5:
@@ -3009,6 +3042,18 @@ export function ProyectoFormulario({
                       const dFinNorm = normalizarTexto(direccionFin || '')
                       if (dIniNorm && dFinNorm && dIniNorm === dFinNorm) {
                         showErrorToast('La ubicación de destino no puede ser idéntica a la ubicación inicial.')
+                        return
+                      }
+                    }
+                    if (pasoActual === 3 && p.num > 3) {
+                      if (!empresaContratista?.trim() || !empresaSupervisora?.trim()) {
+                        showErrorToast('Debe ingresar la Empresa Ejecutora y la Empresa Supervisora.')
+                        return
+                      }
+                      if (!tieneEmpresaDomun) {
+                        setFieldError('empresaContratista', 'Al menos una empresa debe ser Domun.')
+                        setFieldError('empresaSupervisora', 'Al menos una empresa debe ser Domun.')
+                        showErrorToast('Al menos una de las empresas (Ejecutora o Supervisora) debe ser Domun.')
                         return
                       }
                     }
@@ -3351,6 +3396,78 @@ export function ProyectoFormulario({
               </div>
             </div>
 
+            {/* Banner Informativo y de Verificación de Empresa Domun Obligatoria */}
+            <div className={`p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 transition-all ${
+              tieneEmpresaDomun
+                ? esContratistaDomun
+                  ? 'bg-red-50/70 border-red-200 text-red-950'
+                  : 'bg-orange-50/70 border-orange-200 text-orange-950'
+                : 'bg-amber-50/80 border-amber-300 text-amber-900 ring-1 ring-amber-300/40'
+            }`}>
+              <div className="flex items-start sm:items-center gap-2.5">
+                <div className={`p-2 rounded-lg shrink-0 ${
+                  tieneEmpresaDomun
+                    ? esContratistaDomun ? 'bg-[#9B0F06] text-white' : 'bg-orange-700 text-white'
+                    : 'bg-amber-500 text-white'
+                }`}>
+                  <ShieldCheck size={16} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold font-[Poppins]">
+                      {tieneEmpresaDomun
+                        ? esContratistaDomun
+                          ? 'Domun asignado como Empresa Ejecutora (Obra)'
+                          : 'Domun asignado como Empresa Supervisora'
+                        : 'Requisito de Plataforma: Domun debe ser asignado'}
+                    </span>
+                    <span className={`text-[8.5px] font-bold px-2 py-0.2 rounded-full uppercase ${
+                      tieneEmpresaDomun
+                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                        : 'bg-amber-100 text-amber-800 border border-amber-300'
+                    }`}>
+                      {tieneEmpresaDomun ? 'Cumple Requisito' : 'Pendiente'}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-gray-600 mt-0.5 leading-snug">
+                    {tieneEmpresaDomun
+                      ? `La bitácora y plan de trabajo de este proyecto se gestionarán bajo el rol de ${esContratistaDomun ? 'Ejecución de Obra' : 'Supervisión'}.`
+                      : 'Obligatorio: En este proyecto, la Empresa Ejecutora o la Empresa Supervisora debe ser Domun.'}
+                  </p>
+                </div>
+              </div>
+              {!tieneEmpresaDomun && (
+                <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleSelectContratista('Domun')
+                      setSubTabPaso3('ejecutora')
+                      setFieldError('empresaContratista', null)
+                      setFieldError('empresaSupervisora', null)
+                    }}
+                    className="inline-flex items-center gap-1 rounded bg-[#9B0F06] hover:bg-[#7D0C05] text-white px-2.5 py-1 text-[10px] font-bold transition-all shadow-2xs cursor-pointer"
+                  >
+                    <HardHat size={11} />
+                    <span>Asignar Domun en Ejecutora</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleSelectSupervisora('Domun')
+                      setSubTabPaso3('supervisora')
+                      setFieldError('empresaContratista', null)
+                      setFieldError('empresaSupervisora', null)
+                    }}
+                    className="inline-flex items-center gap-1 rounded bg-orange-700 hover:bg-orange-800 text-white px-2.5 py-1 text-[10px] font-bold transition-all shadow-2xs cursor-pointer"
+                  >
+                    <ShieldCheck size={11} />
+                    <span>Asignar Domun en Supervisora</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
             {/* Sub-tabs para Paso 3 con diseño moderno estilo underline (img3) */}
             <div className="flex items-center gap-1 border-b border-gray-200">
               <button
@@ -3364,6 +3481,9 @@ export function ProyectoFormulario({
               >
                 <HardHat size={13} className={subTabPaso3 === 'ejecutora' ? 'text-[#9B0F06]' : 'text-gray-400'} />
                 <span>3.1 Empresa Ejecutora (Obra)</span>
+                {esContratistaDomun && (
+                  <span className="text-[8px] bg-red-100 text-[#9B0F06] px-1.5 py-0.2 rounded font-bold">Domun</span>
+                )}
               </button>
               <button
                 type="button"
@@ -3376,6 +3496,9 @@ export function ProyectoFormulario({
               >
                 <ShieldCheck size={13} className={subTabPaso3 === 'supervisora' ? 'text-orange-700' : 'text-gray-400'} />
                 <span>3.2 Empresa Supervisora</span>
+                {esSupervisoraDomun && (
+                  <span className="text-[8px] bg-orange-100 text-orange-700 px-1.5 py-0.2 rounded font-bold">Domun</span>
+                )}
               </button>
             </div>
 
@@ -3396,7 +3519,23 @@ export function ProyectoFormulario({
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
                   <div>
-                    <label className={labelClass}>Empresa Ejecutora <span className="text-[#9B0F06]">*</span></label>
+                    <div className="flex items-center justify-between mb-0.5">
+                      <label className={labelClass}>Empresa Ejecutora <span className="text-[#9B0F06]">*</span></label>
+                      {!esContratistaDomun && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleSelectContratista('Domun')
+                            setFieldError('empresaContratista', null)
+                            setFieldError('empresaSupervisora', null)
+                          }}
+                          className="text-[9px] font-bold text-[#9B0F06] hover:underline cursor-pointer flex items-center gap-0.5"
+                          title="Asignar a Domun como Empresa Ejecutora"
+                        >
+                          <span>+ Asignar Domun</span>
+                        </button>
+                      )}
+                    </div>
                     <Combobox
                       options={opcionesEmpresaConDomun(empresasContratistas)}
                       value={empresaContratista}
@@ -3803,7 +3942,23 @@ export function ProyectoFormulario({
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
                   <div>
-                    <label className={labelClass}>Empresa Supervisora <span className="text-[#9B0F06]">*</span></label>
+                    <div className="flex items-center justify-between mb-0.5">
+                      <label className={labelClass}>Empresa Supervisora <span className="text-[#9B0F06]">*</span></label>
+                      {!esSupervisoraDomun && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleSelectSupervisora('Domun')
+                            setFieldError('empresaContratista', null)
+                            setFieldError('empresaSupervisora', null)
+                          }}
+                          className="text-[9px] font-bold text-orange-700 hover:underline cursor-pointer flex items-center gap-0.5"
+                          title="Asignar a Domun como Empresa Supervisora"
+                        >
+                          <span>+ Asignar Domun</span>
+                        </button>
+                      )}
+                    </div>
                     <Combobox
                       options={opcionesEmpresaConDomun(empresasSupervisoras)}
                       value={empresaSupervisora}
@@ -4459,6 +4614,9 @@ export function ProyectoFormulario({
               >
                 <Banknote size={13} className={subTabPaso5 === 'ejecucion' ? 'text-[#9B0F06]' : 'text-gray-400'} />
                 <span>5.1 Financiero Obra (Ejecución)</span>
+                {esContratistaDomun && (
+                  <span className="text-[8px] bg-red-100 text-[#9B0F06] px-1.5 py-0.2 rounded font-bold">Domun</span>
+                )}
                 <span className={`text-[8.5px] px-1.5 py-0.2 rounded-full font-semibold ${
                   modoObra === 'sabana' ? 'bg-red-100 text-[#9B0F06]' : 'bg-gray-100 text-gray-600'
                 }`}>
@@ -4476,6 +4634,9 @@ export function ProyectoFormulario({
               >
                 <Banknote size={13} className={subTabPaso5 === 'supervision' ? 'text-orange-700' : 'text-gray-400'} />
                 <span>5.2 Financiero Supervisión</span>
+                {esSupervisoraDomun && (
+                  <span className="text-[8px] bg-orange-100 text-orange-700 px-1.5 py-0.2 rounded font-bold">Domun</span>
+                )}
                 <span className={`text-[8.5px] px-1.5 py-0.2 rounded-full font-semibold ${
                   modoSupervision === 'sabana' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-600'
                 }`}>
@@ -4570,28 +4731,29 @@ export function ProyectoFormulario({
                     </button>
                   </div>
 
-                  {modoObra === 'manual' && (
-                    <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-gray-200/80">
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <p className="text-[10.5px] font-bold text-gray-800">Renglones Habilitados para Bitácora</p>
-                          <span className="rounded-full bg-gray-100 border border-gray-200 px-1.5 py-0.2 text-[8.5px] font-bold text-gray-700">
-                            {renglonesProyecto.filter((r) => r.seleccionado !== false).length} seleccionados
-                          </span>
-                        </div>
-                        <p className="text-[9px] text-gray-500">
-                          Configura qué renglones estarán disponibles en la bitácora de obra.
-                        </p>
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-gray-200/80">
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-[10.5px] font-bold text-gray-800">Renglones Habilitados para Bitácora</p>
+                        <span className="rounded-full bg-gray-100 border border-gray-200 px-1.5 py-0.2 text-[8.5px] font-bold text-gray-700">
+                          {renglonesProyecto.filter((r) => r.seleccionado !== false).length} seleccionados
+                        </span>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setDrawerRenglonesAbierto(true)}
-                        className="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-2.5 py-1 text-[10.5px] font-bold text-gray-800 hover:bg-gray-50 active:scale-95 transition-all shadow-2xs cursor-pointer"
-                      >
-                        <span>Gestionar Renglones ({renglonesProyecto.filter((r) => r.seleccionado !== false).length})</span>
-                      </button>
+                      <p className="text-[9px] text-gray-500">
+                        {modoObra === 'sabana'
+                          ? 'Renglones habilitados para el registro en bitácora según la Hoja Sábana analítica.'
+                          : 'Configura qué renglones estarán disponibles en la bitácora de obra en modo manual.'}
+                      </p>
                     </div>
-                  )}
+                    <button
+                      type="button"
+                      onClick={() => setDrawerRenglonesAbierto(true)}
+                      className="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-2.5 py-1 text-[10.5px] font-bold text-gray-800 hover:bg-gray-50 active:scale-95 transition-all shadow-2xs cursor-pointer"
+                    >
+                      <Layers size={12} className="text-[#9B0F06]" />
+                      <span>Gestionar Renglones ({renglonesProyecto.filter((r) => r.seleccionado !== false).length})</span>
+                    </button>
+                  </div>
                 </div>
 
                 <div className="flex items-center justify-between border-b border-gray-100 pb-1.5">
@@ -4839,6 +5001,30 @@ export function ProyectoFormulario({
                           Ingreso manual y libre de montos en estimaciones de supervisión.
                         </p>
                       </div>
+                    </button>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-gray-200/80">
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-[10.5px] font-bold text-gray-800">Renglones Habilitados para Bitácora</p>
+                        <span className="rounded-full bg-gray-100 border border-gray-200 px-1.5 py-0.2 text-[8.5px] font-bold text-gray-700">
+                          {renglonesProyecto.filter((r) => r.seleccionado !== false).length} seleccionados
+                        </span>
+                      </div>
+                      <p className="text-[9px] text-gray-500">
+                        {modoSupervision === 'sabana'
+                          ? 'Renglones habilitados para el registro en bitácora según la Hoja Sábana analítica.'
+                          : 'Configura qué renglones estarán disponibles en la bitácora de supervisión en modo manual.'}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setDrawerRenglonesAbierto(true)}
+                      className="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-2.5 py-1 text-[10.5px] font-bold text-gray-800 hover:bg-gray-50 active:scale-95 transition-all shadow-2xs cursor-pointer"
+                    >
+                      <Layers size={12} className="text-orange-700" />
+                      <span>Gestionar Renglones ({renglonesProyecto.filter((r) => r.seleccionado !== false).length})</span>
                     </button>
                   </div>
                 </div>
@@ -5266,6 +5452,18 @@ export function ProyectoFormulario({
                     const dFinNorm = normalizarTexto(direccionFin || '')
                     if (dIniNorm && dFinNorm && dIniNorm === dFinNorm) {
                       showErrorToast('La ubicación de destino no puede ser idéntica a la ubicación inicial.')
+                      return
+                    }
+                  }
+                  if (pasoActual === 3) {
+                    if (!empresaContratista?.trim() || !empresaSupervisora?.trim()) {
+                      showErrorToast('Debe ingresar la Empresa Ejecutora y la Empresa Supervisora.')
+                      return
+                    }
+                    if (!tieneEmpresaDomun) {
+                      setFieldError('empresaContratista', 'Al menos una empresa debe ser Domun.')
+                      setFieldError('empresaSupervisora', 'Al menos una empresa debe ser Domun.')
+                      showErrorToast('Requisito indispensable: Al menos una de las empresas (Ejecutora o Supervisora) debe ser Domun.')
                       return
                     }
                   }

@@ -539,15 +539,35 @@ export function BitacoraForm({
         rengsBd = resReng.value.data.data.filter((r: any) => String(r.proyecto_id || r.proyectoId) === String(proyId))
       }
 
-      // 3. Determinar modalidad: 'manual' vs 'sabana'
-      const modoManual =
-        proy?.modoGestionFinanciera === 'manual' ||
-        proy?.modo_gestion_financiera === 'manual' ||
-        proy?.tipoObra === 'manual' ||
-        proy?.tipo_obra === 'manual' ||
-        proy?.usarModoSabana === false ||
-        proy?.tieneSabana === false ||
-        (Array.isArray(proy?.renglones_seleccionados) && proy.renglones_seleccionados.length > 0)
+      // 3. Determinar rol de Domun y su modalidad ('manual' vs 'sabana')
+      const nomContratista = String(proy?.empresaContratista || proy?.empresa_contratista || proy?.contratista || '').toUpperCase()
+      const nomSupervisora = String(proy?.empresaSupervisora || proy?.empresa_supervisora || proy?.supervisora || '').toUpperCase()
+      const esContratistaDomun = nomContratista.includes('DOMUN')
+      const esSupervisoraDomun = nomSupervisora.includes('DOMUN')
+      const rolDomun = proy?.empresaDomunRol || proy?.empresa_domun_rol || (esSupervisoraDomun && !esContratistaDomun ? 'supervisora' : 'ejecutora')
+      
+      const modalidadDomun =
+        proy?.modalidadDomun ||
+        proy?.modalidad_domun ||
+        (rolDomun === 'supervisora'
+          ? (proy?.modoSupervision || proy?.modo_supervision)
+          : (proy?.modoObra || proy?.modo_obra))
+
+      let modoManual = false
+      if (modalidadDomun === 'sabana') {
+        modoManual = false
+      } else if (modalidadDomun === 'manual') {
+        modoManual = true
+      } else {
+        modoManual =
+          proy?.modoGestionFinanciera === 'manual' ||
+          proy?.modo_gestion_financiera === 'manual' ||
+          proy?.tipoObra === 'manual' ||
+          proy?.tipo_obra === 'manual' ||
+          proy?.usarModoSabana === false ||
+          proy?.tieneSabana === false ||
+          (Array.isArray(proy?.renglones_seleccionados) && proy.renglones_seleccionados.length > 0)
+      }
 
       let renglonesValidos: any[] = []
 
@@ -581,13 +601,14 @@ export function BitacoraForm({
           []
 
         const seleccionados = listaOrigen.filter((item: any) => {
+          const estaMarcado = item.seleccionado === true || (item.seleccionado !== false && (localSel || proy?.renglones_seleccionados))
           const cant = Number(item.cantidadContratada || item.cantidad_contractual || item.cantidad || 0)
           const pu = Number(item.costoUnitarioDirecto || item.precio_unitario_directo || 0)
           const cantEjec = Number(item.cantidadEstePeriodo || item.cantidadAcumuladaAnterior || item.cantidad_ejecutada || 0)
-          return cant > 0 || pu > 0 || cantEjec > 0
+          return estaMarcado || cant > 0 || pu > 0 || cantEjec > 0
         })
 
-        const itemsFinales = seleccionados
+        const itemsFinales = seleccionados.length > 0 ? seleccionados : listaOrigen
         renglonesValidos = itemsFinales.map((item: any) => ({
           id: String(item.codigoDGC || item.codigo || item.id || 'R').trim(),
           renglonId: item.renglonId || (typeof item.id === 'string' && item.id.length === 36 ? item.id : undefined),
@@ -598,11 +619,33 @@ export function BitacoraForm({
           ),
         }))
       } else {
-        // --- MODO HOJA SÁBANA / PROYECTO ACTIVO: Renglones con registro económico en la hoja sábana ---
+        // --- MODO HOJA SÁBANA / PROYECTO ACTIVO: Renglones con registro económico o seleccionados ---
+        let localSelSabana: any[] = []
+        let localRengsSabana: any[] = []
+        if (proy?.id) {
+          try {
+            const sSel = localStorage.getItem(`domun_renglones_seleccionados_${proy.id}`)
+            if (sSel) {
+              const p = JSON.parse(sSel)
+              if (Array.isArray(p)) localSelSabana = p
+            }
+          } catch (_) {}
+          try {
+            const sRengs = localStorage.getItem(`domun_proyecto_renglones_${proy.id}`)
+            if (sRengs) {
+              const p = JSON.parse(sRengs)
+              if (Array.isArray(p)) localRengsSabana = p
+            }
+          } catch (_) {}
+        }
+
         const candidatos = [
           ...sabanaLocal,
           ...rengsBd,
           ...(Array.isArray(proy?.renglones_sabana) ? proy.renglones_sabana : []),
+          ...localSelSabana,
+          ...localRengsSabana,
+          ...(Array.isArray(proy?.renglones_seleccionados) ? proy.renglones_seleccionados : []),
           ...(Array.isArray(proy?.planTrabajo) ? proy.planTrabajo : []),
           ...(Array.isArray(proy?.renglones) ? proy.renglones : []),
         ]
@@ -621,6 +664,7 @@ export function BitacoraForm({
                                (item.avances_mensuales && Object.keys(item.avances_mensuales).length > 0) ||
                                (item.avancesMensualesPlan && Object.keys(item.avancesMensualesPlan).length > 0)
           const tieneMedicion = codigosConRegistro.has(cod)
+          const esSeleccionadoEnDrawer = item.seleccionado === true || (item.seleccionado !== false && (localSelSabana.some((s: any) => (s.codigoDGC || s.id) === cod) || (Array.isArray(proy?.renglones_seleccionados) && proy.renglones_seleccionados.some((s: any) => (s.codigoDGC || s.id) === cod))))
 
           const tieneRegistroSabana =
             cantContr > 0 ||
@@ -628,7 +672,8 @@ export function BitacoraForm({
             (costoUnit > 0 && cantContr > 0) ||
             cantEjec > 0 ||
             tieneAvances ||
-            tieneMedicion
+            tieneMedicion ||
+            esSeleccionadoEnDrawer
 
           if (tieneRegistroSabana && !mapaConRegistro.has(cod)) {
             mapaConRegistro.set(cod, {
