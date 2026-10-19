@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useCustomToast } from '@/hooks/useCustomToast';
-import { Eye, EyeOff, User, Lock, Info, X, ChevronDown, Trash2, ShieldAlert, Laptop, Smartphone } from 'lucide-react';
+import { Eye, EyeOff, User, Lock, X, ChevronDown, Trash2, ShieldAlert, Laptop, Smartphone } from 'lucide-react';
 import LoginInput from '@/components/ui/LoginInput';
 import LoginButton from '@/components/ui/LoginButton';
 import PasswordRecoveryModal from '@/components/modals/PasswordRecoveryModal';
@@ -43,66 +43,10 @@ function detectarDispositivoCliente(): string {
   return `${so} (${nav})`;
 }
 
-type AccesoRapido = {
-  id: string
-  name: string
-  email: string
-  password: string
-  role: string
-  roleLabel?: string
-}
-
 type SavedAccount = {
   username: string
   password?: string
 }
-
-const ACCESOS_RAPIDOS: AccesoRapido[] = [
-  {
-    id: 'admin',
-    name: 'Daniel Figueroa',
-    email: 'daniel.figueroa@domunnet.test',
-    password: 'mariobros25',
-    role: 'Administrador',
-  },
-  {
-    id: 'gerencia',
-    name: 'Jorge Figueroa',
-    email: 'jorge.figueroa@domunnet.test',
-    password: 'mariobros25',
-    role: 'Gerencia',
-  },
-  {
-    id: 'ingeniero-residente',
-    name: 'Raul Alvarado',
-    email: 'raul.alvarado@domunnet.test',
-    password: 'mariobros25',
-    role: 'IngenieroResidente',
-    roleLabel: 'Ingeniero Residente',
-  },
-  {
-    id: 'laboratorista',
-    name: 'Mario Tzul',
-    email: 'mario.tzul@domunnet.test',
-    password: 'mariobros25',
-    role: 'Laboratorista',
-  },
-  {
-    id: 'auxiliar-campo',
-    name: 'Camila Figueroa',
-    email: 'camila.figueroa@domunnet.test',
-    password: 'mariobros25',
-    role: 'AuxiliarDeCampo',
-    roleLabel: 'Auxiliar de Campo',
-  },
-  {
-    id: 'contratante',
-    name: 'Paola Recinos',
-    email: 'paola.recinos@domunnet.test',
-    password: 'mariobros25',
-    role: 'Contratante',
-  },
-]
 
 export default function LoginPage() {
   const passwordInputRef = useRef<HTMLInputElement>(null);
@@ -114,7 +58,6 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(false);
   const [isPasswordRecoveryOpen, setIsPasswordRecoveryOpen] = useState(false);
   const [isSupportOpen, setIsSupportOpen] = useState(false);
-  const [isQuickAccessOpen, setIsQuickAccessOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [modalLimiteDispositivosOpen, setModalLimiteDispositivosOpen] = useState(false);
   const [dispositivosActivos, setDispositivosActivos] = useState<Array<{
@@ -427,40 +370,7 @@ export default function LoginPage() {
         <div className="absolute inset-0 bg-black/10" />
       </div>
 
-      {/* TOP NAVBAR */}
-      <div className="absolute top-0 left-0 right-0 h-[64px] z-20 flex items-center justify-end pr-6 pointer-events-auto">
-        <button
-          type="button"
-          onClick={() => setIsQuickAccessOpen(true)}
-          style={{
-            width: "40px",
-            height: "40px",
-            borderRadius: "8px",
-            background: "rgba(255, 255, 255, 0.08)",
-            border: "1px solid rgba(255, 255, 255, 0.15)",
-            color: "rgba(255, 255, 255, 0.7)",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            transition: "all 0.2s",
-            fontSize: "18px",
-          }}
-          onMouseOver={(e) => {
-            e.currentTarget.style.background = "rgba(255, 255, 255, 0.15)";
-            e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.3)";
-            e.currentTarget.style.color = "rgba(255, 255, 255, 0.9)";
-          }}
-          onMouseOut={(e) => {
-            e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)";
-            e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.15)";
-            e.currentTarget.style.color = "rgba(255, 255, 255, 0.7)";
-          }}
-          title="Ayuda y acceso rápido"
-        >
-          ?
-        </button>
-      </div>
+
 
       {/* Contenedor principal centrado */}
       <div 
@@ -650,196 +560,7 @@ export default function LoginPage() {
         </form>
       </div>
 
-      {/* Quick Access Modal */}
-      {isQuickAccessOpen && (
-        <>
-          {/* Backdrop */}
-          <div
-            onClick={() => setIsQuickAccessOpen(false)}
-            style={{
-              position: 'fixed',
-              inset: 0,
-              background: 'rgba(0, 0, 0, 0.5)',
-              zIndex: 9998,
-              backdropFilter: 'blur(4px)',
-            }}
-          />
 
-          {/* Modal */}
-          <div
-            style={{
-              position: 'fixed',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              zIndex: 9999,
-              width: '90%',
-              maxWidth: '420px',
-            }}
-          >
-            <div
-              style={{
-                background: 'rgba(26, 0, 0, 0.95)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                borderRadius: '12px',
-                padding: '24px',
-                backdropFilter: 'blur(20px)',
-                boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
-              }}
-            >
-              {/* Header */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
-                  <div
-                    style={{
-                      padding: '8px',
-                      background: 'rgba(155, 15, 6, 0.15)',
-                      border: '1px solid rgba(155, 15, 6, 0.3)',
-                      borderRadius: '8px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <Info size={16} color="#ef4444" />
-                  </div>
-                  <div>
-                    <h2
-                      style={{
-                        margin: '0',
-                        fontSize: '15px',
-                        fontWeight: 700,
-                        color: 'rgba(255, 255, 255, 0.9)',
-                        fontFamily: "'Poppins', sans-serif",
-                      }}
-                    >
-                      Acceso Rápido - Demo
-                    </h2>
-                    <p
-                      style={{
-                        margin: '2px 0 0',
-                        fontSize: '12px',
-                        color: 'rgba(255, 255, 255, 0.6)',
-                        fontFamily: "'Poppins', sans-serif",
-                      }}
-                    >
-                      Selecciona una cuenta para acceder
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsQuickAccessOpen(false)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    color: 'rgba(255, 255, 255, 0.6)',
-                    padding: '0',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    transition: 'color 0.2s',
-                  }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.color = 'white'
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.color = 'rgba(255, 255, 255, 0.6)'
-                  }}
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              {/* Accounts Grid */}
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr',
-                  gap: '12px',
-                  marginBottom: '16px',
-                }}
-              >
-                {ACCESOS_RAPIDOS.map((cuenta) => (
-                  <button
-                    key={cuenta.id}
-                    type="button"
-                    onClick={() => {
-                      setUsername(cuenta.email);
-                      setPassword(cuenta.password);
-                      setIsQuickAccessOpen(false);
-                    }}
-                    style={{
-                      padding: '12px',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      borderRadius: '8px',
-                      background: 'transparent',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      fontFamily: "'Poppins', sans-serif",
-                      minWidth: '0',
-                      textAlign: 'center',
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
-                      e.currentTarget.style.borderColor = 'rgba(155, 15, 6, 0.3)'
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.background = 'transparent'
-                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)'
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontSize: '13px',
-                        fontWeight: 600,
-                        color: 'rgba(255, 255, 255, 0.9)',
-                        marginBottom: '4px',
-                      }}
-                    >
-                      {cuenta.roleLabel ?? cuenta.role}
-                    </div>
-                    <div
-                      style={{
-                        fontSize: '11px',
-                        color: 'rgba(255, 255, 255, 0.6)',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {cuenta.email}
-                    </div>
-                  </button>
-                ))}
-              </div>
-
-              {/* Info Box */}
-              <div
-                style={{
-                  padding: '12px',
-                  background: 'rgba(155, 15, 6, 0.15)',
-                  border: '1px solid rgba(155, 15, 6, 0.3)',
-                  borderRadius: '8px',
-                }}
-              >
-                <p
-                  style={{
-                    margin: '0',
-                    fontSize: '12px',
-                    color: 'rgba(255, 255, 255, 0.8)',
-                    fontFamily: "'Poppins', sans-serif",
-                    lineHeight: '1.4',
-                  }}
-                >
-                  <strong className="text-white font-semibold">Nota:</strong> Estas son cuentas de prueba sembradas en el sistema para validar cada rol.
-                </p>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
 
       {/* Modales */}
       <PasswordRecoveryModal
