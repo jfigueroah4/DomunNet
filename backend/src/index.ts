@@ -25,8 +25,29 @@ import { hojaSabanaRutas } from '@/modules/hojaSabana/hojaSabana.rutas'
 const app = express()
 const PORT = entorno.puerto
 app.set('trust proxy', 1)
-app.use(helmet())
-app.use(cors({ origin: entorno.origenCors, credentials: true }))
+const origenesPermitidos = (entorno.origenCors || '')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean)
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true)
+      if (
+        origenesPermitidos.includes(origin) ||
+        origin.endsWith('.pages.dev') ||
+        origin.endsWith('.onrender.com') ||
+        origin.includes('localhost') ||
+        origin.includes('127.0.0.1')
+      ) {
+        return callback(null, true)
+      }
+      return callback(null, true)
+    },
+    credentials: true,
+  })
+)
 app.use(morgan('combined'))
 app.use(
   rateLimit({
