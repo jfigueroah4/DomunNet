@@ -18,7 +18,6 @@ import {
   FileText,
   FolderPlus,
   Layers,
-  Info,
   Lock,
   Plus,
   Receipt,
@@ -191,9 +190,9 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
     pAny.usarModoSabana === false
   const ambitoPlanTrabajo = pAny.ambitoPlanTrabajo || pAny.ambito_plan_trabajo || 'obra'
   const esModoSabana = (pAny.modoGestionFinanciera === 'sabana' || pAny.usarModoSabana === true) && !modoManual
-  const perspectivaTieneSabana = esModoSabana && (
-    (ambitoPlanTrabajo === 'obra' && perspectivaEstimacion === 'ejecutora') ||
-    (ambitoPlanTrabajo === 'supervision' && perspectivaEstimacion === 'supervisora')
+  const perspectivaTieneSabana = (
+    (perspectivaEstimacion === 'ejecutora' && (pAny.modoObra === 'sabana' || (pAny.modoObra === undefined && esModoSabana && ambitoPlanTrabajo === 'obra'))) ||
+    (perspectivaEstimacion === 'supervisora' && (pAny.modoSupervision === 'sabana' || (pAny.modoSupervision === undefined && esModoSabana && ambitoPlanTrabajo === 'supervision')))
   )
   const perspectivaEsManual = !perspectivaTieneSabana
 
@@ -249,27 +248,132 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
   useEffect(() => {
     if (!proyecto?.id) return
     try {
-      const stored = localStorage.getItem(`domun_estimaciones_manuales_${proyecto.id}`)
-      if (stored) {
-        const parsed = JSON.parse(stored)
-        if (Array.isArray(parsed)) {
-          // Filtrar dummies de versiones anteriores para no mostrar estimaciones falsas
-          const limpios = parsed.filter(
-            (item: any) => !item.id?.startsWith('est-ejec-1-') && !item.id?.startsWith('est-sup-1-')
-          )
-          setEstimacionesManuales(limpios)
-          return
+      const sabanaStored = localStorage.getItem(`domun_estimaciones_sabana_${proyecto.id}`)
+      const manualStored = localStorage.getItem(`domun_estimaciones_manuales_${proyecto.id}`)
+      const activaStored = localStorage.getItem(`domun_estimacion_activa_${proyecto.id}`)
+
+      const mapa = new Map<string, EstimacionFinancieraItem>()
+
+      // 1. Cargar estimaciones de sábana
+      if (sabanaStored) {
+        try {
+          const parsedSab = JSON.parse(sabanaStored)
+          if (Array.isArray(parsedSab)) {
+            parsedSab.forEach((s: any) => {
+              const num = s.numero || 'Est. 01'
+              const bruto = Number(s.valorBruto || s.montoEstimacion || s.valorBrutoTrabajado || 0)
+              const pctAmort = Number(s.porcentajeAmortizacion ?? 20)
+              const amort = Number(s.montoAmortizacion ?? ((bruto * pctAmort) / 100))
+              const liq = Number(s.montoLiquido || s.montoLiquidoAPagar || (bruto - amort))
+              mapa.set(num, {
+                id: s.id || `est-sab-${num}`,
+                numero: num,
+                nombreEstimacion: s.nombreEstimacion || `Estimación de Obra - ${num}`,
+                delegadoResidente: s.delegadoResidente || (nombreDelegadoProyecto !== '-' ? nombreDelegadoProyecto : 'Delegado Residente'),
+                perspectiva: (s.perspectiva as any) || 'ejecutora',
+                fechaInicio: s.fechaInicio || '',
+                fechaFin: s.fechaFin || s.fechaCorte || '',
+                mes: s.mes || 'Periodo Obra',
+                diasRetraso: Number(s.diasRetraso || 0),
+                porcentajeRendimiento: Number(s.porcentajeRendimiento || s.rendimiento || 100),
+                calificacionDesempeno: (s.calificacionDesempeno as any) || 'bueno',
+                valorBrutoTrabajado: bruto,
+                porcentajeAmortizacion: pctAmort,
+                montoAmortizacion: amort,
+                montoLiquidoAPagar: liq,
+                saldoContractualRestante: Number(s.saldoContractualRestante || s.saldoRestante || 0),
+                estado: s.estado === 'cerrada' ? 'aprobada' : (s.estado || 'en_revision'),
+                supervisadoPor: s.supervisadoPor || nombreEmpresaSupervisora,
+                observaciones: s.notas || s.observaciones || 'Generada desde Hoja Sábana Analítica',
+              })
+            })
+          }
+        } catch {}
+      }
+
+      // 2. Cargar estimaciones de proyecto o manuales
+      const candidatas = [
+        ...(Array.isArray(pAny.estimaciones) ? pAny.estimaciones : []),
+        ...(Array.isArray(pAny.estimacionesManuales) ? pAny.estimacionesManuales : []),
+      ]
+      if (manualStored) {
+        try {
+          const parsed = JSON.parse(manualStored)
+          if (Array.isArray(parsed)) candidatas.push(...parsed)
+        } catch {}
+      }
+
+      candidatas.forEach((c: any) => {
+        const num = c.numero || 'Est. 01'
+        if (!mapa.has(num)) {
+          const bruto = Number(c.valorBruto || c.valorBrutoTrabajado || c.montoEstimacion || 0)
+          const pctAmort = Number(c.porcentajeAmortizacion ?? 20)
+          const amort = Number(c.montoAmortizacion ?? ((bruto * pctAmort) / 100))
+          const liq = Number(c.montoLiquido || c.montoLiquidoAPagar || (bruto - amort))
+          mapa.set(num, {
+            id: c.id || `est-${num}`,
+            numero: num,
+            nombreEstimacion: c.nombreEstimacion || `Estimación - ${num}`,
+            delegadoResidente: c.delegadoResidente || (nombreDelegadoProyecto !== '-' ? nombreDelegadoProyecto : 'Delegado Residente'),
+            perspectiva: (c.perspectiva as any) || 'ejecutora',
+            fechaInicio: c.fechaInicio || '',
+            fechaFin: c.fechaFin || c.fechaCorte || '',
+            mes: c.mes || 'Periodo',
+            diasRetraso: Number(c.diasRetraso || 0),
+            porcentajeRendimiento: Number(c.porcentajeRendimiento || c.rendimiento || 100),
+            calificacionDesempeno: (c.calificacionDesempeno as any) || 'bueno',
+            valorBrutoTrabajado: bruto,
+            porcentajeAmortizacion: pctAmort,
+            montoAmortizacion: amort,
+            montoLiquidoAPagar: liq,
+            saldoContractualRestante: Number(c.saldoContractualRestante || c.saldoRestante || 0),
+            estado: c.estado || 'borrador',
+            supervisadoPor: c.supervisadoPor || (c.perspectiva === 'supervisora' ? nombreEmpresaSupervisora : nombreEmpresaEjecutora),
+            observaciones: c.observaciones || '',
+          })
         }
+      })
+
+      // 3. Estimación activa actualmente abierta en Hoja Sábana
+      if (activaStored) {
+        try {
+          const act = JSON.parse(activaStored)
+          if (act && act.numero) {
+            const bruto = Number(act.valorBruto || act.valorBrutoTrabajado || act.montoEstimacion || 0)
+            const pctAmort = Number(act.porcentajeAmortizacion ?? 20)
+            const amort = Number(act.montoAmortizacion ?? ((bruto * pctAmort) / 100))
+            const liq = Number(act.montoLiquido || act.montoLiquidoAPagar || (bruto - amort))
+            mapa.set(act.numero, {
+              id: act.id || `est-activa-${act.numero}`,
+              numero: act.numero,
+              nombreEstimacion: `Estimación de Obra - ${act.numero} (En Progreso)`,
+              delegadoResidente: (nombreDelegadoProyecto !== '-' ? nombreDelegadoProyecto : 'Delegado Residente'),
+              perspectiva: 'ejecutora',
+              fechaInicio: act.fechaInicio || '',
+              fechaFin: act.fechaCorte || '',
+              mes: act.mes || 'Periodo Actual',
+              diasRetraso: 0,
+              porcentajeRendimiento: 100,
+              calificacionDesempeno: 'bueno',
+              valorBrutoTrabajado: bruto,
+              porcentajeAmortizacion: pctAmort,
+              montoAmortizacion: amort,
+              montoLiquidoAPagar: liq,
+              saldoContractualRestante: 0,
+              estado: 'en_revision',
+              supervisadoPor: nombreEmpresaSupervisora,
+              observaciones: act.notas || 'Estimación en progreso en Hoja Sábana',
+            })
+          }
+        } catch {}
       }
-      if (Array.isArray(pAny.estimacionesManuales) && pAny.estimacionesManuales.length > 0) {
-        setEstimacionesManuales(pAny.estimacionesManuales)
-      } else if (Array.isArray(pAny.estimaciones) && pAny.estimaciones.length > 0) {
-        setEstimacionesManuales(pAny.estimaciones)
-      } else {
-        setEstimacionesManuales([])
-      }
+
+      const lista = Array.from(mapa.values()).filter(
+        (item: any) => !item.id?.startsWith('est-ejec-1-') && !item.id?.startsWith('est-sup-1-')
+      )
+      setEstimacionesManuales(lista)
     } catch (e) {
-      console.warn('Error cargando estimaciones manuales:', e)
+      console.warn('Error cargando estimaciones:', e)
     }
   }, [proyecto?.id, pAny.estimacionesManuales, pAny.estimaciones])
 
@@ -297,8 +401,8 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
         codigoDGC: String(r.codigoDGC || r.codigo || `10${idx + 1}.01`),
         descripcion: r.descripcion || '',
         unidad: r.unidad || r.unidad_medida || 'm³',
-        cantidadContratada: Number(r.cantidadContratada ?? r.cantidad_contractual ?? r.cantidad ?? 1),
-        cantidadAjustada: Number(r.cantidadAjustada ?? r.cantidad_ajustada ?? r.cantidadContratada ?? 1),
+        cantidadContratada: Number(r.cantidadContratada ?? r.cantidad_contractual ?? r.cantidad ?? 0),
+        cantidadAjustada: Number(r.cantidadAjustada ?? r.cantidad_ajustada ?? r.cantidadContratada ?? 0),
         costoUnitarioDirecto: Number(r.costoUnitarioDirecto ?? r.precio_unitario_directo ?? r.precioUnitario ?? 0),
         cantidadEstePeriodo: Number(r.cantidadEstePeriodo || 0),
         cantidadAcumuladaAnterior: Number(r.cantidadAcumuladaAnterior || 0),
@@ -1496,48 +1600,32 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
 
             {/* Botón para crear o agregar estimación */}
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handleAbrirCrearEstimacionManual}
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-[#9B0F06] px-2.5 py-1.5 text-[10px] font-bold text-white hover:bg-[#7a0c05] transition-colors cursor-pointer shadow-2xs whitespace-nowrap"
-                title="Crear o registrar estimación"
-              >
-                <Plus size={12} />
-                <span>Nueva Estimación</span>
-              </button>
+              {esModoSabana ? (
+                <a
+                  href={`/dashboard/proyectos/${proyecto?.id || ''}/hoja-sabana`}
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-[#9B0F06] px-2.5 py-1.5 text-[10px] font-bold text-white hover:bg-[#7a0c05] transition-colors cursor-pointer shadow-2xs whitespace-nowrap"
+                  title="Gestionar periodos y estimaciones en Hoja Sábana"
+                >
+                  <FileSpreadsheet size={12} />
+                  <span>Gestionar en Hoja Sábana</span>
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleAbrirCrearEstimacionManual}
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-[#9B0F06] px-2.5 py-1.5 text-[10px] font-bold text-white hover:bg-[#7a0c05] transition-colors cursor-pointer shadow-2xs whitespace-nowrap"
+                  title="Crear o registrar estimación manual"
+                >
+                  <Plus size={12} />
+                  <span>Nueva Estimación</span>
+                </button>
+              )}
 
               <div className="text-[10px] text-gray-500 font-medium pl-1">
                 <strong className="text-gray-900">{estimacionesFiltradas.length}</strong> {estimacionesFiltradas.length === 1 ? 'estimación' : 'estimaciones'}
               </div>
             </div>
           </div>
-
-          {/* Banner contextual de Estimación según Ámbito del Plan de Trabajo en Modo Sábana */}
-          {esModoSabana && perspectivaEsManual && (
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50/70 p-3 shadow-2xs font-[Poppins]">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-100 text-amber-800 shrink-0 border border-amber-200">
-                  <Info size={16} />
-                </div>
-                <div>
-                  <h4 className="text-[11px] font-bold text-amber-900">
-                    Apartado de Estimación Manual: {perspectivaEstimacion === 'supervisora' ? 'Contrato de Supervisión' : 'Contrato de Obra (Ejecución)'}
-                  </h4>
-                  <p className="text-[9.5px] text-amber-800 leading-snug">
-                    El Plan de Trabajo con Hoja Sábana está implementado para el contrato de <strong>{ambitoPlanTrabajo === 'obra' ? 'Obra (Ejecución)' : 'Supervisión'}</strong>. En este apartado las estimaciones de <strong>{perspectivaEstimacion === 'supervisora' ? 'Supervisión' : 'Obra'}</strong> se van ingresando de forma manual.
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={handleAbrirCrearEstimacionManual}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-amber-700 px-3 py-1.5 text-[10px] font-bold text-white hover:bg-amber-800 transition-colors shadow-2xs shrink-0 cursor-pointer"
-              >
-                <Plus size={12} />
-                <span>+ Ingresar Estimación Manual</span>
-              </button>
-            </div>
-          )}
 
           {/* Tabla de Estimaciones con Acción (Solo Ojo / Editar) y Paginación */}
           <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xs">
@@ -1569,16 +1657,28 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
                             No hay estimaciones registradas
                           </p>
                           <p className="text-[10px] text-gray-500 leading-normal">
-                            Este proyecto no cuenta con estimaciones registradas en la perspectiva actual. Haz clic en el botón para crear la primera estimación progresiva.
+                            {esModoSabana
+                              ? 'Las estimaciones de este proyecto se generan y controlan directamente a través de la Hoja Sábana Analítica.'
+                              : 'Este proyecto no cuenta con estimaciones registradas en la perspectiva actual. Haz clic en el botón para crear la primera estimación progresiva.'}
                           </p>
-                          <button
-                            type="button"
-                            onClick={handleAbrirCrearEstimacionManual}
-                            className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-[#9B0F06] px-3.5 py-1.5 text-[10px] font-bold text-white hover:bg-[#7a0c05] transition-colors cursor-pointer shadow-xs"
-                          >
-                            <Plus size={12} />
-                            <span>Crear Primera Estimación</span>
-                          </button>
+                          {esModoSabana ? (
+                            <a
+                              href={`/dashboard/proyectos/${proyecto?.id || ''}/hoja-sabana`}
+                              className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-[#9B0F06] px-3.5 py-1.5 text-[10px] font-bold text-white hover:bg-[#7a0c05] transition-colors cursor-pointer shadow-xs"
+                            >
+                              <FileSpreadsheet size={12} />
+                              <span>Abrir Hoja Sábana</span>
+                            </a>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={handleAbrirCrearEstimacionManual}
+                              className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-[#9B0F06] px-3.5 py-1.5 text-[10px] font-bold text-white hover:bg-[#7a0c05] transition-colors cursor-pointer shadow-xs"
+                            >
+                              <Plus size={12} />
+                              <span>Crear Primera Estimación</span>
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

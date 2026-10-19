@@ -4,6 +4,7 @@ import {
   obtenerPerfilControlador,
   iniciarSesionControlador,
   cerrarSesionControlador,
+  liberarDispositivoControlador,
 } from '@/modules/autenticacion/autenticacion.controlador'
 
 const router = Router()
@@ -12,6 +13,7 @@ router.post('/iniciar-sesion', iniciarSesionControlador)
 router.post('/login', iniciarSesionControlador)
 router.post('/cerrar-sesion', cerrarSesionControlador)
 router.post('/logout', cerrarSesionControlador)
+router.post('/liberar-dispositivo', liberarDispositivoControlador)
 router.get('/perfil', autenticarSolicitud, obtenerPerfilControlador)
 
 export const autenticacionRutas: Router = router

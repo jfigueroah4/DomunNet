@@ -1402,7 +1402,17 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
   const [modalProcesarPendienteOpen, setModalProcesarPendienteOpen] = useState(false)
   const [pendienteSeleccionado, setPendienteSeleccionado] = useState<TrabajoPendienteItem | null>(null)
 
-  const [listaEstimaciones, setListaEstimaciones] = useState<Array<{ id: string; numero: string; mes?: string; fechaInicio: string; fechaCorte: string; estado: 'actual' | 'cerrada' }>>([])
+  const [listaEstimaciones, setListaEstimaciones] = useState<Array<{
+    id: string
+    numero: string
+    mes?: string
+    fechaInicio: string
+    fechaCorte: string
+    estado: 'actual' | 'cerrada'
+    montoEstimacion?: number
+    valorBruto?: number
+    montoLiquido?: number
+  }>>([])
   const [formEstNumero, setFormEstNumero] = useState('Estimación 01')
   const [formEstFechaInicio, setFormEstFechaInicio] = useState(new Date().toISOString().slice(0, 10))
   const [formEstFechaCorte, setFormEstFechaCorte] = useState(() => {
@@ -1411,17 +1421,29 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
   })
   const [formEstNotas, setFormEstNotas] = useState('')
 
-  // Cargar estado de estimación guardada en localStorage
+  // Cargar estado de estimación guardada en localStorage y proyecto
   useEffect(() => {
-    if (!proyecto?.id) return
+    const targetProjId = proyecto?.id || proyectoIdSeleccionado || id
+    if (!targetProjId || targetProjId === 'nuevo' || targetProjId === 'crear') return
     try {
-      const stored = localStorage.getItem(`domun_estimacion_activa_${proyecto.id}`)
+      const stored = localStorage.getItem(`domun_estimacion_activa_${targetProjId}`)
       if (stored) {
         const parsed = JSON.parse(stored)
         setEstimacionEnProgreso(parsed)
       }
+      const storedLista = localStorage.getItem(`domun_estimaciones_sabana_${targetProjId}`)
+      if (storedLista) {
+        const parsedLista = JSON.parse(storedLista)
+        if (Array.isArray(parsedLista) && parsedLista.length > 0) {
+          setListaEstimaciones(parsedLista)
+          return
+        }
+      }
+      if (Array.isArray(proyecto?.estimaciones) && proyecto.estimaciones.length > 0) {
+        setListaEstimaciones(proyecto.estimaciones)
+      }
     } catch {}
-  }, [proyecto?.id])
+  }, [proyecto?.id, proyectoIdSeleccionado, id])
 
   // Auto-abrir modal de Apertura de Estimación si el proyecto está ACTIVO y no hay estimación en progreso
   useEffect(() => {
@@ -2363,10 +2385,24 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
       const cantAjustada = isPlan ? (r.cantidadAjustadaPlan ?? r.cantidadAjustada) : r.cantidadAjustada
       const pu = isPlan ? (r.costoUnitarioDirectoPlan ?? r.costoUnitarioDirecto) : r.costoUnitarioDirecto
 
+      let cantPeriodo = isPlan ? 0 : r.cantidadEstePeriodo
+      let cantAcum = isPlan ? 0 : (r.cantidadAcumuladaAnterior || 0)
+
+      if (!isPlan && numEstimacionFiltro !== 'todos') {
+        const medEst = medicionesAnaliticas.filter(
+          (m) => m.codigoDGC === r.codigoDGC && (m.numEstimacion === numEstimacionFiltro || m.mesPeriodo === numEstimacionFiltro)
+        )
+        if (medEst.length > 0) {
+          cantPeriodo = medEst.reduce((sum, m) => sum + (m.cantidadCalculada || 0), 0)
+        } else {
+          cantPeriodo = Number(r.avancesMensuales?.[numEstimacionFiltro] || 0)
+        }
+      }
+
       const costoContratado = cantContratada * pu
       const costoAjustado = cantAjustada * pu
-      const costoEstePeriodo = r.cantidadEstePeriodo * pu
-      const costoAcumAnterior = r.cantidadAcumuladaAnterior * pu
+      const costoEstePeriodo = cantPeriodo * pu
+      const costoAcumAnterior = cantAcum * pu
       const costoTotalFecha = costoEstePeriodo + costoAcumAnterior
       const saldo = Math.max(0, costoAjustado - costoTotalFecha)
 
@@ -2390,7 +2426,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
     })
 
     return mapa
-  }, [renglones, modoVistaSabana])
+  }, [renglones, modoVistaSabana, numEstimacionFiltro, medicionesAnaliticas])
 
   const formatFechaDisplay = (str: string): string => {
     if (!str) return ''
@@ -2491,6 +2527,8 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
     const uAny = user as any
     const responsableNombre = user ? `${uAny?.primerNombre || uAny?.primer_nombre || user.nombre || 'Ingeniero'} ${uAny?.primerApellido || uAny?.primer_apellido || user.apellido || ''}`.trim() : 'Residente de Obra'
 
+    const targetProjId = proyecto?.id || proyectoIdSeleccionado || id
+
     const nuevaEst = {
       id: `est-${Date.now()}`,
       numero: formEstNumero.trim() || 'Estimación 01',
@@ -2501,18 +2539,24 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
       creadoEn: new Date().toLocaleDateString('es-GT'),
       creadoPor: responsableNombre,
       estado: 'actual' as const,
+      montoEstimacion: 0,
+      valorBruto: 0,
+      montoLiquido: 0,
     }
 
     setEstimacionEnProgreso(nuevaEst)
-    try {
-      if (proyecto?.id) {
-        localStorage.setItem(`domun_estimacion_activa_${proyecto.id}`, JSON.stringify(nuevaEst))
-      }
-    } catch {}
-
-    setListaEstimaciones((prev) => [...prev.map((e) => ({ ...e, estado: 'cerrada' as const })), nuevaEst])
+    const listaActualizada = [...listaEstimaciones.map((e) => ({ ...e, estado: 'cerrada' as const })), nuevaEst]
+    setListaEstimaciones(listaActualizada)
     setNumEstimacionFiltro(nuevaEst.numero)
     setModalAperturaEstimacionOpen(false)
+
+    if (targetProjId) {
+      localStorage.setItem(`domun_estimacion_activa_${targetProjId}`, JSON.stringify(nuevaEst))
+      localStorage.setItem(`domun_estimaciones_sabana_${targetProjId}`, JSON.stringify(listaActualizada))
+      localStorage.setItem(`domun_estimaciones_manuales_${targetProjId}`, JSON.stringify(listaActualizada))
+      api.put(`/proyectos/${targetProjId}`, { estimaciones: listaActualizada }).catch(() => {})
+    }
+
     showSuccessToast(`Se aperturó con éxito el periodo ${nuevaEst.numero} (${nuevaEst.fechaInicio} al ${nuevaEst.fechaCorte})`)
   }
 
@@ -2532,15 +2576,29 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
 
     setRenglones(nuevosRenglones)
 
-    setListaEstimaciones((prev) =>
-      prev.map((e) => (e.id === estimacionEnProgreso.id || e.numero === estimacionEnProgreso.numero ? { ...e, estado: 'cerrada' } : e))
-    )
+    const montoCalculadoCierre = valorTotalEstimacionSumaEstePeriodo || valorTotalEstimacionBrutoGlobal || 0
+    const nuevasEstimaciones = listaEstimaciones.map((e) => {
+      if (e.id === estimacionEnProgreso.id || e.numero === estimacionEnProgreso.numero) {
+        return {
+          ...e,
+          estado: 'cerrada' as const,
+          montoEstimacion: montoCalculadoCierre,
+          valorBruto: valorTotalEstimacionBrutoGlobal,
+          montoLiquido: liquidoAPagarNetoContratista,
+        }
+      }
+      return e
+    })
+
+    setListaEstimaciones(nuevasEstimaciones)
 
     const numCerrado = estimacionEnProgreso.numero
     setEstimacionEnProgreso(null)
     const targetProjId = proyecto?.id || proyectoIdSeleccionado || id
     if (targetProjId) {
       localStorage.removeItem(`domun_estimacion_activa_${targetProjId}`)
+      localStorage.setItem(`domun_estimaciones_sabana_${targetProjId}`, JSON.stringify(nuevasEstimaciones))
+      localStorage.setItem(`domun_estimaciones_manuales_${targetProjId}`, JSON.stringify(nuevasEstimaciones))
 
       // Persistir automáticamente el avance acumulado cerrado en el backend
       let totalPlan = 0
@@ -2805,8 +2863,20 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
   const montoContractualOriginalTotal = resLiquidacionContratadoGlobal.valorTotalEstimacion
 
   const subtotalCostoDirectoGlobalPeriodo = useMemo(() => {
+    if (modoVistaSabana === 'planificacion') return 0
+    if (numEstimacionFiltro !== 'todos') {
+      return renglones.reduce((sum, r) => {
+        const medEst = medicionesAnaliticas.filter(
+          (m) => m.codigoDGC === r.codigoDGC && (m.numEstimacion === numEstimacionFiltro || m.mesPeriodo === numEstimacionFiltro)
+        )
+        const cantEst = medEst.length > 0
+          ? medEst.reduce((s, m) => s + (m.cantidadCalculada || 0), 0)
+          : Number(r.avancesMensuales?.[numEstimacionFiltro] || 0)
+        return sum + cantEst * r.costoUnitarioDirecto
+      }, 0)
+    }
     return renglones.reduce((sum, r) => sum + r.cantidadEstePeriodo * r.costoUnitarioDirecto, 0)
-  }, [renglones])
+  }, [renglones, modoVistaSabana, numEstimacionFiltro, medicionesAnaliticas])
 
   const subtotalCostoDirectoAcumuladoAnteriorGlobal = useMemo(() => {
     return renglones.reduce((sum, r) => sum + (r.cantidadAcumuladaAnterior || 0) * r.costoUnitarioDirecto, 0)
@@ -3741,7 +3811,45 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
               </button>
             </div>
           ) : (
-            <div ref={tableScrollRef} className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-270px)] scroll-smooth">
+            <>
+              {/* Barra de estado distintiva del modo Planificación / Inicial vs Modo Actual */}
+              <div className={`flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 text-[9.5px] border-b font-[Poppins] ${
+                modoVistaSabana === 'planificacion'
+                  ? 'bg-amber-50/90 border-amber-200 text-amber-900'
+                  : 'bg-emerald-50/90 border-emerald-200 text-emerald-900'
+              }`}>
+                <div className="flex items-center gap-2">
+                  {modoVistaSabana === 'planificacion' ? (
+                    <>
+                      <Calendar size={13} className="text-amber-700 shrink-0" />
+                      <span>
+                        <strong>Modo Planificación / Línea Base ({modoVistaLineaBase === 'inicial' ? 'Inicial' : 'Modificada'}):</strong> Visualizando programación contractual. Las columnas de ejecución real inician en 0.
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <Clock size={13} className="text-emerald-700 shrink-0" />
+                      <span>
+                        <strong>Modo Actual:</strong> Seguimiento de mediciones y avance físico real en obra.
+                        {numEstimacionFiltro !== 'todos' && (
+                          <span className="ml-1 font-bold underline">Valores adaptados a {numEstimacionFiltro}.</span>
+                        )}
+                      </span>
+                    </>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className={`px-2 py-0.5 rounded text-[8.5px] font-bold font-mono uppercase tracking-wider border ${
+                    modoVistaSabana === 'planificacion'
+                      ? 'bg-amber-100 text-amber-900 border-amber-300'
+                      : 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                  }`}>
+                    {modoVistaSabana === 'planificacion' ? 'Línea Base / Plan' : (numEstimacionFiltro !== 'todos' ? numEstimacionFiltro : 'Ejecución Actual')}
+                  </span>
+                </div>
+              </div>
+
+              <div ref={tableScrollRef} className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-270px)] scroll-smooth">
               <table className="w-full text-[9.5px] leading-tight">
                 <thead className="sticky top-0 z-20 bg-gray-50 shadow-2xs">
                   <tr className="border-b border-gray-300 bg-gray-50 text-gray-600 font-medium uppercase tracking-wider text-left text-[8.5px] whitespace-nowrap select-none">
@@ -3961,8 +4069,20 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                             const costoTotalDirectoG = Math.round(cantContratadaD * costoUnitF * 100) / 100
                             const costoTotalAjustadoH = Math.round(cantAjustadaE * costoUnitF * 100) / 100
 
-                            const cantEstePeriodoI = r.cantidadEstePeriodo
-                            const cantAcumAnteriorJ = esEditando ? Number(datosEditando.cantidadAcumuladaAnterior ?? r.cantidadAcumuladaAnterior) : r.cantidadAcumuladaAnterior
+                            let cantEstePeriodoI = isPlanMode ? 0 : r.cantidadEstePeriodo
+                            let cantAcumAnteriorJ = isPlanMode ? 0 : (esEditando ? Number(datosEditando.cantidadAcumuladaAnterior ?? r.cantidadAcumuladaAnterior) : r.cantidadAcumuladaAnterior)
+
+                            if (!isPlanMode && numEstimacionFiltro !== 'todos') {
+                              const medEst = medicionesAnaliticas.filter(
+                                (m) => m.codigoDGC === r.codigoDGC && (m.numEstimacion === numEstimacionFiltro || m.mesPeriodo === numEstimacionFiltro)
+                              )
+                              if (medEst.length > 0) {
+                                cantEstePeriodoI = medEst.reduce((sum, m) => sum + (m.cantidadCalculada || 0), 0)
+                              } else {
+                                cantEstePeriodoI = Number(r.avancesMensuales?.[numEstimacionFiltro] || 0)
+                              }
+                            }
+
                             const cantTotalFechaK = cantEstePeriodoI + cantAcumAnteriorJ
                             const pctAvanceCantL = (!cantAjustadaE || cantAjustadaE <= 0 || isNaN(cantAjustadaE)) ? 0 : (cantTotalFechaK / cantAjustadaE) * 100
 
@@ -4280,6 +4400,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                 </tbody>
               </table>
             </div>
+            </>
           )}
 
           {/* Paginación */}

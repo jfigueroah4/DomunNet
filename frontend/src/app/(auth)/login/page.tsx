@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useCustomToast } from '@/hooks/useCustomToast';
-import { Eye, EyeOff, User, Lock, X, ChevronDown, Trash2, ShieldAlert, Laptop, Smartphone } from 'lucide-react';
+import { Eye, EyeOff, User, Lock, X, ChevronDown, Trash2, Laptop, Smartphone } from 'lucide-react';
 import LoginInput from '@/components/ui/LoginInput';
 import LoginButton from '@/components/ui/LoginButton';
 import PasswordRecoveryModal from '@/components/modals/PasswordRecoveryModal';
@@ -59,6 +59,7 @@ export default function LoginPage() {
   const [isPasswordRecoveryOpen, setIsPasswordRecoveryOpen] = useState(false);
   const [isSupportOpen, setIsSupportOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loginStatusText, setLoginStatusText] = useState('Ingresando...');
   const [modalLimiteDispositivosOpen, setModalLimiteDispositivosOpen] = useState(false);
   const [dispositivosActivos, setDispositivosActivos] = useState<Array<{
     id: string;
@@ -70,6 +71,11 @@ export default function LoginPage() {
   const [showRememberedDropdown, setShowRememberedDropdown] = useState(false);
 
   useEffect(() => {
+    // Despertar el backend inmediatamente en segundo plano al cargar el login para eliminar cold starts
+    try {
+      api.get('/health', { timeout: 3500 }).catch(() => {});
+    } catch (_) {}
+
     try {
       const raw = localStorage.getItem('domun_remembered_accounts');
       let accounts: SavedAccount[] = [];
@@ -96,6 +102,14 @@ export default function LoginPage() {
     } catch (err) {
       console.error('Error cargando usuarios recordados:', err);
     }
+
+    // Liberar en segundo plano cualquier sesión que haya quedado en este equipo si está en pantalla login
+    try {
+      const devId = getOrCreateDeviceId();
+      if (devId) {
+        api.post('/auth/liberar-dispositivo', { deviceId: devId }).catch(() => {});
+      }
+    } catch (_) {}
   }, []);
 
   const { showErrorToast, showSuccessToast } = useCustomToast();
@@ -139,13 +153,17 @@ export default function LoginPage() {
     const deviceId = getOrCreateDeviceId();
     const dispositivo = detectarDispositivoCliente();
 
-    const res = await api.post('/auth/iniciar-sesion', {
-      correo: identificador,
-      contrasena,
-      deviceId,
-      dispositivo,
-      cerrarOtrasSesiones: Boolean(cerrarOtrasSesiones),
-    });
+    const res = await api.post(
+      '/auth/iniciar-sesion',
+      {
+        correo: identificador,
+        contrasena,
+        deviceId,
+        dispositivo,
+        cerrarOtrasSesiones: Boolean(cerrarOtrasSesiones),
+      },
+      { timeout: 12000 }
+    );
 
     const token = res.data?.data?.token;
     if (token && typeof document !== 'undefined') {
@@ -158,7 +176,13 @@ export default function LoginPage() {
     localStorage.removeItem('domun_notificaciones_borradas');
     sessionStorage.removeItem('domun_notificaciones_borradas');
 
-    // Solicitar al navegador que guarde/actualice las credenciales (Credential Management API)
+    // Guardar perfil de usuario retornado por el login para acceso instantáneo
+    const usuarioLogueado = res.data?.data?.usuario;
+    if (usuarioLogueado) {
+      localStorage.setItem('domun_user_profile', JSON.stringify(usuarioLogueado));
+    }
+
+    // Solicitar al navegador que guarde las credenciales de forma asíncrona (sin bloquear redirección)
     try {
       if (typeof window !== 'undefined' && 'credentials' in navigator && (window as any).PasswordCredential) {
         let cred: any = null;
@@ -175,12 +199,10 @@ export default function LoginPage() {
           });
         }
         if (cred) {
-          await navigator.credentials.store(cred);
+          navigator.credentials.store(cred).catch(() => {});
         }
       }
-    } catch (e) {
-      console.warn('Browser password saving skipped:', e);
-    }
+    } catch (_) {}
 
     if (rememberMe) {
       try {
@@ -219,17 +241,8 @@ export default function LoginPage() {
       } catch {}
     }
 
-    try {
-      // Precargar perfil de forma inmediata para que el dashboard abra instantáneo
-      const resPerfil = await api.get('/auth/perfil');
-      if (resPerfil.data?.success && resPerfil.data?.data) {
-        localStorage.setItem('domun_user_profile', JSON.stringify(resPerfil.data.data));
-      }
-    } catch (_) {}
-
-    setTimeout(() => {
-      window.location.href = '/dashboard';
-    }, 200);
+    // Redirección inmediata al dashboard sin esperas
+    window.location.replace('/dashboard');
   };
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -265,15 +278,26 @@ export default function LoginPage() {
     }
 
     setIsSubmitting(true);
+    setLoginStatusText('Ingresando...');
+    const t1 = setTimeout(() => setLoginStatusText('Validando credenciales...'), 1800);
+    const t2 = setTimeout(() => setLoginStatusText('Conectando con el servidor...'), 4500);
 
     try {
       await iniciarSesion(username, password, formEl);
     } catch (error: any) {
+      clearTimeout(t1);
+      clearTimeout(t2);
       setEmailError(true);
       setPasswordError(true);
 
       const status = error?.response?.status;
       const serverMsg = error?.response?.data?.mensaje || error?.response?.data?.message;
+
+      // Timeout explícito de axios o conexión tardía
+      if (error?.code === 'ECONNABORTED' || (!error.response && error.message?.toLowerCase().includes('timeout'))) {
+        showErrorToast('El servidor está iniciando o tardó en responder. Por favor intenta de nuevo en unos segundos.');
+        return;
+      }
 
       // Si es un fallo de conexión / backend iniciando (ECONNREFUSED / 502 / 503 / 504 / red caída)
       if (!error.response || status >= 500) {
@@ -323,19 +347,10 @@ export default function LoginPage() {
         showErrorToast(serverMsg || 'Error al iniciar sesión. Intenta de nuevo.');
       }
     } finally {
+      clearTimeout(t1);
+      clearTimeout(t2);
       setIsSubmitting(false);
-    }
-  };
-
-  const handleForzarInicioSesion = async () => {
-    setIsSubmitting(true);
-    try {
-      await iniciarSesion(username, password, undefined, true);
-      setModalLimiteDispositivosOpen(false);
-    } catch (err: any) {
-      showErrorToast(err?.response?.data?.mensaje || 'Error al iniciar sesión.');
-    } finally {
-      setIsSubmitting(false);
+      setLoginStatusText('Ingresando...');
     }
   };
 
@@ -540,7 +555,7 @@ export default function LoginPage() {
 
           {/* Login Button */}
           <LoginButton type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Ingresando...' : 'Iniciar sesión'}
+            {isSubmitting ? loginStatusText : 'Iniciar sesión'}
           </LoginButton>
 
           {/* Legal / Policy Links */}
@@ -582,27 +597,22 @@ export default function LoginPage() {
             className="w-full max-w-md rounded-2xl bg-white p-5 sm:p-6 shadow-2xl border border-gray-100 space-y-4 animate-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-start gap-3.5">
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-100 text-amber-700 shrink-0">
-                <ShieldAlert size={24} />
-              </div>
+            <div className="flex items-start justify-between gap-3">
               <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-extrabold text-gray-900 leading-tight">
-                    Límite de Dispositivos Alcanzado
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={() => setModalLimiteDispositivosOpen(false)}
-                    className="p-1 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700 cursor-pointer"
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
+                <h3 className="text-sm font-extrabold text-gray-900 leading-tight">
+                  Límite de Dispositivos Alcanzado
+                </h3>
                 <p className="text-[11px] text-gray-500 mt-0.5">
                   Máximo <strong>2 dispositivos simultáneos</strong> permitidos por cuenta.
                 </p>
               </div>
+              <button
+                type="button"
+                onClick={() => setModalLimiteDispositivosOpen(false)}
+                className="p-1 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700 cursor-pointer"
+              >
+                <X size={16} />
+              </button>
             </div>
 
             <p className="text-xs text-gray-600 leading-relaxed">
@@ -642,27 +652,14 @@ export default function LoginPage() {
               )}
             </div>
 
-            <div className="rounded-xl bg-amber-50/80 border border-amber-200 p-2.5 text-[11px] text-amber-900 leading-snug">
-              ¿Deseas cerrar las sesiones en los otros dispositivos para poder ingresar inmediatamente en este equipo?
-            </div>
-
             {/* Acciones */}
-            <div className="flex flex-col-reverse sm:flex-row items-center justify-end gap-2 pt-2 border-t border-gray-100">
+            <div className="flex items-center justify-end pt-2 border-t border-gray-100">
               <button
                 type="button"
                 onClick={() => setModalLimiteDispositivosOpen(false)}
-                className="w-full sm:w-auto px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer text-center"
+                className="w-full sm:w-auto px-5 py-2 text-xs font-bold text-white bg-[#9B0F06] hover:bg-[#7a0c05] rounded-xl transition-colors cursor-pointer text-center"
               >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={handleForzarInicioSesion}
-                disabled={isSubmitting}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-[#9B0F06] hover:bg-[#7a0c05] rounded-xl shadow-xs transition-colors cursor-pointer disabled:opacity-50"
-              >
-                <ShieldAlert size={14} />
-                <span>Cerrar otras sesiones e ingresar</span>
+                Entendido
               </button>
             </div>
           </div>

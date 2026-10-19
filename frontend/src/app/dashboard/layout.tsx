@@ -15,15 +15,25 @@ import { apiGetDeduplicado } from '@/lib/api/cliente'
 function getSectionTitle(pathname: string) {
   if (pathname === '/dashboard') return 'INICIO'
   if (pathname.startsWith('/dashboard/proyectos/') && pathname.includes('/editar')) return 'EDITAR PROYECTO'
+  if (pathname.startsWith('/dashboard/proyectos/nuevo')) return 'NUEVO PROYECTO'
   if (pathname.startsWith('/dashboard/proyectos/')) return 'DETALLE PROYECTO'
   if (pathname.startsWith('/dashboard/proyectos')) return 'PROYECTOS'
   if (pathname.startsWith('/dashboard/bitacora')) return 'BITÁCORA'
   if (pathname.startsWith('/dashboard/fotografias')) return 'FOTOGRAFÍAS'
   if (pathname.startsWith('/dashboard/reportes')) return 'REPORTES'
+  if (pathname.startsWith('/dashboard/estadisticas')) return 'ESTADÍSTICAS'
   if (pathname.startsWith('/dashboard/usuarios')) return 'USUARIOS'
   if (pathname.startsWith('/dashboard/roles')) return 'ROLES'
+  if (pathname.startsWith('/dashboard/configuracion/backup')) return 'BACKUP'
+  if (pathname.startsWith('/dashboard/configuracion/restauracion')) return 'RESTAURACIÓN'
+  if (pathname.startsWith('/dashboard/configuracion/mantenimiento-tablas')) return 'TABLAS'
+  if (pathname.startsWith('/dashboard/configuracion/notificaciones')) return 'NOTIFICACIONES'
+  if (pathname.startsWith('/dashboard/configuracion/reinicio')) return 'REINICIO'
+  if (pathname.startsWith('/dashboard/configuracion/general')) return 'GENERAL'
+  if (pathname.startsWith('/dashboard/configuracion/tablas')) return 'TABLAS'
   if (pathname.startsWith('/dashboard/configuracion')) return 'CONFIGURACIÓN'
   if (pathname.startsWith('/dashboard/perfil')) return 'PERFIL'
+  if (pathname.startsWith('/dashboard/tickets')) return 'TICKETS'
   if (pathname.startsWith('/dashboard/soporte')) return 'SOPORTE'
   return 'INICIO'
 }
@@ -48,7 +58,7 @@ function getSectionDisplayTitle(pathname: string): string {
   if (pathname.startsWith('/dashboard/usuarios')) return 'Usuarios'
   if (pathname.startsWith('/dashboard/roles')) return 'Roles'
   if (pathname.startsWith('/dashboard/configuracion/mantenimiento-tablas')) return 'Mantenimiento de Tablas'
-  if (pathname.startsWith('/dashboard/configuracion/backup')) return 'Respaldos'
+  if (pathname.startsWith('/dashboard/configuracion/backup')) return 'Backup'
   if (pathname.startsWith('/dashboard/configuracion/restauracion')) return 'Restauración'
   if (pathname.startsWith('/dashboard/configuracion/reinicio')) return 'Reinicio'
   if (pathname.startsWith('/dashboard/configuracion/notificaciones')) return 'Notificaciones'
@@ -158,7 +168,7 @@ export default function DashboardLayout({
       <Sidebar collapsed={collapsed} />
       <div className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden bg-[#F3F4F7]">
         <TopBar section={section} onToggle={() => setCollapsed(!collapsed)} />
-        <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-3.5 sm:px-4 pt-3.5 sm:pt-4 pb-20 sm:pb-24 md:pb-6 xl:px-5 overscroll-y-contain">
+        <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-3.5 sm:px-4 pt-3.5 sm:pt-4 pb-32 sm:pb-36 md:pb-6 xl:px-5 overscroll-y-contain">
           <div className="mx-auto w-full max-w-[1600px] min-w-0">
             {autorizado ? children : <AccessDenied />}
           </div>

@@ -2,11 +2,12 @@
 
 import { useState, useRef, useMemo, useEffect } from 'react'
 import {
-  ArrowLeft, RotateCcw, UploadCloud, FileArchive, CheckCircle2, ShieldAlert, X, Search, ChevronLeft, ChevronRight
+  ArrowLeft, RotateCcw, UploadCloud, FileArchive, CheckCircle2, ShieldAlert, X, Search, ChevronLeft, ChevronRight, SlidersHorizontal
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { api } from '@/lib/api/cliente'
 import { showErrorToast, showSuccessToast } from '@/hooks/useCustomToast'
+import { useUIStore } from '@/stores/useUIStore'
 
 const POPPINS = "'Poppins', sans-serif"
 
@@ -31,6 +32,33 @@ export default function RestauracionDatosPage() {
   const [busqueda, setBusqueda] = useState('')
   const [fechaInicio, setFechaInicio] = useState('')
   const [fechaFin, setFechaFin] = useState('')
+
+  // Bottom Sheet Mobile
+  const [sheetFiltrosAbierto, setSheetFiltrosAbierto] = useState(false)
+  const setOcultarBottomNav = useUIStore((s) => s.setOcultarBottomNav)
+
+  const abrirSheetFiltros = () => {
+    setSheetFiltrosAbierto(true)
+    setOcultarBottomNav(true)
+  }
+
+  const cerrarSheetFiltros = () => {
+    setSheetFiltrosAbierto(false)
+    setOcultarBottomNav(false)
+  }
+
+  useEffect(() => {
+    return () => {
+      setOcultarBottomNav(false)
+    }
+  }, [setOcultarBottomNav])
+
+  const cantidadFiltrosActivos = useMemo(() => {
+    let c = 0
+    if (fechaInicio) c++
+    if (fechaFin) c++
+    return c
+  }, [fechaInicio, fechaFin])
 
   // Paginación
   const [paginaActual, setPaginaActual] = useState(1)
@@ -165,8 +193,8 @@ export default function RestauracionDatosPage() {
       </div>
 
       {/* Área de Carga / Selección de Archivo Backup */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6 shadow-sm">
-        <h2 className="text-xs font-bold text-gray-800 uppercase tracking-wide mb-3">1. Seleccionar Archivo de Respaldo (.SQL o .ZIP)</h2>
+      <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-5 mb-6 shadow-sm">
+        <h2 className="text-[10px] sm:text-xs font-bold text-gray-800 uppercase tracking-wide mb-2.5 sm:mb-3">1. Seleccionar Archivo de Respaldo (.SQL o .ZIP)</h2>
 
         <input
           type="file"
@@ -181,29 +209,29 @@ export default function RestauracionDatosPage() {
             onDragOver={handleDragOver}
             onDrop={handleDrop}
             onClick={() => fileInputRef.current?.click()}
-            className="border-2 border-dashed border-gray-300 hover:border-[#9B0F06] bg-gray-50/40 hover:bg-red-50/10 rounded-xl p-6 text-center transition-all cursor-pointer group"
+            className="border-2 border-dashed border-gray-300 hover:border-[#9B0F06] bg-gray-50/40 hover:bg-red-50/10 rounded-xl p-5 sm:p-6 text-center transition-all cursor-pointer group"
           >
-            <UploadCloud size={40} className="mx-auto text-gray-400 group-hover:text-[#9B0F06] mb-2 transition-colors" />
-            <h3 className="text-xs md:text-sm font-bold text-gray-800 mb-0.5">Haga clic o arrastre el archivo de Backup aquí</h3>
-            <p className="text-[11px] text-gray-500">Admite archivos .SQL o .ZIP generados por DomunNet</p>
+            <UploadCloud size={36} className="mx-auto text-gray-400 group-hover:text-[#9B0F06] mb-2 transition-colors sm:w-10 sm:h-10" />
+            <h3 className="text-[10px] sm:text-xs md:text-sm font-bold text-gray-800 mb-0.5">Haga clic o arrastre el archivo de Backup aquí</h3>
+            <p className="text-[9.5px] sm:text-[11px] text-gray-500">Admite archivos .SQL o .ZIP generados por DomunNet</p>
           </div>
         ) : (
-          <div className="border border-red-200 bg-red-50/20 rounded-xl p-4 relative">
+          <div className="border border-red-200 bg-red-50/20 rounded-xl p-3.5 sm:p-4 relative">
             <button
               onClick={() => setFile(null)}
-              className="absolute top-4 right-4 text-xs font-semibold text-[#9B0F06] hover:underline"
+              className="absolute top-3 sm:top-4 right-3 sm:right-4 text-[10px] sm:text-xs font-semibold text-[#9B0F06] hover:underline"
             >
               Cambiar Archivo
             </button>
 
-            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 sm:gap-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-red-100 text-[#9B0F06] flex items-center justify-center flex-shrink-0">
-                  <FileArchive size={20} />
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-red-100 text-[#9B0F06] flex items-center justify-center flex-shrink-0">
+                  <FileArchive size={18} className="sm:w-5 sm:h-5" />
                 </div>
                 <div>
-                  <h3 className="text-xs md:text-sm font-bold text-gray-900 font-mono">{file.name}</h3>
-                  <div className="flex items-center gap-3 mt-0.5 text-[11px] text-gray-500">
+                  <h3 className="text-[10px] sm:text-xs md:text-sm font-bold text-gray-900 font-mono break-all">{file.name}</h3>
+                  <div className="flex items-center gap-2 sm:gap-3 mt-0.5 text-[9.5px] sm:text-[11px] text-gray-500">
                     <span>Tamaño: <strong className="text-gray-700">{(file.size / (1024 * 1024)).toFixed(2)} MB</strong></span>
                     <span>•</span>
                     <span className="text-emerald-700 font-medium">Validación preliminar: Correcta</span>
@@ -215,9 +243,9 @@ export default function RestauracionDatosPage() {
                 type="button"
                 onClick={handleIniciarProceso}
                 style={{ backgroundColor: '#9B0F06' }}
-                className="w-full md:w-auto inline-flex items-center justify-center gap-2 text-white px-5 py-2 rounded-lg text-xs font-semibold hover:opacity-90 transition-opacity shadow-sm"
+                className="w-full md:w-auto inline-flex items-center justify-center gap-2 text-white px-4 sm:px-5 py-2 rounded-lg text-[10px] sm:text-xs font-semibold hover:opacity-90 transition-opacity shadow-sm"
               >
-                <RotateCcw size={15} />
+                <RotateCcw size={14} />
                 Iniciar Restauración
               </button>
             </div>
@@ -228,24 +256,45 @@ export default function RestauracionDatosPage() {
       {/* Historial de Restauraciones con Tabla Corporativa */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-2xs overflow-hidden">
         {/* Toolbar con Buscador y Filtro por Fecha (Inicio / Fin) */}
-        <div className="p-3 border-b border-gray-200 bg-gray-50/80 flex flex-col md:flex-row items-center justify-between gap-3">
-          <div className="relative w-full md:w-72">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              value={busqueda}
-              onChange={(e) => {
-                setBusqueda(e.target.value)
-                setPaginaActual(1)
-              }}
-              placeholder="Buscar en historial..."
-              className="w-full text-xs pl-8 pr-3 py-1.5 rounded-lg border border-gray-200 focus:outline-none focus:border-[#9B0F06] bg-white"
-            />
+        <div className="p-2 sm:p-3 border-b border-gray-200 bg-gray-50/80 flex flex-col md:flex-row items-center justify-between gap-2.5 sm:gap-3">
+          <div className="flex items-center gap-2 w-full md:w-auto">
+            <div className="relative flex-1 md:w-72">
+              <Search size={14} className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                value={busqueda}
+                onChange={(e) => {
+                  setBusqueda(e.target.value)
+                  setPaginaActual(1)
+                }}
+                placeholder="Buscar en historial..."
+                className="w-full text-[10px] sm:text-xs pl-7 sm:pl-8 pr-3 py-1.5 rounded-lg border border-gray-200 focus:outline-none focus:border-[#9B0F06] bg-white placeholder:text-[10px] sm:placeholder:text-xs"
+              />
+            </div>
+
+            {/* Botón de Filtros para Mobile */}
+            <button
+              type="button"
+              onClick={abrirSheetFiltros}
+              className={`relative md:hidden flex items-center justify-center p-2 rounded-lg border transition-colors shrink-0 ${
+                cantidadFiltrosActivos > 0
+                  ? 'border-[#9B0F06] bg-red-50/50 text-[#9B0F06]'
+                  : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+              }`}
+              title="Abrir filtros"
+            >
+              <SlidersHorizontal size={14} className="stroke-[2.2]" />
+              {cantidadFiltrosActivos > 0 && (
+                <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-[#9B0F06] text-white text-[8px] font-black flex items-center justify-center">
+                  {cantidadFiltrosActivos}
+                </span>
+              )}
+            </button>
           </div>
 
-          {/* Filtro Rango de Fechas (Inicio / Fin) */}
-          <div className="flex items-center gap-2 w-full md:w-auto text-xs text-gray-600">
-            <span className="font-medium whitespace-nowrap text-[11px]">Fecha Inicio:</span>
+          {/* Filtro Rango de Fechas (Inicio / Fin) en Desktop */}
+          <div className="hidden md:flex items-center gap-2 text-xs text-gray-600">
+            <span className="font-medium whitespace-nowrap text-[10px] sm:text-[11px]">Fecha Inicio:</span>
             <input
               type="date"
               value={fechaInicio}
@@ -253,10 +302,10 @@ export default function RestauracionDatosPage() {
                 setFechaInicio(e.target.value)
                 setPaginaActual(1)
               }}
-              className="text-xs p-1.5 border border-gray-200 rounded-lg focus:outline-none focus:border-[#9B0F06] bg-white"
+              className="text-[10px] sm:text-xs p-1.5 border border-gray-200 rounded-lg focus:outline-none focus:border-[#9B0F06] bg-white"
             />
 
-            <span className="font-medium whitespace-nowrap text-[11px] ml-1">Fecha Fin:</span>
+            <span className="font-medium whitespace-nowrap text-[10px] sm:text-[11px] ml-1">Fecha Fin:</span>
             <input
               type="date"
               value={fechaFin}
@@ -264,7 +313,7 @@ export default function RestauracionDatosPage() {
                 setFechaFin(e.target.value)
                 setPaginaActual(1)
               }}
-              className="text-xs p-1.5 border border-gray-200 rounded-lg focus:outline-none focus:border-[#9B0F06] bg-white"
+              className="text-[10px] sm:text-xs p-1.5 border border-gray-200 rounded-lg focus:outline-none focus:border-[#9B0F06] bg-white"
             />
 
             {(fechaInicio || fechaFin) && (
@@ -273,7 +322,7 @@ export default function RestauracionDatosPage() {
                   setFechaInicio('')
                   setFechaFin('')
                 }}
-                className="text-[11px] text-[#9B0F06] font-semibold hover:underline ml-1"
+                className="text-[10px] sm:text-[11px] text-[#9B0F06] font-semibold hover:underline ml-1 cursor-pointer"
               >
                 Limpiar
               </button>
@@ -281,33 +330,65 @@ export default function RestauracionDatosPage() {
           </div>
         </div>
 
+        {/* Pills de Filtros Activos en Mobile */}
+        {cantidadFiltrosActivos > 0 && (
+          <div className="flex md:hidden flex-wrap items-center gap-1.5 px-3 py-2 bg-gray-50/50 border-b border-gray-100">
+            {fechaInicio && (
+              <span className="inline-flex items-center gap-1 bg-red-50 text-[#9B0F06] text-[9.5px] font-medium px-2 py-0.5 rounded-full border border-red-100">
+                Desde: {fechaInicio}
+                <button type="button" onClick={() => setFechaInicio('')} className="hover:opacity-75">
+                  <X size={10} />
+                </button>
+              </span>
+            )}
+            {fechaFin && (
+              <span className="inline-flex items-center gap-1 bg-red-50 text-[#9B0F06] text-[9.5px] font-medium px-2 py-0.5 rounded-full border border-red-100">
+                Hasta: {fechaFin}
+                <button type="button" onClick={() => setFechaFin('')} className="hover:opacity-75">
+                  <X size={10} />
+                </button>
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                setFechaInicio('')
+                setFechaFin('')
+              }}
+              className="text-[9.5px] text-gray-500 hover:text-[#9B0F06] underline ml-1 cursor-pointer"
+            >
+              Limpiar todo
+            </button>
+          </div>
+        )}
+
         {/* Tabla (1px menor, sin colores en estado) */}
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-gray-50/50 border-b border-gray-200 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-                <th className="py-2.5 px-3.5">Archivo de Respaldo</th>
-                <th className="py-2.5 px-3.5">Tipo</th>
-                <th className="py-2.5 px-3.5">Fecha y Hora</th>
-                <th className="py-2.5 px-3.5">Tamaño</th>
-                <th className="py-2.5 px-3.5">Ejecutado por</th>
-                <th className="py-2.5 px-3.5 text-right">Estado</th>
+                <th className="py-2 sm:py-2.5 px-2.5 sm:px-3.5 whitespace-nowrap">Archivo de Respaldo</th>
+                <th className="py-2 sm:py-2.5 px-2.5 sm:px-3.5 whitespace-nowrap">Tipo</th>
+                <th className="py-2 sm:py-2.5 px-2.5 sm:px-3.5 whitespace-nowrap">Fecha y Hora</th>
+                <th className="py-2 sm:py-2.5 px-2.5 sm:px-3.5 whitespace-nowrap">Tamaño</th>
+                <th className="py-2 sm:py-2.5 px-2.5 sm:px-3.5 whitespace-nowrap">Ejecutado por</th>
+                <th className="py-2 sm:py-2.5 px-2.5 sm:px-3.5 text-right whitespace-nowrap">Estado</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 text-[11px] text-gray-700">
+            <tbody className="divide-y divide-gray-100 text-[10px] text-gray-700">
               {historialPaginado.map((h) => (
                 <tr key={h.id} className="hover:bg-gray-50/50 transition-colors">
-                  <td className="py-2.5 px-3.5 font-semibold text-gray-900 font-mono">
+                  <td className="py-2 sm:py-2.5 px-2.5 sm:px-3.5 font-semibold text-gray-900 font-mono text-[10px] whitespace-nowrap">
                     {h.archivo}
                   </td>
-                  <td className="py-2.5 px-3.5 text-gray-600 font-medium">
+                  <td className="py-2 sm:py-2.5 px-2.5 sm:px-3.5 text-gray-600 font-medium whitespace-nowrap">
                     {h.tipo}
                   </td>
-                  <td className="py-2.5 px-3.5 text-gray-600">{h.fecha}</td>
-                  <td className="py-2.5 px-3.5 font-mono text-gray-600">{h.tamano}</td>
-                  <td className="py-2.5 px-3.5 text-gray-600">{h.usuario}</td>
+                  <td className="py-2 sm:py-2.5 px-2.5 sm:px-3.5 text-gray-600 whitespace-nowrap">{h.fecha}</td>
+                  <td className="py-2 sm:py-2.5 px-2.5 sm:px-3.5 font-mono text-gray-600 whitespace-nowrap">{h.tamano}</td>
+                  <td className="py-2 sm:py-2.5 px-2.5 sm:px-3.5 text-gray-600 whitespace-nowrap">{h.usuario}</td>
                   {/* Estado (sin color de fondo) */}
-                  <td className="py-2.5 px-3.5 text-right text-gray-800 font-medium">
+                  <td className="py-2 sm:py-2.5 px-2.5 sm:px-3.5 text-right text-gray-800 font-medium whitespace-nowrap">
                     {h.estado}
                   </td>
                 </tr>
@@ -315,7 +396,7 @@ export default function RestauracionDatosPage() {
 
               {historialPaginado.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-gray-400 text-xs">
+                  <td colSpan={6} className="py-8 text-center text-gray-400 text-[10px] sm:text-xs">
                     No se registran restauraciones en el historial.
                   </td>
                 </tr>
@@ -366,6 +447,91 @@ export default function RestauracionDatosPage() {
           </div>
         )}
       </div>
+
+      {/* Bottom Sheet Modal para Filtros en Móvil */}
+      {sheetFiltrosAbierto && (
+        <div className="fixed inset-0 z-[9999] md:hidden">
+          <div
+            className="fixed inset-0 bg-black/50 backdrop-blur-xs transition-opacity"
+            onClick={cerrarSheetFiltros}
+          />
+          <div className="fixed inset-x-0 bottom-0 w-full max-w-lg mx-auto max-h-[85vh] rounded-t-2xl bg-white shadow-2xl flex flex-col z-10 animate-in slide-in-from-bottom duration-300">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+              <button
+                type="button"
+                onClick={cerrarSheetFiltros}
+                className="text-[10px] font-medium text-gray-500 hover:text-gray-800 cursor-pointer"
+              >
+                Cerrar
+              </button>
+              <div className="text-center">
+                <h3 className="text-xs font-bold text-gray-900 leading-tight">Filtros de Historial</h3>
+                <span className="text-[9.5px] text-gray-400 font-normal">Filtrar por rango de fechas</span>
+              </div>
+              <button
+                type="button"
+                onClick={cerrarSheetFiltros}
+                className="text-[10px] font-bold text-[#9B0F06] hover:text-[#7D0C05] cursor-pointer"
+              >
+                Listo
+              </button>
+            </div>
+
+            <div className="p-4 overflow-y-auto space-y-3.5 flex-1 text-[10px]">
+              <div>
+                <label className="block text-[10px] font-bold text-gray-700 uppercase tracking-wide mb-1.5">
+                  Fecha Inicio
+                </label>
+                <input
+                  type="date"
+                  value={fechaInicio}
+                  onChange={(e) => {
+                    setFechaInicio(e.target.value)
+                    setPaginaActual(1)
+                  }}
+                  className="w-full text-[10px] p-2 border border-gray-200 rounded-lg focus:outline-none focus:border-[#9B0F06] bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-gray-700 uppercase tracking-wide mb-1.5">
+                  Fecha Fin
+                </label>
+                <input
+                  type="date"
+                  value={fechaFin}
+                  onChange={(e) => {
+                    setFechaFin(e.target.value)
+                    setPaginaActual(1)
+                  }}
+                  className="w-full text-[10px] p-2 border border-gray-200 rounded-lg focus:outline-none focus:border-[#9B0F06] bg-white"
+                />
+              </div>
+            </div>
+
+            <div className="p-3 border-t border-gray-100 bg-gray-50/50 flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setFechaInicio('')
+                  setFechaFin('')
+                }}
+                className="px-3 py-1.5 text-[10px] font-medium text-gray-600 hover:text-gray-900 cursor-pointer"
+              >
+                Limpiar filtros
+              </button>
+              <button
+                type="button"
+                onClick={cerrarSheetFiltros}
+                style={{ backgroundColor: '#9B0F06' }}
+                className="px-4 py-1.5 rounded-lg text-white text-[10px] font-semibold hover:opacity-90 cursor-pointer"
+              >
+                Aplicar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal de Confirmación de Restauración */}
       {modalConfirmacionAbierto && (

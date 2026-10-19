@@ -534,8 +534,7 @@ export default function UsuariosPage() {
 
 
   return (
-
-    <div className="space-y-3.5 font-[Poppins]">
+    <div className="space-y-3.5 font-[Poppins] pb-8 sm:pb-2">
       {/* Encabezado y Barra de Filtros Fija al hacer scroll */}
       <div className="sticky -top-4 z-20 bg-[#F3F4F7] pt-4 pb-3 space-y-3 -mx-4 px-4 xl:-mx-5 xl:px-5">
         <div className="flex flex-wrap items-start justify-between gap-3">

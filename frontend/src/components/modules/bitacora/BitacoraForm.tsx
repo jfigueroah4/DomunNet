@@ -13,6 +13,7 @@ import {
   Eraser,
   ImagePlus,
   Loader2,
+  Map,
   MapPin,
   Save,
   Search,
@@ -29,6 +30,7 @@ import { Portal } from '@/components/ui/Portal'
 import { Combobox } from '@/components/ui/Combobox'
 import { CATALOGO_COMPLETO_88 } from '@/mocks/proyectoMock'
 import { useUIStore } from '@/stores/useUIStore'
+import { BitacoraUbicacionPickerModal } from './BitacoraUbicacionPickerModal'
 
 const geocodeReverse = async (lat: number, lng: number) => {
   try {
@@ -273,6 +275,7 @@ export function BitacoraForm({
     { id: string; desc: string; unidad: string; renglonId?: string }[]
   >([])
   const [obteniendoGps, setObteniendoGps] = useState(false)
+  const [modalMapaPickerOpen, setModalMapaPickerOpen] = useState(false)
   const [guardando, setGuardando] = useState(false)
   const [arrastrandoFoto, setArrastrandoFoto] = useState(false)
 
@@ -578,16 +581,13 @@ export function BitacoraForm({
           []
 
         const seleccionados = listaOrigen.filter((item: any) => {
-          if (item.seleccionado === true) return true
-          if (item.seleccionado === false) return false
-          return (
-            Number(item.cantidadContratada || item.cantidad_contractual || item.cantidad || 0) > 0 ||
-            Number(item.costoUnitarioDirecto || item.precio_unitario_directo || 0) > 0 ||
-            Boolean(item.esPersonalizado)
-          )
+          const cant = Number(item.cantidadContratada || item.cantidad_contractual || item.cantidad || 0)
+          const pu = Number(item.costoUnitarioDirecto || item.precio_unitario_directo || 0)
+          const cantEjec = Number(item.cantidadEstePeriodo || item.cantidadAcumuladaAnterior || item.cantidad_ejecutada || 0)
+          return cant > 0 || pu > 0 || cantEjec > 0
         })
 
-        const itemsFinales = seleccionados.length > 0 ? seleccionados : listaOrigen
+        const itemsFinales = seleccionados
         renglonesValidos = itemsFinales.map((item: any) => ({
           id: String(item.codigoDGC || item.codigo || item.id || 'R').trim(),
           renglonId: item.renglonId || (typeof item.id === 'string' && item.id.length === 36 ? item.id : undefined),
@@ -598,7 +598,7 @@ export function BitacoraForm({
           ),
         }))
       } else {
-        // --- MODO HOJA SÁBANA / PROYECTO ACTIVO: Renglones con registro en la hoja sábana ---
+        // --- MODO HOJA SÁBANA / PROYECTO ACTIVO: Renglones con registro económico en la hoja sábana ---
         const candidatos = [
           ...sabanaLocal,
           ...rengsBd,
@@ -621,18 +621,14 @@ export function BitacoraForm({
                                (item.avances_mensuales && Object.keys(item.avances_mensuales).length > 0) ||
                                (item.avancesMensualesPlan && Object.keys(item.avancesMensualesPlan).length > 0)
           const tieneMedicion = codigosConRegistro.has(cod)
-          const esPersonalizado = Boolean(item.esPersonalizado)
-          const tieneSeleccion = item.seleccionado === true
 
           const tieneRegistroSabana =
             cantContr > 0 ||
             cantAjust > 0 ||
-            costoUnit > 0 ||
+            (costoUnit > 0 && cantContr > 0) ||
             cantEjec > 0 ||
             tieneAvances ||
-            tieneMedicion ||
-            esPersonalizado ||
-            tieneSeleccion
+            tieneMedicion
 
           if (tieneRegistroSabana && !mapaConRegistro.has(cod)) {
             mapaConRegistro.set(cod, {
@@ -824,11 +820,16 @@ export function BitacoraForm({
     showSuccessToast('Ubicación borrada')
   }
 
-  // Capturar GPS con Geocodificación Inversa y soporte Multicapa (evita "No se pudo obtener la señal GPS")
+  // Capturar GPS con Geocodificación Inversa y soporte Multicapa de alta precisión
   const handleObtenerUbicacionGps = () => {
     setObteniendoGps(true)
 
-    const aplicarCoordenadas = async (latitude: number, longitude: number, accuracy?: number | null) => {
+    const aplicarCoordenadas = async (
+      latitude: number,
+      longitude: number,
+      accuracy?: number | null,
+      esAproximada = false
+    ) => {
       const geo = await geocodeReverse(latitude, longitude)
       setFd((prev) => ({
         ...prev,
@@ -841,21 +842,24 @@ export function BitacoraForm({
       }))
       setErrors((p) => ({ ...p, ubicacionGps: '' }))
       setObteniendoGps(false)
-      showSuccessToast('Ubicación obtenida correctamente')
+      if (esAproximada) {
+        showSuccessToast('Ubicación aproximada detectada. Puedes ajustarla en el mapa Leaflet.')
+      } else {
+        showSuccessToast('Ubicación GPS real obtenida correctamente')
+      }
     }
 
     const fallbackIPorProyecto = async () => {
-      // 1. Intentar resolver por servicio de geolocalización IP gratuita
-      try {
-        const resIp = await fetch('https://ipwho.is/', { signal: AbortSignal.timeout(3500) })
-        if (resIp.ok) {
-          const ipData = await resIp.json()
-          if (ipData && ipData.latitude && ipData.longitude) {
-            await aplicarCoordenadas(ipData.latitude, ipData.longitude, 1200)
-            return
-          }
-        }
-      } catch (_) {}
+      // 1. Fallback por coordenadas del proyecto asignado si existen
+      if (proyectoSeleccionadoObj?.latitud && proyectoSeleccionadoObj?.longitud) {
+        await aplicarCoordenadas(
+          proyectoSeleccionadoObj.latitud,
+          proyectoSeleccionadoObj.longitud,
+          500,
+          true
+        )
+        return
+      }
 
       // 2. Fallback por departamento/municipio asignado al proyecto
       if (proyectoSeleccionadoObj?.departamento || proyectoSeleccionadoObj?.municipio) {
@@ -873,12 +877,24 @@ export function BitacoraForm({
         }))
         setErrors((p) => ({ ...p, ubicacionGps: '' }))
         setObteniendoGps(false)
-        showSuccessToast('Ubicación establecida según el proyecto')
+        showSuccessToast('Ubicación establecida según el proyecto. Puedes ajustarla en el mapa.')
         return
       }
 
-      // 3. Fallback central Guatemala
-      await aplicarCoordenadas(14.6349, -90.5069, 5000)
+      // 3. Intento IP como último recurso
+      try {
+        const resIp = await fetch('https://ipwho.is/', { signal: AbortSignal.timeout(3500) })
+        if (resIp.ok) {
+          const ipData = await resIp.json()
+          if (ipData && ipData.latitude && ipData.longitude) {
+            await aplicarCoordenadas(ipData.latitude, ipData.longitude, 1200, true)
+            return
+          }
+        }
+      } catch (_) {}
+
+      // 4. Fallback central Guatemala
+      await aplicarCoordenadas(14.6349, -90.5069, 5000, true)
     }
 
     if (typeof window === 'undefined' || !navigator.geolocation) {
@@ -886,15 +902,30 @@ export function BitacoraForm({
       return
     }
 
+    // 1. Intentar con Alta Precisión (GPS real del dispositivo móvil/hardware)
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        aplicarCoordenadas(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy)
+        aplicarCoordenadas(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, false)
       },
-      () => {
-        // En lugar de dar error "No se pudo obtener la señal GPS", usamos el fallback inteligente
-        fallbackIPorProyecto()
+      (error) => {
+        if (error.code === error.PERMISSION_DENIED) {
+          setObteniendoGps(false)
+          showErrorToast('Permiso de GPS no concedido en el navegador. Por favor permítelo o usa el mapa.')
+          return
+        }
+
+        // Si falló por timeout de señal satelital, intentar precisión estándar
+        navigator.geolocation.getCurrentPosition(
+          (posB) => {
+            aplicarCoordenadas(posB.coords.latitude, posB.coords.longitude, posB.coords.accuracy, true)
+          },
+          () => {
+            fallbackIPorProyecto()
+          },
+          { enableHighAccuracy: false, timeout: 6000, maximumAge: 30000 }
+        )
       },
-      { enableHighAccuracy: false, timeout: 5000, maximumAge: 300000 }
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
     )
   }
 
@@ -1620,7 +1651,7 @@ export function BitacoraForm({
                         }}
                         disabled={obteniendoGps}
                         className="p-1.5 rounded-full hover:bg-gray-100 text-gray-500 hover:text-[#9B0F06] transition-colors cursor-pointer"
-                        title="Detectar ubicación GPS automáticamente"
+                        title="Detectar ubicación GPS automáticamente con alta precisión"
                       >
                         {obteniendoGps ? (
                           <Loader2 size={15} className="animate-spin text-[#9B0F06]" />
@@ -1628,13 +1659,29 @@ export function BitacoraForm({
                           <MapPin size={15} />
                         )}
                       </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setModalMapaPickerOpen(true)}
+                        className="p-1.5 rounded-full hover:bg-gray-100 text-gray-500 hover:text-[#9B0F06] transition-colors cursor-pointer"
+                        title="Abrir mapa Leaflet interactivo para fijar ubicación exacta"
+                      >
+                        <Map size={15} />
+                      </button>
                     </div>
                   </div>
 
-                  {/* Badge de Auto-Detección */}
+                  {/* Badge de Auto-Detección y acceso rápido al mapa Leaflet */}
                   {(fd.latitud || fd.departamento || fd.municipio) && (
-                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[9.5px] text-gray-500 font-mono pt-1 border-t border-gray-100 mt-1" style={{ fontSize: '9.5px' }}>
-                      <span className="text-gray-700 font-bold">Coordenada:</span>
+                    <div
+                      onClick={() => setModalMapaPickerOpen(true)}
+                      className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[9.5px] text-gray-500 font-mono pt-1 border-t border-gray-100 mt-1 cursor-pointer hover:bg-red-50/40 rounded px-1 transition-colors"
+                      style={{ fontSize: '9.5px' }}
+                      title="Haz clic para ver o ajustar la ubicación en el mapa Leaflet"
+                    >
+                      <span className="text-gray-700 font-bold inline-flex items-center gap-1">
+                        <Map size={11} className="text-[#9B0F06]" /> Coordenada:
+                      </span>
                       {fd.latitud && fd.longitud && (
                         <span>Lat: {fd.latitud.toFixed(6)}, Lng: {fd.longitud.toFixed(6)}</span>
                       )}
@@ -1644,6 +1691,7 @@ export function BitacoraForm({
                       {fd.municipio && (
                         <span>· Mun: <strong className="text-gray-800">{fd.municipio}</strong></span>
                       )}
+                      <span className="text-[#9B0F06] text-[9px] underline font-sans ml-auto">Ver mapa</span>
                     </div>
                   )}
                 </div>
@@ -2144,6 +2192,28 @@ export function BitacoraForm({
           </div>
         </Portal>
       )}
+
+      {/* Modal Interactivo de Selección de Ubicación Leaflet */}
+      <BitacoraUbicacionPickerModal
+        abierto={modalMapaPickerOpen}
+        onClose={() => setModalMapaPickerOpen(false)}
+        latInicial={fd.latitud}
+        lngInicial={fd.longitud}
+        direccionInicial={fd.ubicacionGps}
+        onSeleccionarUbicacion={(loc) => {
+          setFd((prev) => ({
+            ...prev,
+            ubicacionGps: loc.direccion,
+            latitud: loc.lat,
+            longitud: loc.lng,
+            departamento: loc.departamento || prev.departamento || 'Guatemala',
+            municipio: loc.municipio || prev.municipio || 'Guatemala',
+            precisionGps: 5,
+          }))
+          setErrors((p) => ({ ...p, ubicacionGps: '' }))
+          showSuccessToast('Ubicación fijada en el mapa')
+        }}
+      />
     </div>
   )
 }

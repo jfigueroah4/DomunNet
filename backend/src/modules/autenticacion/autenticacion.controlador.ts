@@ -7,6 +7,7 @@ import {
   iniciarSesion,
   LimiteDispositivosError,
   cerrarSesionUsuario,
+  liberarDispositivo,
 } from '@/modules/autenticacion/autenticacion.servicio'
 import { obtenerCookie } from '@/shared/utils/cookies'
 import { entorno } from '@/configuracion/entorno'
@@ -103,16 +104,25 @@ export async function cerrarSesionControlador(req: Request, res: Response) {
       token = req.headers.authorization.slice(7)
     }
 
+    const deviceId = req.body?.deviceId || (req.headers['x-device-id'] as string)
+    let sub: string | undefined = undefined
+    let sessionId: string | undefined = undefined
+
     if (token) {
       try {
         const payload = jwt.decode(token) as any
         if (payload?.sub) {
-          const deviceId = req.body?.deviceId || (req.headers['x-device-id'] as string) || payload.deviceId
-          await cerrarSesionUsuario(payload.sub, deviceId, payload.sessionId)
+          sub = payload.sub
+          sessionId = payload.sessionId
         }
       } catch (errLog) {
         console.warn('[autenticacion.controlador] Error al procesar logout en seguridad_log:', errLog)
       }
+    }
+
+    // Cerrar la sesión si se cuenta con el ID de usuario o el identificador del dispositivo
+    if (sub || deviceId) {
+      await cerrarSesionUsuario(sub, deviceId, sessionId)
     }
 
     const esHttps = req.secure || req.headers['x-forwarded-proto'] === 'https' || entorno.modo === 'production'
@@ -130,6 +140,18 @@ export async function cerrarSesionControlador(req: Request, res: Response) {
     return sendResponse(res, 200, null, 'Sesión cerrada correctamente')
   } catch (error: any) {
     return sendError(res, 500, 'Error al cerrar sesión', error.message)
+  }
+}
+
+export async function liberarDispositivoControlador(req: Request, res: Response) {
+  try {
+    const deviceId = req.body?.deviceId || (req.headers['x-device-id'] as string)
+    if (deviceId) {
+      await liberarDispositivo(deviceId)
+    }
+    return sendResponse(res, 200, null, 'Dispositivo liberado exitosamente')
+  } catch (error: any) {
+    return sendResponse(res, 200, null, 'Ignorado')
   }
 }
 

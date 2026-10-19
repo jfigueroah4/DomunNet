@@ -12,11 +12,11 @@ import { Portal } from '@/components/ui/Portal'
 
 
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 
 
 
-import { Save, X, Eye, PencilLine, UserPlus, Mail, Phone, FolderOpen, Edit2, Loader2} from 'lucide-react'
+import { Save, X, Eye, PencilLine, UserPlus, Mail, Phone, FolderOpen, Edit2, Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
 
 
 
@@ -156,10 +156,25 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
   const [isEditingPassword, setIsEditingPassword] = useState(false)
   const [fechaErrorMsg, setFechaErrorMsg] = useState<string | null>(null)
 
+  // Validaciones en vivo estilo Desktop
+  const statusFecha = useMemo(() => {
+    if (formData.diaNacimiento && formData.mesNacimiento && formData.anoNacimiento.length === 4) {
+      const res = validarFechaNacimiento(formData.diaNacimiento, formData.mesNacimiento, formData.anoNacimiento)
+      if (!res.valida) {
+        return { state: 'error', message: res.mensajeError || 'Fecha inválida' }
+      }
+      return { state: 'valid', message: `Fecha válida (${res.edad} años)` }
+    }
+    return null
+  }, [formData.diaNacimiento, formData.mesNacimiento, formData.anoNacimiento])
 
-
-    
-
+  const statusTelefono = useMemo(() => {
+    if (!formData.telefono) return null
+    if ([4, 8].includes(formData.telefono.length)) {
+      return { state: 'valid', message: 'Teléfono válido' }
+    }
+    return { state: 'error', message: 'Debe contener 8 dígitos' }
+  }, [formData.telefono])
 
 
   const [errors, setErrors] = useState({
@@ -1099,7 +1114,7 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
 
 
 
-              <label className="mb-1 block text-xs sm:text-[9px] font-semibold text-gray-700 uppercase tracking-wide">Primer nombre *</label>
+              <label className="mb-1 block text-[11px] sm:text-[9px] font-semibold text-gray-700 uppercase tracking-wide">Primer nombre *</label>
 
 
 
@@ -1123,11 +1138,11 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
 
 
 
-                className={`w-full h-10 sm:h-8 px-3 text-base sm:text-xs border rounded-lg focus:outline-none transition-colors disabled:bg-gray-50 text-gray-700 ${
+                className={`w-full h-10 sm:h-8 px-3 text-[15px] sm:text-xs border rounded-lg focus:outline-none transition-colors disabled:bg-gray-50 text-gray-700 ${
 
 
 
-                  errors.primerNombre ? 'border-[#FF4D4F] bg-red-50/20' : 'border-gray-200 focus:border-[#9B0F06]'
+                  errors.primerNombre ? 'border-red-500 ring-1 ring-red-400/40 bg-red-50/20 text-red-900' : formData.primerNombre && formData.primerNombre.trim() ? 'border-emerald-500 ring-1 ring-emerald-400/40 bg-emerald-50/10 text-emerald-900' : 'border-gray-200 focus:border-[#9B0F06]'
 
 
 
@@ -1151,7 +1166,7 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
 
 
 
-              <label className="mb-1 block text-xs sm:text-[9px] font-semibold text-gray-700 uppercase tracking-wide">Segundo nombre</label>
+              <label className="mb-1 block text-[11px] sm:text-[9px] font-semibold text-gray-700 uppercase tracking-wide">Segundo nombre</label>
 
 
 
@@ -1175,7 +1190,7 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
 
 
 
-                className="w-full h-10 sm:h-8 px-3 text-base sm:text-xs border border-gray-200 rounded-lg focus:outline-none focus:border-[#9B0F06] transition-colors disabled:bg-gray-50 text-gray-700"
+                className="w-full h-10 sm:h-8 px-3 text-[15px] sm:text-xs border border-gray-200 rounded-lg focus:outline-none focus:border-[#9B0F06] transition-colors disabled:bg-gray-50 text-gray-700"
 
 
 
@@ -1207,7 +1222,7 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
 
 
 
-              <label className="mb-1 block text-xs sm:text-[9px] font-semibold text-gray-700 uppercase tracking-wide">Primer apellido *</label>
+              <label className="mb-1 block text-[11px] sm:text-[9px] font-semibold text-gray-700 uppercase tracking-wide">Primer apellido *</label>
 
 
 
@@ -1231,11 +1246,11 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
 
 
 
-                className={`w-full h-10 sm:h-8 px-3 text-base sm:text-xs border rounded-lg focus:outline-none transition-colors disabled:bg-gray-50 text-gray-700 ${
+                className={`w-full h-10 sm:h-8 px-3 text-[15px] sm:text-xs border rounded-lg focus:outline-none transition-colors disabled:bg-gray-50 text-gray-700 ${
 
 
 
-                  errors.primerApellido ? 'border-[#FF4D4F] bg-red-50/20' : 'border-gray-200 focus:border-[#9B0F06]'
+                  errors.primerApellido ? 'border-red-500 ring-1 ring-red-400/40 bg-red-50/20 text-red-900' : formData.primerApellido && formData.primerApellido.trim() ? 'border-emerald-500 ring-1 ring-emerald-400/40 bg-emerald-50/10 text-emerald-900' : 'border-gray-200 focus:border-[#9B0F06]'
 
 
 
@@ -1259,7 +1274,7 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
 
 
 
-              <label className="mb-1 block text-xs sm:text-[9px] font-semibold text-gray-700 uppercase tracking-wide">Segundo apellido</label>
+              <label className="mb-1 block text-[11px] sm:text-[9px] font-semibold text-gray-700 uppercase tracking-wide">Segundo apellido</label>
 
 
 
@@ -1283,7 +1298,7 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
 
 
 
-                className="w-full h-10 sm:h-8 px-3 text-base sm:text-xs border border-gray-200 rounded-lg focus:outline-none focus:border-[#9B0F06] transition-colors disabled:bg-gray-50 text-gray-700"
+                className="w-full h-10 sm:h-8 px-3 text-[15px] sm:text-xs border border-gray-200 rounded-lg focus:outline-none focus:border-[#9B0F06] transition-colors disabled:bg-gray-50 text-gray-700"
 
 
 
@@ -1315,7 +1330,7 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
 
 
 
-              <label className="mb-1 block text-xs sm:text-[9px] font-semibold text-gray-700 uppercase tracking-wide">Teléfono *</label>
+              <label className="mb-1 block text-[11px] sm:text-[9px] font-semibold text-gray-700 uppercase tracking-wide">Teléfono *</label>
 
 
 
@@ -1333,33 +1348,22 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
                   maxLength={8}
                   value={formData.telefono}
                   onChange={handleChange}
-
-
-
                   disabled={isViewMode}
-
-
-
-                  className={`w-full h-10 sm:h-8 pl-9 pr-3 text-base sm:text-xs border rounded-lg focus:outline-none transition-colors disabled:bg-gray-50 text-gray-700 ${
-
-
-
-                    errors.telefono ? 'border-[#FF4D4F] bg-red-50/20' : 'border-gray-200 focus:border-[#9B0F06]'
-
-
-
+                  className={`w-full h-10 sm:h-8 pl-9 pr-8 text-[15px] sm:text-xs border rounded-lg focus:outline-none transition-colors disabled:bg-gray-50 text-gray-700 ${
+                    errors.telefono || statusTelefono?.state === 'error'
+                      ? 'border-red-500 ring-1 ring-red-400/40 bg-red-50/20 text-red-900'
+                      : statusTelefono?.state === 'valid'
+                        ? 'border-emerald-500 ring-1 ring-emerald-400/40 bg-emerald-50/10 text-emerald-900'
+                        : 'border-gray-200 focus:border-[#9B0F06]'
                   }`}
-
-
-
                   placeholder="Ej: 55551234"
-
-
-
                 />
-
-
-
+                {statusTelefono?.state === 'valid' && (
+                  <CheckCircle2 size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-600 pointer-events-none" />
+                )}
+                {(errors.telefono || statusTelefono?.state === 'error') && (
+                  <AlertCircle size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-red-500 pointer-events-none" />
+                )}
               </div>
 
 
@@ -1372,7 +1376,7 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
 
 
 
-              <label className="mb-1 block text-xs sm:text-[9px] font-semibold text-gray-700 uppercase tracking-wide">Fecha de nacimiento *</label>
+              <label className="mb-1 block text-[11px] sm:text-[9px] font-semibold text-gray-700 uppercase tracking-wide">Fecha de nacimiento *</label>
 
 
 
@@ -1381,146 +1385,63 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
 
 
                 <input
-
-
-
                   placeholder="DD"
-
-
-
                   maxLength={2}
-
-
-
                   value={formData.diaNacimiento}
-
-
-
                   onChange={(e) => handleFechaChange('dia', e.target.value)}
-
-
-
                   onBlur={handleFechaBlur}
-
-
-
                   disabled={isViewMode}
-
-
-
-                  className={`flex-1 min-w-0 w-full text-center h-10 sm:h-8 text-base sm:text-xs border rounded-lg focus:outline-none transition-colors disabled:bg-gray-50 text-gray-700 ${
-
-
-
-                    errors.fechaNacimiento ? 'border-[#FF4D4F] bg-red-50/20' : 'border-gray-200 focus:border-[#9B0F06]'
-
-
-
+                  className={`flex-1 min-w-0 w-full text-center h-10 sm:h-8 text-[15px] sm:text-xs border rounded-lg focus:outline-none transition-colors disabled:bg-gray-50 text-gray-700 ${
+                    errors.fechaNacimiento || statusFecha?.state === 'error'
+                      ? 'border-red-500 ring-1 ring-red-400/40 bg-red-50/20 text-red-900'
+                      : statusFecha?.state === 'valid'
+                        ? 'border-emerald-500 ring-1 ring-emerald-400/40 bg-emerald-50/10 text-emerald-900'
+                        : 'border-gray-200 focus:border-[#9B0F06]'
                   }`}
-
-
-
                 />
-
-
-
                 <span className="text-gray-300 self-center text-lg">/</span>
-
-
-
                 <input
-
-
-
                   placeholder="MM"
-
-
-
                   maxLength={2}
-
-
-
                   value={formData.mesNacimiento}
-
-
-
                   onChange={(e) => handleFechaChange('mes', e.target.value)}
-
-
-
                   onBlur={handleFechaBlur}
-
-
-
                   disabled={isViewMode}
-
-
-
-                  className={`flex-1 min-w-0 w-full text-center h-10 sm:h-8 text-base sm:text-xs border rounded-lg focus:outline-none transition-colors disabled:bg-gray-50 text-gray-700 ${
-
-
-
-                    errors.fechaNacimiento ? 'border-[#FF4D4F] bg-red-50/20' : 'border-gray-200 focus:border-[#9B0F06]'
-
-
-
+                  className={`flex-1 min-w-0 w-full text-center h-10 sm:h-8 text-[15px] sm:text-xs border rounded-lg focus:outline-none transition-colors disabled:bg-gray-50 text-gray-700 ${
+                    errors.fechaNacimiento || statusFecha?.state === 'error'
+                      ? 'border-red-500 ring-1 ring-red-400/40 bg-red-50/20 text-red-900'
+                      : statusFecha?.state === 'valid'
+                        ? 'border-emerald-500 ring-1 ring-emerald-400/40 bg-emerald-50/10 text-emerald-900'
+                        : 'border-gray-200 focus:border-[#9B0F06]'
                   }`}
-
-
-
                 />
-
-
-
                 <span className="text-gray-300 self-center text-lg">/</span>
-
-
-
                 <input
-
-
-
                   placeholder="YYYY"
-
-
-
                   maxLength={4}
-
-
-
                   value={formData.anoNacimiento}
-
-
-
                   onChange={(e) => handleFechaChange('ano', e.target.value)}
-
-
-
                   onBlur={handleFechaBlur}
-
-
-
                   disabled={isViewMode}
-
-
-
-                  className={`flex-1 min-w-0 w-full text-center h-10 sm:h-8 text-base sm:text-xs border rounded-lg focus:outline-none transition-colors disabled:bg-gray-50 text-gray-700 ${
-
-
-
-                    errors.fechaNacimiento ? 'border-[#FF4D4F] bg-red-50/20' : 'border-gray-200 focus:border-[#9B0F06]'
-
-
-
+                  className={`flex-1 min-w-0 w-full text-center h-10 sm:h-8 text-[15px] sm:text-xs border rounded-lg focus:outline-none transition-colors disabled:bg-gray-50 text-gray-700 ${
+                    errors.fechaNacimiento || statusFecha?.state === 'error'
+                      ? 'border-red-500 ring-1 ring-red-400/40 bg-red-50/20 text-red-900'
+                      : statusFecha?.state === 'valid'
+                        ? 'border-emerald-500 ring-1 ring-emerald-400/40 bg-emerald-50/10 text-emerald-900'
+                        : 'border-gray-200 focus:border-[#9B0F06]'
                   }`}
-
-
-
                 />
-
-
-
               </div>
+              {statusFecha?.state === 'valid' && (
+                <p className="text-[10px] text-emerald-600 mt-1 flex items-center gap-1 font-medium">
+                  <CheckCircle2 size={11} /> {statusFecha.message}
+                </p>
+              )}
+              {(errors.fechaNacimiento || statusFecha?.state === 'error') && (
+                <p className="text-[10px] text-red-500 mt-1 flex items-center gap-1 font-medium">
+                  <AlertCircle size={11} /> {statusFecha?.message || fechaErrorMsg || 'El usuario debe ser mayor de 18 años'}
+                </p>
+              )}
 
 
 
@@ -1544,7 +1465,7 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
 
 
 
-            <label className="mb-1 block text-xs sm:text-[9px] font-semibold text-gray-700 uppercase tracking-wide">Dirección *</label>
+            <label className="mb-1 block text-[11px] sm:text-[9px] font-semibold text-gray-700 uppercase tracking-wide">Dirección *</label>
 
 
 
@@ -1568,7 +1489,7 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
 
 
 
-              className={`w-full h-10 sm:h-8 px-3 text-base sm:text-xs border border-gray-200 rounded-lg focus:outline-none focus:border-[#9B0F06] transition-colors disabled:bg-gray-50 text-gray-700`}
+              className={`w-full h-10 sm:h-8 px-3 text-[15px] sm:text-xs border border-gray-200 rounded-lg focus:outline-none focus:border-[#9B0F06] transition-colors disabled:bg-gray-50 text-gray-700`}
 
 
 
@@ -1609,93 +1530,37 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
 
 
             <div>
-
-
-
-              <label className="mb-1 block text-xs sm:text-[9px] font-semibold text-gray-700 uppercase tracking-wide">Username *</label>
-
-
-
+              <label className="mb-1 block text-[11px] sm:text-[9px] font-semibold text-gray-700 uppercase tracking-wide">Username *</label>
               <div className="relative">
-
-
-
                 <input
-
-
-
                   name="username"
-
-
-
                   value={formData.username}
-
-
-
                   onChange={(e) => {
-
-
-
                     handleChange(e)
-
-
-
                     validarUsername(e.target.value)
-
-
-
                   }}
-
-
-
                   disabled={isViewMode}
-
-
-
-                  className={`w-full h-10 sm:h-8 pl-3 pr-8 text-base sm:text-xs border rounded-lg focus:outline-none transition-colors disabled:bg-gray-50 text-gray-700 ${
-
-
-
-                    errors.username || usernameDisponible === false ? 'border-[#FF4D4F] bg-red-50/20' : 'border-gray-200 focus:border-[#9B0F06]'
-
-
-
+                  className={`w-full h-10 sm:h-8 pl-3 pr-8 text-[15px] sm:text-xs border rounded-lg focus:outline-none transition-colors disabled:bg-gray-50 text-gray-700 ${
+                    errors.username || usernameDisponible === false
+                      ? 'border-red-500 ring-1 ring-red-400/40 bg-red-50/20 text-red-900'
+                      : usernameDisponible === true
+                        ? 'border-emerald-500 ring-1 ring-emerald-400/40 bg-emerald-50/10 text-emerald-900'
+                        : 'border-gray-200 focus:border-[#9B0F06]'
                   }`}
-
-
-
                   placeholder="Ej: jperez"
-
-
-
                 />
-
-
-
                 {usernameCargando && (
-
-
-
                   <Loader2 size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 animate-spin" />
-
-
-
                 )}
-
-
-
+                {!usernameCargando && usernameDisponible === true && (
+                  <CheckCircle2 size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-600 pointer-events-none" />
+                )}
+                {!usernameCargando && (errors.username || usernameDisponible === false) && (
+                  <AlertCircle size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-red-500 pointer-events-none" />
+                )}
               </div>
-
-
-
-              {usernameDisponible === false && <p className="text-[10px] text-[#FF4D4F] mt-1">El usuario ya está en uso</p>}
-
-
-
-              {usernameDisponible === true && <p className="text-[10px] text-green-600 mt-1">Usuario disponible</p>}
-
-
-
+              {usernameDisponible === false && <p className="text-[10px] text-red-500 mt-1 flex items-center gap-1 font-medium"><AlertCircle size={11} /> El usuario ya está en uso</p>}
+              {usernameDisponible === true && <p className="text-[10px] text-emerald-600 mt-1 flex items-center gap-1 font-medium"><CheckCircle2 size={11} /> Usuario disponible</p>}
             </div>
 
 
@@ -1708,98 +1573,43 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
 
 
 
-              <label className="mb-1 block text-xs sm:text-[9px] font-semibold text-gray-700 uppercase tracking-wide">Correo electrónico *</label>
+              <label className="mb-1 block text-[11px] sm:text-[9px] font-semibold text-gray-700 uppercase tracking-wide">Correo electrónico *</label>
 
 
 
               <div className="relative">
-
-
-
                 <Mail size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-
-
-
                 <input
-
-
-
                   name="correo"
-
-
-
                   type="email"
-
-
-
                   value={formData.correo}
-
-
-
                   onChange={(e) => {
-
-
-
                     handleEmailChange(e.target.value)
-
-
-
                     validarEmailAvailability(e.target.value)
-
-
-
                   }}
-
-
-
                   disabled={isViewMode}
-
-
-
-                  className={`w-full h-10 sm:h-8 pl-9 pr-8 text-base sm:text-[11px] text-ellipsis border rounded-lg focus:outline-none transition-colors disabled:bg-gray-50 text-gray-700 ${
-
-
-
-                    errors.correo || correoDisponible === false ? 'border-[#FF4D4F] bg-red-50/20' : 'border-gray-200 focus:border-[#9B0F06]'
-
-
-
+                  className={`w-full h-10 sm:h-8 pl-9 pr-8 text-[15px] sm:text-[11px] text-ellipsis border rounded-lg focus:outline-none transition-colors disabled:bg-gray-50 text-gray-700 ${
+                    errors.correo || correoDisponible === false
+                      ? 'border-red-500 ring-1 ring-red-400/40 bg-red-50/20 text-red-900'
+                      : correoDisponible === true
+                        ? 'border-emerald-500 ring-1 ring-emerald-400/40 bg-emerald-50/10 text-emerald-900'
+                        : 'border-gray-200 focus:border-[#9B0F06]'
                   }`}
-
-
-
                   placeholder="ejemplo@domunnet.com"
-
-
-
                 />
-
-
-
                 {correoCargando && (
-
-
-
                   <Loader2 size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 animate-spin" />
-
-
-
                 )}
-
-
-
+                {!correoCargando && correoDisponible === true && (
+                  <CheckCircle2 size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-600 pointer-events-none" />
+                )}
+                {!correoCargando && (errors.correo || correoDisponible === false) && (
+                  <AlertCircle size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-red-500 pointer-events-none" />
+                )}
               </div>
-
-
-
-              {correoDisponible === false && <p className="text-[10px] text-[#FF4D4F] mt-1">Este correo ya está registrado</p>}
-
-
-
-              {errors.correo && <p className="text-[10px] text-[#FF4D4F] mt-1">Correo electrónico no válido</p>}
-
-
-
+              {correoDisponible === false && <p className="text-[10px] text-red-500 mt-1 flex items-center gap-1 font-medium"><AlertCircle size={11} /> Este correo ya está registrado</p>}
+              {correoDisponible === true && <p className="text-[10px] text-emerald-600 mt-1 flex items-center gap-1 font-medium"><CheckCircle2 size={11} /> Correo disponible</p>}
+              {errors.correo && !correoDisponible && <p className="text-[10px] text-red-500 mt-1 flex items-center gap-1 font-medium"><AlertCircle size={11} /> Correo electrónico no válido</p>}
             </div>
 
 
@@ -1824,7 +1634,7 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
 
 
 
-                <label className="block text-xs sm:text-[9px] font-semibold text-gray-700 uppercase tracking-wide">Contraseña {mode === 'create' && '*'}</label>
+                <label className="block text-[11px] sm:text-[9px] font-semibold text-gray-700 uppercase tracking-wide">Contraseña {mode === 'create' && '*'}</label>
 
 
 
@@ -1904,7 +1714,7 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
 
 
 
-                  className={`w-full h-10 sm:h-8 px-3 text-base sm:text-xs rounded-lg border focus:outline-none disabled:bg-gray-50 transition-colors ${
+                  className={`w-full h-10 sm:h-8 px-3 text-[15px] sm:text-xs rounded-lg border focus:outline-none disabled:bg-gray-50 transition-colors ${
 
 
 
@@ -1944,7 +1754,7 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
 
 
 
-                <label className="mb-1 block text-xs sm:text-[9px] font-semibold text-gray-700 uppercase tracking-wide">Rol *</label>
+                <label className="mb-1 block text-[11px] sm:text-[9px] font-semibold text-gray-700 uppercase tracking-wide">Rol *</label>
 
 
 
@@ -1953,7 +1763,7 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
                 value={formData.rol}
                 onChange={handleChange}
                 disabled={isViewMode || Boolean(usuario && profile && (usuario.id === profile.id || usuario.correo?.toLowerCase() === profile.correo?.toLowerCase())) || String(formData.rol).toLowerCase() === 'contratante' || String(usuario?.rol).toLowerCase() === 'contratante' || (!esAdmin && String(usuario?.rol) === 'Administrador')}
-                className={`w-full h-10 sm:h-8 px-3 text-base sm:text-xs rounded-lg border border-gray-200 focus:border-[#9B0F06] focus:outline-none transition-colors ${
+                className={`w-full h-10 sm:h-8 px-3 text-[15px] sm:text-xs rounded-lg border border-gray-200 focus:border-[#9B0F06] focus:outline-none transition-colors ${
                   isViewMode || Boolean(usuario && profile && (usuario.id === profile.id || usuario.correo?.toLowerCase() === profile.correo?.toLowerCase())) || String(formData.rol).toLowerCase() === 'contratante' || String(usuario?.rol).toLowerCase() === 'contratante' || (!esAdmin && String(usuario?.rol) === 'Administrador')
                     ? 'bg-gray-100 font-semibold text-gray-700 cursor-not-allowed'
                     : 'bg-white'
@@ -1971,6 +1781,7 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
                     { id: 'r4', nombre: 'Laboratorista', estado: 'Activo' },
                     { id: 'r5', nombre: 'AuxiliarDeCampo', estado: 'Activo' },
                     { id: 'r6', nombre: 'Supervisor', estado: 'Activo' },
+                    { id: 'r6b', nombre: 'Ejecutora', estado: 'Activo' },
                     { id: 'r7', nombre: 'Inspector', estado: 'Activo' },
                     { id: 'r8', nombre: 'Campo', estado: 'Activo' },
                     { id: 'r9', nombre: 'Proveedor', estado: 'Activo' },
@@ -1999,7 +1810,7 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
 
 
 
-                <label className="mb-1 block text-xs sm:text-[9px] font-semibold text-gray-700 uppercase tracking-wide">Estado *</label>
+                <label className="mb-1 block text-[11px] sm:text-[9px] font-semibold text-gray-700 uppercase tracking-wide">Estado *</label>
 
 
 
@@ -2023,7 +1834,7 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
 
 
 
-                  className="w-full h-10 sm:h-8 px-3 text-base sm:text-xs rounded-lg border border-gray-200 bg-white focus:border-[#9B0F06] focus:outline-none disabled:bg-gray-50 transition-colors"
+                  className="w-full h-10 sm:h-8 px-3 text-[15px] sm:text-xs rounded-lg border border-gray-200 bg-white focus:border-[#9B0F06] focus:outline-none disabled:bg-gray-50 transition-colors"
 
 
 
@@ -2061,7 +1872,7 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
 
 
 
-              <label className="mb-1 block text-xs sm:text-[9px] font-semibold text-gray-700 uppercase tracking-wide">Motivo de bloqueo *</label>
+              <label className="mb-1 block text-[11px] sm:text-[9px] font-semibold text-gray-700 uppercase tracking-wide">Motivo de bloqueo *</label>
 
 
 
@@ -2071,7 +1882,7 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
                 onChange={handleChange}
                 rows={2}
                 disabled={isViewMode}
-                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-base sm:text-xs text-gray-700 focus:border-gray-400 focus:outline-none disabled:bg-gray-50 transition-colors resize-none h-16 overflow-y-auto max-w-full"
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-[15px] sm:text-xs text-gray-700 focus:border-gray-400 focus:outline-none disabled:bg-gray-50 transition-colors resize-none h-16 overflow-y-auto max-w-full"
                 placeholder="Razón de la suspensión..."
               />
 
@@ -2181,7 +1992,7 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
 
 
 
-            className="flex-1 border border-gray-200 bg-white text-gray-700 text-sm sm:text-xs font-semibold h-10 sm:h-8 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+            className="flex-1 border border-gray-200 bg-white text-gray-700 text-[13px] sm:text-xs font-semibold h-10 sm:h-8 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
 
 
 
@@ -2209,7 +2020,7 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
 
 
 
-              className="flex-1 bg-[#9B0F06] text-white text-sm sm:text-xs font-semibold h-10 sm:h-8 rounded-lg hover:bg-[#5E0006] transition-colors flex items-center justify-center gap-2 cursor-pointer"
+              className="flex-1 bg-[#9B0F06] text-white text-[13px] sm:text-xs font-semibold h-10 sm:h-8 rounded-lg hover:bg-[#5E0006] transition-colors flex items-center justify-center gap-2 cursor-pointer"
 
 
 

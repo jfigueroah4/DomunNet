@@ -809,78 +809,94 @@ function SelectorMapaInteractivo({
     }
   }
 
-  // Genera variantes de búsqueda ordenadas de mayor especificidad a menor
-  // Esto resuelve búsquedas con números de casa ("1 calle 51-06") o micro-colonias no indexadas en OSM Guatemala
+  // Cache en memoria para búsquedas instantáneas sin esperar a la red
+  const cacheNominatimRef = useRef<Map<string, any>>(new Map())
+
+  // Coordenadas de referencia para departamentos y municipios clave de Guatemala (fallback instantáneo 0ms)
+  const CENTROS_DEPARTAMENTOS_GT: Record<string, [number, number]> = {
+    'guatemala': [14.6349, -90.5069],
+    'villa nueva': [14.5256, -90.5886],
+    'mixco': [14.6317, -90.6067],
+    'palencia': [14.6644, -90.3597],
+    'san jose pinula': [14.5456, -90.4128],
+    'santa catarina pinula': [14.5667, -90.4950],
+    'amatitlan': [14.4878, -90.6150],
+    'chinautla': [14.7139, -90.4989],
+    'san miguel petapa': [14.5019, -90.5608],
+    'quetzaltenango': [14.8347, -91.5181],
+    'escuintla': [14.3009, -90.7850],
+    'sacatepequez': [14.5586, -90.7340],
+    'antigua': [14.5586, -90.7340],
+    'chimaltenango': [14.6622, -90.8208],
+    'alta verapaz': [15.4716, -90.3708],
+    'coban': [15.4716, -90.3708],
+    'baja verapaz': [15.1028, -90.3181],
+    'salama': [15.1028, -90.3181],
+    'peten': [16.9244, -89.8967],
+    'flores': [16.9244, -89.8967],
+    'izabal': [15.7278, -88.5944],
+    'puerto barrios': [15.7278, -88.5944],
+    'zacapa': [14.9722, -89.5306],
+    'chiquimula': [14.8000, -89.5458],
+    'jalapa': [14.6339, -89.9889],
+    'jutiapa': [14.2917, -89.8958],
+    'santa rosa': [14.2789, -90.2989],
+    'el progreso': [14.8542, -90.0758],
+    'guastatoya': [14.8542, -90.0758],
+    'solola': [14.7725, -91.1836],
+    'totonicapan': [14.9108, -91.3611],
+    'quiche': [15.0306, -91.1489],
+    'huehuetenango': [15.3197, -91.4708],
+    'san marcos': [14.9628, -91.7944],
+    'suchitepequez': [14.5342, -91.5033],
+    'mazatenango': [14.5342, -91.5033],
+    'retalhuleu': [14.5361, -91.6778],
+  }
+
+  // Genera variantes de búsqueda simplificadas y directas (máximo 2)
   const generarVariantesBusqueda = (textoOriginal: string): string[] => {
-    const variantes: string[] = []
     const base = textoOriginal.trim()
-    if (!base) return variantes
+    if (!base) return []
 
-    // 1. Texto original exacto
-    variantes.push(base)
+    const variantes: string[] = []
 
-    // 2. Sin números de casa / lote / manzana / nomenclatura (ej: "51-06", "#4", "Lote 12")
+    // 1. Quitar números de nomenclatura ("51-06", "#4", "Lote 12")
     const sinNumeros = base
       .replace(/\b\d+\s*[-/]\s*\d+\b/g, '')
       .replace(/#\s*\d+/gi, '')
       .replace(/\b(no\.|num\.|número|lote|manzana|mz|sector)\s*[a-z0-9]+/gi, '')
       .replace(/\s{2,}/g, ' ')
       .trim()
+
     if (sinNumeros && sinNumeros !== base) {
       variantes.push(sinNumeros)
     }
 
-    // 3. Segmentación por comas o punto y coma
-    const partes = base.split(/[,;]+/).map(p => p.trim()).filter(Boolean)
-    if (partes.length > 1) {
-      // Omitir primer segmento (frecuentemente calle o número)
-      const sinPrimeraParte = partes.slice(1).join(', ')
-      if (sinPrimeraParte) variantes.push(sinPrimeraParte)
-
-      // Sub-sectores sin números finales (ej: "Naciones Unidas 2" -> "Naciones Unidas")
-      const partesSinNumeros = partes.slice(1).map(p => p.replace(/\b\d+\b/g, '').trim()).filter(Boolean)
-      if (partesSinNumeros.length > 0) {
-        variantes.push(partesSinNumeros.join(', '))
-      }
-
-      // Probar las últimas dos partes (ej: municipio, depto)
-      if (partes.length > 2) {
-        variantes.push(partes.slice(-2).join(', '))
-      }
-
-      // Probar únicamente el municipio / zona
-      const partesInteres = partes.filter(
-        p => !p.toLowerCase().includes('guatemala') && !p.toLowerCase().includes('república')
-      )
-      if (partesInteres.length > 0) {
-        variantes.push(partesInteres[partesInteres.length - 1])
-      }
-    }
-
-    // Deduplicar manteniendo el orden
-    const unicas: string[] = []
-    for (const v of variantes) {
-      const limpio = v.trim().replace(/^,\s*|,\s*$/g, '')
-      if (limpio && !unicas.includes(limpio)) {
-        unicas.push(limpio)
-      }
-    }
-    return unicas
+    variantes.push(base)
+    return variantes.slice(0, 2)
   }
 
   const consultarNominatim = async (queryTexto: string) => {
     const qLimpio = queryTexto.trim()
     if (!qLimpio) return null
+
+    const cacheKey = qLimpio.toLowerCase()
+    if (cacheNominatimRef.current.has(cacheKey)) {
+      return cacheNominatimRef.current.get(cacheKey)
+    }
+
     const q = qLimpio.toLowerCase().includes('guatemala') ? qLimpio : `${qLimpio}, Guatemala`
     const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(q)}&limit=1&addressdetails=1&countrycodes=gt&accept-language=es`
     try {
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 6000)
+      // Timeout ultrarrápido de 1800ms
+      const timeoutId = setTimeout(() => controller.abort(), 1800)
       const res = await fetch(url, { signal: controller.signal })
       clearTimeout(timeoutId)
       if (!res.ok) return null
       const data = await res.json()
       if (Array.isArray(data) && data.length > 0) {
+        cacheNominatimRef.current.set(cacheKey, data[0])
         return data[0]
       }
       return null
@@ -908,7 +924,22 @@ function SelectorMapaInteractivo({
       }
     }
 
-    if (!resultado) return null
+    if (!resultado) {
+      // Fallback local instantáneo buscando departamentos o municipios de Guatemala
+      const textoNorm = normalizarTexto(texto)
+      for (const [lugar, coords] of Object.entries(CENTROS_DEPARTAMENTOS_GT)) {
+        if (textoNorm.includes(lugar)) {
+          return {
+            resultado: { display_name: texto, address: { state: lugar } },
+            lat: coords[0],
+            lng: coords[1],
+            display: texto,
+            esAproximado: true,
+          }
+        }
+      }
+      return null
+    }
 
     const lat = Number.parseFloat(resultado.lat)
     const lng = Number.parseFloat(resultado.lon)
@@ -981,21 +1012,33 @@ function SelectorMapaInteractivo({
       setErrorBusqueda(null)
       setAvisoBusqueda(null)
 
-      // 1. Geocodificar Dirección Inicial
-      const geoIni = await geocodificarDireccion(direccion)
-      if (!geoIni) {
+      // Geocodificar en paralelo ambas direcciones simultáneamente
+      const [geoIni, geoFin] = await Promise.all([
+        geocodificarDireccion(direccion),
+        geocodificarDireccion(direccionFin),
+      ])
+
+      if (!geoIni && !geoFin) {
         setErrorBusqueda(
-          'No se encontró la dirección inicial en el mapa. Intenta ingresar la zona, colonia o municipio, o haz clic directamente sobre el mapa para fijar el punto.'
+          'No se encontraron las direcciones en el mapa. Puedes hacer clic directamente en el mapa para marcar los puntos.'
         )
         return
       }
 
-      // Pequeña pausa para no saturar Nominatim (rate limit amigable)
-      await new Promise((res) => setTimeout(res, 400))
+      if (!geoIni && geoFin) {
+        aplicarResultadoFin(geoFin, direccionFin)
+        const mapa = instanciaMapaRef.current
+        const L = leafletRef.current
+        if (mapa && L) {
+          mapa.setView([geoFin.lat, geoFin.lng], geoFin.esAproximado ? 14 : 16)
+        }
+        setErrorBusqueda(
+          'Se localizó el destino, pero no la dirección de inicio. Haz clic en el mapa para fijar el inicio.'
+        )
+        return
+      }
 
-      // 2. Geocodificar Dirección Final
-      const geoFin = await geocodificarDireccion(direccionFin)
-      if (!geoFin) {
+      if (geoIni && !geoFin) {
         aplicarResultadoInicio(geoIni, direccion)
         const mapa = instanciaMapaRef.current
         const L = leafletRef.current
@@ -1003,49 +1046,48 @@ function SelectorMapaInteractivo({
           mapa.setView([geoIni.lat, geoIni.lng], geoIni.esAproximado ? 14 : 16)
         }
         setErrorBusqueda(
-          'Se localizó la dirección inicial, pero no se encontró la dirección de destino en el mapa. Intenta ingresar una zona o municipio para el destino.'
+          'Se localizó la dirección inicial, pero no se encontró la dirección de destino. Haz clic en el mapa para fijar el destino.'
         )
         return
       }
 
-      // Validar que no caigan en el mismo punto físico
-      const L = leafletRef.current
-      if (L) {
-        const dist = L.latLng(geoIni.lat, geoIni.lng).distanceTo(L.latLng(geoFin.lat, geoFin.lng))
-        if (dist < 30) {
-          setErrorBusqueda('La ubicación inicial y de destino no pueden estar en el mismo punto físico.')
-          return
+      if (geoIni && geoFin) {
+        const L = leafletRef.current
+        if (L) {
+          const dist = L.latLng(geoIni.lat, geoIni.lng).distanceTo(L.latLng(geoFin.lat, geoFin.lng))
+          if (dist < 30) {
+            setErrorBusqueda('La ubicación inicial y de destino no pueden estar en el mismo punto físico.')
+            return
+          }
+        }
+
+        aplicarResultadoInicio(geoIni, direccion)
+        aplicarResultadoFin(geoFin, direccionFin)
+
+        const mapa = instanciaMapaRef.current
+        if (mapa && L) {
+          mapa.fitBounds(
+            L.latLngBounds([
+              [geoIni.lat, geoIni.lng],
+              [geoFin.lat, geoFin.lng],
+            ]),
+            { padding: [50, 50] }
+          )
+          actualizarLineaRuta(mapa, L)
+        }
+
+        ultimaDireccionFinalBuscadaRef.current = direccionFin.trim()
+
+        if (!geoIni.esAproximado && !geoFin.esAproximado) {
+          setAvisoBusqueda('✓ Ubicaciones de inicio y destino localizadas con precisión en el mapa.')
+        } else {
+          setAvisoBusqueda(
+            '📍 Ubicaciones localizadas en el mapa. Puedes arrastrar los globos A (Inicio) o B (Destino) para ajustar el punto exacto.'
+          )
         }
       }
-
-      // 3. Aplicar resultados a estado, inputs y marcadores A y B
-      aplicarResultadoInicio(geoIni, direccion)
-      aplicarResultadoFin(geoFin, direccionFin)
-
-      // 4. Ajustar encuadre del mapa para mostrar ambos marcadores y trazar la ruta
-      const mapa = instanciaMapaRef.current
-      if (mapa && L) {
-        mapa.fitBounds(
-          L.latLngBounds([
-            [geoIni.lat, geoIni.lng],
-            [geoFin.lat, geoFin.lng]
-          ]),
-          { padding: [50, 50] }
-        )
-        actualizarLineaRuta(mapa, L)
-      }
-
-      ultimaDireccionFinalBuscadaRef.current = direccionFin.trim()
-
-      if (!geoIni.esAproximado && !geoFin.esAproximado) {
-        setAvisoBusqueda('✓ Ubicaciones de inicio y destino localizadas con precisión en el mapa.')
-      } else {
-        setAvisoBusqueda(
-          '📍 Ubicaciones localizadas en el mapa. Puedes arrastrar los globos A (Inicio) o B (Destino) para ajustar el punto exacto.'
-        )
-      }
     } catch {
-      setErrorBusqueda('No se pudo realizar la búsqueda de direcciones. Verifica la conexión a internet.')
+      setErrorBusqueda('No se pudo realizar la búsqueda de direcciones. Verifica tu conexión.')
     } finally {
       setBuscandoDireccion(false)
       setBuscandoDireccionFinal(false)
@@ -1056,12 +1098,6 @@ function SelectorMapaInteractivo({
     if (!direccion.trim()) return
     if (sonDireccionesIdenticas) {
       setErrorBusqueda('La ubicación de destino no puede ser idéntica a la ubicación inicial.')
-      return
-    }
-
-    // Si ambas direcciones están establecidas y falta mostrar alguna en el mapa, buscar ambas
-    if (direccion.trim() && direccionFin.trim() && (!marcadorRef.current || !marcadorFinRef.current)) {
-      await buscarAmbasDirecciones()
       return
     }
 
@@ -1125,12 +1161,6 @@ function SelectorMapaInteractivo({
     if (!direccionFin.trim()) return
     if (sonDireccionesIdenticas) {
       setErrorBusqueda('La ubicación de destino no puede ser idéntica a la ubicación inicial.')
-      return
-    }
-
-    // Si ambas direcciones están establecidas y falta mostrar alguna en el mapa, buscar ambas
-    if (direccion.trim() && direccionFin.trim() && (!marcadorRef.current || !marcadorFinRef.current)) {
-      await buscarAmbasDirecciones()
       return
     }
 
@@ -1345,7 +1375,7 @@ function SelectorMapaInteractivo({
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 e.preventDefault()
-                if (!buscandoDireccion && !buscandoDireccionFinal && direccion.trim() && !sonDireccionesIdenticas) {
+                if (!buscandoDireccion && direccion.trim() && !sonDireccionesIdenticas) {
                   void buscarDireccionTexto()
                 }
               }
@@ -1356,7 +1386,7 @@ function SelectorMapaInteractivo({
           <button
             type="button"
             onClick={buscarDireccionTexto}
-            disabled={buscandoDireccion || buscandoDireccionFinal || !direccion.trim() || sonDireccionesIdenticas}
+            disabled={buscandoDireccion || !direccion.trim() || sonDireccionesIdenticas}
             className="rounded bg-[#E06D53] px-3.5 py-1 text-[10px] md:text-[11px] font-bold text-white hover:bg-[#c95941] disabled:cursor-not-allowed disabled:opacity-50 transition-colors shrink-0 flex items-center gap-1 shadow-2xs cursor-pointer font-[Poppins]"
           >
             {buscandoDireccion ? (
@@ -1397,7 +1427,7 @@ function SelectorMapaInteractivo({
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 e.preventDefault()
-                if (!buscandoDireccion && !buscandoDireccionFinal && direccionFin.trim() && !sonDireccionesIdenticas) {
+                if (!buscandoDireccionFinal && direccionFin.trim() && !sonDireccionesIdenticas) {
                   void buscarDireccionFinalTexto()
                 }
               }
@@ -1408,7 +1438,7 @@ function SelectorMapaInteractivo({
           <button
             type="button"
             onClick={buscarDireccionFinalTexto}
-            disabled={buscandoDireccion || buscandoDireccionFinal || !direccionFin.trim() || sonDireccionesIdenticas}
+            disabled={buscandoDireccionFinal || !direccionFin.trim() || sonDireccionesIdenticas}
             className="rounded bg-[#9B0F06] px-3.5 py-1 text-[10px] md:text-[11px] font-bold text-white hover:bg-[#7a0c05] disabled:cursor-not-allowed disabled:opacity-50 transition-colors shrink-0 flex items-center gap-1 shadow-2xs cursor-pointer font-[Poppins]"
           >
             {buscandoDireccionFinal ? (
@@ -1618,13 +1648,14 @@ export function ProyectoFormulario({
   const [openCrearUsuarioDrawer, setOpenCrearUsuarioDrawer] = useState(false)
   const [openCrearUsuarioContratistaDrawer, setOpenCrearUsuarioContratistaDrawer] = useState(false)
   const [openCrearUsuarioSupervisoraDrawer, setOpenCrearUsuarioSupervisoraDrawer] = useState(false)
+  const [openCrearUsuarioEntidadDrawer, setOpenCrearUsuarioEntidadDrawer] = useState(false)
   const [openCrearDelegadoDrawer, setOpenCrearDelegadoDrawer] = useState(false)
   const [openCrearIngenieroDrawer, setOpenCrearIngenieroDrawer] = useState(false)
   const [reloadDelegadosTrigger, setReloadDelegadosTrigger] = useState(0)
   const [reloadIngenierosTrigger, setReloadIngenierosTrigger] = useState(0)
 
   const [drawerContextoUsuario, setDrawerContextoUsuario] = useState<
-    'contratista_propietario' | 'contratista_superintendente' | 'supervisora_propietario' | 'supervisora_responsable' | null
+    'entidad_contacto' | 'contratista_propietario' | 'contratista_superintendente' | 'supervisora_propietario' | 'supervisora_responsable' | null
   >(null)
   const [usuariosLocalesPorEmpresa, setUsuariosLocalesPorEmpresa] = useState<
     Array<{
@@ -1664,6 +1695,8 @@ export function ProyectoFormulario({
   const [descripcion, setDescripcion] = useState(proyectoInicial?.descripcion || '')
   const [entidadContratante, setEntidadContratante] = useState(proyectoInicial?.entidadContratante || (proyectoInicial as any)?.entidad_contratante || '')
   const [empresaContratanteId, setEmpresaContratanteId] = useState((proyectoInicial as any)?.empresaContratanteId || (proyectoInicial as any)?.empresa_contratante_id || '')
+  const [contactoContratante, setContactoContratante] = useState((proyectoInicial as any)?.contactoContratante || (proyectoInicial as any)?.contacto_contratante || '')
+  const [contactoContratanteId, setContactoContratanteId] = useState((proyectoInicial as any)?.contactoContratanteId || (proyectoInicial as any)?.contacto_contratante_id || '')
 
   // -------------------------------------------------------------
   // PASO 2: Ubicación Geográfica y Tramo Vial DGC
@@ -1825,19 +1858,33 @@ export function ProyectoFormulario({
     : 0
   const esDiferenciaPlazoInvalida = Boolean(mesesObraNum > 0 && mesesSupervisionNum > 0 && diferenciaPlazoMeses > 1)
 
-  // Modalidad de Gestión Financiera: Modo Hoja Sábana vs Modo Manual
-  const [modoGestionFinanciera, setModoGestionFinanciera] = useState<'sabana' | 'manual'>(
-    (proyectoInicial as any)?.modoGestionFinanciera ||
-    (proyectoInicial as any)?.modo_gestion_financiera ||
-    ((proyectoInicial as any)?.usarModoSabana === false ? 'manual' : 'sabana')
-  )
+  // Modalidades independientes de Gestión Financiera: Modo Hoja Sábana vs Modo Manual por Contrato
+  const [modoObra, setModoObra] = useState<'sabana' | 'manual'>(() => {
+    if ((proyectoInicial as any)?.modoObra) return (proyectoInicial as any).modoObra
+    if ((proyectoInicial as any)?.modo_obra) return (proyectoInicial as any).modo_obra
+    const mgf = (proyectoInicial as any)?.modoGestionFinanciera || (proyectoInicial as any)?.modo_gestion_financiera
+    const amb = (proyectoInicial as any)?.ambitoPlanTrabajo || (proyectoInicial as any)?.ambito_plan_trabajo
+    if (mgf === 'manual') return 'manual'
+    if (mgf === 'sabana' && amb === 'supervision') return 'manual'
+    return 'sabana'
+  })
 
-  // Ámbito del Plan de Trabajo (Modo Sábana): Obra (Ejecución) vs Supervisión
-  const [ambitoPlanTrabajo, setAmbitoPlanTrabajo] = useState<'obra' | 'supervision'>(
-    (proyectoInicial as any)?.ambitoPlanTrabajo ||
-    (proyectoInicial as any)?.ambito_plan_trabajo ||
-    'obra'
-  )
+  const [modoSupervision, setModoSupervision] = useState<'sabana' | 'manual'>(() => {
+    if ((proyectoInicial as any)?.modoSupervision) return (proyectoInicial as any).modoSupervision
+    if ((proyectoInicial as any)?.modo_supervision) return (proyectoInicial as any).modo_supervision
+    const mgf = (proyectoInicial as any)?.modoGestionFinanciera || (proyectoInicial as any)?.modo_gestion_financiera
+    const amb = (proyectoInicial as any)?.ambitoPlanTrabajo || (proyectoInicial as any)?.ambito_plan_trabajo
+    if (mgf === 'sabana' && amb === 'supervision') return 'sabana'
+    return 'manual'
+  })
+
+  // Compatibilidad con funciones y esquemas heredados
+  const modoGestionFinanciera = (modoObra === 'sabana' || modoSupervision === 'sabana') ? 'sabana' : 'manual'
+  const setModoGestionFinanciera = (val: 'sabana' | 'manual') => {
+    setModoObra(val)
+  }
+  const ambitoPlanTrabajo = (modoObra === 'sabana' && modoSupervision !== 'sabana') ? 'obra' : (modoSupervision === 'sabana' && modoObra !== 'sabana') ? 'supervision' : 'obra'
+  const setAmbitoPlanTrabajo = (_val: 'obra' | 'supervision') => {}
 
   // Monto Calculado por el Plan de Trabajo / Hoja Sábana (Separado del Monto Original Contractual)
   const [montoPlanTrabajo, setMontoPlanTrabajo] = useState<string>(() => {
@@ -1881,16 +1928,12 @@ export function ProyectoFormulario({
         unidad: r.unidad || r.unidad_medida || 'm³',
         capituloId: r.capituloId || 1,
         capituloNombre: r.capituloNombre || '',
-        cantidadContratada: Number(r.cantidadContratada || r.cantidadContractual || 1),
-        costoUnitarioDirecto: Number(r.costoUnitarioDirecto || r.precioUnitario || 0),
+        cantidadContratada: Number(r.cantidadContratada ?? r.cantidadContractual ?? 0),
+        costoUnitarioDirecto: Number(r.costoUnitarioDirecto ?? r.precioUnitario ?? 0),
         esPersonalizado: Boolean(r.esPersonalizado),
-        seleccionado: r.seleccionado !== false,
+        seleccionado: r.seleccionado !== false && Number(r.cantidadContratada ?? r.cantidadContractual ?? 0) > 0,
       }))
     }
-    const esModoManualInicial =
-      (proyectoInicial as any)?.modoGestionFinanciera === 'manual' ||
-      (proyectoInicial as any)?.modo_gestion_financiera === 'manual' ||
-      (proyectoInicial as any)?.usarModoSabana === false
     return CATALOGO_COMPLETO_88.map((r: any) => ({
       id: r.id || r.codigoDGC,
       codigoDGC: r.codigoDGC,
@@ -1898,10 +1941,10 @@ export function ProyectoFormulario({
       unidad: r.unidad || 'm³',
       capituloId: r.capituloId || 1,
       capituloNombre: r.capituloNombre || '',
-      cantidadContratada: r.cantidadContratada || 1,
-      costoUnitarioDirecto: r.costoUnitarioDirecto || 0,
+      cantidadContratada: 0,
+      costoUnitarioDirecto: 0,
       esPersonalizado: false,
-      seleccionado: esModoManualInicial ? false : true,
+      seleccionado: false,
     }))
   })
 
@@ -1918,8 +1961,8 @@ export function ProyectoFormulario({
           unidad: r.unidad || r.unidad_medida || 'm³',
           capituloId: Number(r.capituloId || r.capitulo_id || 1),
           capituloNombre: r.capituloNombre || `Capítulo ${r.capituloId || r.capitulo_id || 1}`,
-          cantidadContratada: Number(r.cantidadContratada || r.cantidadContractual || 1),
-          costoUnitarioDirecto: Number(r.costoUnitarioDirecto || r.precioUnitario || 0),
+          cantidadContratada: Number(r.cantidadContratada ?? r.cantidadContractual ?? 0),
+          costoUnitarioDirecto: Number(r.costoUnitarioDirecto ?? r.precioUnitario ?? 0),
           esPersonalizado: Boolean(r.esPersonalizado),
           seleccionado: r.seleccionado !== false,
         }))
@@ -2220,12 +2263,15 @@ export function ProyectoFormulario({
         })
     }
 
-    // Para empresas externas (No Domun):
+    // Para empresas externas (No Domun) o entidades contratantes:
     // Debe ser un usuario vinculado a dicha empresa (contactos de la empresa o creados para ella)
-    const matchedEmp = (empresasSupervisoras || []).concat(empresasContratistas || []).find((e: any) => {
-      const eNom = (e.nombre || e.razon_social || '').toLowerCase().trim()
-      return eNom === norm
-    })
+    const matchedEmp = (empresasSupervisoras || [])
+      .concat(empresasContratistas || [])
+      .concat(entidadesContratantes || [])
+      .find((e: any) => {
+        const eNom = (e.nombre || e.razon_social || '').toLowerCase().trim()
+        return eNom === norm
+      })
 
     const listaOpciones: any[] = []
 
@@ -2290,6 +2336,8 @@ export function ProyectoFormulario({
       valorActualCampo = tipo === 'propietario' ? contratistaPropietario : contratistaSuperintendente
     } else if (norm === (empresaSupervisora || '').toLowerCase().trim()) {
       valorActualCampo = tipo === 'propietario' ? supervisoraPropietario : supervisoraResponsable
+    } else if (norm === (entidadContratante || '').toLowerCase().trim()) {
+      valorActualCampo = contactoContratante
     }
 
     if (valorActualCampo && valorActualCampo.trim()) {
@@ -2427,7 +2475,7 @@ export function ProyectoFormulario({
   }
 
   // Apertura directa del Plan de Trabajo (Hoja Sábana) desde Paso 5
-  const handleAbrirPlanTrabajo = async () => {
+  const handleAbrirPlanTrabajo = async (ambito: 'obra' | 'supervision' = 'obra') => {
     if (isGuardando) return
     setIsGuardando(true)
     try {
@@ -2552,6 +2600,8 @@ export function ProyectoFormulario({
         fechaFinSupervisora: supervisoraFechaFin || null,
         entidadContratante,
         empresaContratanteId: empresaContratanteId || null,
+        contactoContratante: contactoContratante || null,
+        contactoContratanteId: contactoContratanteId || null,
         empresaContratista,
         empresaContratistaId: empresaContratistaId || null,
         empresaSupervisora,
@@ -2566,10 +2616,14 @@ export function ProyectoFormulario({
         fechaFin: fechaFinContractualPlan || null,
         montoContractualOriginal: parseMontoNumber(montoContractualOriginal),
         presupuesto: parseMontoNumber(montoContractualOriginal),
+        modoObra,
+        modo_obra: modoObra,
+        modoSupervision,
+        modo_supervision: modoSupervision,
         modoGestionFinanciera,
         usarModoSabana: modoGestionFinanciera === 'sabana',
-        ambitoPlanTrabajo,
-        ambito_plan_trabajo: ambitoPlanTrabajo,
+        ambitoPlanTrabajo: ambito,
+        ambito_plan_trabajo: ambito,
         montoPlanTrabajo: parseFloat(montoPlanTrabajo) || 0,
         monto_plan_trabajo: parseFloat(montoPlanTrabajo) || 0,
         renglones: renglonesProyecto.filter((r) => r.seleccionado !== false),
@@ -2591,7 +2645,7 @@ export function ProyectoFormulario({
 
       if (targetId) {
         showSuccessToast('Datos registrados en borrador. Accediendo a la Hoja Sábana...')
-        router.push(`/dashboard/proyectos/${targetId}/hoja-sabana?from=paso5`)
+        router.push(`/dashboard/proyectos/${targetId}/hoja-sabana?from=paso5&ambito=${ambito}`)
       } else {
         showErrorToast('No se pudo abrir el plan de trabajo. Guarde el borrador manualmente.')
       }
@@ -2817,6 +2871,8 @@ export function ProyectoFormulario({
       fechaFinSupervisora: supervisoraFechaFin || null,
       entidadContratante,
       empresaContratanteId: empresaContratanteId || null,
+      contactoContratante: contactoContratante || null,
+      contactoContratanteId: contactoContratanteId || null,
       empresaContratista,
       empresaContratistaId: empresaContratistaId || null,
       empresaSupervisora,
@@ -2831,6 +2887,10 @@ export function ProyectoFormulario({
       fechaFin: fechaFinContractualPlan || null,
       montoContractualOriginal: parseMontoNumber(montoContractualOriginal),
       presupuesto: parseMontoNumber(montoContractualOriginal),
+      modoObra,
+      modo_obra: modoObra,
+      modoSupervision,
+      modo_supervision: modoSupervision,
       modoGestionFinanciera,
       usarModoSabana: modoGestionFinanciera === 'sabana',
       ambitoPlanTrabajo,
@@ -3231,25 +3291,64 @@ export function ProyectoFormulario({
               icon={Briefcase}
             />
 
-            <div>
-              <label className={labelClass}>
-                Entidad Contratante / Propietaria <span className="text-[#9B0F06]">*</span>
-              </label>
-              <Combobox
-                options={entidadesContratantes.map((e: any) => ({ value: e.nombre, label: e.nombre }))}
-                value={entidadContratante}
-                allowCustomValue
-                hasError={errors.entidadContratante || !!errorMessages.entidadContratante}
-                onChange={(val) => {
-                  setEntidadContratante(val)
-                  const found = entidadesContratantes.find((e: any) => e.nombre === val || e.id === val)
-                  if (found?.id) setEmpresaContratanteId(found.id)
-                  setFieldError('entidadContratante', val?.trim() ? null : 'La entidad contratante es obligatoria')
-                }}
-                placeholder="Buscar o seleccionar entidad contratante..."
-                className="mt-0.5"
-              />
-              {renderFieldError('entidadContratante')}
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+              <div>
+                <label className={labelClass}>
+                  Entidad Contratante / Propietaria <span className="text-[#9B0F06]">*</span>
+                </label>
+                <Combobox
+                  options={entidadesContratantes.map((e: any) => ({ value: e.nombre, label: e.nombre }))}
+                  value={entidadContratante}
+                  allowCustomValue
+                  hasError={errors.entidadContratante || !!errorMessages.entidadContratante}
+                  onChange={(val) => {
+                    setEntidadContratante(val)
+                    const found = entidadesContratantes.find((e: any) => e.nombre === val || e.id === val)
+                    if (found?.id) setEmpresaContratanteId(found.id)
+                    setFieldError('entidadContratante', val?.trim() ? null : 'La entidad contratante es obligatoria')
+                  }}
+                  placeholder="Buscar o seleccionar entidad contratante..."
+                  className="mt-0.5"
+                />
+                {renderFieldError('entidadContratante')}
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className={labelClass}>Representante / Contacto (Entidad Contratante)</label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDrawerContextoUsuario('entidad_contacto')
+                      setOpenCrearUsuarioEntidadDrawer(true)
+                    }}
+                    className="text-[9px] font-bold text-[#9B0F06] hover:text-[#7a0c05] cursor-pointer flex items-center gap-0.5 shrink-0 whitespace-nowrap"
+                  >
+                    <Plus size={10} />
+                    <span>Crear Usuario</span>
+                  </button>
+                </div>
+                <Combobox
+                  options={getUsuariosParaEmpresa(entidadContratante, 'propietario')}
+                  value={contactoContratante}
+                  allowCustomValue={true}
+                  onChange={(val) => {
+                    setContactoContratante(val)
+                    const foundOpt = getUsuariosParaEmpresa(entidadContratante, 'propietario').find((o: any) => o.value === val)
+                    if (foundOpt?.usuario?.id) {
+                      setContactoContratanteId(foundOpt.usuario.id)
+                    }
+                  }}
+                  placeholder="Seleccionar o escribir contacto / usuario..."
+                  emptyAction={{
+                    label: 'Crear Nuevo Usuario',
+                    onClick: () => {
+                      setDrawerContextoUsuario('entidad_contacto')
+                      setOpenCrearUsuarioEntidadDrawer(true)
+                    },
+                  }}
+                />
+              </div>
             </div>
 
             {/* Sub-tabs para Paso 3 con diseño moderno estilo underline (img3) */}
@@ -3297,7 +3396,7 @@ export function ProyectoFormulario({
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
                   <div>
-                    <label className={labelClass}>Empresa Contratista Ejecutora <span className="text-[#9B0F06]">*</span></label>
+                    <label className={labelClass}>Empresa Ejecutora <span className="text-[#9B0F06]">*</span></label>
                     <Combobox
                       options={opcionesEmpresaConDomun(empresasContratistas)}
                       value={empresaContratista}
@@ -3306,7 +3405,7 @@ export function ProyectoFormulario({
                       onChange={(val) => {
                         handleSelectContratista(val)
                         if (!val || !val.trim()) {
-                          setFieldError('empresaContratista', 'La empresa contratista es obligatoria')
+                          setFieldError('empresaContratista', 'La empresa ejecutora es obligatoria')
                         } else {
                           setFieldError('empresaContratista', null)
                         }
@@ -4347,173 +4446,7 @@ export function ProyectoFormulario({
               icon={Banknote}
             />
 
-            {/* Selector de Modalidad de Presupuesto / Estimaciones: Modo Hoja Sábana vs Modo Manual */}
-            <div className="rounded-xl border border-gray-200 bg-white p-3.5 space-y-2.5">
-              <div>
-                <h4 className="text-[11px] font-bold text-gray-800">
-                  Modalidad de Gestión de Presupuesto y Estimaciones
-                </h4>
-                <p className="text-[9.5px] text-gray-500">
-                  Define cómo se calcularán y registrarán los montos de estimaciones y avances en este proyecto.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                {/* Opción 1: Modo Hoja Sábana */}
-                <button
-                  type="button"
-                  onClick={() => setModoGestionFinanciera('sabana')}
-                  className={`flex items-start gap-3 p-3 rounded-xl border text-left transition-all cursor-pointer ${
-                    modoGestionFinanciera === 'sabana'
-                      ? 'border-[#9B0F06] bg-white shadow-xs ring-1 ring-[#9B0F06]/30'
-                      : 'border-gray-200 bg-white/60 hover:bg-white hover:border-gray-300'
-                  }`}
-                >
-                  <div className={`p-2 rounded-lg shrink-0 ${
-                    modoGestionFinanciera === 'sabana' ? 'bg-[#9B0F06] text-white' : 'bg-gray-100 text-gray-500'
-                  }`}>
-                    <FileSpreadsheet size={16} />
-                  </div>
-                  <div className="space-y-0.5 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[11px] font-bold text-gray-900">Modo Hoja Sábana</span>
-                    </div>
-                    <p className="text-[9.5px] text-gray-500 leading-snug">
-                      Cálculo automatizado desde los renglones DGC, mediciones analíticas en campo, amortización y liquidación por período. Al seleccionar <strong>Ver</strong> se puede desglosar el plan de trabajo.
-                    </p>
-                  </div>
-                </button>
-
-                {/* Opción 2: Modo Manual */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setModoGestionFinanciera('manual')
-                    // Al seleccionar el modo manual no deben salir seleccionados los renglones todos por defecto
-                    setRenglonesProyecto((prev) => {
-                      const todosEstabanSeleccionados = prev.every((r) => r.seleccionado !== false)
-                      if (todosEstabanSeleccionados) {
-                        return prev.map((r) => ({ ...r, seleccionado: false }))
-                      }
-                      return prev
-                    })
-                  }}
-                  className={`flex items-start gap-3 p-3 rounded-xl border text-left transition-all cursor-pointer ${
-                    modoGestionFinanciera === 'manual'
-                      ? 'border-gray-800 bg-white shadow-xs ring-1 ring-gray-800/30'
-                      : 'border-gray-200 bg-white/60 hover:bg-white hover:border-gray-300'
-                  }`}
-                >
-                  <div className={`p-2 rounded-lg shrink-0 ${
-                    modoGestionFinanciera === 'manual' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-500'
-                  }`}>
-                    <Banknote size={16} />
-                  </div>
-                  <div className="space-y-0.5 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[11px] font-bold text-gray-900">Modo Manual</span>
-                    </div>
-                    <p className="text-[9.5px] text-gray-500 leading-snug">
-                      Ingreso manual y libre de montos finales, anticipos y saldos en las estimaciones de ejecutora y supervisora sin obligar a usar la sábana.
-                    </p>
-                  </div>
-                </button>
-              </div>
-
-              {/* Modo Manual: Configuración y Selección de Renglones para Bitácora */}
-              {modoGestionFinanciera === 'manual' && (
-                <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl border border-gray-200 bg-white mt-1">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="text-xs font-bold text-gray-900">Renglones Habilitados para Bitácora</p>
-                      <span className="rounded-full bg-gray-100 border border-gray-200 px-2 py-0.5 text-[9.5px] font-bold text-gray-700">
-                        {renglonesProyecto.filter((r) => r.seleccionado !== false).length} seleccionados
-                      </span>
-                    </div>
-                    <p className="text-[10px] text-gray-500 mt-0.5">
-                      Configura qué renglones estarán disponibles para registrar anotaciones y avances en la bitácora de este proyecto.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setDrawerRenglonesAbierto(true)}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3.5 py-1.5 text-xs font-bold text-gray-800 hover:bg-gray-50 active:scale-95 transition-all shadow-2xs cursor-pointer"
-                  >
-                    <span>Gestionar Renglones ({renglonesProyecto.filter((r) => r.seleccionado !== false).length})</span>
-                  </button>
-                </div>
-              )}
-              {/* Modo Sábana: Asignación de Ámbito del Plan de Trabajo (Obra vs Supervisión) */}
-              {modoGestionFinanciera === 'sabana' && (
-                <div className="rounded-xl border border-gray-200 bg-gray-50/70 p-3 space-y-2 mt-1 font-[Poppins]">
-                  <div className="flex flex-wrap items-center justify-between gap-1">
-                    <div>
-                      <p className="text-[10.5px] font-bold text-gray-900">
-                        Implementación del Plan de Trabajo (Hoja Sábana)
-                      </p>
-                      <p className="text-[9px] text-gray-500">
-                        Indica en qué contrato se implementará la Hoja Sábana con cálculo analítico de renglones DGC. El contrato complementario se ingresará manualmente en la vista de estimaciones.
-                      </p>
-                    </div>
-                    <span className="text-[8.5px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-[#9B0F06] border border-red-200">
-                      Modo Sábana Activo
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setAmbitoPlanTrabajo('obra')}
-                      className={`flex items-start gap-2.5 p-2.5 rounded-lg border text-left transition-all cursor-pointer ${
-                        ambitoPlanTrabajo === 'obra'
-                          ? 'border-[#9B0F06] bg-white ring-1 ring-[#9B0F06]/30 shadow-2xs'
-                          : 'border-gray-200 bg-white/70 hover:bg-white'
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="ambitoPlanTrabajo"
-                        checked={ambitoPlanTrabajo === 'obra'}
-                        onChange={() => setAmbitoPlanTrabajo('obra')}
-                        className="mt-0.5 text-[#9B0F06] focus:ring-[#9B0F06] cursor-pointer"
-                      />
-                      <div className="min-w-0">
-                        <div className="text-[10.5px] font-bold text-gray-900">Contrato de Obra (Ejecución)</div>
-                        <p className="text-[9px] text-gray-500">
-                          El plan de trabajo analítico se aplica a la <strong>Obra</strong>. La estimación de Supervisión se ingresará de forma manual.
-                        </p>
-                      </div>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setAmbitoPlanTrabajo('supervision')}
-                      className={`flex items-start gap-2.5 p-2.5 rounded-lg border text-left transition-all cursor-pointer ${
-                        ambitoPlanTrabajo === 'supervision'
-                          ? 'border-orange-700 bg-white ring-1 ring-orange-700/30 shadow-2xs'
-                          : 'border-gray-200 bg-white/70 hover:bg-white'
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="ambitoPlanTrabajo"
-                        checked={ambitoPlanTrabajo === 'supervision'}
-                        onChange={() => setAmbitoPlanTrabajo('supervision')}
-                        className="mt-0.5 text-orange-700 focus:ring-orange-700 cursor-pointer"
-                      />
-                      <div className="min-w-0">
-                        <div className="text-[10.5px] font-bold text-gray-900">Contrato de Supervisión</div>
-                        <p className="text-[9px] text-gray-500">
-                          El plan de trabajo analítico se aplica a la <strong>Supervisión</strong>. La estimación de Obra se ingresará de forma manual.
-                        </p>
-                      </div>
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Sub-tabs para Paso 5 con diseño moderno estilo underline (img3) */}
+            {/* Sub-tabs para Paso 5 con diseño moderno estilo underline */}
             <div className="flex items-center gap-1 border-b border-gray-200">
               <button
                 type="button"
@@ -4526,6 +4459,11 @@ export function ProyectoFormulario({
               >
                 <Banknote size={13} className={subTabPaso5 === 'ejecucion' ? 'text-[#9B0F06]' : 'text-gray-400'} />
                 <span>5.1 Financiero Obra (Ejecución)</span>
+                <span className={`text-[8.5px] px-1.5 py-0.2 rounded-full font-semibold ${
+                  modoObra === 'sabana' ? 'bg-red-100 text-[#9B0F06]' : 'bg-gray-100 text-gray-600'
+                }`}>
+                  {modoObra === 'sabana' ? 'Sábana' : 'Manual'}
+                </span>
               </button>
               <button
                 type="button"
@@ -4538,6 +4476,11 @@ export function ProyectoFormulario({
               >
                 <Banknote size={13} className={subTabPaso5 === 'supervision' ? 'text-orange-700' : 'text-gray-400'} />
                 <span>5.2 Financiero Supervisión</span>
+                <span className={`text-[8.5px] px-1.5 py-0.2 rounded-full font-semibold ${
+                  modoSupervision === 'sabana' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-600'
+                }`}>
+                  {modoSupervision === 'sabana' ? 'Sábana' : 'Manual'}
+                </span>
               </button>
               <button
                 type="button"
@@ -4555,15 +4498,102 @@ export function ProyectoFormulario({
 
             {/* 5.1 Financiero de Ejecución (Obra) */}
             {subTabPaso5 === 'ejecucion' && (
-              <div className="rounded-lg border border-gray-200 bg-white p-3.5 space-y-3">
-                {modoGestionFinanciera === 'sabana' && ambitoPlanTrabajo === 'supervision' && (
-                  <p className="text-[10px] text-gray-500 font-[Poppins] flex items-center gap-1.5 pb-0.5">
-                    <Info size={12} className="shrink-0 text-amber-600" />
-                    <span>
-                      <strong className="text-gray-700">Estimación Manual:</strong> El Plan de Trabajo de la Hoja Sábana está asignado a <strong>Supervisión</strong>. Las estimaciones de Obra se registrarán de forma manual.
+              <div className="rounded-lg border border-gray-200 bg-white p-3.5 space-y-3 font-[Poppins]">
+                {/* Selector de Modalidad para Contrato de Obra */}
+                <div className="rounded-xl border border-gray-200 bg-gray-50/70 p-3 space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-1">
+                    <div>
+                      <h4 className="text-[11px] font-bold text-gray-800">
+                        Modalidad de Gestión: Contrato de Obra (Ejecución)
+                      </h4>
+                      <p className="text-[9px] text-gray-500">
+                        Define cómo se calcularán y registrarán las estimaciones de obra en este proyecto.
+                      </p>
+                    </div>
+                    <span className={`text-[8.5px] font-bold px-2 py-0.5 rounded-full ${
+                      modoObra === 'sabana'
+                        ? 'bg-red-100 text-[#9B0F06] border border-red-200'
+                        : 'bg-gray-200 text-gray-700 border border-gray-300'
+                    }`}>
+                      {modoObra === 'sabana' ? 'Modo Hoja Sábana' : 'Modo Manual'}
                     </span>
-                  </p>
-                )}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setModoObra('sabana')}
+                      className={`flex items-start gap-2.5 p-2.5 rounded-lg border text-left transition-all cursor-pointer ${
+                        modoObra === 'sabana'
+                          ? 'border-[#9B0F06] bg-white ring-1 ring-[#9B0F06]/30 shadow-2xs'
+                          : 'border-gray-200 bg-white/70 hover:bg-white'
+                      }`}
+                    >
+                      <div className={`p-1.5 rounded-md shrink-0 ${modoObra === 'sabana' ? 'bg-[#9B0F06] text-white' : 'bg-gray-100 text-gray-500'}`}>
+                        <FileSpreadsheet size={15} />
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-[10.5px] font-bold text-gray-900 block">Modo Hoja Sábana</span>
+                        <p className="text-[8.5px] text-gray-500 leading-snug">
+                          Cálculo automatizado desde renglones DGC y desglose analítico en campo.
+                        </p>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setModoObra('manual')
+                        setRenglonesProyecto((prev) => {
+                          const todosEstabanSeleccionados = prev.every((r) => r.seleccionado !== false)
+                          if (todosEstabanSeleccionados) {
+                            return prev.map((r) => ({ ...r, seleccionado: false }))
+                          }
+                          return prev
+                        })
+                      }}
+                      className={`flex items-start gap-2.5 p-2.5 rounded-lg border text-left transition-all cursor-pointer ${
+                        modoObra === 'manual'
+                          ? 'border-gray-800 bg-white ring-1 ring-gray-800/30 shadow-2xs'
+                          : 'border-gray-200 bg-white/70 hover:bg-white'
+                      }`}
+                    >
+                      <div className={`p-1.5 rounded-md shrink-0 ${modoObra === 'manual' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-500'}`}>
+                        <Banknote size={15} />
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-[10.5px] font-bold text-gray-900 block">Modo Manual</span>
+                        <p className="text-[8.5px] text-gray-500 leading-snug">
+                          Ingreso manual y libre de montos en estimaciones sin obligar la sábana.
+                        </p>
+                      </div>
+                    </button>
+                  </div>
+
+                  {modoObra === 'manual' && (
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-gray-200/80">
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-[10.5px] font-bold text-gray-800">Renglones Habilitados para Bitácora</p>
+                          <span className="rounded-full bg-gray-100 border border-gray-200 px-1.5 py-0.2 text-[8.5px] font-bold text-gray-700">
+                            {renglonesProyecto.filter((r) => r.seleccionado !== false).length} seleccionados
+                          </span>
+                        </div>
+                        <p className="text-[9px] text-gray-500">
+                          Configura qué renglones estarán disponibles en la bitácora de obra.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setDrawerRenglonesAbierto(true)}
+                        className="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-2.5 py-1 text-[10.5px] font-bold text-gray-800 hover:bg-gray-50 active:scale-95 transition-all shadow-2xs cursor-pointer"
+                      >
+                        <span>Gestionar Renglones ({renglonesProyecto.filter((r) => r.seleccionado !== false).length})</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+
                 <div className="flex items-center justify-between border-b border-gray-100 pb-1.5">
                   <div className="flex items-center gap-1.5 font-bold text-gray-800 text-[10.5px]">
                     <Banknote size={13} className="text-[#9B0F06]" />
@@ -4571,7 +4601,7 @@ export function ProyectoFormulario({
                   </div>
                 </div>
 
-                <div className={`grid grid-cols-1 ${modoGestionFinanciera === 'sabana' && ambitoPlanTrabajo === 'obra' ? 'md:grid-cols-4' : 'md:grid-cols-3'} gap-2.5`}>
+                <div className={`grid grid-cols-1 ${modoObra === 'sabana' ? 'md:grid-cols-4' : 'md:grid-cols-3'} gap-2.5`}>
                   {/* Monto Original del Contrato de Obra (Q) * (Aparte y siempre editable) */}
                   <div>
                     <label className={labelClass}>
@@ -4613,8 +4643,8 @@ export function ProyectoFormulario({
                     {renderFieldError('montoContractualOriginal')}
                   </div>
 
-                  {/* Monto Calculado por el Plan de Trabajo (Aparte en Modo Sábana si aplica a Obra) */}
-                  {modoGestionFinanciera === 'sabana' && ambitoPlanTrabajo === 'obra' && (
+                  {/* Monto Calculado por el Plan de Trabajo (Modo Sábana) */}
+                  {modoObra === 'sabana' && (
                     <div>
                       <label className={labelClass}>
                         <span>Monto Calculado Plan de Trabajo <span className="text-gray-400 font-normal">(Hoja Sábana)</span></span>
@@ -4636,7 +4666,7 @@ export function ProyectoFormulario({
                         {/* Botón Ver Hoja Sábana */}
                         <button
                           type="button"
-                          onClick={handleAbrirPlanTrabajo}
+                          onClick={() => handleAbrirPlanTrabajo('obra')}
                           title="Ver y desglosar el plan de trabajo en la Hoja Sábana"
                           className="inline-flex items-center gap-1.5 rounded bg-[#9B0F06] px-3 py-1.5 text-xs font-bold text-white hover:bg-[#7D0C05] active:scale-95 transition-all shadow-2xs shrink-0 cursor-pointer font-[Poppins]"
                         >
@@ -4646,7 +4676,7 @@ export function ProyectoFormulario({
                       </div>
                       <p className="mt-1 text-[8.5px] text-[#9B0F06] font-medium font-[Poppins] flex items-center gap-1">
                         <Info size={11} className="shrink-0 text-[#9B0F06]" />
-                        <span>Al seleccionar <strong>Ver</strong> se puede desglosar el plan de trabajo.</span>
+                        <span>Al seleccionar <strong>Ver</strong> se puede desglosar el plan de trabajo de obra.</span>
                       </p>
                     </div>
                   )}
@@ -4749,15 +4779,70 @@ export function ProyectoFormulario({
 
             {/* 5.2 Financiero de Supervisión */}
             {subTabPaso5 === 'supervision' && (
-              <div className="rounded-lg border border-gray-200 bg-white p-3.5 space-y-3">
-                {modoGestionFinanciera === 'sabana' && ambitoPlanTrabajo === 'obra' && (
-                  <p className="text-[10px] text-gray-500 font-[Poppins] flex items-center gap-1.5 pb-0.5">
-                    <Info size={12} className="shrink-0 text-amber-600" />
-                    <span>
-                      <strong className="text-gray-700">Estimación Manual:</strong> El Plan de Trabajo de la Hoja Sábana está asignado a <strong>Obra</strong>. Las estimaciones de Supervisión se registrarán de forma manual.
+              <div className="rounded-lg border border-gray-200 bg-white p-3.5 space-y-3 font-[Poppins]">
+                {/* Selector de Modalidad para Contrato de Supervisión */}
+                <div className="rounded-xl border border-gray-200 bg-gray-50/70 p-3 space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-1">
+                    <div>
+                      <h4 className="text-[11px] font-bold text-gray-800">
+                        Modalidad de Gestión: Contrato de Supervisión
+                      </h4>
+                      <p className="text-[9px] text-gray-500">
+                        Define cómo se calcularán y registrarán las estimaciones de supervisión en este proyecto.
+                      </p>
+                    </div>
+                    <span className={`text-[8.5px] font-bold px-2 py-0.5 rounded-full ${
+                      modoSupervision === 'sabana'
+                        ? 'bg-orange-100 text-orange-700 border border-orange-200'
+                        : 'bg-gray-200 text-gray-700 border border-gray-300'
+                    }`}>
+                      {modoSupervision === 'sabana' ? 'Modo Hoja Sábana' : 'Modo Manual'}
                     </span>
-                  </p>
-                )}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setModoSupervision('sabana')}
+                      className={`flex items-start gap-2.5 p-2.5 rounded-lg border text-left transition-all cursor-pointer ${
+                        modoSupervision === 'sabana'
+                          ? 'border-orange-700 bg-white ring-1 ring-orange-700/30 shadow-2xs'
+                          : 'border-gray-200 bg-white/70 hover:bg-white'
+                      }`}
+                    >
+                      <div className={`p-1.5 rounded-md shrink-0 ${modoSupervision === 'sabana' ? 'bg-orange-700 text-white' : 'bg-gray-100 text-gray-500'}`}>
+                        <FileSpreadsheet size={15} />
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-[10.5px] font-bold text-gray-900 block">Modo Hoja Sábana</span>
+                        <p className="text-[8.5px] text-gray-500 leading-snug">
+                          Cálculo automatizado desde renglones analíticos de supervisión.
+                        </p>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setModoSupervision('manual')}
+                      className={`flex items-start gap-2.5 p-2.5 rounded-lg border text-left transition-all cursor-pointer ${
+                        modoSupervision === 'manual'
+                          ? 'border-gray-800 bg-white ring-1 ring-gray-800/30 shadow-2xs'
+                          : 'border-gray-200 bg-white/70 hover:bg-white'
+                      }`}
+                    >
+                      <div className={`p-1.5 rounded-md shrink-0 ${modoSupervision === 'manual' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-500'}`}>
+                        <Banknote size={15} />
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-[10.5px] font-bold text-gray-900 block">Modo Manual</span>
+                        <p className="text-[8.5px] text-gray-500 leading-snug">
+                          Ingreso manual y libre de montos en estimaciones de supervisión.
+                        </p>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
                 <div className="flex items-center justify-between border-b border-gray-100 pb-1.5">
                   <div className="flex items-center gap-1.5 font-bold text-gray-800 text-[10.5px]">
                     <Banknote size={13} className="text-orange-700" />
@@ -4765,7 +4850,7 @@ export function ProyectoFormulario({
                   </div>
                 </div>
 
-                <div className={`grid grid-cols-1 ${modoGestionFinanciera === 'sabana' && ambitoPlanTrabajo === 'supervision' ? 'md:grid-cols-4' : 'md:grid-cols-3'} gap-2.5`}>
+                <div className={`grid grid-cols-1 ${modoSupervision === 'sabana' ? 'md:grid-cols-4' : 'md:grid-cols-3'} gap-2.5`}>
                   <div>
                     <label className={labelClass}>Monto Original de Supervisión (Q)</label>
                     <div className="flex rounded border border-gray-300 shadow-2xs overflow-hidden focus-within:ring-1 focus-within:ring-orange-600 focus-within:border-orange-600 bg-white">
@@ -4802,8 +4887,8 @@ export function ProyectoFormulario({
                     {renderFieldError('supervisoraMontoOriginal')}
                   </div>
 
-                  {/* Monto Calculado por el Plan de Trabajo (Aparte en Modo Sábana si aplica a Supervisión) */}
-                  {modoGestionFinanciera === 'sabana' && ambitoPlanTrabajo === 'supervision' && (
+                  {/* Monto Calculado por el Plan de Trabajo (Modo Sábana) */}
+                  {modoSupervision === 'sabana' && (
                     <div>
                       <label className={labelClass}>
                         <span>Monto Calculado Plan de Trabajo <span className="text-gray-400 font-normal">(Hoja Sábana)</span></span>
@@ -4825,7 +4910,7 @@ export function ProyectoFormulario({
                         {/* Botón Ver Hoja Sábana */}
                         <button
                           type="button"
-                          onClick={handleAbrirPlanTrabajo}
+                          onClick={() => handleAbrirPlanTrabajo('supervision')}
                           title="Ver y desglosar el plan de trabajo en la Hoja Sábana"
                           className="inline-flex items-center gap-1.5 rounded bg-orange-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-orange-800 active:scale-95 transition-all shadow-2xs shrink-0 cursor-pointer font-[Poppins]"
                         >
@@ -4958,6 +5043,30 @@ export function ProyectoFormulario({
                       <div className="text-[9.5px] text-gray-500 mt-1 font-mono">
                         • Anticipo Obra: Q {contratistaMontoAnticipoCalculado.toLocaleString('es-GT', { minimumFractionDigits: 2 })}<br/>
                         • Anticipo Supervisión: Q {supervisoraMontoAnticipoCalculado.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-gray-200 bg-gray-50/80 p-3.5 col-span-full">
+                      <span className="text-[9px] font-bold uppercase tracking-wider text-gray-500 block mb-2">
+                        Modalidades Financieras Seleccionadas
+                      </span>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div className="flex items-center justify-between p-2 rounded-lg bg-white border border-gray-200">
+                          <span className="text-[10px] font-medium text-gray-700">Contrato de Obra (Ejecución):</span>
+                          <span className={`text-[9.5px] font-bold px-2 py-0.5 rounded-full ${
+                            modoObra === 'sabana' ? 'bg-red-50 text-[#9B0F06] border border-red-200' : 'bg-gray-100 text-gray-700 border border-gray-200'
+                          }`}>
+                            {modoObra === 'sabana' ? 'Hoja Sábana' : 'Modo Manual'}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between p-2 rounded-lg bg-white border border-gray-200">
+                          <span className="text-[10px] font-medium text-gray-700">Contrato de Supervisión:</span>
+                          <span className={`text-[9.5px] font-bold px-2 py-0.5 rounded-full ${
+                            modoSupervision === 'sabana' ? 'bg-orange-50 text-orange-700 border border-orange-200' : 'bg-gray-100 text-gray-700 border border-gray-200'
+                          }`}>
+                            {modoSupervision === 'sabana' ? 'Hoja Sábana' : 'Modo Manual'}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -5310,10 +5419,51 @@ export function ProyectoFormulario({
         onSave={() => { setOpenCrearUsuarioDrawer(false); cargarUsuarios() }}
       />
       <UsuarioFormularioDrawer
+        isOpen={openCrearUsuarioEntidadDrawer}
+        onClose={() => setOpenCrearUsuarioEntidadDrawer(false)}
+        rolInicial="Contratante"
+        rolesPermitidos={['Contratante', 'Supervisor', 'Ejecutora', 'IngenieroResidente']}
+        bloquearRol={false}
+        bloquearEstado={true}
+        ocultarEmpresaContratista={true}
+        onSave={async (u) => {
+          setOpenCrearUsuarioEntidadDrawer(false)
+          cargarUsuarios()
+          if (u) {
+            const nom = `${u.primer_nombre || ''} ${u.primer_apellido || ''}`.trim() || u.nombre || u.username
+            if (nom) {
+              registrarUsuarioEnEmpresa(entidadContratante, u)
+              const targetEnt = (entidadesContratantes || []).find((e: any) =>
+                (e.nombre || '').trim().toLowerCase() === (entidadContratante || '').trim().toLowerCase() || e.id === empresaContratanteId
+              )
+              const entId = targetEnt?.id || empresaContratanteId
+              if (entId && u.id) {
+                try {
+                  await api.post(`/entidades-contratantes/${entId}/contactos`, {
+                    usuario_id: u.id,
+                    cargo: 'Representante',
+                  })
+                  recargarEmpresasGlobal().then((e) => {
+                    if (e) {
+                      setEntidadesContratantes(e.entidades || [])
+                    }
+                  })
+                } catch (err) {
+                  console.warn('Error vinculando contacto a entidad contratante:', err)
+                }
+              }
+              setContactoContratante(nom)
+              if (u.id) setContactoContratanteId(u.id)
+              showSuccessToast(`Usuario "${nom}" creado y asignado a Entidad Contratante`)
+            }
+          }
+        }}
+      />
+      <UsuarioFormularioDrawer
         isOpen={openCrearUsuarioContratistaDrawer}
         onClose={() => setOpenCrearUsuarioContratistaDrawer(false)}
-        rolInicial="Contratante"
-        rolesPermitidos={['Contratante', 'IngenieroResidente', 'Supervisor']}
+        rolInicial="Ejecutora"
+        rolesPermitidos={['Ejecutora', 'Supervisor', 'IngenieroResidente', 'Contratante']}
         bloquearRol={false}
         bloquearEstado={true}
         empresaContratistaIdInicial={empresaContratistaId}

@@ -57,6 +57,11 @@ const rolConfig: Record<
     color: '#EA580C',
     icono: Shield,
   },
+  Ejecutora: {
+    label: 'Empresa Ejecutora',
+    color: '#0D9488',
+    icono: Shield,
+  },
 }
 
 export function UsuarioCard({ rol, cantidad }: UsuarioCardProps) {

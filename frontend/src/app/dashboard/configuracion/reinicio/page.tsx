@@ -175,7 +175,7 @@ export default function ReinicioDatosPage() {
     : MODULOS_DISPONIBLES.filter(m => modulosSeleccionados.includes(m.id)).flatMap(m => m.tablas)
 
   return (
-    <div style={{ fontFamily: POPPINS }} className="p-3 sm:p-4 max-w-6xl mx-auto min-h-[calc(100vh-80px)] font-poppins">
+    <div style={{ fontFamily: POPPINS }} className="p-3 sm:p-4 pb-10 sm:pb-4 max-w-6xl mx-auto min-h-full font-poppins">
       {/* Encabezado */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
         <div className="flex items-center gap-2.5">

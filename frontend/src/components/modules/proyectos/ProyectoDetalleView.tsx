@@ -864,6 +864,14 @@ function obtenerValoresCompletosProyecto(p?: ProyectoType | any): Record<string,
     fechaFinSupervisora: cSup.fechaFin || pAny.fechaFinSupervisora || '',
 
     // Ubicación
+    departamentoId: p.departamentoId || pAny.departamentoId || pAny.departamento_id || '',
+    departamentoNombre: p.departamentoNombre || pAny.departamentoNombre || pAny.departamento_nombre || pAny.departamento?.nombre || '',
+    municipioId: p.municipioId || pAny.municipioId || pAny.municipio_id || '',
+    municipioNombre: p.municipioNombre || pAny.municipioNombre || pAny.municipio_nombre || pAny.municipio?.nombre || '',
+    departamentoFinId: p.departamentoFinId || pAny.departamentoFinId || pAny.departamento_fin_id || '',
+    departamentoFinNombre: p.departamentoFinNombre || pAny.departamentoFinNombre || pAny.departamento_fin_nombre || pAny.departamentoFin?.nombre || '',
+    municipioFinId: p.municipioFinId || pAny.municipioFinId || pAny.municipio_fin_id || '',
+    municipioFinNombre: p.municipioFinNombre || pAny.municipioFinNombre || pAny.municipio_fin_nombre || pAny.municipioFin?.nombre || '',
     direccionFin: p.direccionFin || pAny.direccion_fin || '',
     kilometroInicio: pAny.kilometroInicio ?? pAny.kilometro_inicio ?? '',
     kilometroFin: pAny.kilometroFin ?? pAny.kilometro_fin ?? '',
@@ -2107,7 +2115,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto, slugId }: { pro
   ]
 
   return (
-    <div className="project-detail-view space-y-3 font-[Poppins]">
+    <div className="project-detail-view space-y-3 font-[Poppins] pb-10 sm:pb-4">
       {/* Barra de Encabezado Superior Responsive */}
       <div className="flex flex-col sm:flex-row items-start justify-between gap-3 sm:gap-4 py-0.5">
         <div className="flex items-start gap-2.5 min-w-0 w-full sm:flex-1 sm:max-w-[calc(100%-380px)]">

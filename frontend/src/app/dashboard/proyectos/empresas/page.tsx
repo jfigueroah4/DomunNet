@@ -18,11 +18,20 @@ export default function EmpresasPage() {
   return (
     <div className="space-y-4 font-[Poppins] pt-7 sm:pt-9">
       <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 border-b border-gray-100 pb-3">
-        <div>
-          <h1 className="text-[17px] sm:text-[17px] font-extrabold leading-tight text-gray-800">Catálogo de Empresas</h1>
-          <p className="mt-1 text-[13px] text-gray-400">
-            Gestión unificada de empresas vinculadas a proyectos
-          </p>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/dashboard/proyectos"
+            className="p-1 -ml-1 text-gray-500 hover:text-gray-900 transition-colors shrink-0"
+            title="Volver a Proyectos"
+          >
+            <ArrowLeft size={18} />
+          </Link>
+          <div>
+            <h1 className="text-[17px] sm:text-[17px] font-extrabold leading-tight text-gray-800">Catálogo de Empresas</h1>
+            <p className="mt-1 text-[13px] text-gray-400">
+              Gestión unificada de empresas vinculadas a proyectos
+            </p>
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -47,15 +56,6 @@ export default function EmpresasPage() {
               </button>
             ))}
           </div>
-
-          {/* Botón Volver a Proyectos con fondo blanco como en Roles */}
-          <Link
-            href="/dashboard/proyectos"
-            className="flex items-center gap-1.5 px-3.5 sm:px-3 h-8 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs sm:text-[11px] font-semibold rounded-lg transition-colors shadow-2xs active:scale-95"
-          >
-            <ArrowLeft size={14} />
-            <span>Volver a Proyectos</span>
-          </Link>
 
           {/* Botón Nueva Entidad/Empresa */}
           <button

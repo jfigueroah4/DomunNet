@@ -8,6 +8,7 @@ export type RolSistemaBase =
   | 'Inspector'
   | 'Contratante'
   | 'Contratista'
+  | 'Ejecutora'
   | 'Gerencia'
   | 'Campo'
   | 'Proveedor'

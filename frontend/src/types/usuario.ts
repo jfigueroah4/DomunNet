@@ -7,6 +7,7 @@ export type RolUsuario =
   | 'Contratante'
   | 'Topografo'
   | 'Supervisor'
+  | 'Ejecutora'
 
 export type EstadoUsuario = 'Activo' | 'Inactivo' | 'Suspendido'
 

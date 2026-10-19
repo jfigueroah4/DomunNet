@@ -536,12 +536,12 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
         </button>
         <div className="flex flex-col leading-tight">
           <span className="text-[8px] text-gray-300 uppercase tracking-widest hidden sm:block">Sección</span>
-          <span className="text-[10px] text-gray-700 font-semibold uppercase tracking-wide truncate max-w-[85px] sm:max-w-none">{section}</span>
+          <span className="text-[9.5px] sm:text-[10px] text-gray-700 font-bold uppercase tracking-tight sm:tracking-wide whitespace-nowrap shrink-0">{section}</span>
         </div>
       </div>
 
       {/* Center Section - Search */}
-      <div id="search-bar-container" className="flex-1 mx-2 sm:mx-6 max-w-[420px] min-w-0 relative">
+      <div id="search-bar-container" className="flex-1 mx-1.5 sm:mx-6 max-w-[420px] min-w-[60px] relative">
         <div className="flex items-center gap-1.5 bg-gray-100 rounded-full px-2.5 sm:px-4 py-1" style={{ height: '32px' }}>
           <Search size={14} className="text-gray-400 shrink-0" />
           <input
@@ -780,18 +780,19 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
                   onClick={async () => {
                     closeMenu()
                     try {
+                      const devId = typeof window !== 'undefined' ? localStorage.getItem('domun_device_id') : null
+                      // Enviar petición de cierre al servidor conservando la cookie activa
+                      await api.post('/auth/cerrar-sesion', { deviceId: devId }).catch(() => {})
                       localStorage.removeItem('domun_notificaciones_borradas')
                       sessionStorage.removeItem('domun_notificaciones_borradas')
                       localStorage.removeItem('domun_user_profile')
                       if (typeof document !== 'undefined') {
                         document.cookie = 'token=; path=/; max-age=0'
                       }
-                      const devId = localStorage.getItem('domun_device_id')
-                      await api.post('/auth/cerrar-sesion', { deviceId: devId })
                     } catch (e) {
                       console.error('Error al cerrar sesión:', e)
                     }
-                    setTimeout(() => { window.location.href = '/login' }, 200)
+                    window.location.replace('/login')
                   }}
                   className="flex items-center gap-3 px-4 py-2 hover:bg-red-50 transition-colors w-full text-left text-[11px]">
                   <LogOut size={13} className="text-[#D53E0F]" />

@@ -756,6 +756,7 @@ export async function obtenerProyectoPorId(proyectoId: string) {
     kilometroInicio: detalle.kilometro_inicio,
     kilometroFin: detalle.kilometro_fin,
     empresaContratanteId: detalle.empresa_contratante_id ?? null,
+    contactoContratanteId: detalle.contacto_contratante_id ?? null,
     entidadContratante: entidadContratanteNombre,
     empresaContratistaId: detalle.empresa_contratista_id ?? null,
     empresaContratista: empresaContratistaNombre || contratoEjecucion?.empresaNombre || '',
@@ -1252,6 +1253,7 @@ export async function crearProyecto(datosFormulario: any) {
       direccion: datosFormulario.direccion || null,
       monto_final: datosFormulario.montoFinal || null,
       empresa_contratante_id: empContratanteId,
+      contacto_contratante_id: esUuidValido(datosFormulario.contactoContratanteId) || null,
       empresa_contratista_id: empContratistaId,
       empresa_supervisora: datosFormulario.empresaSupervisora || null,
       delegado_residente_id: delegadoResId,
@@ -1341,6 +1343,9 @@ export async function actualizarProyecto(proyectoId: string, datosFormulario: Re
   if ('empresaContratanteId' in datosFormulario || 'entidadContratante' in datosFormulario) {
     const val = await resolverEmpresaContratanteId(datosFormulario.empresaContratanteId || datosFormulario.entidadContratante)
     if (val) detalleUpdates.empresa_contratante_id = val
+  }
+  if ('contactoContratanteId' in datosFormulario) {
+    detalleUpdates.contacto_contratante_id = esUuidValido(datosFormulario.contactoContratanteId) || null
   }
   if ('empresaContratista' in datosFormulario || 'empresaContratistaId' in datosFormulario) {
     const contratoEjec = (datosFormulario.contratoEjecucion as any) || {}

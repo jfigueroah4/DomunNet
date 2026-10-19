@@ -192,18 +192,44 @@ export async function iniciarSesion(
     throw new Error('DESACTIVADO')
   }
 
-  let rol: { nombre: string; permisos: string[]; nivel_permisos: number } = { nombre: 'Sin rol asignado', permisos: [], nivel_permisos: 0 };
-  if (usuarioFila.rol_id) {
-    try {
-      const dbRol = await obtenerRolPorId(usuarioFila.rol_id);
-      if (dbRol) {
-        rol = { nombre: dbRol.nombre, permisos: dbRol.permisos, nivel_permisos: dbRol.nivel_permisos };
+  // Consultar Rol y Logs de Concurrencia en paralelo para reducir el tiempo de respuesta a la mitad
+  const cuatroHorasAtras = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString()
+  const [resRol, resLogs] = await Promise.all([
+    usuarioFila.rol_id
+      ? clienteSupabase
+          .from('rol')
+          .select('nombre_rol, permisos, nivel_permisos')
+          .eq('id', usuarioFila.rol_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+    clienteSupabase
+      .from('seguridad_log')
+      .select('id, ip, user_agent, exitoso, detalles, fecha_hora, accion')
+      .eq('usuario_id', usuarioFila.id)
+      .in('accion', ['login', 'logout'])
+      .gte('fecha_hora', cuatroHorasAtras)
+      .order('fecha_hora', { ascending: false }),
+  ])
+
+  let rol: { nombre: string; permisos: string[]; nivel_permisos: number } = { nombre: 'Sin rol asignado', permisos: [], nivel_permisos: 0 }
+  if (resRol?.data) {
+    const dbRol = resRol.data as any
+    const permisosMap = (dbRol.permisos || {}) as Record<string, string[]>
+    const permisosPlanos: string[] = []
+    for (const [mod, acciones] of Object.entries(permisosMap)) {
+      for (const a of acciones || []) {
+        if (a === '*' || a === '') permisosPlanos.push(mod)
+        else permisosPlanos.push(`${mod}.${a}`)
       }
-    } catch (errorRol) {
-      console.error('[autenticacion.servicio] Error obteniendo rol', { error: errorRol });
-      throw errorRol;
+    }
+    rol = {
+      nombre: dbRol.nombre_rol || 'Sin rol asignado',
+      permisos: permisosPlanos,
+      nivel_permisos: dbRol.nivel_permisos ?? 0,
     }
   }
+
+  const logsRecientes = resLogs?.data || []
 
   const nombreCompleto = obtenerNombreCompleto(usuarioFila.dato_usuario)
 
@@ -217,12 +243,7 @@ export async function iniciarSesion(
       console.error('[autenticacion.servicio] Error vinculando auth_user_id', {
         usuarioId: usuarioFila.id,
         authUserId: accesoAuth.user.id,
-        supabaseError: {
-          message: errorVinculo.message,
-          code: errorVinculo.code,
-          details: errorVinculo.details,
-          hint: errorVinculo.hint,
-        },
+        supabaseError: errorVinculo,
       })
       throw new Error(errorVinculo.message)
     }
@@ -245,42 +266,35 @@ export async function iniciarSesion(
     entorno.jwtSecret,
     { expiresIn: '8h' }
   )
-  const { error: errorAcceso } = await clienteSupabase
+
+  // Actualizar último acceso de forma no bloqueante en segundo plano
+  clienteSupabase
     .from('usuario')
     .update({ ultimo_acceso: new Date().toISOString() })
     .eq('id', usuarioFila.id)
-
-  if (errorAcceso) {
-    console.error('[autenticacion.servicio] Error actualizando ultimo_acceso', {
-      usuarioId: usuarioFila.id,
-      supabaseError: {
-        message: errorAcceso.message,
-        code: errorAcceso.code,
-        details: errorAcceso.details,
-        hint: errorAcceso.hint,
-      },
+    .then(({ error: errAcceso }) => {
+      if (errAcceso) console.error('[autenticacion.servicio] Error actualizando ultimo_acceso en background:', errAcceso.message)
     })
-    throw new Error(errorAcceso.message)
-  }
 
-  // LÍMITE DE CONCURRENCIA: Máximo 2 dispositivos activos simultáneamente por usuario
-  const ochoHorasAtras = new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString()
-  const { data: logsRecientes } = await clienteSupabase
-    .from('seguridad_log')
-    .select('id, ip, user_agent, exitoso, detalles, fecha_hora')
-    .eq('usuario_id', usuarioFila.id)
-    .eq('accion', 'login')
-    .gte('fecha_hora', ochoHorasAtras)
-    .order('fecha_hora', { ascending: false })
+  // Rastrear dispositivos que cerraron sesión o están fuera
+  const dispositivosCerrados = new Set<string>()
+  for (const log of logsRecientes) {
+    if (log.accion === 'logout') {
+      const d = (log.detalles as any) || {}
+      const devId = d.device_id || `legacy_${log.ip || 'ip'}_${(log.user_agent || '').substring(0, 30)}`
+      dispositivosCerrados.add(devId)
+    }
+  }
 
   // Agrupar por device_id los dispositivos actualmente activos
   const mapaDispositivosActivos = new Map<string, { id: string; dispositivo: string; ip: string; fechaHora: string }>()
   for (const log of logsRecientes || []) {
+    if (log.accion !== 'login') continue
     const d = (log.detalles as any) || {}
     const estado = d.estado
-    const esActivo = log.exitoso && estado !== 'cerrada' && estado !== 'revocada'
+    const devId = d.device_id || `legacy_${log.ip || 'ip'}_${(log.user_agent || '').substring(0, 30)}`
+    const esActivo = log.exitoso && estado !== 'cerrada' && estado !== 'revocada' && !dispositivosCerrados.has(devId)
     if (esActivo) {
-      const devId = d.device_id || `legacy_${log.ip || 'ip'}_${(log.user_agent || '').substring(0, 30)}`
       if (!mapaDispositivosActivos.has(devId)) {
         mapaDispositivosActivos.set(devId, {
           id: log.id,
@@ -384,16 +398,21 @@ export async function iniciarSesion(
   }
 }
 
-export async function cerrarSesionUsuario(usuarioId: string, deviceId?: string, sessionId?: string) {
+export async function cerrarSesionUsuario(usuarioId?: string, deviceId?: string, sessionId?: string) {
   try {
-    const ochoHorasAtras = new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString()
-    const { data: logs } = await clienteSupabase
+    const cuatroHorasAtras = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString()
+    let query = clienteSupabase
       .from('seguridad_log')
-      .select('id, detalles')
-      .eq('usuario_id', usuarioId)
+      .select('id, detalles, usuario_id')
       .eq('accion', 'login')
       .eq('exitoso', true)
-      .gte('fecha_hora', ochoHorasAtras)
+      .gte('fecha_hora', cuatroHorasAtras)
+
+    if (usuarioId) {
+      query = query.eq('usuario_id', usuarioId)
+    }
+
+    const { data: logs } = await query
 
     if (logs && logs.length > 0) {
       const idsACerrar: string[] = []
@@ -423,14 +442,54 @@ export async function cerrarSesionUsuario(usuarioId: string, deviceId?: string, 
       }
     }
 
-    await clienteSupabase.from('seguridad_log').insert({
-      usuario_id: usuarioId,
-      accion: 'logout',
-      exitoso: true,
-      fecha_hora: new Date().toISOString(),
-      detalles: { device_id: deviceId, session_id: sessionId },
-    })
+    if (usuarioId) {
+      await clienteSupabase.from('seguridad_log').insert({
+        usuario_id: usuarioId,
+        accion: 'logout',
+        exitoso: true,
+        fecha_hora: new Date().toISOString(),
+        detalles: { device_id: deviceId, session_id: sessionId },
+      })
+    }
   } catch (error) {
     console.error('[autenticacion.servicio] Error en cerrarSesionUsuario:', error)
   }
 }
+
+export async function liberarDispositivo(deviceId: string) {
+  try {
+    if (!deviceId) return
+    const cuatroHorasAtras = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString()
+    const { data: logs } = await clienteSupabase
+      .from('seguridad_log')
+      .select('id, detalles')
+      .eq('accion', 'login')
+      .eq('exitoso', true)
+      .gte('fecha_hora', cuatroHorasAtras)
+
+    if (logs && logs.length > 0) {
+      const idsACerrar: string[] = []
+      for (const log of logs) {
+        const d = (log.detalles as any) || {}
+        if (d.device_id === deviceId && d.estado !== 'cerrada' && d.estado !== 'revocada') {
+          idsACerrar.push(log.id)
+        }
+      }
+      if (idsACerrar.length > 0) {
+        await clienteSupabase
+          .from('seguridad_log')
+          .update({
+            detalles: {
+              estado: 'cerrada',
+              motivo: 'dispositivo_en_login',
+              cerrado_en: new Date().toISOString(),
+            },
+          })
+          .in('id', idsACerrar)
+      }
+    }
+  } catch (error) {
+    console.warn('[autenticacion.servicio] Error en liberarDispositivo:', error)
+  }
+}
+

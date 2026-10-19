@@ -4,10 +4,11 @@ import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ArrowLeft, Download, Trash2, Search, Plus, RotateCcw, ChevronLeft, ChevronRight, X, ShieldAlert, HardDrive,
-  ArrowUpDown, ArrowUp, ArrowDown
+  ArrowUpDown, ArrowUp, ArrowDown, SlidersHorizontal
 } from 'lucide-react'
 import { showErrorToast, showSuccessToast } from '@/hooks/useCustomToast'
 import { api } from '@/lib/api/cliente'
+import { useUIStore } from '@/stores/useUIStore'
 
 const POPPINS = "'Poppins', sans-serif"
 
@@ -53,6 +54,34 @@ export default function BackupPage() {
   
   // Módulo seleccionado en filtro Incremental vía select
   const [moduloIncrementalFiltro, setModuloIncrementalFiltro] = useState<string>('')
+
+  // Bottom Sheet Mobile
+  const [sheetFiltrosAbierto, setSheetFiltrosAbierto] = useState(false)
+  const setOcultarBottomNav = useUIStore((s) => s.setOcultarBottomNav)
+
+  const abrirSheetFiltros = () => {
+    setSheetFiltrosAbierto(true)
+    setOcultarBottomNav(true)
+  }
+
+  const cerrarSheetFiltros = () => {
+    setSheetFiltrosAbierto(false)
+    setOcultarBottomNav(false)
+  }
+
+  useEffect(() => {
+    return () => {
+      setOcultarBottomNav(false)
+    }
+  }, [setOcultarBottomNav])
+
+  const cantidadFiltrosActivos = useMemo(() => {
+    let c = 0
+    if (fechaInicio) c++
+    if (fechaFin) c++
+    if (tabActiva === 'Backup Incremental' && moduloIncrementalFiltro) c++
+    return c
+  }, [fechaInicio, fechaFin, tabActiva, moduloIncrementalFiltro])
 
   // Ordenamiento por columna
   const [columnaOrden, setColumnaOrden] = useState<ColumnaOrdenable>('fecha')
@@ -267,7 +296,7 @@ export default function BackupPage() {
             <ArrowLeft size={22} />
           </button>
           <div>
-            <h1 className="text-xl md:text-2xl font-bold text-gray-900 leading-tight">Copias de Seguridad (Backup)</h1>
+            <h1 className="text-xl md:text-2xl font-bold text-gray-900 leading-tight">Backup</h1>
             <p className="text-xs md:text-sm text-gray-500 mt-0.5">Genera y administra los respaldos programados y manuales de la base de datos</p>
           </div>
         </div>
@@ -277,9 +306,9 @@ export default function BackupPage() {
           <button
             type="button"
             onClick={() => router.push('/dashboard/configuracion/restauracion')}
-            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs font-semibold rounded-lg transition-colors shadow-2xs"
+            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-[10px] sm:text-xs font-semibold rounded-lg transition-colors shadow-2xs cursor-pointer"
           >
-            <RotateCcw size={15} />
+            <RotateCcw size={14} />
             <span>Restaurar Backup</span>
           </button>
 
@@ -292,16 +321,16 @@ export default function BackupPage() {
               setModalGenerarAbierto(true)
             }}
             style={{ backgroundColor: '#9B0F06' }}
-            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 text-white px-4 py-2 rounded-lg text-xs font-semibold hover:opacity-90 transition-opacity shadow-sm"
+            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 text-white px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-lg text-[10px] sm:text-xs font-semibold hover:opacity-90 transition-opacity shadow-sm cursor-pointer"
           >
-            <Plus size={15} />
+            <Plus size={14} />
             Generar Backup
           </button>
         </div>
       </div>
 
       {/* Tabs Principales de Filtrado (Todos, Backup Completo, Backup Incremental) */}
-      <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl mb-4 max-w-md">
+      <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl mb-3 sm:mb-4 max-w-md w-full">
         {(['Todos', 'Backup Completo', 'Backup Incremental'] as const).map((tab) => (
           <button
             key={tab}
@@ -310,7 +339,7 @@ export default function BackupPage() {
               setTabActiva(tab)
               setPaginaActual(1)
             }}
-            className={`flex-1 py-1.5 text-xs transition-colors rounded-lg cursor-pointer text-center ${
+            className={`flex-1 py-1 sm:py-1.5 text-[10px] sm:text-xs transition-colors rounded-lg cursor-pointer text-center ${
               tabActiva === tab
                 ? 'bg-white text-gray-900 shadow-2xs font-bold'
                 : 'text-gray-500 hover:text-gray-700 font-medium'
@@ -321,11 +350,11 @@ export default function BackupPage() {
         ))}
       </div>
 
-      {/* Toolbar con Buscador, Filtro de Módulo (en Incremental) y Filtro por Fecha (Inicio / Fin) */}
-      <div className="bg-white rounded-xl border border-gray-200 p-3 mb-4 shadow-2xs flex flex-col md:flex-row items-center justify-between gap-3 font-poppins">
-        <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full md:w-auto">
-          <div className="relative w-full sm:w-72">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+      {/* Toolbar con Buscador, Botón de Filtros Mobile y Filtro Desktop */}
+      <div className="bg-white rounded-xl border border-gray-200 p-2.5 sm:p-3 mb-3 sm:mb-4 shadow-2xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5 font-poppins">
+        <div className="flex items-center gap-2 w-full md:w-auto">
+          <div className="relative flex-1 md:w-72">
+            <Search size={14} className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
               value={busqueda}
@@ -334,21 +363,42 @@ export default function BackupPage() {
                 setPaginaActual(1)
               }}
               placeholder="Buscar backup por nombre o usuario..."
-              className="w-full text-xs pl-8 pr-3 py-1.5 rounded-lg border border-gray-200 focus:outline-none focus:border-[#9B0F06] font-poppins"
+              className="w-full text-[10px] sm:text-xs pl-7 sm:pl-8 pr-3 py-1.5 rounded-lg border border-gray-200 focus:outline-none focus:border-[#9B0F06] font-poppins placeholder:text-[10px] sm:placeholder:text-xs"
             />
           </div>
 
-          {/* Filtro por Módulo vía Select (cuando está en tab Backup Incremental) */}
+          {/* Botón de Filtros para Mobile */}
+          <button
+            type="button"
+            onClick={abrirSheetFiltros}
+            className={`relative md:hidden flex items-center justify-center p-2 rounded-lg border transition-colors shrink-0 ${
+              cantidadFiltrosActivos > 0
+                ? 'border-[#9B0F06] bg-red-50/50 text-[#9B0F06]'
+                : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+            }`}
+            title="Abrir filtros"
+          >
+            <SlidersHorizontal size={14} className="stroke-[2.2]" />
+            {cantidadFiltrosActivos > 0 && (
+              <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-[#9B0F06] text-white text-[8px] font-black flex items-center justify-center">
+                {cantidadFiltrosActivos}
+              </span>
+            )}
+          </button>
+        </div>
+
+        {/* Filtros Rango de Fechas y Módulo en Desktop */}
+        <div className="hidden md:flex items-center gap-2.5 text-xs text-gray-600 font-poppins">
           {tabActiva === 'Backup Incremental' && (
-            <div className="flex items-center gap-1.5 text-xs text-gray-600 w-full sm:w-auto">
-              <span className="font-medium whitespace-nowrap text-[11px]">Módulo:</span>
+            <div className="flex items-center gap-1.5 text-xs text-gray-600">
+              <span className="font-medium whitespace-nowrap text-[10px] sm:text-[11px]">Módulo:</span>
               <select
                 value={moduloIncrementalFiltro}
                 onChange={(e) => {
                   setModuloIncrementalFiltro(e.target.value)
                   setPaginaActual(1)
                 }}
-                className="text-xs p-1.5 border border-gray-200 rounded-lg focus:outline-none focus:border-[#9B0F06] bg-white text-gray-700 w-full sm:w-auto font-poppins"
+                className="text-[10px] sm:text-xs p-1.5 border border-gray-200 rounded-lg focus:outline-none focus:border-[#9B0F06] bg-white text-gray-700 font-poppins"
               >
                 <option value="">Todos los módulos</option>
                 {MODULOS_DISPONIBLES.map((m) => (
@@ -357,56 +407,195 @@ export default function BackupPage() {
               </select>
             </div>
           )}
-        </div>
 
-        {/* Filtro Rango de Fechas (Inicio / Fin) */}
-        <div className="flex items-center gap-2 w-full md:w-auto text-xs text-gray-600">
-          <span className="font-medium whitespace-nowrap text-[11px]">Fecha Inicio:</span>
-          <input
-            type="date"
-            value={fechaInicio}
-            onChange={(e) => {
-              setFechaInicio(e.target.value)
-              setPaginaActual(1)
-            }}
-            className="text-xs p-1.5 border border-gray-200 rounded-lg focus:outline-none focus:border-[#9B0F06] bg-white font-poppins"
-          />
-
-          <span className="font-medium whitespace-nowrap text-[11px] ml-1">Fecha Fin:</span>
-          <input
-            type="date"
-            value={fechaFin}
-            onChange={(e) => {
-              setFechaFin(e.target.value)
-              setPaginaActual(1)
-            }}
-            className="text-xs p-1.5 border border-gray-200 rounded-lg focus:outline-none focus:border-[#9B0F06] bg-white font-poppins"
-          />
-
-          {(fechaInicio || fechaFin || (tabActiva === 'Backup Incremental' && moduloIncrementalFiltro)) && (
-            <button
-              onClick={() => {
-                setFechaInicio('')
-                setFechaFin('')
-                setModuloIncrementalFiltro('')
+          <div className="flex items-center gap-2 text-xs text-gray-600">
+            <span className="font-medium whitespace-nowrap text-[10px] sm:text-[11px]">Fecha Inicio:</span>
+            <input
+              type="date"
+              value={fechaInicio}
+              onChange={(e) => {
+                setFechaInicio(e.target.value)
+                setPaginaActual(1)
               }}
-              className="text-[11px] text-[#9B0F06] font-semibold hover:underline ml-1 font-poppins"
-            >
-              Limpiar
-            </button>
-          )}
+              className="text-[10px] sm:text-xs p-1.5 border border-gray-200 rounded-lg focus:outline-none focus:border-[#9B0F06] bg-white font-poppins"
+            />
+
+            <span className="font-medium whitespace-nowrap text-[10px] sm:text-[11px] ml-1">Fecha Fin:</span>
+            <input
+              type="date"
+              value={fechaFin}
+              onChange={(e) => {
+                setFechaFin(e.target.value)
+                setPaginaActual(1)
+              }}
+              className="text-[10px] sm:text-xs p-1.5 border border-gray-200 rounded-lg focus:outline-none focus:border-[#9B0F06] bg-white font-poppins"
+            />
+
+            {(fechaInicio || fechaFin || (tabActiva === 'Backup Incremental' && moduloIncrementalFiltro)) && (
+              <button
+                onClick={() => {
+                  setFechaInicio('')
+                  setFechaFin('')
+                  setModuloIncrementalFiltro('')
+                }}
+                className="text-[10px] sm:text-[11px] text-[#9B0F06] font-semibold hover:underline ml-1 font-poppins cursor-pointer"
+              >
+                Limpiar
+              </button>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* Pills de Filtros Activos en Mobile */}
+      {cantidadFiltrosActivos > 0 && (
+        <div className="flex md:hidden flex-wrap items-center gap-1.5 mb-3 font-poppins">
+          {fechaInicio && (
+            <span className="inline-flex items-center gap-1 bg-red-50 text-[#9B0F06] text-[9.5px] font-medium px-2 py-0.5 rounded-full border border-red-100">
+              Desde: {fechaInicio}
+              <button type="button" onClick={() => setFechaInicio('')} className="hover:opacity-75">
+                <X size={10} />
+              </button>
+            </span>
+          )}
+          {fechaFin && (
+            <span className="inline-flex items-center gap-1 bg-red-50 text-[#9B0F06] text-[9.5px] font-medium px-2 py-0.5 rounded-full border border-red-100">
+              Hasta: {fechaFin}
+              <button type="button" onClick={() => setFechaFin('')} className="hover:opacity-75">
+                <X size={10} />
+              </button>
+            </span>
+          )}
+          {moduloIncrementalFiltro && (
+            <span className="inline-flex items-center gap-1 bg-red-50 text-[#9B0F06] text-[9.5px] font-medium px-2 py-0.5 rounded-full border border-red-100">
+              Módulo: {MODULOS_DISPONIBLES.find(m => m.id === moduloIncrementalFiltro)?.nombre || moduloIncrementalFiltro}
+              <button type="button" onClick={() => setModuloIncrementalFiltro('')} className="hover:opacity-75">
+                <X size={10} />
+              </button>
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              setFechaInicio('')
+              setFechaFin('')
+              setModuloIncrementalFiltro('')
+            }}
+            className="text-[9.5px] text-gray-500 hover:text-[#9B0F06] underline ml-1 cursor-pointer"
+          >
+            Limpiar todo
+          </button>
+        </div>
+      )}
+
+      {/* Bottom Sheet Modal para Filtros en Móvil */}
+      {sheetFiltrosAbierto && (
+        <div className="fixed inset-0 z-[9999] md:hidden font-poppins">
+          <div
+            className="fixed inset-0 bg-black/50 backdrop-blur-xs transition-opacity"
+            onClick={cerrarSheetFiltros}
+          />
+          <div className="fixed inset-x-0 bottom-0 w-full max-w-lg mx-auto max-h-[85vh] rounded-t-2xl bg-white shadow-2xl flex flex-col z-10 animate-in slide-in-from-bottom duration-300">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+              <button
+                type="button"
+                onClick={cerrarSheetFiltros}
+                className="text-[10px] font-medium text-gray-500 hover:text-gray-800 cursor-pointer"
+              >
+                Cerrar
+              </button>
+              <div className="text-center">
+                <h3 className="text-xs font-bold text-gray-900 leading-tight">Filtros de Backup</h3>
+                <span className="text-[9.5px] text-gray-400 font-normal">Personalizar fechas y módulos</span>
+              </div>
+              <button
+                type="button"
+                onClick={cerrarSheetFiltros}
+                className="text-[10px] font-bold text-[#9B0F06] hover:text-[#7D0C05] cursor-pointer"
+              >
+                Listo
+              </button>
+            </div>
+
+            <div className="p-4 overflow-y-auto space-y-3.5 flex-1 text-[10px]">
+              {tabActiva === 'Backup Incremental' && (
+                <div className="space-y-1">
+                  <label className="text-[9.5px] font-bold text-gray-500 uppercase tracking-wider block">
+                    Módulo de Trabajo
+                  </label>
+                  <select
+                    value={moduloIncrementalFiltro}
+                    onChange={(e) => {
+                      setModuloIncrementalFiltro(e.target.value)
+                      setPaginaActual(1)
+                    }}
+                    className="w-full text-[10px] p-2 border border-gray-200 rounded-lg focus:outline-none focus:border-[#9B0F06] bg-white text-gray-700"
+                  >
+                    <option value="">Todos los módulos</option>
+                    {MODULOS_DISPONIBLES.map((m) => (
+                      <option key={m.id} value={m.id}>{m.nombre}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className="space-y-1">
+                <label className="text-[9.5px] font-bold text-gray-500 uppercase tracking-wider block">
+                  Fecha Inicio
+                </label>
+                <input
+                  type="date"
+                  value={fechaInicio}
+                  onChange={(e) => {
+                    setFechaInicio(e.target.value)
+                    setPaginaActual(1)
+                  }}
+                  className="w-full text-[10px] p-2 border border-gray-200 rounded-lg focus:outline-none focus:border-[#9B0F06] bg-white text-gray-700"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[9.5px] font-bold text-gray-500 uppercase tracking-wider block">
+                  Fecha Fin
+                </label>
+                <input
+                  type="date"
+                  value={fechaFin}
+                  onChange={(e) => {
+                    setFechaFin(e.target.value)
+                    setPaginaActual(1)
+                  }}
+                  className="w-full text-[10px] p-2 border border-gray-200 rounded-lg focus:outline-none focus:border-[#9B0F06] bg-white text-gray-700"
+                />
+              </div>
+
+              {cantidadFiltrosActivos > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFechaInicio('')
+                    setFechaFin('')
+                    setModuloIncrementalFiltro('')
+                  }}
+                  className="w-full py-2 text-center text-[10px] text-[#9B0F06] font-semibold border border-red-200 rounded-lg bg-red-50/50 hover:bg-red-50 transition-colors cursor-pointer"
+                >
+                  Limpiar todos los filtros
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tabla estilo Usuarios con Ordenamiento por Columna */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-2xs overflow-hidden font-poppins">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+          <table className="w-full text-left border-collapse min-w-[620px]">
             <thead>
               <tr className="bg-gray-50/80 border-b border-gray-200 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
                 <th
                   onClick={() => handleOrdenar('nombre')}
-                  className="py-2.5 px-3.5 cursor-pointer select-none hover:text-gray-900 transition-colors"
+                  className="py-2 sm:py-2.5 px-2.5 sm:px-3.5 cursor-pointer select-none hover:text-gray-900 transition-colors"
                   title="Ordenar por Archivo"
                 >
                   <div className="flex items-center gap-1">
@@ -416,7 +605,7 @@ export default function BackupPage() {
                 </th>
                 <th
                   onClick={() => handleOrdenar('tipo')}
-                  className="py-2.5 px-3.5 cursor-pointer select-none hover:text-gray-900 transition-colors"
+                  className="py-2 sm:py-2.5 px-2.5 sm:px-3.5 cursor-pointer select-none hover:text-gray-900 transition-colors"
                   title="Ordenar por Tipo"
                 >
                   <div className="flex items-center gap-1">
@@ -426,7 +615,7 @@ export default function BackupPage() {
                 </th>
                 <th
                   onClick={() => handleOrdenar('fecha')}
-                  className="py-2.5 px-3.5 cursor-pointer select-none hover:text-gray-900 transition-colors"
+                  className="py-2 sm:py-2.5 px-2.5 sm:px-3.5 cursor-pointer select-none hover:text-gray-900 transition-colors"
                   title="Ordenar por Fecha y Hora"
                 >
                   <div className="flex items-center gap-1">
@@ -436,7 +625,7 @@ export default function BackupPage() {
                 </th>
                 <th
                   onClick={() => handleOrdenar('tamano')}
-                  className="py-2.5 px-3.5 cursor-pointer select-none hover:text-gray-900 transition-colors"
+                  className="py-2 sm:py-2.5 px-2.5 sm:px-3.5 cursor-pointer select-none hover:text-gray-900 transition-colors"
                   title="Ordenar por Tamaño"
                 >
                   <div className="flex items-center gap-1">
@@ -446,7 +635,7 @@ export default function BackupPage() {
                 </th>
                 <th
                   onClick={() => handleOrdenar('usuario')}
-                  className="py-2.5 px-3.5 cursor-pointer select-none hover:text-gray-900 transition-colors"
+                  className="py-2 sm:py-2.5 px-2.5 sm:px-3.5 cursor-pointer select-none hover:text-gray-900 transition-colors"
                   title="Ordenar por Origen / Usuario"
                 >
                   <div className="flex items-center gap-1">
@@ -456,7 +645,7 @@ export default function BackupPage() {
                 </th>
                 <th
                   onClick={() => handleOrdenar('estado')}
-                  className="py-2.5 px-3.5 cursor-pointer select-none hover:text-gray-900 transition-colors"
+                  className="py-2 sm:py-2.5 px-2.5 sm:px-3.5 cursor-pointer select-none hover:text-gray-900 transition-colors"
                   title="Ordenar por Estado"
                 >
                   <div className="flex items-center gap-1">
@@ -464,58 +653,58 @@ export default function BackupPage() {
                     {renderIconoOrden('estado')}
                   </div>
                 </th>
-                <th className="py-2.5 px-3.5 text-right">Acciones</th>
+                <th className="py-2 sm:py-2.5 px-2.5 sm:px-3.5 text-right text-[10px]">Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 text-[11px] text-gray-700">
+            <tbody className="divide-y divide-gray-100 text-[10px] text-gray-700">
               {backupsPaginados.map((item) => (
                 <tr key={item.id} className="hover:bg-gray-50/60 transition-colors">
-                  {/* Nombre del archivo (sin icono) */}
-                  <td className="py-2.5 px-3.5 font-semibold text-gray-900 font-mono">
+                  {/* Nombre del archivo */}
+                  <td className="py-2 sm:py-2.5 px-2.5 sm:px-3.5 font-semibold text-gray-900 font-mono text-[10px]">
                     {item.nombre}
                   </td>
 
-                  {/* Tipo (sin colores en la insignia) */}
-                  <td className="py-2.5 px-3.5 text-gray-600 font-medium">
+                  {/* Tipo */}
+                  <td className="py-2 sm:py-2.5 px-2.5 sm:px-3.5 text-gray-600 font-medium text-[10px]">
                     {item.tipo}
                   </td>
 
-                  {/* Fecha y Hora (sin icono de reloj) */}
-                  <td className="py-2.5 px-3.5 text-gray-600">
+                  {/* Fecha y Hora */}
+                  <td className="py-2 sm:py-2.5 px-2.5 sm:px-3.5 text-gray-600 text-[10px]">
                     {item.fecha}
                   </td>
 
                   {/* Tamaño */}
-                  <td className="py-2.5 px-3.5 font-mono text-gray-600">
+                  <td className="py-2 sm:py-2.5 px-2.5 sm:px-3.5 font-mono text-gray-600 text-[10px]">
                     {item.size}
                   </td>
 
                   {/* Usuario */}
-                  <td className="py-2.5 px-3.5 text-gray-600">
+                  <td className="py-2 sm:py-2.5 px-2.5 sm:px-3.5 text-gray-600 text-[10px]">
                     {item.usuario}
                   </td>
 
-                  {/* Estado al estilo Usuarios (texto plano / separado) */}
-                  <td className="py-2.5 px-3.5 text-gray-800 font-medium">
+                  {/* Estado */}
+                  <td className="py-2 sm:py-2.5 px-2.5 sm:px-3.5 text-gray-800 font-medium text-[10px]">
                     {item.estado}
                   </td>
 
                   {/* Acciones */}
-                  <td className="py-2.5 px-3.5 text-right">
+                  <td className="py-2 sm:py-2.5 px-2.5 sm:px-3.5 text-right">
                     <div className="flex items-center justify-end gap-1">
                       <button
                         onClick={() => handleDescargar(item)}
                         className="p-1 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
                         title="Descargar archivo"
                       >
-                        <Download size={15} />
+                        <Download size={14} />
                       </button>
                       <button
                         onClick={() => setItemAEliminar(item)}
                         className="p-1 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
                         title="Eliminar respaldo"
                       >
-                        <Trash2 size={15} />
+                        <Trash2 size={14} />
                       </button>
                     </div>
                   </td>

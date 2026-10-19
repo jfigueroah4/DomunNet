@@ -190,7 +190,7 @@ export default function RolesPage() {
   }
 
   return (
-    <div className="space-y-3.5">
+    <div className="space-y-3.5 pb-8 sm:pb-2">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-xl sm:text-[18px] font-extrabold leading-tight text-gray-800">Roles</h1>
