@@ -66,6 +66,8 @@ import { subirDocumentoProyecto } from '@/lib/supabase/storage'
 interface ProyectoFormularioProps {
   proyectoInicial?: Proyecto
   modo?: 'crear' | 'editar'
+  pasoInicial?: 1 | 2 | 3 | 4 | 5 | 6
+  subtabInicial?: string
   onGuardar?: (proyecto: Partial<Proyecto>) => void
   onCancelar?: () => void
   onNavegarPrograma?: () => void
@@ -1592,6 +1594,8 @@ function recargarEmpresasGlobal() {
 export function ProyectoFormulario({
   proyectoInicial,
   modo = 'crear',
+  pasoInicial,
+  subtabInicial,
   onGuardar,
   onCancelar,
   onNavegarPrograma,
@@ -1601,7 +1605,14 @@ export function ProyectoFormulario({
   const { showSuccessToast, showErrorToast } = useCustomToast()
 
   // Estado del Asistente (6 Pasos Especializados)
-  const [pasoActual, setPasoActual] = useState<1 | 2 | 3 | 4 | 5 | 6>(1)
+  const [pasoActual, setPasoActual] = useState<1 | 2 | 3 | 4 | 5 | 6>(() => {
+    if (typeof window !== 'undefined') {
+      const p = new URLSearchParams(window.location.search).get('paso')
+      const num = parseInt(p || '', 10)
+      if (num >= 1 && num <= 6) return num as any
+    }
+    return pasoInicial || 1
+  })
   const [errors, setErrors] = useState<Record<string, boolean>>({})
   const [errorMessages, setErrorMessages] = useState<Record<string, string>>({})
   const [isGuardando, setIsGuardando] = useState(false)
@@ -2064,8 +2075,22 @@ export function ProyectoFormulario({
   }
 
   // Sub-tabs internas para organización óptima en pasos complejos
-  const [subTabPaso3, setSubTabPaso3] = useState<'ejecutora' | 'supervisora'>('ejecutora')
-  const [subTabPaso4, setSubTabPaso4] = useState<'ejecucion' | 'supervision'>('ejecucion')
+  const [subTabPaso3, setSubTabPaso3] = useState<'ejecutora' | 'supervisora'>(() => {
+    if (typeof window !== 'undefined') {
+      const s = new URLSearchParams(window.location.search).get('subtab')
+      if (s === 'supervisora' || s === 'ejecutora') return s
+    }
+    if (subtabInicial === 'supervisora' || subtabInicial === 'ejecutora') return subtabInicial
+    return 'ejecutora'
+  })
+  const [subTabPaso4, setSubTabPaso4] = useState<'ejecucion' | 'supervision'>(() => {
+    if (typeof window !== 'undefined') {
+      const s = new URLSearchParams(window.location.search).get('subtab')
+      if (s === 'supervision' || s === 'ejecucion') return s
+    }
+    if (subtabInicial === 'supervision' || subtabInicial === 'ejecucion') return subtabInicial
+    return 'ejecucion'
+  })
   const [subTabPaso5, setSubTabPaso5] = useState<'ejecucion' | 'supervision' | 'consolidado'>('ejecucion')
 
   // -------------------------------------------------------------
@@ -2166,11 +2191,23 @@ export function ProyectoFormulario({
   }, [pasoActual, esEditar, cargarUsuarios, usuariosDisponibles])
 
   // Auto-llenar datos de Contratista al seleccionar del combobox
-  // Auto-llenar datos de Contratista al seleccionar del combobox
   const handleSelectContratista = (val: string) => {
     setEmpresaContratista(val)
     setEmpresaContratistaId('')
     const normVal = (val || '').trim().toLowerCase()
+
+    if (normVal.includes('domun')) {
+      if (!contratistaDireccion) setContratistaDireccion('1 calle 51-06, Naciones Unidas 2, Villa Nueva, Guatemala')
+      if (!contratistaTelefono) setContratistaTelefono('56252922')
+      if (!contratistaCorreo) setContratistaCorreo('administracion@domun.com')
+      if (!contratistaRegistroMercantil) setContratistaRegistroMercantil('80050')
+      const usuariosDomun = getUsuariosParaEmpresa('Domun', 'propietario')
+      if (usuariosDomun && usuariosDomun.length > 0 && !contratistaPropietario) {
+        setContratistaPropietario(usuariosDomun[0].label || usuariosDomun[0].value)
+      }
+      return
+    }
+
     const found = empresasContratistas.find((e: any) => {
       const eNom = (e.nombre || e.razon_social || '').trim().toLowerCase()
       return eNom === normVal || e.id === val
@@ -2194,6 +2231,19 @@ export function ProyectoFormulario({
     setEmpresaSupervisora(val)
     setEmpresaSupervisoraId('')
     const normVal = (val || '').trim().toLowerCase()
+
+    if (normVal.includes('domun')) {
+      if (!supervisoraDireccion) setSupervisoraDireccion('1 calle 51-06, Naciones Unidas 2, Villa Nueva, Guatemala')
+      if (!supervisoraTelefono) setSupervisoraTelefono('56252922')
+      if (!supervisoraCorreo) setSupervisoraCorreo('administracion@domun.com')
+      if (!supervisoraRegistroMercantil) setSupervisoraRegistroMercantil('80050')
+      const usuariosDomun = getUsuariosParaEmpresa('Domun', 'propietario')
+      if (usuariosDomun && usuariosDomun.length > 0 && !supervisoraPropietario) {
+        setSupervisoraPropietario(usuariosDomun[0].label || usuariosDomun[0].value)
+      }
+      return
+    }
+
     const found = (empresasSupervisoras || []).find((e: any) => {
       const eNom = (e.nombre || e.razon_social || '').trim().toLowerCase()
       return eNom === normVal || e.id === val

@@ -484,26 +484,41 @@ async function resolverEmpresaContratistaId(
   return null
 }
 
+export const DATOS_INSTITUCIONALES_DOMUN = {
+  nombre: 'Domun',
+  razon_social: 'Domun, S.A.',
+  direccion: '1 calle 51-06, Naciones Unidas 2, Villa Nueva, Guatemala',
+  telefono: '56252922',
+  correo_institucional: 'administracion@domun.com',
+  registro_mercantil: '80050',
+  nit: '853800K',
+  propietario: 'Heriberto Antonio Escobar - Administrador',
+}
+
 async function sincronizarEmpresaSupervisora(
   nombre?: string,
   datosExtra?: { direccion?: string; telefono?: string; correo?: string; propietario?: string }
 ): Promise<void> {
   if (!nombre || typeof nombre !== 'string' || !nombre.trim()) return
   const clean = nombre.trim()
-  if (clean.toLowerCase() === 'domun') return
+  const esDomun = clean.toLowerCase().includes('domun')
+
+  const dirFinal = datosExtra?.direccion || (esDomun ? DATOS_INSTITUCIONALES_DOMUN.direccion : null)
+  const telFinal = datosExtra?.telefono || (esDomun ? DATOS_INSTITUCIONALES_DOMUN.telefono : null)
+  const corFinal = datosExtra?.correo || (esDomun ? DATOS_INSTITUCIONALES_DOMUN.correo_institucional : null)
 
   try {
     const { data: existing } = await clienteSupabase
       .from('empresa_contratista')
       .select('id, direccion, telefono, correo_institucional')
-      .or(`nombre.ilike.${clean},razon_social.ilike.${clean}`)
+      .or(`nombre.ilike.%${clean}%,razon_social.ilike.%${clean}%`)
       .maybeSingle()
 
     if (existing?.id) {
       const updates: any = {}
-      if (datosExtra?.direccion && !existing.direccion) updates.direccion = datosExtra.direccion
-      if (datosExtra?.telefono && !existing.telefono) updates.telefono = datosExtra.telefono
-      if (datosExtra?.correo && !existing.correo_institucional) updates.correo_institucional = datosExtra.correo
+      if (dirFinal && !existing.direccion) updates.direccion = dirFinal
+      if (telFinal && !existing.telefono) updates.telefono = telFinal
+      if (corFinal && !existing.correo_institucional) updates.correo_institucional = corFinal
       if (Object.keys(updates).length > 0) {
         await clienteSupabase.from('empresa_contratista').update(updates).eq('id', existing.id)
       }
@@ -511,9 +526,9 @@ async function sincronizarEmpresaSupervisora(
       await clienteSupabase.from('empresa_contratista').insert({
         nombre: clean,
         razon_social: clean,
-        direccion: datosExtra?.direccion || null,
-        telefono: datosExtra?.telefono || null,
-        correo_institucional: datosExtra?.correo || null,
+        direccion: dirFinal,
+        telefono: telFinal,
+        correo_institucional: corFinal,
         activo: true,
       })
     }
@@ -787,6 +802,27 @@ export async function obtenerProyectoPorId(proyectoId: string) {
 
   const contratoEjecucion = contratos.find((c) => c.tipo === 'EJECUCION') || null
   const contratoSupervision = contratos.find((c) => c.tipo === 'SUPERVISION') || null
+
+  const nomSup = detalle.empresa_supervisora || contratoSupervision?.empresaNombre || ''
+  const nomCont = empresaContratistaNombre || contratoEjecucion?.empresaNombre || ''
+  const esSupDomun = Boolean(nomSup && nomSup.toLowerCase().includes('domun'))
+  const esContDomun = Boolean(nomCont && nomCont.toLowerCase().includes('domun'))
+
+  if (contratoSupervision && esSupDomun) {
+    if (!contratoSupervision.direccion) contratoSupervision.direccion = DATOS_INSTITUCIONALES_DOMUN.direccion
+    if (!contratoSupervision.telefono) contratoSupervision.telefono = DATOS_INSTITUCIONALES_DOMUN.telefono
+    if (!contratoSupervision.correo) contratoSupervision.correo = DATOS_INSTITUCIONALES_DOMUN.correo_institucional
+    if (!contratoSupervision.registroMercantil) contratoSupervision.registroMercantil = DATOS_INSTITUCIONALES_DOMUN.registro_mercantil
+    if (!contratoSupervision.propietario) contratoSupervision.propietario = DATOS_INSTITUCIONALES_DOMUN.propietario
+  }
+
+  if (contratoEjecucion && esContDomun) {
+    if (!contratoEjecucion.direccion) contratoEjecucion.direccion = DATOS_INSTITUCIONALES_DOMUN.direccion
+    if (!contratoEjecucion.telefono) contratoEjecucion.telefono = DATOS_INSTITUCIONALES_DOMUN.telefono
+    if (!contratoEjecucion.correo) contratoEjecucion.correo = DATOS_INSTITUCIONALES_DOMUN.correo_institucional
+    if (!contratoEjecucion.registroMercantil) contratoEjecucion.registroMercantil = DATOS_INSTITUCIONALES_DOMUN.registro_mercantil
+    if (!contratoEjecucion.propietario) contratoEjecucion.propietario = DATOS_INSTITUCIONALES_DOMUN.propietario
+  }
   const documentos = (documentosRes.data || []).map((doc: any) => {
     const u = doc.usuario
     const dato = u?.dato_usuario
@@ -886,11 +922,11 @@ export async function obtenerProyectoPorId(proyectoId: string) {
     contratos,
     documentos,
     licitacionEjecutora: contratoEjecucion?.licitacionNumero || null,
-    propietarioContratista: contratoEjecucion?.propietario || null,
-    registroMercantilContratista: contratoEjecucion?.registroMercantil || null,
-    direccionContratista: contratoEjecucion?.direccion || null,
-    telefonoContratista: contratoEjecucion?.telefono || null,
-    correoContratista: contratoEjecucion?.correo || null,
+    propietarioContratista: contratoEjecucion?.propietario || (esContDomun ? DATOS_INSTITUCIONALES_DOMUN.propietario : null),
+    registroMercantilContratista: contratoEjecucion?.registroMercantil || (esContDomun ? DATOS_INSTITUCIONALES_DOMUN.registro_mercantil : null),
+    direccionContratista: contratoEjecucion?.direccion || (esContDomun ? DATOS_INSTITUCIONALES_DOMUN.direccion : null),
+    telefonoContratista: contratoEjecucion?.telefono || (esContDomun ? DATOS_INSTITUCIONALES_DOMUN.telefono : null),
+    correoContratista: contratoEjecucion?.correo || (esContDomun ? DATOS_INSTITUCIONALES_DOMUN.correo_institucional : null),
     superintendente: contratoEjecucion?.responsable || null,
     colegiadoActivoSuperintendente: contratoEjecucion?.colegiadoActivoSuperintendente || null,
     actaInicioEjecutora: contratoEjecucion?.actaInicioNumero || null,
@@ -906,11 +942,11 @@ export async function obtenerProyectoPorId(proyectoId: string) {
     mesesContratadosObra: contratoEjecucion?.plazoMesesDetalle || null,
     fechaTerminacionOriginalObra: contratoEjecucion?.fechaFin || null,
     licitacionSupervisora: contratoSupervision?.licitacionNumero || null,
-    propietarioSupervisora: contratoSupervision?.propietario || null,
-    registroMercantilSupervisora: contratoSupervision?.registroMercantil || null,
-    direccionSupervisora: contratoSupervision?.direccion || null,
-    telefonoSupervisora: contratoSupervision?.telefono || null,
-    correoSupervisora: contratoSupervision?.correo || null,
+    propietarioSupervisora: contratoSupervision?.propietario || (esSupDomun ? DATOS_INSTITUCIONALES_DOMUN.propietario : null),
+    registroMercantilSupervisora: contratoSupervision?.registroMercantil || (esSupDomun ? DATOS_INSTITUCIONALES_DOMUN.registro_mercantil : null),
+    direccionSupervisora: contratoSupervision?.direccion || (esSupDomun ? DATOS_INSTITUCIONALES_DOMUN.direccion : null),
+    telefonoSupervisora: contratoSupervision?.telefono || (esSupDomun ? DATOS_INSTITUCIONALES_DOMUN.telefono : null),
+    correoSupervisora: contratoSupervision?.correo || (esSupDomun ? DATOS_INSTITUCIONALES_DOMUN.correo_institucional : null),
     actaInicioSupervisora: contratoSupervision?.actaInicioNumero || null,
     responsableSupervisora: contratoSupervision?.responsable || null,
     programaSupervisora: contratoSupervision?.programa || null,
@@ -1676,15 +1712,17 @@ async function guardarContratosProyecto(proyectoId: string, datosFormulario: any
 
     const rows = listaContratos.map((c) => {
       const esEjec = c.tipo === 'EJECUCION'
+      const empNombreRaw = c.empresaNombre || c.empresa_nombre || (esEjec ? datosFormulario.empresaContratista : datosFormulario.empresaSupervisora) || null
+      const esDomun = Boolean(empNombreRaw && String(empNombreRaw).toLowerCase().includes('domun'))
       return {
         proyecto_id: proyectoId,
         tipo: c.tipo,
-        empresa_nombre: c.empresaNombre || c.empresa_nombre || (esEjec ? datosFormulario.empresaContratista : datosFormulario.empresaSupervisora) || null,
-        propietario: c.propietario || (esEjec ? datosFormulario.propietarioContratista : (datosFormulario.propietarioSupervisora || datosFormulario.supervisoraPropietario)) || null,
-        registro_mercantil: c.registroMercantil || c.registro_mercantil || (esEjec ? (datosFormulario.registroMercantilContratista || datosFormulario.contratistaRegistroMercantil) : (datosFormulario.registroMercantilSupervisora || datosFormulario.supervisoraRegistroMercantil)) || null,
-        direccion: c.direccion || (esEjec ? (datosFormulario.direccionContratista || datosFormulario.contratistaDireccion) : (datosFormulario.direccionSupervisora || datosFormulario.supervisoraDireccion)) || null,
-        telefono: c.telefono || (esEjec ? (datosFormulario.telefonoContratista || datosFormulario.contratistaTelefono) : (datosFormulario.telefonoSupervisora || datosFormulario.supervisoraTelefono)) || null,
-        correo: c.correo || (esEjec ? (datosFormulario.correoContratista || datosFormulario.contratistaCorreo) : (datosFormulario.correoSupervisora || datosFormulario.supervisoraCorreo)) || null,
+        empresa_nombre: empNombreRaw,
+        propietario: c.propietario || (esEjec ? datosFormulario.propietarioContratista : (datosFormulario.propietarioSupervisora || datosFormulario.supervisoraPropietario)) || (esDomun ? DATOS_INSTITUCIONALES_DOMUN.propietario : null),
+        registro_mercantil: c.registroMercantil || c.registro_mercantil || (esEjec ? (datosFormulario.registroMercantilContratista || datosFormulario.contratistaRegistroMercantil) : (datosFormulario.registroMercantilSupervisora || datosFormulario.supervisoraRegistroMercantil)) || (esDomun ? DATOS_INSTITUCIONALES_DOMUN.registro_mercantil : null),
+        direccion: c.direccion || (esEjec ? (datosFormulario.direccionContratista || datosFormulario.contratistaDireccion) : (datosFormulario.direccionSupervisora || datosFormulario.supervisoraDireccion)) || (esDomun ? DATOS_INSTITUCIONALES_DOMUN.direccion : null),
+        telefono: c.telefono || (esEjec ? (datosFormulario.telefonoContratista || datosFormulario.contratistaTelefono) : (datosFormulario.telefonoSupervisora || datosFormulario.supervisoraTelefono)) || (esDomun ? DATOS_INSTITUCIONALES_DOMUN.telefono : null),
+        correo: c.correo || (esEjec ? (datosFormulario.correoContratista || datosFormulario.contratistaCorreo) : (datosFormulario.correoSupervisora || datosFormulario.supervisoraCorreo)) || (esDomun ? DATOS_INSTITUCIONALES_DOMUN.correo_institucional : null),
         responsable: c.responsable || (esEjec ? (datosFormulario.superintendente || datosFormulario.responsableNombre) : (datosFormulario.delegadoResidente || datosFormulario.responsableSupervisora || datosFormulario.supervisoraResponsable)) || null,
         colegiado_activo_superintendente: esEjec
           ? (c.colegiadoActivoSuperintendente || c.colegiado_activo_superintendente || datosFormulario.colegiadoActivoSuperintendente || datosFormulario.colegiadoSuperintendente || datosFormulario.contratistaColegiadoActivo || null)

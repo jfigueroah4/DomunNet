@@ -29,21 +29,16 @@ export function ProyectoEditorView({
 
   useEffect(() => {
     if (!esEditar) return
-    if (proyectoInicial) {
-      setProyectoReal(proyectoInicial)
-      setCargando(false)
-      return
-    }
-    const slug = new URLSearchParams(window.location.search).get('slug')
+    const slug = new URLSearchParams(window.location.search).get('slug') || (proyectoInicial as any)?.id
     if (!slug) return
     setCargando(true)
     proyectoService.getProyectoBySlug(slug)
       .then((data) => {
-        setProyectoReal(data)
+        if (data) setProyectoReal(data)
       })
       .catch(() => toast.error('No se pudo cargar el proyecto para editar'))
       .finally(() => setCargando(false))
-  }, [esEditar, proyectoInicial])
+  }, [esEditar])
 
   const proyectoActual = esEditar ? (proyectoReal || proyectoInicial) : proyectoInicial
 
@@ -179,10 +174,17 @@ export function ProyectoEditorView({
       </div>
 
       <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-        <ProyectoFormulario
-          key={proyectoActual?.id || 'nuevo'}
-          modo={modo}
-          proyectoInicial={proyectoActual as any}
+        {cargando ? (
+          <div className="flex h-64 items-center justify-center">
+            <p className="text-xs font-semibold text-gray-500 animate-pulse">Cargando información del proyecto...</p>
+          </div>
+        ) : (
+          <ProyectoFormulario
+            key={`${proyectoActual?.id || 'nuevo'}_${proyectoActual?.updatedAt || (proyectoActual as any)?.updated_at || 'v1'}_${typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('paso') || '1' : '1'}`}
+            modo={modo}
+            proyectoInicial={proyectoActual as any}
+            pasoInicial={typeof window !== 'undefined' ? (parseInt(new URLSearchParams(window.location.search).get('paso') || '1', 10) as any) : 1}
+            subtabInicial={typeof window !== 'undefined' ? (new URLSearchParams(window.location.search).get('subtab') || undefined) : undefined}
           onGuardar={async (proyectoData) => {
             if (isGuardando) return
             setIsGuardando(true)
@@ -224,6 +226,7 @@ export function ProyectoEditorView({
             }
           }}
         />
+        )}
       </div>
     </div>
   )
