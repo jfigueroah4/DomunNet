@@ -497,69 +497,82 @@ export default function UsuariosPage() {
     setDispositivosModalOpen(true);
   };
 
-  // Escuchar cambios de sesiones en tiempo real via Supabase Realtime
+  // Escuchar cambios de sesiones en tiempo real via eventos locales y Supabase Realtime
   useEffect(() => {
-    if (!supabase) return;
+    const handleCierreSesion = (e: any) => {
+      const data = e.detail;
+      if (!data?.usuarioId) return;
 
-    const channel = supabase.channel('domun_sesiones_control')
-      .on('broadcast', { event: 'cierre_sesion' }, (payload: any) => {
-        const data = payload?.payload;
-        if (!data?.usuarioId) return;
-
-        setUsuarios((prev) =>
-          prev.map((u) => {
-            if (u.id === data.usuarioId) {
-              if (data.cerrarTodas) {
-                return {
-                  ...u,
-                  estado: 'Inactivo' as EstadoUsuario,
-                  sesionesActivasCount: 0,
-                  dispositivosActivos: [],
-                };
-              }
-              const nuevaCantidad = Math.max(0, (u.sesionesActivasCount || 1) - 1);
+      setUsuarios((prev) =>
+        prev.map((u) => {
+          if (u.id === data.usuarioId) {
+            if (data.cerrarTodas) {
               return {
                 ...u,
-                sesionesActivasCount: nuevaCantidad,
-                estado: (nuevaCantidad > 0 ? 'Activo' : 'Inactivo') as EstadoUsuario,
-                dispositivosActivos: (u.dispositivosActivos || []).filter(
-                  (d: any) => d.deviceId !== data.deviceId && d.sessionId !== data.sessionId
-                ),
+                estado: 'Inactivo' as EstadoUsuario,
+                sesionesActivasCount: 0,
+                dispositivosActivos: [],
               };
             }
-            return u;
-          })
-        );
-      })
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'seguridad_log' },
-        () => {
-          apiGetDeduplicado('/usuarios', { bypassCache: true }).then((res) => {
-            if (res.data?.data) {
-              setUsuarios((prev) =>
-                prev.map((u) => {
-                  const updated = (res.data.data as any[]).find((nu) => nu.id === u.id);
-                  if (updated) {
-                    return {
-                      ...u,
-                      estado: updated.estado,
-                      sesionesActivasCount: updated.sesionesActivasCount,
-                      dispositivosActivos: updated.dispositivosActivos,
-                      ultimoAcceso: updated.ultimoAcceso,
-                    };
-                  }
-                  return u;
-                })
-              );
+            const nuevaCantidad = Math.max(0, (u.sesionesActivasCount || 1) - 1);
+            return {
+              ...u,
+              sesionesActivasCount: nuevaCantidad,
+              estado: (nuevaCantidad > 0 ? 'Activo' : 'Inactivo') as EstadoUsuario,
+              dispositivosActivos: (u.dispositivosActivos || []).filter(
+                (d: any) => d.deviceId !== data.deviceId && d.sessionId !== data.sessionId
+              ),
+            };
+          }
+          return u;
+        })
+      );
+    };
+
+    window.addEventListener('domun:sesion_cerrada_broadcast', handleCierreSesion);
+
+    let chSeguridad: any = null;
+    if (supabase) {
+      try {
+        chSeguridad = supabase.channel('domun_usuarios_seguridad_changes')
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'seguridad_log' },
+            () => {
+              apiGetDeduplicado('/usuarios', { bypassCache: true }).then((res) => {
+                if (res.data?.data) {
+                  setUsuarios((prev) =>
+                    prev.map((u) => {
+                      const updated = (res.data.data as any[]).find((nu) => nu.id === u.id);
+                      if (updated) {
+                        return {
+                          ...u,
+                          estado: updated.estado,
+                          sesionesActivasCount: updated.sesionesActivasCount,
+                          dispositivosActivos: updated.dispositivosActivos,
+                          ultimoAcceso: updated.ultimoAcceso,
+                        };
+                      }
+                      return u;
+                    })
+                  );
+                }
+              }).catch(() => {});
             }
-          }).catch(() => {});
-        }
-      )
-      .subscribe();
+          )
+          .subscribe();
+      } catch (err) {
+        console.warn('Realtime seguridad_log error:', err);
+      }
+    }
 
     return () => {
-      channel.unsubscribe();
+      window.removeEventListener('domun:sesion_cerrada_broadcast', handleCierreSesion);
+      if (chSeguridad && supabase) {
+        try {
+          supabase.removeChannel(chSeguridad);
+        } catch (_) {}
+      }
     };
   }, []);
 

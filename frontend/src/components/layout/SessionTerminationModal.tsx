@@ -47,6 +47,11 @@ export function SessionTerminationModal() {
         const data = payload?.payload;
         if (!data) return;
 
+        // Notificar a otras vistas abiertas (ej. lista de usuarios)
+        try {
+          window.dispatchEvent(new CustomEvent('domun:sesion_cerrada_broadcast', { detail: data }));
+        } catch (_) {}
+
         // Verificar si este cierre afecta a este usuario
         if (data.usuarioId === profile.id) {
           const afectaMiDispositivo = data.cerrarTodas || !data.deviceId || data.deviceId === myDeviceId;
@@ -63,7 +68,12 @@ export function SessionTerminationModal() {
     window.addEventListener('domun:forzar_cierre_sesion', handleCustomEvent);
 
     return () => {
-      channel.unsubscribe();
+      try {
+        if (supabase) supabase.removeChannel(channel);
+        else channel.unsubscribe();
+      } catch (_) {
+        channel.unsubscribe();
+      }
       window.removeEventListener('domun:forzar_cierre_sesion', handleCustomEvent);
       if (timerRef.current) clearInterval(timerRef.current);
     };
