@@ -25,7 +25,7 @@ export interface ContactosEmpresaDrawerProps {
   isOpen: boolean
   onClose: () => void
   empresa: EmpresaRelacionada | null
-  tipo: 'entidad' | 'contratista'
+  tipo: 'entidad' | 'contratista' | 'ejecutora' | 'supervisora'
   recargarEmpresas: () => Promise<void>
 }
 
@@ -65,7 +65,7 @@ export function ContactosEmpresaDrawer({
 
   if (!isOpen || !empresa) return null
 
-  const endpointBase = tipo === 'entidad' ? '/entidades-contratantes' : '/empresas-contratistas'
+  const endpointBase = tipo === 'entidad' ? '/entidades-contratantes' : tipo === 'supervisora' ? '/empresas' : '/empresas-contratistas'
 
   const abrirVer = (c: ContactoRelacionado) => {
     setSelectedContacto(c)
@@ -129,7 +129,7 @@ export function ContactosEmpresaDrawer({
                     Contactos de la Empresa
                   </h3>
                   <span className="rounded-full bg-red-100 px-2 py-0.5 text-[9.5px] font-bold text-[#9B0F06]">
-                    {tipo === 'entidad' ? 'Entidad Contratante' : 'Empresa Contratista'}
+                    {tipo === 'entidad' ? 'Entidad Contratante' : tipo === 'supervisora' ? 'Empresa Supervisora' : 'Empresa Ejecutora'}
                   </span>
                 </div>
                 <p className="mt-0.5 text-xs font-semibold text-gray-700 truncate" title={empresa.nombre}>

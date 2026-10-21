@@ -7,13 +7,27 @@ import { EmpresasRelacionadasTab } from '@/components/modules/empresas/EmpresasR
 import { useEmpresasRelacionadasStore } from '@/stores/useEmpresasRelacionadasStore'
 
 export default function EmpresasPage() {
-  const [activeTab, setActiveTab] = useState<'entidades' | 'contratistas'>('entidades')
+  const [activeTab, setActiveTab] = useState<'entidades' | 'ejecutoras' | 'supervisoras'>('entidades')
   const [crearSolicitud, setCrearSolicitud] = useState(0)
+
   const entidades = useEmpresasRelacionadasStore(state => state.entidades)
   const contratistas = useEmpresasRelacionadasStore(state => state.contratistas)
+  const ejecutoras = useEmpresasRelacionadasStore(state => state.ejecutoras)
+  const supervisoras = useEmpresasRelacionadasStore(state => state.supervisoras)
   const cargar = useEmpresasRelacionadasStore(state => state.cargar)
+
   const recargarEntidades = useCallback(() => cargar('entidad'), [cargar])
-  const recargarContratistas = useCallback(() => cargar('contratista'), [cargar])
+  const recargarEjecutoras = useCallback(() => cargar('ejecutora'), [cargar])
+  const recargarSupervisoras = useCallback(() => cargar('supervisora'), [cargar])
+
+  const listaEjecutoras = ejecutoras && ejecutoras.length > 0 ? ejecutoras : contratistas
+
+  const botonTexto =
+    activeTab === 'entidades'
+      ? 'Nueva Entidad'
+      : activeTab === 'ejecutoras'
+      ? 'Nueva Ejecutora'
+      : 'Nueva Supervisora'
 
   return (
     <div className="space-y-4 font-[Poppins] pt-7 sm:pt-9">
@@ -35,12 +49,13 @@ export default function EmpresasPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {/* Tabs con fondo blanco en activo como en Roles */}
+          {/* Tabs con fondo blanco en activo */}
           <div className="flex items-center gap-0.5 bg-gray-100 p-0.5 rounded-lg">
             {([
-              ['entidades', 'Entidades Contratantes'],
-              ['contratistas', 'Empresas Contratistas'],
-            ] as const).map(([key, label]) => (
+              ['entidades', 'Entidades Contratantes', 'Contratante'],
+              ['ejecutoras', 'Empresas Ejecutoras', 'Ejecutora'],
+              ['supervisoras', 'Empresas Supervisoras', 'Supervisora'],
+            ] as const).map(([key, label, mobileLabel]) => (
               <button
                 key={key}
                 type="button"
@@ -52,28 +67,47 @@ export default function EmpresasPage() {
                 }`}
               >
                 <span className="hidden sm:inline">{label}</span>
-                <span className="sm:hidden">{key === 'entidades' ? 'Entidad' : 'Empresa'}</span>
+                <span className="sm:hidden">{mobileLabel}</span>
               </button>
             ))}
           </div>
 
-          {/* Botón Nueva Entidad/Empresa */}
+          {/* Botón Nueva Entidad/Ejecutora/Supervisora */}
           <button
             type="button"
             onClick={() => setCrearSolicitud(value => value + 1)}
             className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[#9B0F06] px-3.5 text-[11px] font-bold text-white transition-colors hover:bg-[#5E0006] shadow-sm active:scale-95 cursor-pointer"
           >
             <Plus size={12} />
-            <span className="hidden sm:inline">{activeTab === 'entidades' ? 'Nueva Entidad' : 'Nueva Empresa'}</span>
-            <span className="sm:hidden">{activeTab === 'entidades' ? 'Nueva' : 'Nueva'}</span>
+            <span className="hidden sm:inline">{botonTexto}</span>
+            <span className="sm:hidden">Nueva</span>
           </button>
         </div>
       </div>
 
-      {activeTab === 'entidades' ? (
-        <EmpresasRelacionadasTab tipo="entidad" empresas={entidades} recargar={recargarEntidades} crearSolicitud={crearSolicitud} />
-      ) : (
-        <EmpresasRelacionadasTab tipo="contratista" empresas={contratistas} recargar={recargarContratistas} crearSolicitud={crearSolicitud} />
+      {activeTab === 'entidades' && (
+        <EmpresasRelacionadasTab
+          tipo="entidad"
+          empresas={entidades}
+          recargar={recargarEntidades}
+          crearSolicitud={crearSolicitud}
+        />
+      )}
+      {activeTab === 'ejecutoras' && (
+        <EmpresasRelacionadasTab
+          tipo="ejecutora"
+          empresas={listaEjecutoras}
+          recargar={recargarEjecutoras}
+          crearSolicitud={crearSolicitud}
+        />
+      )}
+      {activeTab === 'supervisoras' && (
+        <EmpresasRelacionadasTab
+          tipo="supervisora"
+          empresas={supervisoras}
+          recargar={recargarSupervisoras}
+          crearSolicitud={crearSolicitud}
+        />
       )}
     </div>
   )

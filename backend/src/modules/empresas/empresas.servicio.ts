@@ -1,26 +1,37 @@
 import { clienteSupabase } from '@/configuracion/cliente-supabase';
 import type { WizardEmpresaType } from './empresas.schemas';
 import { crearUsuario, eliminarUsuario } from '../usuarios/usuarios.servicio';
+import type { DatosUsuario } from '../usuarios/usuarios.servicio';
+
+const contactoSelect = '*, usuario(*, dato_usuario(*))';
 
 export async function listarEmpresas() {
   const { data, error } = await clienteSupabase
     .from('empresa_externa')
     .select(`
       *, 
-      contactos: contacto_empresa_externa(*, usuario(*, dato_usuario(*)))
+      contactos: contacto_empresa_externa(${contactoSelect})
     `)
     .order('created_at', { ascending: false });
 
   if (error) throw new Error(`Error al listar empresas: ${error.message}`);
   
-  return data.map((emp: any) => {
-  // No relationship to proyecto_detalle, so set count to 0
-  const proyectosVinculados = 0;
-  return {
-    ...emp,
-    proyectos_vinculados: proyectosVinculados,
-  };
-});
+  return Promise.all((data || []).map(async (emp: any) => {
+    let proyectosVinculados = 0;
+    try {
+      const { count } = await clienteSupabase
+        .from('proyecto_detalle')
+        .select('id', { count: 'exact', head: true })
+        .ilike('empresa_supervisora', (emp.nombre || '').trim());
+      proyectosVinculados = count || 0;
+    } catch {
+      // Ignorar error de conteo
+    }
+    return {
+      ...emp,
+      proyectos_vinculados: proyectosVinculados,
+    };
+  }));
 }
 
 export async function obtenerEmpresa(id: string) {
@@ -28,24 +39,130 @@ export async function obtenerEmpresa(id: string) {
     .from('empresa_externa')
     .select(`
       *,
-      contactos: contacto_empresa_externa(*)
+      contactos: contacto_empresa_externa(${contactoSelect})
     `)
     .eq('id', id)
     .single();
 
   if (error) throw new Error(`Error al obtener empresa: ${error.message}`);
   
-  const proyectosVinculados = 0;
-return {
-  ...data,
-  proyectos_vinculados: proyectosVinculados,
-};
+  let proyectosVinculados = 0;
+  try {
+    const { count } = await clienteSupabase
+      .from('proyecto_detalle')
+      .select('id', { count: 'exact', head: true })
+      .ilike('empresa_supervisora', (data.nombre || '').trim());
+    proyectosVinculados = count || 0;
+  } catch {
+    // Ignorar error de conteo
+  }
+
+  return {
+    ...data,
+    proyectos_vinculados: proyectosVinculados,
+  };
+}
+
+export async function obtenerProyectosDeSupervisora(id: string) {
+  const emp = await obtenerEmpresa(id);
+  const nombre = emp?.nombre || '';
+  const { data, error } = await clienteSupabase
+    .from('proyecto_detalle')
+    .select(`
+      id,
+      proyecto_id,
+      nombre_oficial,
+      tramo,
+      direccion,
+      monto_original,
+      fecha_inicio_contractual,
+      fecha_finalizacion_real,
+      departamento:departamento_id(nombre),
+      municipio:municipio_id(nombre),
+      proyecto:proyecto_id(id, codigo, nombre, estado_id, fecha_inicio, fecha_fin_estimada)
+    `)
+    .ilike('empresa_supervisora', nombre.trim());
+
+  if (error) throw new Error(error.message);
+  return (data || []).map((row: any) => {
+    const p = row.proyecto || {};
+    return {
+      id: p.id || row.proyecto_id || row.id,
+      codigo: p.codigo || 'PROY',
+      nombre: p.nombre || row.nombre_oficial || 'Proyecto sin nombre',
+      nombreOficial: row.nombre_oficial || p.nombre || '',
+      ubicacion: row.tramo || row.direccion || '',
+      departamento: row.departamento?.nombre || '',
+      municipio: row.municipio?.nombre || '',
+      montoOriginal: Number(row.monto_original) || 0,
+      presupuesto: Number(row.monto_original) || 0,
+      fechaInicio: row.fecha_inicio_contractual || p.fecha_inicio || '',
+      fechaFin: row.fecha_finalizacion_real || p.fecha_fin_estimada || '',
+      estado: 'activo',
+    };
+  });
+}
+
+function datosUsuarioDesdeContacto(c: any): DatosUsuario {
+  return {
+    primer_nombre: c.primer_nombre || '',
+    segundo_nombre: c.segundo_nombre || '',
+    primer_apellido: c.primer_apellido || '',
+    segundo_apellido: c.segundo_apellido || '',
+    correo: c.correo || '',
+    telefono: c.telefono || '',
+    rol: 'Supervisor',
+    estado: 'Activo',
+    username: c.username || undefined,
+    contrasena: c.password || undefined,
+    fecha_nacimiento: c.fecha_nacimiento || undefined,
+    direccion: c.direccion || undefined,
+  };
+}
+
+export async function crearEmpresaEstandar(payload: any) {
+  let usuarioId: string | null = null;
+  if (payload.contacto && payload.contacto.primer_nombre && payload.contacto.correo) {
+    const usuario = await crearUsuario(datosUsuarioDesdeContacto(payload.contacto));
+    if (!usuario) throw new Error('No se pudo crear el usuario del contacto');
+    usuarioId = usuario.id;
+  }
+  try {
+    const { data, error } = await clienteSupabase.from('empresa_externa').insert({
+      nombre: payload.nombre,
+      nit: payload.nit,
+      direccion: payload.direccion,
+      telefono: payload.telefono,
+      correo_institucional: payload.correo_institucional,
+      activo: payload.activo ?? true,
+    }).select('id').single();
+
+    if (error) throw new Error(error.message);
+
+    if (usuarioId && payload.contacto) {
+      const nombreCompleto = [payload.contacto.primer_nombre, payload.contacto.primer_apellido].filter(Boolean).join(' ');
+      const contacto = await clienteSupabase.from('contacto_empresa_externa').insert({
+        empresa_externa_id: data.id,
+        usuario_id: usuarioId,
+        nombre: nombreCompleto,
+        cargo: payload.contacto.cargo || 'Supervisor',
+        telefono: payload.contacto.telefono,
+        correo: payload.contacto.correo,
+      }).select('id').single();
+
+      if (contacto.error) throw new Error(contacto.error.message);
+    }
+    return obtenerEmpresa(data.id);
+  } catch (error) {
+    if (usuarioId) await eliminarUsuario(usuarioId);
+    throw error;
+  }
 }
 
 export async function crearEmpresaWizard(payload: WizardEmpresaType) {
   let createdUserId = payload.usuario_id;
 
-  // 1. Crear el usuario si an no existe (manejo de reintento)
+  // 1. Crear el usuario si aún no existe (manejo de reintento)
   if (!createdUserId) {
     try {
       // Fecha de nacimiento a YYYY-MM-DD
@@ -60,7 +177,7 @@ export async function crearEmpresaWizard(payload: WizardEmpresaType) {
         segundo_apellido: payload.segundo_apellido || '',
         correo: payload.correo_contacto,
         telefono: payload.telefono_contacto,
-        rol: 'Contratante', // Enviamos el nombre del rol porque crearUsuario usa validarRolExiste que busca por nombre_rol
+        rol: 'Supervisor',
         estado: 'Activo',
         username: payload.username,
         contrasena: payload.password,
@@ -69,11 +186,10 @@ export async function crearEmpresaWizard(payload: WizardEmpresaType) {
       });
 
       if (!nuevoUser) {
-        throw new Error('No se recibi informacin del usuario creado');
+        throw new Error('No se recibió información del usuario creado');
       }
       createdUserId = nuevoUser.id;
     } catch (error: any) {
-      // Fallo al crear usuario (ej. duplicado, email invlido). No hay nada que deshacer aqu.
       throw new Error(error.message);
     }
   }
@@ -119,8 +235,7 @@ export async function crearEmpresaWizard(payload: WizardEmpresaType) {
       try {
         await eliminarUsuario(createdUserId);
       } catch (rollbackError: any) {
-        // Fallo el rollback! (Doble falla)
-        throw new Error(`ORPHAN_USER_ERROR: Fall la creacin de la empresa (${error.message}), y el rollback del usuario tambin fall. El usuario se cre exitosamente con el ID [${createdUserId}], pero la empresa no. Por favor, utilice el botn "Reintentar guardar empresa" para continuar.`);
+        throw new Error(`ORPHAN_USER_ERROR: Falló la creación de la empresa (${error.message}), y el rollback del usuario también falló. El usuario se creó exitosamente con el ID [${createdUserId}], pero la empresa no.`);
       }
     }
     throw new Error(`Error al guardar empresa/contacto: ${error.message}`);
@@ -132,9 +247,9 @@ export async function eliminarEmpresa(id: string) {
   const { data: contactos } = await clienteSupabase
     .from('contacto_empresa_externa')
     .select('usuario_id')
-    .eq('empresa_id', id);
+    .or(`empresa_externa_id.eq.${id},empresa_id.eq.${id}`);
 
-  // 2. Eliminar la empresa (esto eliminar en cascada el registro de contacto en DB)
+  // 2. Eliminar la empresa
   const { error } = await clienteSupabase
     .from('empresa_externa')
     .delete()
@@ -156,16 +271,19 @@ export async function eliminarEmpresa(id: string) {
   }
 }
 
-
 export async function actualizarEmpresa(id: string, payload: any) {
+  const nombre = payload.nombre || payload.nombre_empresa;
+  const direccion = payload.direccion || payload.direccion_empresa;
+  const telefono = payload.telefono || payload.telefono_empresa;
+
   // 1. Actualizar empresa
   const { data, error } = await clienteSupabase
     .from('empresa_externa')
     .update({
-      nombre: payload.nombre_empresa,
+      nombre,
       nit: payload.nit,
-      direccion: payload.direccion_empresa,
-      telefono: payload.telefono_empresa,
+      direccion,
+      telefono,
       correo_institucional: payload.correo_institucional,
       activo: payload.activo,
       updated_at: new Date().toISOString()
@@ -176,44 +294,30 @@ export async function actualizarEmpresa(id: string, payload: any) {
 
   if (error) throw new Error(error.message);
 
-  // 2. Actualizar contacto si existe
-  const { data: contactos } = await clienteSupabase
-    .from('contacto_empresa_externa')
-    .select('id, usuario_id')
-    .eq('empresa_id', id)
-    .limit(1);
-  const contacto = contactos && contactos.length > 0 ? contactos[0] : null;
-
-  if (contacto) {
-    // Actualizar tabla contacto_empresa_externa
-    await clienteSupabase
+  // 2. Actualizar contacto si viene especificado
+  if (payload.contacto) {
+    const { data: contactos } = await clienteSupabase
       .from('contacto_empresa_externa')
-      .update({
-        cargo: payload.cargo,
-        telefono: payload.telefono_contacto,
-        correo: payload.correo_contacto,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', contacto.id);
+      .select('id, usuario_id')
+      .or(`empresa_externa_id.eq.${id},empresa_id.eq.${id}`)
+      .limit(1);
 
-    // Actualizar tabla usuario (nombres, username)
-    if (contacto.usuario_id) {
-      await clienteSupabase
-        .from('dato_usuario')
-        .update({
-          primer_nombre: payload.primer_nombre,
-          segundo_nombre: payload.segundo_nombre,
-          primer_apellido: payload.primer_apellido,
-          segundo_apellido: payload.segundo_apellido,
-          username: payload.username,
-          fecha_nacimiento: payload.anoNacimiento ? `${payload.anoNacimiento}-${payload.mesNacimiento}-${payload.diaNacimiento}` : null,
-          updated_at: new Date().toISOString()
-        })
-        .eq('usuario_id', contacto.usuario_id);
+    const contacto = contactos && contactos.length > 0 ? contactos[0] : null;
+    if (contacto) {
+      await actualizarContactoDeSupervisora(id, contacto.id, payload.contacto);
     }
   }
 
-  return data;
+  return obtenerEmpresa(id);
+}
+
+export async function listarContactosDeSupervisora(empresaId: string) {
+  const { data, error } = await clienteSupabase
+    .from('contacto_empresa_externa')
+    .select(contactoSelect)
+    .or(`empresa_externa_id.eq.${empresaId},empresa_id.eq.${empresaId}`);
+  if (error) throw new Error(error.message);
+  return data || [];
 }
 
 export async function crearContactoDeEmpresaExterna(empresaId: string, payload: any) {
@@ -245,7 +349,7 @@ export async function crearContactoDeEmpresaExterna(empresaId: string, payload: 
 
   const { data: existente } = await clienteSupabase
     .from('contacto_empresa_externa')
-    .select('*, usuario(*, dato_usuario(*))')
+    .select(contactoSelect)
     .or(`empresa_externa_id.eq.${empresaId},empresa_id.eq.${empresaId}`)
     .eq('usuario_id', usuarioId)
     .maybeSingle();
@@ -259,8 +363,10 @@ export async function crearContactoDeEmpresaExterna(empresaId: string, payload: 
       usuario_id: usuarioId,
       nombre: nombreContacto || null,
       cargo: payload.cargo || 'Supervisor',
+      telefono: payload.telefono,
+      correo: payload.correo,
     })
-    .select('*, usuario(*, dato_usuario(*))')
+    .select(contactoSelect)
     .single();
 
   if (error) {
@@ -268,4 +374,76 @@ export async function crearContactoDeEmpresaExterna(empresaId: string, payload: 
     throw new Error(error.message);
   }
   return data;
+}
+
+export async function actualizarContactoDeSupervisora(empresaId: string, contactoId: string, payload: any) {
+  const { data: c, error } = await clienteSupabase
+    .from('contacto_empresa_externa')
+    .select('id, usuario_id')
+    .eq('id', contactoId)
+    .single();
+
+  if (error || !c) throw new Error('Contacto no encontrado');
+
+  if (c.usuario_id) {
+    await clienteSupabase.from('dato_usuario').update({
+      primer_nombre: payload.primer_nombre,
+      segundo_nombre: payload.segundo_nombre || null,
+      primer_apellido: payload.primer_apellido,
+      segundo_apellido: payload.segundo_apellido || null,
+      telefono: payload.telefono,
+      email: payload.correo,
+      username: payload.username,
+      fecha_nacimiento: payload.fecha_nacimiento || null,
+      direccion: payload.direccion || null,
+      updated_at: new Date().toISOString()
+    }).eq('usuario_id', c.usuario_id);
+
+    if (payload.correo) {
+      await clienteSupabase.from('usuario').update({ correo: payload.correo, updated_at: new Date().toISOString() }).eq('id', c.usuario_id);
+    }
+  }
+
+  const nombreCompleto = [payload.primer_nombre, payload.segundo_nombre, payload.primer_apellido, payload.segundo_apellido].filter(Boolean).join(' ');
+  await clienteSupabase.from('contacto_empresa_externa').update({
+    nombre: nombreCompleto || undefined,
+    cargo: payload.cargo,
+    telefono: payload.telefono,
+    correo: payload.correo,
+    updated_at: new Date().toISOString()
+  }).eq('id', contactoId);
+
+  const { data: contactoActualizado } = await clienteSupabase
+    .from('contacto_empresa_externa')
+    .select(contactoSelect)
+    .eq('id', contactoId)
+    .single();
+
+  return contactoActualizado;
+}
+
+export async function eliminarContactoDeSupervisora(empresaId: string, contactoId: string) {
+  const { data: c, error } = await clienteSupabase
+    .from('contacto_empresa_externa')
+    .select('id, usuario_id')
+    .eq('id', contactoId)
+    .single();
+
+  if (error || !c) throw new Error('Contacto no encontrado');
+
+  const { error: delError } = await clienteSupabase
+    .from('contacto_empresa_externa')
+    .delete()
+    .eq('id', contactoId);
+  if (delError) throw new Error(delError.message);
+
+  if (c.usuario_id) {
+    try {
+      await eliminarUsuario(c.usuario_id);
+    } catch (e) {
+      console.warn('Usuario no eliminado al borrar contacto:', e);
+    }
+  }
+
+  return { ok: true };
 }

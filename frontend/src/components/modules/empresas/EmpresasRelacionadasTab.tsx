@@ -17,7 +17,7 @@ export function EmpresasRelacionadasTab({
   crearSolicitud,
   onFilteredCountChange,
 }: {
-  tipo: 'entidad' | 'contratista'
+  tipo: 'entidad' | 'contratista' | 'ejecutora' | 'supervisora'
   empresas: EmpresaRelacionada[]
   recargar: () => Promise<void>
   crearSolicitud: number
@@ -124,8 +124,8 @@ export function EmpresasRelacionadasTab({
     onFilteredCountChange?.(listaOrdenada.length)
   }, [listaOrdenada.length, onFilteredCountChange])
 
-  const endpoint = tipo === 'entidad' ? '/entidades-contratantes' : '/empresas-contratistas'
-  const titulo = tipo === 'entidad' ? 'Entidades Contratantes' : 'Empresas Contratistas'
+  const endpoint = tipo === 'entidad' ? '/entidades-contratantes' : tipo === 'supervisora' ? '/empresas' : '/empresas-contratistas'
+  const titulo = tipo === 'entidad' ? 'Entidades Contratantes' : tipo === 'supervisora' ? 'Empresas Supervisoras' : 'Empresas Ejecutoras'
 
   const guardar = async (payload: any) => {
     try {
@@ -194,13 +194,21 @@ export function EmpresasRelacionadasTab({
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="text-sm font-bold text-gray-800">{titulo}</h2>
-          <p className="text-[10px] text-gray-400">Catálogo de empresas vinculadas con ordenamiento de columnas</p>
+          <p className="text-[10px] text-gray-400">
+            {tipo === 'entidad'
+              ? 'Catálogo de entidades contratantes vinculadas con ordenamiento de columnas'
+              : tipo === 'supervisora'
+              ? 'Catálogo de empresas supervisoras vinculadas con ordenamiento de columnas'
+              : 'Catálogo de empresas ejecutoras vinculadas con ordenamiento de columnas'}
+          </p>
         </div>
         <div className="flex w-full flex-col items-start sm:w-auto sm:items-end gap-1.5">
           <span className="text-[10px] sm:text-[10.5px] font-medium text-gray-500">
             {tipo === 'entidad'
               ? `${listaOrdenada.length} ${listaOrdenada.length === 1 ? 'entidad encontrada' : 'entidades encontradas'}`
-              : `${listaOrdenada.length} ${listaOrdenada.length === 1 ? 'empresa encontrada' : 'empresas encontradas'}`}
+              : tipo === 'supervisora'
+              ? `${listaOrdenada.length} ${listaOrdenada.length === 1 ? 'supervisora encontrada' : 'supervisoras encontradas'}`
+              : `${listaOrdenada.length} ${listaOrdenada.length === 1 ? 'empresa ejecutora encontrada' : 'empresas ejecutoras encontradas'}`}
           </span>
           <div className="relative w-full sm:w-72">
             <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -404,7 +412,7 @@ export function EmpresasRelacionadasTab({
           setEmpresaEliminar(undefined)
         }}
         onConfirm={confirmarAccion}
-        titulo={`Acción sobre ${tipo === 'entidad' ? 'Entidad Contratante' : 'Empresa Contratista'}`}
+        titulo={`Acción sobre ${tipo === 'entidad' ? 'Entidad Contratante' : tipo === 'supervisora' ? 'Empresa Supervisora' : 'Empresa Ejecutora'}`}
         nombreItem={empresaEliminar?.nombre || 'registro'}
         subtitulo1={empresaEliminar?.nit ? `NIT: ${empresaEliminar.nit}` : ''}
         subtitulo2={empresaEliminar?.correo_institucional || ''}

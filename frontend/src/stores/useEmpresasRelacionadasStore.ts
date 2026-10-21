@@ -23,11 +23,17 @@ export interface EmpresaRelacionada {
 interface State {
   entidades: EmpresaRelacionada[]
   contratistas: EmpresaRelacionada[]
+  ejecutoras: EmpresaRelacionada[]
+  supervisoras: EmpresaRelacionada[]
   loading: boolean
-  cargar: (tipo: 'entidad' | 'contratista') => Promise<void>
+  cargar: (tipo: 'entidad' | 'contratista' | 'ejecutora' | 'supervisora') => Promise<void>
 }
 
-const endpoint = (tipo: 'entidad' | 'contratista') => tipo === 'entidad' ? '/entidades-contratantes' : '/empresas-contratistas'
+const endpoint = (tipo: 'entidad' | 'contratista' | 'ejecutora' | 'supervisora') => {
+  if (tipo === 'entidad') return '/entidades-contratantes'
+  if (tipo === 'supervisora') return '/empresas'
+  return '/empresas-contratistas'
+}
 
 const MOCK_ENTIDADES_FALLBACK: EmpresaRelacionada[] = [
   {
@@ -142,20 +148,84 @@ const MOCK_CONTRATISTAS_FALLBACK: EmpresaRelacionada[] = [
   },
   {
     id: 'cont-emp-3',
-    nombre: 'SERVICIOS DE INGENIERIA - SERINGE',
+    nombre: 'Constructora y Pavimentos del Norte S.A.',
     nit: '4567890-2',
     direccion: 'Avenida Las Américas, 24-70 Zona 13, Ciudad de Guatemala',
     telefono: '2212-9675',
-    correo_institucional: 'supervision@seringe.com',
+    correo_institucional: 'proyectos@pavimentosnorte.com.gt',
     activo: true,
     contactos: [],
     proyectos_vinculados: 3,
   },
 ]
 
+const MOCK_SUPERVISORAS_FALLBACK: EmpresaRelacionada[] = [
+  {
+    id: 'sup-emp-1',
+    nombre: 'Consorcio de Ingeniería y Supervisión Vial R.L.',
+    nit: '5566778-9',
+    direccion: 'Boulevard Los Próceres 24-69 Zona 10, Edificio Empresarial, Nivel 8',
+    telefono: '2333-8899',
+    correo_institucional: 'contacto@consorciosupervision.com.gt',
+    activo: true,
+    contactos: [
+      {
+        id: 'cont-sup-1',
+        cargo: 'Supervisor General de Obras',
+        usuario: {
+          correo: 'supervisor.general@consorciosupervision.com.gt',
+          dato_usuario: {
+            primer_nombre: 'Ing. Carlos',
+            primer_apellido: 'Mendoza',
+            telefono: '5555-9988',
+          },
+        },
+      },
+    ],
+    proyectos_vinculados: 3,
+  },
+  {
+    id: 'sup-emp-2',
+    nombre: 'Supervisión Técnica y Control de Calidad S.A.',
+    nit: '9988776-5',
+    direccion: '12 Calle 1-25 Zona 10, Edificio Géminis 10, Ciudad de Guatemala',
+    telefono: '2335-4422',
+    correo_institucional: 'operaciones@supervisioncalidad.com.gt',
+    activo: true,
+    contactos: [
+      {
+        id: 'cont-sup-2',
+        cargo: 'Director de Aseguramiento de Calidad',
+        usuario: {
+          correo: 'calidad@supervisioncalidad.com.gt',
+          dato_usuario: {
+            primer_nombre: 'Inga. Patricia',
+            primer_apellido: 'Morales',
+            telefono: '5555-7766',
+          },
+        },
+      },
+    ],
+    proyectos_vinculados: 2,
+  },
+  {
+    id: 'sup-emp-3',
+    nombre: 'SERVICIOS DE INGENIERIA Y SUPERVISION VIAL - SERINGE',
+    nit: '4567890-2',
+    direccion: 'Avenida Las Américas, 24-70 Zona 13, Ciudad de Guatemala',
+    telefono: '2212-9675',
+    correo_institucional: 'supervision@seringe.com.gt',
+    activo: true,
+    contactos: [],
+    proyectos_vinculados: 1,
+  },
+]
+
 export const useEmpresasRelacionadasStore = create<State>((set, get) => ({
   entidades: [],
   contratistas: [],
+  ejecutoras: [],
+  supervisoras: [],
   loading: false,
   cargar: async (tipo) => {
     set({ loading: true })
@@ -163,23 +233,39 @@ export const useEmpresasRelacionadasStore = create<State>((set, get) => ({
       const response = await api.get(endpoint(tipo))
       const data = response.data?.data
       if (Array.isArray(data) && data.length > 0) {
-        set(tipo === 'entidad' ? { entidades: data, loading: false } : { contratistas: data, loading: false })
+        if (tipo === 'entidad') {
+          set({ entidades: data, loading: false })
+        } else if (tipo === 'supervisora') {
+          set({ supervisoras: data, loading: false })
+        } else {
+          set({ contratistas: data, ejecutoras: data, loading: false })
+        }
       } else {
         // Si el backend devuelve arreglo vacío, usar fallback para mostrar información inicial
-        const current = tipo === 'entidad' ? get().entidades : get().contratistas
-        if (current.length === 0) {
-          set(tipo === 'entidad' ? { entidades: MOCK_ENTIDADES_FALLBACK, loading: false } : { contratistas: MOCK_CONTRATISTAS_FALLBACK, loading: false })
+        if (tipo === 'entidad') {
+          const current = get().entidades
+          set({ entidades: current.length > 0 ? current : MOCK_ENTIDADES_FALLBACK, loading: false })
+        } else if (tipo === 'supervisora') {
+          const current = get().supervisoras
+          set({ supervisoras: current.length > 0 ? current : MOCK_SUPERVISORAS_FALLBACK, loading: false })
         } else {
-          set({ loading: false })
+          const current = get().contratistas
+          const list = current.length > 0 ? current : MOCK_CONTRATISTAS_FALLBACK
+          set({ contratistas: list, ejecutoras: list, loading: false })
         }
       }
     } catch (err) {
       console.warn(`[useEmpresasRelacionadasStore] No se pudo conectar al endpoint (${endpoint(tipo)}):`, err)
-      const current = tipo === 'entidad' ? get().entidades : get().contratistas
-      if (current.length === 0) {
-        set(tipo === 'entidad' ? { entidades: MOCK_ENTIDADES_FALLBACK, loading: false } : { contratistas: MOCK_CONTRATISTAS_FALLBACK, loading: false })
+      if (tipo === 'entidad') {
+        const current = get().entidades
+        set({ entidades: current.length > 0 ? current : MOCK_ENTIDADES_FALLBACK, loading: false })
+      } else if (tipo === 'supervisora') {
+        const current = get().supervisoras
+        set({ supervisoras: current.length > 0 ? current : MOCK_SUPERVISORAS_FALLBACK, loading: false })
       } else {
-        set({ loading: false })
+        const current = get().contratistas
+        const list = current.length > 0 ? current : MOCK_CONTRATISTAS_FALLBACK
+        set({ contratistas: list, ejecutoras: list, loading: false })
       }
     } finally {
       set({ loading: false })

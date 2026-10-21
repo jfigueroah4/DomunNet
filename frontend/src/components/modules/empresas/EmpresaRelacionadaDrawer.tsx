@@ -29,7 +29,7 @@ export function EmpresaRelacionadaDrawer({
   onClose: () => void
   onSave: (payload: any) => Promise<void>
   empresa?: EmpresaRelacionada
-  tipo: 'entidad' | 'contratista'
+  tipo: 'entidad' | 'contratista' | 'ejecutora' | 'supervisora'
   mode?: 'create' | 'edit' | 'view'
 }) {
   const { showErrorToast } = useCustomToast()
@@ -67,7 +67,7 @@ export function EmpresaRelacionadaDrawer({
   // Carga de catálogos para verificación en vivo
   useEffect(() => {
     if (!isOpen) return
-    const endpointEmp = tipo === 'entidad' ? '/entidades-contratantes' : '/empresas-contratistas'
+    const endpointEmp = tipo === 'entidad' ? '/entidades-contratantes' : tipo === 'supervisora' ? '/empresas' : '/empresas-contratistas'
     apiGetDeduplicado(endpointEmp)
       .then((r) => setEmpresasExistentes(r.data?.data || []))
       .catch(() => {})
@@ -475,7 +475,7 @@ export function EmpresaRelacionadaDrawer({
   if (!isOpen) return null
 
   const isViewMode = mode === 'view'
-  const titulo = tipo === 'entidad' ? 'Entidad Contratante' : 'Empresa Contratista'
+  const titulo = tipo === 'entidad' ? 'Entidad Contratante' : tipo === 'supervisora' ? 'Empresa Supervisora' : 'Empresa Ejecutora'
 
   return (
     <Portal>

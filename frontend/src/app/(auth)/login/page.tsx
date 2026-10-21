@@ -356,33 +356,29 @@ export default function LoginPage() {
 
   return (
     <div 
-      className="relative min-h-screen w-full overflow-hidden bg-[#1a0000]"
+      className="fixed inset-0 w-full h-[100dvh] overflow-hidden overscroll-none flex flex-col items-center justify-center bg-[#140B07]"
       style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
         fontFamily: "'Poppins', sans-serif",
+        touchAction: 'manipulation',
       }}
     >
-      {/* Fondo con ilustración de camiones */}
+      {/* Fondo de alta resolución precargado con máxima prioridad y fijado al viewport */}
       <div
-        className="absolute inset-x-0 bottom-[-80px] w-full h-[120vh] overflow-hidden pointer-events-none"
-        style={{
-          backgroundImage: 'url(/fondo_carretas.png)',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center 40%',
-          backgroundAttachment: 'fixed',
-        }}
+        aria-hidden="true"
+        className="fixed inset-0 overflow-hidden pointer-events-none select-none z-0"
       >
-        {/* Gradient overlay suave y animado */}
-        <div className="absolute inset-0 bg-gradient-to-br from-[#cc1111] via-[#9B0F06] to-[#e63b00] opacity-20" />
-
-        {/* Animated radial gradient pulse */}
-        <div className="absolute inset-0 animate-pulse-gradient bg-gradient-radial from-[rgba(200,0,0,0.1)] to-[rgba(80,0,0,0.15)]" />
-
-        {/* Overlay oscuro adicional para mejor legibilidad */}
-        <div className="absolute inset-0 bg-black/10" />
+        <Image
+          src="/fondo.png"
+          alt="Fondo Carretera"
+          fill
+          priority
+          sizes="100vw"
+          quality={85}
+          className="object-cover object-center pointer-events-none"
+        />
+        {/* Capa de contraste oscuro para máxima nitidez y legibilidad */}
+        <div className="absolute inset-0 bg-black/45 pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-black/60 pointer-events-none" />
       </div>
 
 
@@ -463,10 +459,10 @@ export default function LoginPage() {
             {/* Dropdown de usuarios recordados (desplegado desde el campo, sin extender altura del login) */}
             {showRememberedDropdown && rememberedAccounts.length > 0 && (
               <div 
-                className="absolute left-0 right-0 top-[42px] z-50 rounded-lg border border-white/20 bg-[#240303]/95 shadow-2xl backdrop-blur-md overflow-hidden max-h-[150px] overflow-y-auto animate-fadeIn"
+                className="absolute left-0 right-0 top-[42px] z-50 rounded-lg border border-white/20 bg-black/95 shadow-2xl backdrop-blur-md overflow-hidden max-h-[150px] overflow-y-auto animate-fadeIn"
                 style={{ fontFamily: 'Poppins, sans-serif' }}
               >
-                <div className="px-3 py-1.5 border-b border-white/10 text-[10px] uppercase font-semibold text-white/50 tracking-wider flex justify-between items-center bg-black/20">
+                <div className="px-3 py-1.5 border-b border-white/10 text-[10px] uppercase font-semibold text-white/50 tracking-wider flex justify-between items-center bg-black/40">
                   <span>Usuarios Guardados</span>
                   <span className="text-[9px] text-white/40">{rememberedAccounts.length}</span>
                 </div>

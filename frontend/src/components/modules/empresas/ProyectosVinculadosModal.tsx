@@ -38,7 +38,7 @@ interface Props {
   isOpen: boolean
   onClose: () => void
   empresa: EmpresaRelacionada | null
-  tipo: 'entidad' | 'contratista'
+  tipo: 'entidad' | 'contratista' | 'ejecutora' | 'supervisora'
 }
 
 const MOCK_PROYECTOS_POR_EMPRESA: Record<string, ProyectoVinculadoItem[]> = {
@@ -322,6 +322,8 @@ export function ProyectosVinculadosModal({
         const endpointProyectos =
           tipo === 'entidad'
             ? `/entidades-contratantes/${empresa.id}/proyectos`
+            : tipo === 'supervisora'
+            ? `/empresas/${empresa.id}/proyectos`
             : `/empresas-contratistas/${empresa.id}/proyectos`
 
         // 1. Intentar endpoint dedicado
@@ -351,6 +353,19 @@ export function ProyectosVinculadosModal({
                         empresa.nombre &&
                         (p.entidadContratante.toLowerCase().includes(empresa.nombre.toLowerCase()) ||
                           empresa.nombre.toLowerCase().includes(p.entidadContratante.toLowerCase())))
+                    )
+                  } else if (tipo === 'supervisora') {
+                    return (
+                      p.empresaSupervisoraId === empresa.id ||
+                      p.empresa_supervisora_id === empresa.id ||
+                      (p.empresaSupervisora &&
+                        empresa.nombre &&
+                        (p.empresaSupervisora.toLowerCase().includes(empresa.nombre.toLowerCase()) ||
+                          empresa.nombre.toLowerCase().includes(p.empresaSupervisora.toLowerCase()))) ||
+                      (p.empresa_supervisora &&
+                        empresa.nombre &&
+                        (p.empresa_supervisora.toLowerCase().includes(empresa.nombre.toLowerCase()) ||
+                          empresa.nombre.toLowerCase().includes(p.empresa_supervisora.toLowerCase())))
                     )
                   } else {
                     return (
@@ -445,7 +460,7 @@ export function ProyectosVinculadosModal({
                   Proyectos Vinculados
                 </h3>
                 <span className="rounded-full bg-red-100 px-2 py-0.5 text-[9.5px] font-bold text-[#9B0F06]">
-                  {tipo === 'entidad' ? 'Entidad Contratante' : 'Empresa Contratista'}
+                  {tipo === 'entidad' ? 'Entidad Contratante' : tipo === 'supervisora' ? 'Empresa Supervisora' : 'Empresa Ejecutora'}
                 </span>
               </div>
               <p className="mt-0.5 text-xs sm:text-[13px] font-bold text-gray-800 truncate" title={empresa.nombre}>
@@ -500,7 +515,7 @@ export function ProyectosVinculadosModal({
               </div>
               <h4 className="text-sm sm:text-base font-bold text-gray-800">Sin proyectos vinculados</h4>
               <p className="mt-1 text-xs text-gray-500 max-w-md leading-relaxed">
-                Esta empresa no se encuentra asignada actualmente como {tipo === 'entidad' ? 'entidad contratante' : 'empresa contratista'} en ningún proyecto del sistema.
+                Esta empresa no se encuentra asignada actualmente como {tipo === 'entidad' ? 'entidad contratante' : tipo === 'supervisora' ? 'empresa supervisora' : 'empresa ejecutora'} en ningún proyecto del sistema.
               </p>
             </div>
           ) : (

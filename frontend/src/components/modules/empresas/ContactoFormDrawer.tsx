@@ -25,7 +25,7 @@ export interface ContactoFormDrawerProps {
   onClose: () => void
   onSuccess: () => Promise<void>
   empresa: EmpresaRelacionada | null
-  tipo: 'entidad' | 'contratista'
+  tipo: 'entidad' | 'contratista' | 'ejecutora' | 'supervisora'
   contacto?: ContactoRelacionado | null
   mode: 'create' | 'edit' | 'view'
 }
@@ -103,7 +103,7 @@ export function ContactoFormDrawer({
   const isEdit = mode === 'edit'
   const isCreate = mode === 'create'
 
-  const endpointBase = tipo === 'entidad' ? '/entidades-contratantes' : '/empresas-contratistas'
+  const endpointBase = tipo === 'entidad' ? '/entidades-contratantes' : tipo === 'supervisora' ? '/empresas' : '/empresas-contratistas'
 
   const validar = () => {
     const errs: Record<string, string> = {}
