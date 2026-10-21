@@ -23,6 +23,7 @@ import {
   Building2,
   Calendar,
   CalendarDays,
+  Check,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
@@ -2297,6 +2298,7 @@ export function ProyectoFormulario({
             value: cNom,
             label: `${cNom} - ${c.cargo || (tipo === 'tecnico' ? 'Superintendente' : 'Representante Legal')}`,
             usuario: u,
+            contactoId: c.id,
           })
         }
       }
@@ -3380,7 +3382,9 @@ export function ProyectoFormulario({
                   onChange={(val) => {
                     setContactoContratante(val)
                     const foundOpt = getUsuariosParaEmpresa(entidadContratante, 'propietario').find((o: any) => o.value === val)
-                    if (foundOpt?.usuario?.id) {
+                    if (foundOpt?.contactoId) {
+                      setContactoContratanteId(foundOpt.contactoId)
+                    } else if (foundOpt?.usuario?.id) {
                       setContactoContratanteId(foundOpt.usuario.id)
                     }
                   }}
@@ -3397,44 +3401,32 @@ export function ProyectoFormulario({
             </div>
 
             {/* Banner Informativo y de Verificación de Empresa Domun Obligatoria */}
-            <div className={`p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 transition-all ${
-              tieneEmpresaDomun
-                ? esContratistaDomun
-                  ? 'bg-red-50/70 border-red-200 text-red-950'
-                  : 'bg-orange-50/70 border-orange-200 text-orange-950'
-                : 'bg-amber-50/80 border-amber-300 text-amber-900 ring-1 ring-amber-300/40'
-            }`}>
-              <div className="flex items-start sm:items-center gap-2.5">
-                <div className={`p-2 rounded-lg shrink-0 ${
-                  tieneEmpresaDomun
-                    ? esContratistaDomun ? 'bg-[#9B0F06] text-white' : 'bg-orange-700 text-white'
-                    : 'bg-amber-500 text-white'
-                }`}>
-                  <ShieldCheck size={16} />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold font-[Poppins]">
-                      {tieneEmpresaDomun
-                        ? esContratistaDomun
-                          ? 'Domun asignado como Empresa Ejecutora (Obra)'
-                          : 'Domun asignado como Empresa Supervisora'
-                        : 'Requisito de Plataforma: Domun debe ser asignado'}
-                    </span>
-                    <span className={`text-[8.5px] font-bold px-2 py-0.2 rounded-full uppercase ${
-                      tieneEmpresaDomun
-                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                        : 'bg-amber-100 text-amber-800 border border-amber-300'
-                    }`}>
-                      {tieneEmpresaDomun ? 'Cumple Requisito' : 'Pendiente'}
-                    </span>
-                  </div>
-                  <p className="text-[10px] text-gray-600 mt-0.5 leading-snug">
+            <div className="p-3 rounded-xl border border-gray-200 bg-white flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 transition-all">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-gray-900 font-[Poppins]">
                     {tieneEmpresaDomun
-                      ? `La bitácora y plan de trabajo de este proyecto se gestionarán bajo el rol de ${esContratistaDomun ? 'Ejecución de Obra' : 'Supervisión'}.`
-                      : 'Obligatorio: En este proyecto, la Empresa Ejecutora o la Empresa Supervisora debe ser Domun.'}
-                  </p>
+                      ? esContratistaDomun
+                        ? 'Domun asignado como Empresa Ejecutora (Obra)'
+                        : 'Domun asignado como Empresa Supervisora'
+                      : 'Requisito de Plataforma: Domun debe ser asignado'}
+                  </span>
+                  <span
+                    className={`inline-flex items-center justify-center w-4 h-4 rounded transition-colors shrink-0 ${
+                      tieneEmpresaDomun
+                        ? 'bg-black border border-black text-white'
+                        : 'bg-white border-2 border-gray-400 text-transparent'
+                    }`}
+                    title={tieneEmpresaDomun ? 'Requisito cumplido' : 'Requisito pendiente'}
+                  >
+                    {tieneEmpresaDomun && <Check size={11} strokeWidth={3.5} className="text-white" />}
+                  </span>
                 </div>
+                <p className="text-[10px] text-gray-500 mt-0.5 leading-snug">
+                  {tieneEmpresaDomun
+                    ? `La bitácora y plan de trabajo de este proyecto se gestionarán bajo el rol de ${esContratistaDomun ? 'Ejecución de Obra' : 'Supervisión'}.`
+                    : 'Obligatorio: En este proyecto, la Empresa Ejecutora o la Empresa Supervisora debe ser Domun.'}
+                </p>
               </div>
               {!tieneEmpresaDomun && (
                 <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-center">
@@ -4731,29 +4723,29 @@ export function ProyectoFormulario({
                     </button>
                   </div>
 
-                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-gray-200/80">
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <p className="text-[10.5px] font-bold text-gray-800">Renglones Habilitados para Bitácora</p>
-                        <span className="rounded-full bg-gray-100 border border-gray-200 px-1.5 py-0.2 text-[8.5px] font-bold text-gray-700">
-                          {renglonesProyecto.filter((r) => r.seleccionado !== false).length} seleccionados
-                        </span>
+                  {modoObra === 'manual' && (
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-gray-200/80">
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-[10.5px] font-bold text-gray-800">Renglones Habilitados para Bitácora</p>
+                          <span className="rounded-full bg-gray-100 border border-gray-200 px-1.5 py-0.2 text-[8.5px] font-bold text-gray-700">
+                            {renglonesProyecto.filter((r) => r.seleccionado !== false).length} seleccionados
+                          </span>
+                        </div>
+                        <p className="text-[9px] text-gray-500">
+                          Configura qué renglones estarán disponibles en la bitácora de obra en modo manual.
+                        </p>
                       </div>
-                      <p className="text-[9px] text-gray-500">
-                        {modoObra === 'sabana'
-                          ? 'Renglones habilitados para el registro en bitácora según la Hoja Sábana analítica.'
-                          : 'Configura qué renglones estarán disponibles en la bitácora de obra en modo manual.'}
-                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setDrawerRenglonesAbierto(true)}
+                        className="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-2.5 py-1 text-[10.5px] font-bold text-gray-800 hover:bg-gray-50 active:scale-95 transition-all shadow-2xs cursor-pointer"
+                      >
+                        <Layers size={12} className="text-[#9B0F06]" />
+                        <span>Gestionar Renglones ({renglonesProyecto.filter((r) => r.seleccionado !== false).length})</span>
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setDrawerRenglonesAbierto(true)}
-                      className="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-2.5 py-1 text-[10.5px] font-bold text-gray-800 hover:bg-gray-50 active:scale-95 transition-all shadow-2xs cursor-pointer"
-                    >
-                      <Layers size={12} className="text-[#9B0F06]" />
-                      <span>Gestionar Renglones ({renglonesProyecto.filter((r) => r.seleccionado !== false).length})</span>
-                    </button>
-                  </div>
+                  )}
                 </div>
 
                 <div className="flex items-center justify-between border-b border-gray-100 pb-1.5">
@@ -5004,29 +4996,29 @@ export function ProyectoFormulario({
                     </button>
                   </div>
 
-                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-gray-200/80">
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <p className="text-[10.5px] font-bold text-gray-800">Renglones Habilitados para Bitácora</p>
-                        <span className="rounded-full bg-gray-100 border border-gray-200 px-1.5 py-0.2 text-[8.5px] font-bold text-gray-700">
-                          {renglonesProyecto.filter((r) => r.seleccionado !== false).length} seleccionados
-                        </span>
+                  {modoSupervision === 'manual' && (
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-gray-200/80">
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-[10.5px] font-bold text-gray-800">Renglones Habilitados para Bitácora</p>
+                          <span className="rounded-full bg-gray-100 border border-gray-200 px-1.5 py-0.2 text-[8.5px] font-bold text-gray-700">
+                            {renglonesProyecto.filter((r) => r.seleccionado !== false).length} seleccionados
+                          </span>
+                        </div>
+                        <p className="text-[9px] text-gray-500">
+                          Configura qué renglones estarán disponibles en la bitácora de supervisión en modo manual.
+                        </p>
                       </div>
-                      <p className="text-[9px] text-gray-500">
-                        {modoSupervision === 'sabana'
-                          ? 'Renglones habilitados para el registro en bitácora según la Hoja Sábana analítica.'
-                          : 'Configura qué renglones estarán disponibles en la bitácora de supervisión en modo manual.'}
-                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setDrawerRenglonesAbierto(true)}
+                        className="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-2.5 py-1 text-[10.5px] font-bold text-gray-800 hover:bg-gray-50 active:scale-95 transition-all shadow-2xs cursor-pointer"
+                      >
+                        <Layers size={12} className="text-orange-700" />
+                        <span>Gestionar Renglones ({renglonesProyecto.filter((r) => r.seleccionado !== false).length})</span>
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setDrawerRenglonesAbierto(true)}
-                      className="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-2.5 py-1 text-[10.5px] font-bold text-gray-800 hover:bg-gray-50 active:scale-95 transition-all shadow-2xs cursor-pointer"
-                    >
-                      <Layers size={12} className="text-orange-700" />
-                      <span>Gestionar Renglones ({renglonesProyecto.filter((r) => r.seleccionado !== false).length})</span>
-                    </button>
-                  </div>
+                  )}
                 </div>
 
                 <div className="flex items-center justify-between border-b border-gray-100 pb-1.5">
@@ -5637,10 +5629,13 @@ export function ProyectoFormulario({
               const entId = targetEnt?.id || empresaContratanteId
               if (entId && u.id) {
                 try {
-                  await api.post(`/entidades-contratantes/${entId}/contactos`, {
+                  const resCont = await api.post(`/entidades-contratantes/${entId}/contactos`, {
                     usuario_id: u.id,
                     cargo: 'Representante',
                   })
+                  if (resCont?.data?.id) {
+                    setContactoContratanteId(resCont.data.id)
+                  }
                   recargarEmpresasGlobal().then((e) => {
                     if (e) {
                       setEntidadesContratantes(e.entidades || [])
@@ -5651,7 +5646,7 @@ export function ProyectoFormulario({
                 }
               }
               setContactoContratante(nom)
-              if (u.id) setContactoContratanteId(u.id)
+              if (u.id && !contactoContratanteId) setContactoContratanteId(u.id)
               showSuccessToast(`Usuario "${nom}" creado y asignado a Entidad Contratante`)
             }
           }

@@ -328,28 +328,33 @@ DIRECTIVAS Y POLÍTICA DE SOLO LECTURA:
 1. ACCESO TOTAL DE LECTURA Y CONSULTA EN TIEMPO REAL:
 - NUNCA digas: "No puedo ver la base de datos en tiempo real", "no tengo acceso", "mi función es estática". YA TIENES TODOS LOS DATOS EN VIVO EN ESTE PROMPT.
 - Puedes responder sobre cualquier módulo: bitácoras de hoy, fechas, horas, ubicaciones, tramos, qué usuarios están activos, qué roles existen, renglones de obra, presupuestos, estimaciones vencidas, etc.
-- Responde de forma clara, directa, concisa y estructurada.
+- Responde de forma clara, directa, profesional y concisa.
+- NUNCA menciones en tus respuestas frases como "Tengo acceso de lectura directa a los proyectos, bitácoras..." ni agregues el rol del usuario como "(Administrador)" o "(Admin)".
 
 2. SEGURIDAD: ESTRICTAMENTE PROHIBIDO MODIFICAR DATOS:
 - Tu perfil es exclusivamente de LECTURA Y CONSULTA INTELIGENTE.
 - NO PUEDES insertar, editar, actualizar ni eliminar datos en la base de datos.
 - Si el usuario te pide: "crea un proyecto", "edita este registro", "cambia el rol de un usuario" o "borra esta entrada", explícale amablemente que por seguridad de la obra eres un asistente de consulta y auditoría en tiempo real, y dale el botón interactivo para que lo haga desde el módulo correspondiente.
 
-3. SELECCIÓN DE PROYECTO:
-- Si el usuario está trabajando en un proyecto (PROYECTO ACTUAL EN PANTALLA) o menciona el nombre/código del proyecto, responde sobre ese proyecto de inmediato.
-- Si pide un resumen o información de un proyecto y NO indica cuál, escribe solo la frase "Selecciona el proyecto:" y a continuación un botón por cada proyecto, mostrando ÚNICAMENTE el nombre del proyecto como texto del botón, con este formato exacto:
-  [NOMBRE DEL PROYECTO](ask:Resumen completo de bitácora de NOMBRE DEL PROYECTO)
-- NUNCA pongas en el texto del botón la frase "Resumen de bitácora de".
+3. USO DE BOTONES (ESTRICTAMENTE SOLO CUANDO SEA NECESARIO):
+- NUNCA muestres botones de forma innecesaria o excesiva.
+- En saludos cotidianos (ej. "hola", "buenos días") o consultas generales, responde cordialmente en texto natural, NUNCA muestres listas de botones.
+- SOLO debes generar botones interactivos en dos casos específicos:
+  a) Redirección a módulos/pantallas cuando el usuario manifieste explícitamente que desea realizar una acción (ej. "quiero registrar una bitácora", "subir foto", "ver el proyecto"), usando el formato [Texto descriptivo](/ruta).
+  b) Desambiguación de proyecto: cuando el usuario pida consultar o resumir un proyecto pero existan múltiples proyectos y no haya proyecto activo ni especificado, pregunta amablemente y coloca botones breves con el formato [NOMBRE DEL PROYECTO](ask:Resumen del proyecto NOMBRE DEL PROYECTO).
+- Fuera de estos casos necesarios, responde siempre en texto normal sin botones.
 
-4. RESUMEN DE BITÁCORA (siempre completo):
-- Usa la sección 2B. Presenta el resumen completo de TODO el tiempo del proyecto: total de registros, rango de fechas, publicados/borradores/firmados, turnos, y luego desgloses por día, semana, mes y año, por renglón de trabajo (mediciones y cantidades) y por usuario.
-- Si el usuario pide un periodo concreto (hoy, semana, mes, año) o un usuario o renglón, filtra y detalla solo eso con la mayor cantidad de datos disponibles.
-- Al final puedes ofrecer botones de seguimiento con este formato, sin nombres de proyecto: [Ver por semana](ask:Resumen por semana de bitácora de NOMBRE DEL PROYECTO) [Ver por mes](ask:Resumen por mes de bitácora de NOMBRE DEL PROYECTO) [Ver por usuario](ask:Resumen por usuario de bitácora de NOMBRE DEL PROYECTO) [Ver por renglón](ask:Resumen por renglón de bitácora de NOMBRE DEL PROYECTO).
-- NO incluyas botones de navegación en los resúmenes ni como "navegación rápida" por defecto.
+4. FORMATO DE RESÚMENES DE PROYECTO (REGLA FUNDAMENTAL DE DOS PASOS):
+- PASO 1 (Resumen general explicativo por defecto): Cuando el usuario pida un resumen de algún proyecto o pregunte cómo va un proyecto:
+  * Ofrécelo PRIMERO como un PÁRRAFO continuo y explicativo (o 2 párrafos redactados de forma fluida y natural).
+  * En este párrafo explica el contexto de la obra, avance general, ubicación/tramo, empresa supervisora y estado de plazos y bitácoras.
+  * PROHIBIDO usar viñetas o listas por defecto en este primer resumen.
+  * NO agregues botones innecesarios al final.
+- PASO 2 (Detalle estructurado en viñetas SOLO bajo solicitud):
+  * ÚNICAMENTE si el usuario pide explícitamente que especifiques, detalles o desgloses la información (por ejemplo frases como "especifica", "en viñetas", "dame los detalles", "desglósalo", "detalle puntual"), ENTONCES responde desglosando la información en viñetas simples (-) con cifras exactas, fechas, mediciones por renglón y desglose cronológico de bitácora.
 
-4B. REDIRECCIÓN A SECCIONES (solo cuando el usuario lo pida):
-- Si el usuario expresa que quiere hacer algo o ir a una sección específica (ej. "quiero hacer un registro", "quiero subir una foto", "quiero crear un reporte", "ver el proyecto"), responde con una frase corta y UN botón de navegación que lo lleve directo a esa sección dentro del proyecto seleccionado, con formato [Texto corto](/ruta).
-- Si no hay proyecto indicado ni PROYECTO ACTUAL EN PANTALLA, primero escribe "Selecciona el proyecto:" con un botón por proyecto usando el formato [NOMBRE DEL PROYECTO](ask:Quiero <acción> en NOMBRE DEL PROYECTO); al elegirlo, entrega el botón de redirección.
+5. REDIRECCIÓN A SECCIONES (solo cuando el usuario lo pida explícitamente):
+- Si el usuario expresa que quiere hacer algo o ir a una sección específica (ej. "quiero hacer un registro", "quiero subir una foto", "quiero crear un reporte", "ver el proyecto"), responde con una frase corta y UN botón de navegación hacia esa sección, con formato [Texto corto](/ruta).
 - Rutas (reemplaza ID_PROYECTO por el ID real del proyecto):
   - Nuevo registro de bitácora: /dashboard/bitacora?proyectoId=ID_PROYECTO&nuevo=true
   - Ver bitácora del proyecto: /dashboard/bitacora?proyectoId=ID_PROYECTO
@@ -361,11 +366,11 @@ DIRECTIVAS Y POLÍTICA DE SOLO LECTURA:
   - Nuevo reporte: /dashboard/reportes/nuevo
 - El texto del botón debe describir la acción (ej. "Crear registro de bitácora"), sin incluir el nombre del proyecto. Solo ofrece rutas a las que el rol/permisos del usuario den acceso.
 
-5. ESTILO Y PRESENTACIÓN:
-- Sé profesional y claro. Para resúmenes de bitácora entrega el detalle completo en viñetas simples; para otras consultas, sé conciso.
+6. ESTILO Y PRESENTACIÓN:
+- Sé profesional, técnico y cordial.
 - Responde siempre en español.
 - NO uses emojis.
-- NO uses encabezados con numerales (# o ##). Usa negritas (**texto**) y viñetas simples (-).`;
+- NO uses encabezados con numerales (# o ##). Usa negritas (**texto**) y cuando corresponda viñetas simples (-).`;
 
     // 1. Proveedor: Groq Cloud con modelos disponibles comprobados
     if (groqKey) {
@@ -498,19 +503,53 @@ DIRECTIVAS Y POLÍTICA DE SOLO LECTURA:
     }
 
     // 6. Fallback local basado en la base de datos real
-    const lastMessage = (messages?.[messages.length - 1]?.content || '').toLowerCase();
+    const lastMessage = (messages?.[messages.length - 1]?.content || '').toLowerCase().trim();
     let fallbackReply = '';
 
-    const proyectoMencionado = proyectosLiveList.find((p) => p.nombre && lastMessage.includes(String(p.nombre).toLowerCase()));
-    const botonesProyectos = proyectosLiveList.map((p) => '[' + p.nombre + '](ask:Resumen completo de bitácora de ' + p.nombre + ')').join('\n');
+    const esSaludo = /^(hola|buenos d[ií]as|buenas tardes|buenas noches|qu[eé] tal|hey|saludos)/i.test(lastMessage);
+    const pideEspecificar = /(especifica|especificar|detall|viñeta|desglos|puntual)/i.test(lastMessage);
 
-    if (lastMessage.includes('bitacora') || lastMessage.includes('bitácora') || lastMessage.includes('resumen') || lastMessage.includes('hoy') || lastMessage.includes('registro')) {
+    const proyectoMencionado = proyectosLiveList.find(
+      (p) =>
+        (p.nombre && lastMessage.includes(String(p.nombre).toLowerCase())) ||
+        (p.codigo && lastMessage.includes(String(p.codigo).toLowerCase())) ||
+        (currentProject?.id && String(p.id) === String(currentProject.id))
+    );
+    const botonesProyectos = proyectosLiveList.map((p) => '[' + p.nombre + '](ask:Resumen del proyecto ' + p.nombre + ')').join('\n');
+
+    if (esSaludo) {
+      const saludoNombre = userFirstName ? `Hola, ${userFirstName}.` : 'Hola.';
+      fallbackReply = `${saludoNombre} Soy DomunBot AI, tu asistente en tiempo real de DomunNet. ¿En qué puedo ayudarte hoy?`;
+    } else if (proyectoMencionado && (lastMessage.includes('resumen') || lastMessage.includes('como va') || lastMessage.includes('cómo va') || lastMessage.includes('estado'))) {
+      if (pideEspecificar) {
+        const idx = bitacorasStatsText.indexOf('== PROYECTO: ' + (proyectoMencionado.codigo || ''));
+        const bloque = idx >= 0 ? bitacorasStatsText.slice(idx).split('\n\n')[0] : 'Sin registros de bitácora para este proyecto.';
+        fallbackReply = `**Detalle específico del proyecto ${proyectoMencionado.nombre}:**\n\n` +
+          `- **Código:** ${proyectoMencionado.codigo || 'S/C'}\n` +
+          `- **Tramo / Ubicación:** ${proyectoMencionado.tramo || 'No especificada'}\n` +
+          `- **Supervisión:** ${proyectoMencionado.supervisora}\n` +
+          `- **Presupuesto contractual:** Q ${(Number(proyectoMencionado.monto_original) || 0).toLocaleString()}\n` +
+          `- **Plazo:** Del ${proyectoMencionado.fecha_inicio || 'N/D'} al ${proyectoMencionado.fecha_fin || 'N/D'}\n\n` +
+          bloque.split('\n').map((l) => (l.startsWith('==') ? '' : (l.startsWith('    -') ? l.replace('    -', '-') : '**' + l.trim() + '**'))).filter(Boolean).join('\n');
+      } else {
+        const bs = bitacorasLiveList.filter((b) => String(b.proyecto_id) === String(proyectoMencionado.id));
+        const regsCount = bs.length;
+        const regsPub = bs.filter((b) => b.publicada).length;
+        fallbackReply = `El proyecto "${proyectoMencionado.nombre}" (${proyectoMencionado.codigo || 'S/C'}) se encuentra ubicado en ${proyectoMencionado.tramo || 'su tramo asignado'}, coordinado bajo la supervisión de ${proyectoMencionado.supervisora}. Cuenta con una asignación presupuestaria contractual de Q ${(Number(proyectoMencionado.monto_original) || 0).toLocaleString()} y una fecha estipulada de culminación para el ${proyectoMencionado.fecha_fin || 'plazo convenido'}. A la fecha se registran ${regsCount} entradas en la bitácora de obra (${regsPub} debidamente publicadas y validadas), reflejando un seguimiento continuo de las actividades ejecutadas en campo. Si necesitas que especifique algún renglón, fecha o desglose detallado en viñetas, con gusto indícamelo.`;
+      }
+    } else if (lastMessage.includes('bitacora') || lastMessage.includes('bitácora') || lastMessage.includes('registro') || lastMessage.includes('hoy')) {
       if (!proyectoMencionado) {
-        fallbackReply = 'Selecciona el proyecto:\n\n' + botonesProyectos;
+        fallbackReply = '¿De qué proyecto te gustaría revisar las bitácoras?\n\n' + botonesProyectos;
       } else {
         const idx = bitacorasStatsText.indexOf('== PROYECTO: ' + (proyectoMencionado.codigo || ''));
         const bloque = idx >= 0 ? bitacorasStatsText.slice(idx).split('\n\n')[0] : 'Sin registros de bitácora para este proyecto.';
         fallbackReply = '**' + proyectoMencionado.nombre + '**\n\n' + bloque.split('\n').map((l) => (l.startsWith('==') ? '' : (l.startsWith('    -') ? l.replace('    -', '-') : '**' + l.trim() + '**'))).filter(Boolean).join('\n');
+      }
+    } else if (lastMessage.includes('resumen') || lastMessage.includes('proyecto')) {
+      if (proyectosLiveList.length > 0) {
+        fallbackReply = `Actualmente hay ${proyectosLiveList.length} proyectos registrados en el sistema. ¿De cuál de ellos te gustaría conocer el resumen? Puedes indicarme su nombre o código.`;
+      } else {
+        fallbackReply = 'Actualmente no hay proyectos registrados en el sistema.';
       }
     } else if (lastMessage.includes('reporte') && (lastMessage.includes('cuant') || lastMessage.includes('cantid') || lastMessage.includes('cread') || lastMessage.includes('generad') || lastMessage.includes('historial') || lastMessage.includes('registro'))) {
       fallbackReply = reportesContextText;
@@ -521,7 +560,7 @@ DIRECTIVAS Y POLÍTICA DE SOLO LECTURA:
     } else if (lastMessage.includes('estimaci') || lastMessage.includes('vencid') || lastMessage.includes('vencer') || lastMessage.includes('finanz')) {
       fallbackReply = estimacionesCatalogContext.replace(/•/g, '-');
     } else {
-      fallbackReply = 'Selecciona el proyecto:\n\n' + botonesProyectos;
+      fallbackReply = 'Hola. ¿En qué puedo orientarte hoy? Puedes consultarme sobre el estado de algún proyecto, bitácoras de campo, estimaciones o reportes del sistema.';
     }
 
     return NextResponse.json({ reply: fallbackReply, provider: 'DomunNet Live DB' });

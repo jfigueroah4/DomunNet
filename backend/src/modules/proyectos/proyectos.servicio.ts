@@ -352,6 +352,83 @@ async function resolverEmpresaContratanteId(val: any): Promise<string | null> {
   return null
 }
 
+async function resolverContactoContratanteId(
+  val: any,
+  entidadId?: string | null,
+  nombreContacto?: string | null
+): Promise<string | null> {
+  const uuid = esUuidValido(val)
+
+  try {
+    // 1. Si es UUID, verificar si ya es el ID de un registro en contacto_entidad
+    if (uuid) {
+      const { data: contactoPorId } = await clienteSupabase
+        .from('contacto_entidad')
+        .select('id')
+        .eq('id', uuid)
+        .maybeSingle()
+      if (contactoPorId?.id) return contactoPorId.id
+
+      // 2. ¿Es el usuario_id de un contacto existente en contacto_entidad?
+      if (entidadId) {
+        const { data: contactoPorUser } = await clienteSupabase
+          .from('contacto_entidad')
+          .select('id')
+          .eq('usuario_id', uuid)
+          .eq('entidad_contratante_id', entidadId)
+          .maybeSingle()
+        if (contactoPorUser?.id) return contactoPorUser.id
+      }
+
+      const { data: contactoGeneral } = await clienteSupabase
+        .from('contacto_entidad')
+        .select('id')
+        .eq('usuario_id', uuid)
+        .maybeSingle()
+      if (contactoGeneral?.id) return contactoGeneral.id
+
+      // 3. Si tenemos entidadId y el usuario existe en usuario, crear o vincular en contacto_entidad
+      if (entidadId) {
+        const { data: u } = await clienteSupabase
+          .from('usuario')
+          .select('id, nombre, correo')
+          .eq('id', uuid)
+          .maybeSingle()
+        if (u?.id) {
+          const { data: nuevoContacto, error: errInsert } = await clienteSupabase
+            .from('contacto_entidad')
+            .insert({
+              entidad_contratante_id: entidadId,
+              usuario_id: u.id,
+              nombre: u.nombre || null,
+              cargo: 'Representante',
+            })
+            .select('id')
+            .maybeSingle()
+          if (nuevoContacto?.id) return nuevoContacto.id
+          if (errInsert) console.warn('No se pudo auto-vincular contacto_entidad:', errInsert.message)
+        }
+      }
+    }
+
+    // 4. Si viene nombreContacto o val es un nombre string
+    const targetNombre = (nombreContacto || (typeof val === 'string' && !uuid ? val : null) || '').trim()
+    if (targetNombre && entidadId) {
+      const { data: contactoPorNom } = await clienteSupabase
+        .from('contacto_entidad')
+        .select('id')
+        .eq('entidad_contratante_id', entidadId)
+        .ilike('nombre', targetNombre)
+        .maybeSingle()
+      if (contactoPorNom?.id) return contactoPorNom.id
+    }
+  } catch (err) {
+    console.warn('Error resolviendo contacto_contratante_id:', err)
+  }
+
+  return null
+}
+
 async function resolverEmpresaContratistaId(
   val: any,
   datosExtra?: { direccion?: string; telefono?: string; correo?: string; nit?: string }
@@ -1234,6 +1311,12 @@ export async function crearProyecto(datosFormulario: any) {
     }
   }
 
+  const contactoContratanteIdFinal = await resolverContactoContratanteId(
+    datosFormulario.contactoContratanteId,
+    empContratanteId,
+    datosFormulario.contactoContratante as string
+  )
+
   // 3. Ejecutar en paralelo la inserción de detalle, equipo, parámetros, contratos y renglones
   const [detalleRes, equipoRes, paramRes] = await Promise.all([
     clienteSupabase.from('proyecto_detalle').insert({
@@ -1253,7 +1336,7 @@ export async function crearProyecto(datosFormulario: any) {
       direccion: datosFormulario.direccion || null,
       monto_final: datosFormulario.montoFinal || null,
       empresa_contratante_id: empContratanteId,
-      contacto_contratante_id: esUuidValido(datosFormulario.contactoContratanteId) || null,
+      contacto_contratante_id: contactoContratanteIdFinal,
       empresa_contratista_id: empContratistaId,
       empresa_supervisora: datosFormulario.empresaSupervisora || null,
       delegado_residente_id: delegadoResId,
@@ -1340,12 +1423,28 @@ export async function actualizarProyecto(proyectoId: string, datosFormulario: Re
   if ('direccion' in datosFormulario) detalleUpdates.direccion = datosFormulario.direccion
   if ('kilometroInicio' in datosFormulario) detalleUpdates.kilometro_inicio = datosFormulario.kilometroInicio
   if ('kilometroFin' in datosFormulario) detalleUpdates.kilometro_fin = datosFormulario.kilometroFin
+  let entidadIdParaContacto: string | null = null
   if ('empresaContratanteId' in datosFormulario || 'entidadContratante' in datosFormulario) {
     const val = await resolverEmpresaContratanteId(datosFormulario.empresaContratanteId || datosFormulario.entidadContratante)
-    if (val) detalleUpdates.empresa_contratante_id = val
+    if (val) {
+      detalleUpdates.empresa_contratante_id = val
+      entidadIdParaContacto = val
+    }
   }
-  if ('contactoContratanteId' in datosFormulario) {
-    detalleUpdates.contacto_contratante_id = esUuidValido(datosFormulario.contactoContratanteId) || null
+  if (!entidadIdParaContacto) {
+    const { data: detActual } = await clienteSupabase
+      .from('proyecto_detalle')
+      .select('empresa_contratante_id')
+      .eq('proyecto_id', proyectoId)
+      .maybeSingle()
+    entidadIdParaContacto = detActual?.empresa_contratante_id || null
+  }
+  if ('contactoContratanteId' in datosFormulario || 'contactoContratante' in datosFormulario) {
+    detalleUpdates.contacto_contratante_id = await resolverContactoContratanteId(
+      datosFormulario.contactoContratanteId,
+      entidadIdParaContacto,
+      datosFormulario.contactoContratante as string
+    )
   }
   if ('empresaContratista' in datosFormulario || 'empresaContratistaId' in datosFormulario) {
     const contratoEjec = (datosFormulario.contratoEjecucion as any) || {}

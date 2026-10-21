@@ -8,7 +8,6 @@ import {
   Maximize2,
   Minimize2,
   Bot,
-  UserCheck,
   Minus,
   ChevronUp,
   ArrowRight,
@@ -292,8 +291,8 @@ export default function AIAssistant({ isOpen, onClose }: AIAssistantProps) {
   // Inicializar saludo personalizado cuando carga la información del perfil o se abre el chat
   useEffect(() => {
     const nombreGreeting = primerNombre ? `Hola, ${primerNombre}.` : 'Hola.';
-    const rolText = roleData.roleTitle ? ` (${roleData.roleTitle})` : '';
-    const initialText = `${nombreGreeting} Soy DomunBot AI, tu asistente en tiempo real de DomunNet${rolText}. Tengo acceso de lectura directa a los proyectos, bitácoras, fotos y estimaciones de la base de datos. ¿En qué puedo ayudarte hoy?`;
+    const suggestionButtons = roleData.items.map(it => `[${it.label}](ask:${it.query})`).join(' ');
+    const initialText = `${nombreGreeting} Soy DomunBot AI, tu asistente en tiempo real de DomunNet. ¿En qué puedo ayudarte hoy?\n\n${suggestionButtons}`;
     const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
     setMessages((prev) => {
@@ -305,7 +304,7 @@ export default function AIAssistant({ isOpen, onClose }: AIAssistantProps) {
       }
       return prev;
     });
-  }, [primerNombre, roleData.roleTitle]);
+  }, [primerNombre, roleData.items]);
 
   useEffect(() => {
     if (isOpen) {
@@ -478,34 +477,6 @@ export default function AIAssistant({ isOpen, onClose }: AIAssistantProps) {
         {/* Cuerpo del chat */}
         {!isMinimized && (
           <>
-            {/* Opciones de Sugerencias Rápidas */}
-            {messages.length <= 1 && (
-              <div className="border-b border-gray-100 bg-white px-3.5 py-2.5">
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-[10px] font-semibold text-[#6B7280] uppercase tracking-wider">
-                    {roleData.title}
-                  </span>
-                  {roleData.roleTitle && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#F3F4F6] text-[#4B5563] text-[9px] font-medium border border-[#D1D5DB]">
-                      <UserCheck size={10} className="text-[#4B5563]" />
-                      {roleData.roleTitle}
-                    </span>
-                  )}
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {roleData.items.map((suggestion) => (
-                    <button
-                      key={suggestion.label}
-                      onClick={() => handleSendMessage(suggestion.query)}
-                      className="rounded-full border border-gray-200 bg-gray-50/70 px-2.5 py-1 text-left text-[10.5px] font-medium text-gray-700 transition-all hover:border-[#4B5563]/40 hover:bg-[#F3F4F6] hover:text-[#4B5563] shadow-2xs active:scale-95 cursor-pointer"
-                    >
-                      {suggestion.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
             {/* Área de Mensajes */}
             <div className="flex-1 space-y-3 overflow-y-auto bg-white p-4">
               {messages.map((msg, idx) => (
