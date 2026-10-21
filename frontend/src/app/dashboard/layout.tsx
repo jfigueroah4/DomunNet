@@ -9,6 +9,7 @@ import { useAuthStore } from '@/stores/useAuthStore'
 import { Loader2 } from 'lucide-react'
 import { tienePermiso, RUTAS_PERMISOS } from '@/lib/rutas-permisos'
 import AccessDenied from '@/components/layout/AccessDenied'
+import { SessionTerminationModal } from '@/components/layout/SessionTerminationModal'
 import { useUIStore } from '@/stores/useUIStore'
 import { apiGetDeduplicado } from '@/lib/api/cliente'
 
@@ -174,6 +175,7 @@ export default function DashboardLayout({
           </div>
         </main>
         {!ocultarBottomNav && <BottomNavbar />}
+        <SessionTerminationModal />
       </div>
     </div>
   )

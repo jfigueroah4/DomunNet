@@ -8,6 +8,8 @@ import {
   listarUsuariosControlador,
   listarDelegadosResidenteControlador,
   obtenerUsuarioControlador,
+  obtenerSesionesUsuarioControlador,
+  cerrarSesionUsuarioAdminControlador,
   validarUsernameControlador,
   validarCorreoControlador,
 } from '@/modules/usuarios/usuarios.controlador'
@@ -20,6 +22,8 @@ router.get('/validar-username', autenticarSolicitud, requierePermisos('usuarios.
 router.get('/delegados_residente', autenticarSolicitud, requierePermisos('usuarios.read'), listarDelegadosResidenteControlador)
 router.get('/delegados-residente', autenticarSolicitud, requierePermisos('usuarios.read'), listarDelegadosResidenteControlador)
 router.get('/:id', autenticarSolicitud, requierePermisos('usuarios.read'), obtenerUsuarioControlador)
+router.get('/:id/sesiones', autenticarSolicitud, requierePermisos('usuarios.read'), obtenerSesionesUsuarioControlador)
+router.post('/:id/cerrar-sesion', autenticarSolicitud, requierePermisos('usuarios.write'), cerrarSesionUsuarioAdminControlador)
 router.post('/', autenticarSolicitud, requierePermisos('usuarios.write'), crearUsuarioControlador)
 router.put('/:id', autenticarSolicitud, requierePermisos('usuarios.write'), actualizarUsuarioControlador)
 router.delete('/:id', autenticarSolicitud, requierePermisos('usuarios.write'), eliminarUsuarioControlador)

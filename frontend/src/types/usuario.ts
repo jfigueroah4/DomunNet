@@ -28,4 +28,6 @@ export interface Usuario {
   fecha_nacimiento?: string | null
   direccion?: string | null
   avatar?: string
+  sesionesActivasCount?: number
+  dispositivosActivos?: any[]
 }

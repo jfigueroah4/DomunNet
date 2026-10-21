@@ -170,7 +170,7 @@ export async function obtenerPerfilControlador(req: SolicitudAutenticada, res: R
         .contains('detalles', { session_id: req.usuario.sessionId })
         .maybeSingle()
 
-      if (sessionLog && ((sessionLog.detalles as any)?.estado === 'revocada' || !sessionLog.exitoso)) {
+      if (sessionLog && ((sessionLog.detalles as any)?.estado === 'revocada' || (sessionLog.detalles as any)?.estado === 'cerrada' || !sessionLog.exitoso)) {
         return sendError(
           res,
           401,

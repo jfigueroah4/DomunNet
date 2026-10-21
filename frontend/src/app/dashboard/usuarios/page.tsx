@@ -25,10 +25,12 @@ import dynamic from 'next/dynamic'
 const UsuarioDrawer = dynamic(() => import('@/components/modules/usuarios/UsuarioDrawer').then(m => m.UsuarioDrawer), { ssr: false })
 
 const UsuarioDeleteModal = dynamic(() => import('@/components/modules/usuarios/UsuarioDeleteModal').then(m => m.UsuarioDeleteModal), { ssr: false })
+const DispositivosConectadosModal = dynamic(() => import('@/components/modules/usuarios/DispositivosConectadosModal').then(m => m.DispositivosConectadosModal), { ssr: false })
 
 
 
 import { useAuthStore } from '@/stores/useAuthStore'
+import { supabase } from '@/lib/supabase/client'
 
 export default function UsuariosPage() {
   const { roles, fetchRoles } = useRolesStore()
@@ -190,13 +192,19 @@ export default function UsuariosPage() {
       if (!isCuentaActiva) {
         return { ...u, estado: 'Suspendido' as EstadoUsuario }
       }
-      const isCurrentlyInSystem = profile && (
+      const isCurrentlyInThisBrowser = profile && (
         (u.id && u.id === profile.id) ||
         (u.correo && profile.correo && u.correo.toLowerCase() === profile.correo.toLowerCase())
-      )
+      );
+      const tieneSesiones = Boolean(
+        (u.sesionesActivasCount && u.sesionesActivasCount > 0) ||
+        u.estado === 'Activo' ||
+        isCurrentlyInThisBrowser
+      );
       return {
         ...u,
-        estado: (isCurrentlyInSystem ? 'Activo' : 'Inactivo') as EstadoUsuario
+        estado: (tieneSesiones ? 'Activo' : 'Inactivo') as EstadoUsuario,
+        sesionesActivasCount: u.sesionesActivasCount ?? (isCurrentlyInThisBrowser ? 1 : (tieneSesiones ? 1 : 0)),
       }
     })
   }, [usuarios, profile])
@@ -480,6 +488,80 @@ export default function UsuariosPage() {
       setUsuarioEliminar(undefined)
     }
   }
+
+  const [dispositivosModalOpen, setDispositivosModalOpen] = useState(false)
+  const [usuarioDispositivos, setUsuarioDispositivos] = useState<Usuario | undefined>()
+
+  const handleGestionarDispositivos = (usuario: Usuario) => {
+    setUsuarioDispositivos(usuario);
+    setDispositivosModalOpen(true);
+  };
+
+  // Escuchar cambios de sesiones en tiempo real via Supabase Realtime
+  useEffect(() => {
+    if (!supabase) return;
+
+    const channel = supabase.channel('domun_sesiones_control')
+      .on('broadcast', { event: 'cierre_sesion' }, (payload: any) => {
+        const data = payload?.payload;
+        if (!data?.usuarioId) return;
+
+        setUsuarios((prev) =>
+          prev.map((u) => {
+            if (u.id === data.usuarioId) {
+              if (data.cerrarTodas) {
+                return {
+                  ...u,
+                  estado: 'Inactivo' as EstadoUsuario,
+                  sesionesActivasCount: 0,
+                  dispositivosActivos: [],
+                };
+              }
+              const nuevaCantidad = Math.max(0, (u.sesionesActivasCount || 1) - 1);
+              return {
+                ...u,
+                sesionesActivasCount: nuevaCantidad,
+                estado: (nuevaCantidad > 0 ? 'Activo' : 'Inactivo') as EstadoUsuario,
+                dispositivosActivos: (u.dispositivosActivos || []).filter(
+                  (d: any) => d.deviceId !== data.deviceId && d.sessionId !== data.sessionId
+                ),
+              };
+            }
+            return u;
+          })
+        );
+      })
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'seguridad_log' },
+        () => {
+          apiGetDeduplicado('/usuarios', { bypassCache: true }).then((res) => {
+            if (res.data?.data) {
+              setUsuarios((prev) =>
+                prev.map((u) => {
+                  const updated = (res.data.data as any[]).find((nu) => nu.id === u.id);
+                  if (updated) {
+                    return {
+                      ...u,
+                      estado: updated.estado,
+                      sesionesActivasCount: updated.sesionesActivasCount,
+                      dispositivosActivos: updated.dispositivosActivos,
+                      ultimoAcceso: updated.ultimoAcceso,
+                    };
+                  }
+                  return u;
+                })
+              );
+            }
+          }).catch(() => {});
+        }
+      )
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, []);
 
   const [closeSessionModalOpen, setCloseSessionModalOpen] = useState(false)
   const [usuarioCerrarSesion, setUsuarioCerrarSesion] = useState<Usuario | undefined>()
@@ -778,6 +860,7 @@ export default function UsuariosPage() {
             onEditar={handleEditar}
             onEliminar={handleEliminar}
             onCerrarSesion={handleCerrarSesionUsuario}
+            onGestionarDispositivos={handleGestionarDispositivos}
           />
 
           {/* Controls de Paginación iniciando en 8, luego 16 */}
@@ -886,6 +969,20 @@ export default function UsuariosPage() {
         usuario={usuarioEliminar}
         modoModal={modoModalEliminar}
       />
+
+      {dispositivosModalOpen && usuarioDispositivos && (
+        <DispositivosConectadosModal
+          isOpen={dispositivosModalOpen}
+          onClose={() => {
+            setDispositivosModalOpen(false);
+            setUsuarioDispositivos(undefined);
+          }}
+          usuario={usuarioDispositivos}
+          onSesionCerrada={async () => {
+            await cargarUsuarios();
+          }}
+        />
+      )}
 
       {closeSessionModalOpen && usuarioCerrarSesion && (
         <>

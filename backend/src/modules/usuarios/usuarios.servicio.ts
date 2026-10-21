@@ -1,3 +1,4 @@
+import { detectarNombreDispositivo } from '@/modules/autenticacion/autenticacion.servicio'
 import { clienteSupabase } from '@/configuracion/cliente-supabase'
 
 export interface FiltrosUsuarios {
@@ -75,7 +76,7 @@ export function formatearFecha(valor: string | null) {
   return fecha.toLocaleDateString('es-GT')
 }
 
-export function mapearUsuario(fila: FilaUsuarioJoin, nombreRol: string | null) {
+export function mapearUsuario(fila: FilaUsuarioJoin, nombreRol: string | null, sesionesActivas: any[] = []) {
   const dato = Array.isArray(fila.dato_usuario) ? fila.dato_usuario[0] : fila.dato_usuario
   const primerNom = capitalizarNombrePropio(dato?.primer_nombre)
   const segundoNom = capitalizarNombrePropio(dato?.segundo_nombre)
@@ -91,8 +92,7 @@ export function mapearUsuario(fila: FilaUsuarioJoin, nombreRol: string | null) {
 
   let estadoCalculado: 'Activo' | 'Inactivo' | 'Suspendido' = 'Suspendido'
   if (fila.activo) {
-    const haIngresado = fila.ultimo_acceso !== null && fila.ultimo_acceso !== undefined && fila.ultimo_acceso !== ''
-    estadoCalculado = haIngresado ? 'Activo' : 'Inactivo'
+    estadoCalculado = sesionesActivas.length > 0 ? 'Activo' : 'Inactivo'
   }
 
   return {
@@ -110,6 +110,8 @@ export function mapearUsuario(fila: FilaUsuarioJoin, nombreRol: string | null) {
     rol: nombreRol || 'Sin asignar',
     estado: estadoCalculado,
     proyectosAsignados: [],
+    sesionesActivasCount: sesionesActivas.length,
+    dispositivosActivos: sesionesActivas,
     ultimoAcceso: formatearFecha(fila.ultimo_acceso),
     fechaCreacion: formatearFecha(fila.fecha_registro),
   }
@@ -158,7 +160,49 @@ async function obtenerUsuariosBase() {
 }
 
 export async function listarUsuarios(filtros: FiltrosUsuarios = {}) {
-  const [usuarios, mapaRoles] = await Promise.all([obtenerUsuariosBase(), obtenerRolesPorId()])
+  const ochoHorasAtras = new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString()
+  const [usuarios, mapaRoles, resLogs] = await Promise.all([
+    obtenerUsuariosBase(),
+    obtenerRolesPorId(),
+    clienteSupabase
+      .from('seguridad_log')
+      .select('id, usuario_id, accion, exitoso, detalles, fecha_hora, ip, user_agent')
+      .eq('exitoso', true)
+      .in('accion', ['login', 'logout'])
+      .gte('fecha_hora', ochoHorasAtras)
+      .order('fecha_hora', { ascending: false }),
+  ])
+
+  const mapaLogs = new Map<string, any[]>()
+  for (const l of resLogs.data || []) {
+    if (!l.usuario_id) continue
+    if (!mapaLogs.has(l.usuario_id)) mapaLogs.set(l.usuario_id, [])
+    mapaLogs.get(l.usuario_id)!.push(l)
+  }
+
+  const mapaSesionesActivas = new Map<string, any[]>()
+  for (const [uid, userLogs] of mapaLogs.entries()) {
+    const devicesVistos = new Set<string>()
+    const activas: any[] = []
+    for (const l of userLogs) {
+      const d = (l.detalles as any) || {}
+      const devId = d.device_id || l.id
+      if (devicesVistos.has(devId)) continue
+      devicesVistos.add(devId)
+      if (l.accion === 'login' && d.estado === 'activa') {
+        activas.push({
+          id: l.id,
+          deviceId: devId,
+          sessionId: d.session_id,
+          dispositivo: d.dispositivo || detectarNombreDispositivo(l.user_agent),
+          ip: l.ip || 'Red Local / Internet',
+          fechaHora: l.fecha_hora,
+        })
+      }
+    }
+    mapaSesionesActivas.set(uid, activas)
+  }
+
   const busqueda = normalizar(filtros.busqueda || '')
 
   return usuarios.filter((usuario) => {
@@ -166,10 +210,10 @@ export async function listarUsuarios(filtros: FiltrosUsuarios = {}) {
     const nombreCompleto = dato ? `${dato.primer_nombre} ${dato.segundo_nombre || ''} ${dato.primer_apellido} ${dato.segundo_apellido || ''}`.replace(/\s+/g, ' ').trim() : ''
     const nombreRol = usuario.rol_id ? mapaRoles.get(usuario.rol_id) || 'Sin asignar' : 'Sin asignar'
     
+    const sesiones = mapaSesionesActivas.get(usuario.id) || []
     let estadoStr: 'Activo' | 'Inactivo' | 'Suspendido' = 'Suspendido'
     if (usuario.activo) {
-      const haIngresado = usuario.ultimo_acceso !== null && usuario.ultimo_acceso !== undefined && usuario.ultimo_acceso !== ''
-      estadoStr = haIngresado ? 'Activo' : 'Inactivo'
+      estadoStr = sesiones.length > 0 ? 'Activo' : 'Inactivo'
     }
 
     const cumpleBusqueda =
@@ -182,23 +226,148 @@ export async function listarUsuarios(filtros: FiltrosUsuarios = {}) {
     const cumpleEstado = !filtros.estado || filtros.estado === 'Todos' || estadoStr === filtros.estado
 
     return cumpleBusqueda && cumpleRol && cumpleEstado
-  }).map((usuario) => mapearUsuario(usuario, usuario.rol_id ? mapaRoles.get(usuario.rol_id) || null : null))
+  }).map((usuario) => mapearUsuario(usuario, usuario.rol_id ? mapaRoles.get(usuario.rol_id) || null : null, mapaSesionesActivas.get(usuario.id) || []))
 }
 
-
 export async function obtenerUsuarioPorId(id: string) {
-  const { data, error } = await clienteSupabase
-    .from('usuario')
-    .select('id, correo, rol_id, activo, ultimo_acceso, fecha_registro, updated_at, dato_usuario(primer_nombre, segundo_nombre, primer_apellido, segundo_apellido, telefono, avatar_url, username, fecha_nacimiento, direccion)')
-    .eq('id', id)
-    .maybeSingle()
+  const [resData, mapaRoles, sesiones] = await Promise.all([
+    clienteSupabase
+      .from('usuario')
+      .select('id, correo, rol_id, activo, ultimo_acceso, fecha_registro, updated_at, dato_usuario(primer_nombre, segundo_nombre, primer_apellido, segundo_apellido, telefono, avatar_url, username, fecha_nacimiento, direccion)')
+      .eq('id', id)
+      .maybeSingle(),
+    obtenerRolesPorId(),
+    obtenerSesionesActivasUsuario(id),
+  ])
 
-  if (error) throw new Error(error.message)
-  if (!data) return null
+  if (resData.error) throw new Error(resData.error.message)
+  if (!resData.data) return null
 
-  const mapaRoles = await obtenerRolesPorId()
-  const fila = data as FilaUsuarioJoin
-  return mapearUsuario(fila, fila.rol_id ? mapaRoles.get(fila.rol_id) || null : null)
+  const fila = resData.data as FilaUsuarioJoin
+  return mapearUsuario(fila, fila.rol_id ? mapaRoles.get(fila.rol_id) || null : null, sesiones)
+}
+
+export async function obtenerSesionesActivasUsuario(usuarioId: string) {
+  const ochoHorasAtras = new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString()
+  const { data: logs, error } = await clienteSupabase
+    .from('seguridad_log')
+    .select('id, usuario_id, accion, exitoso, detalles, fecha_hora, ip, user_agent')
+    .eq('usuario_id', usuarioId)
+    .eq('exitoso', true)
+    .in('accion', ['login', 'logout'])
+    .gte('fecha_hora', ochoHorasAtras)
+    .order('fecha_hora', { ascending: false })
+
+  if (error || !logs) return []
+
+  const mapaDispositivos = new Map<string, any>()
+  const dispositivosCerrados = new Set<string>()
+
+  for (const log of logs) {
+    const d = (log.detalles as any) || {}
+    const devId = d.device_id || `dev_${log.ip || 'ip'}_${(log.user_agent || '').substring(0, 20)}`
+
+    if (log.accion === 'logout' || d.estado === 'cerrada' || d.estado === 'revocada') {
+      dispositivosCerrados.add(devId)
+      continue
+    }
+
+    if (log.accion === 'login' && d.estado === 'activa' && !dispositivosCerrados.has(devId)) {
+      if (!mapaDispositivos.has(devId)) {
+        mapaDispositivos.set(devId, {
+          id: log.id,
+          deviceId: devId,
+          sessionId: d.session_id,
+          dispositivo: d.dispositivo || detectarNombreDispositivo(log.user_agent),
+          ip: log.ip || 'Red Local / Internet',
+          fechaHora: log.fecha_hora,
+          estado: 'activa',
+        })
+      }
+    }
+  }
+
+  return Array.from(mapaDispositivos.values())
+}
+
+export async function cerrarSesionUsuarioRemota(
+  usuarioId: string,
+  opciones?: { deviceId?: string; sessionId?: string; cerrarTodas?: boolean; cerradoPor?: string }
+) {
+  const ochoHorasAtras = new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString()
+  const { data: logs } = await clienteSupabase
+    .from('seguridad_log')
+    .select('id, detalles, usuario_id')
+    .eq('usuario_id', usuarioId)
+    .eq('accion', 'login')
+    .eq('exitoso', true)
+    .gte('fecha_hora', ochoHorasAtras)
+
+  if (logs && logs.length > 0) {
+    const idsACerrar: string[] = []
+    for (const log of logs) {
+      const d = (log.detalles as any) || {}
+      if (d.estado !== 'cerrada' && d.estado !== 'revocada') {
+        if (opciones?.cerrarTodas || (!opciones?.deviceId && !opciones?.sessionId)) {
+          idsACerrar.push(log.id)
+        } else if (opciones?.sessionId && d.session_id === opciones.sessionId) {
+          idsACerrar.push(log.id)
+        } else if (opciones?.deviceId && d.device_id === opciones.deviceId) {
+          idsACerrar.push(log.id)
+        }
+      }
+    }
+
+    if (idsACerrar.length > 0) {
+      await clienteSupabase
+        .from('seguridad_log')
+        .update({
+          detalles: {
+            estado: 'cerrada',
+            motivo: 'cierre_remoto_admin',
+            cerrado_por: opciones?.cerradoPor || 'admin',
+            cerrado_en: new Date().toISOString(),
+          },
+        })
+        .in('id', idsACerrar)
+    }
+  }
+
+  // Insertar evento logout en seguridad_log
+  await clienteSupabase.from('seguridad_log').insert({
+    usuario_id: usuarioId,
+    accion: 'logout',
+    exitoso: true,
+    fecha_hora: new Date().toISOString(),
+    detalles: {
+      motivo: 'cierre_remoto_admin',
+      cerrado_por: opciones?.cerradoPor || 'admin',
+      device_id: opciones?.deviceId,
+      session_id: opciones?.sessionId,
+      cerrarTodas: Boolean(opciones?.cerrarTodas),
+    },
+  })
+
+  // Broadcast realtime
+  try {
+    const channel = clienteSupabase.channel('domun_sesiones_control')
+    await channel.send({
+      type: 'broadcast',
+      event: 'cierre_sesion',
+      payload: {
+        usuarioId,
+        deviceId: opciones?.deviceId,
+        sessionId: opciones?.sessionId,
+        cerrarTodas: Boolean(opciones?.cerrarTodas),
+        cerradoPor: opciones?.cerradoPor,
+        timestamp: Date.now(),
+      },
+    })
+  } catch (err) {
+    console.warn('[cerrarSesionUsuarioRemota] Error enviando broadcast:', err)
+  }
+
+  return true
 }
 
 async function validarRolExiste(rol: string) {

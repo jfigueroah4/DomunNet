@@ -10,6 +10,8 @@ import {
   listarDelegadosResidente,
   obtenerUsuarioPorId,
   actualizarUsuario,
+  obtenerSesionesActivasUsuario,
+  cerrarSesionUsuarioRemota,
   verificarUsernameDisponible, verificarCorreoDisponible,
 } from '@/modules/usuarios/usuarios.servicio'
 
@@ -199,4 +201,50 @@ export async function validarUsernameControlador(req: Request, res: Response) {
   const usernameNormalizado = username.trim().toLowerCase()
   const disponible = await verificarUsernameDisponible(usernameNormalizado, excluirId)
   return sendResponse(res, 200, { disponible }, 'Verificación de username realizada')
+}
+
+export async function obtenerSesionesUsuarioControlador(req: SolicitudAutenticada, res: Response) {
+  try {
+    const id = req.params.id
+    const sesiones = await obtenerSesionesActivasUsuario(id)
+    const currentDeviceId = req.usuario?.deviceId
+    const currentSessionId = req.usuario?.sessionId
+
+    const sesionesFormateadas = sesiones.map((s) => ({
+      ...s,
+      esDispositivoActual: req.usuario?.sub === id && (s.deviceId === currentDeviceId || s.sessionId === currentSessionId),
+    }))
+
+    return sendResponse(res, 200, sesionesFormateadas, 'Sesiones obtenidas correctamente')
+  } catch (error: any) {
+    return sendError(res, 500, 'Error al obtener sesiones del usuario', error.message)
+  }
+}
+
+export async function cerrarSesionUsuarioAdminControlador(req: SolicitudAutenticada, res: Response) {
+  try {
+    const id = req.params.id
+    const { deviceId, sessionId, cerrarTodas } = req.body || {}
+
+    const isSelf = req.usuario?.sub === id
+    const currentDeviceId = req.usuario?.deviceId
+    const currentSessionId = req.usuario?.sessionId
+
+    if (isSelf && !cerrarTodas) {
+      if ((deviceId && deviceId === currentDeviceId) || (sessionId && sessionId === currentSessionId)) {
+        return sendError(res, 400, 'No puedes cerrar la sesión de tu dispositivo actual desde aquí. Puedes cerrar las sesiones de tus otros dispositivos.')
+      }
+    }
+
+    await cerrarSesionUsuarioRemota(id, {
+      deviceId,
+      sessionId,
+      cerrarTodas: Boolean(cerrarTodas),
+      cerradoPor: req.usuario?.sub,
+    })
+
+    return sendResponse(res, 200, null, 'Sesión cerrada exitosamente')
+  } catch (error: any) {
+    return sendError(res, 500, 'Error al cerrar sesión del usuario', error.message)
+  }
 }

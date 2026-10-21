@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react'
-import { Trash2, Edit2, Eye, UserX, LogOut, CheckCircle } from 'lucide-react'
+import { Trash2, Edit2, Eye, UserX, LogOut, CheckCircle, Laptop } from 'lucide-react'
 import { Usuario } from '@/types/usuario'
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useRolesStore } from '@/stores/useRolesStore';
@@ -13,6 +13,7 @@ interface UsuarioTablaProps {
   onEditar: (usuario: Usuario) => void
   onEliminar: (id: string, modoModal?: 'todos' | 'activar' | 'eliminar' | 'suspender') => void
   onCerrarSesion?: (usuario: Usuario) => void
+  onGestionarDispositivos?: (usuario: Usuario) => void
 }
 
 export const UsuarioTabla = React.memo(function UsuarioTabla({
@@ -21,6 +22,7 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
   onEditar,
   onEliminar,
   onCerrarSesion,
+  onGestionarDispositivos,
 }: UsuarioTablaProps) {
   const profile = useAuthStore((state) => state.profile);
   const roles = useRolesStore((state) => state.roles);
@@ -164,6 +166,26 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
                   <Edit2 size={12} className={canEdit ? 'text-gray-600' : 'text-gray-300'} />
                   <span>Editar</span>
                 </button>
+
+                {usuario.estado === 'Activo' && (
+                  <button
+                    type="button"
+                    onClick={() => onGestionarDispositivos?.(usuario)}
+                    className={`p-1.5 rounded-lg border text-[9.5px] font-semibold active:scale-95 cursor-pointer shadow-2xs relative ${
+                      (usuario.sesionesActivasCount || 0) > 1
+                        ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+                        : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+                    }`}
+                    title="Gestionar dispositivos conectados"
+                  >
+                    <Laptop size={12} className={(usuario.sesionesActivasCount || 0) > 1 ? 'text-emerald-600' : 'text-gray-600'} />
+                    {(usuario.sesionesActivasCount || 0) > 1 && (
+                      <span className="absolute -top-1 -right-1 flex h-3 w-3 items-center justify-center rounded-full bg-emerald-600 text-[8px] font-bold text-white shadow-2xs">
+                        {usuario.sesionesActivasCount}
+                      </span>
+                    )}
+                  </button>
+                )}
 
                 {usuario.estado === 'Activo' && esGerenciaOAdmin && (
                   <button
@@ -355,6 +377,30 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
                       <button onClick={() => canEdit && onEditar(usuario)} className={`p-1 transition-colors ${canEdit ? 'text-gray-400 hover:text-blue-600 cursor-pointer' : 'text-gray-200 cursor-not-allowed'}`} title={canEdit ? 'Editar' : 'No puedes editar un Administrador'} disabled={!canEdit}>
                         <Edit2 size={13} />
                       </button>
+                      {usuario.estado === 'Activo' && (
+                        <button
+                          type="button"
+                          onClick={() => onGestionarDispositivos?.(usuario)}
+                          className={`p-1 transition-colors relative cursor-pointer ${
+                            (usuario.sesionesActivasCount || 0) > 1
+                              ? 'text-emerald-600 hover:text-emerald-700'
+                              : 'text-gray-400 hover:text-emerald-600'
+                          }`}
+                          title={
+                            (usuario.sesionesActivasCount || 0) > 1
+                              ? `Gestionar ${usuario.sesionesActivasCount} dispositivos conectados`
+                              : 'Dispositivos conectados'
+                          }
+                        >
+                          <Laptop size={13} />
+                          {(usuario.sesionesActivasCount || 0) > 1 && (
+                            <span className="absolute -top-1 -right-1 flex h-3 w-3 items-center justify-center rounded-full bg-emerald-600 text-[8px] font-bold text-white shadow-2xs">
+                              {usuario.sesionesActivasCount}
+                            </span>
+                          )}
+                        </button>
+                      )}
+
                       {usuario.estado === 'Activo' && esGerenciaOAdmin && (
                         <button
                           onClick={() => canCloseSession && onCerrarSesion?.(usuario)}
