@@ -92,7 +92,7 @@ export function mapearUsuario(fila: FilaUsuarioJoin, nombreRol: string | null, s
 
   let estadoCalculado: 'Activo' | 'Inactivo' | 'Suspendido' = 'Suspendido'
   if (fila.activo) {
-    estadoCalculado = sesionesActivas.length > 0 ? 'Activo' : 'Inactivo'
+    estadoCalculado = 'Activo'
   }
 
   return {
@@ -108,7 +108,9 @@ export function mapearUsuario(fila: FilaUsuarioJoin, nombreRol: string | null, s
     direccion: dato?.direccion || '',
     fecha_nacimiento: dato?.fecha_nacimiento || null,
     rol: nombreRol || 'Sin asignar',
+    activo: fila.activo,
     estado: estadoCalculado,
+    enLinea: sesionesActivas.length > 0,
     proyectosAsignados: [],
     sesionesActivasCount: sesionesActivas.length,
     dispositivosActivos: sesionesActivas,
@@ -213,7 +215,7 @@ export async function listarUsuarios(filtros: FiltrosUsuarios = {}) {
     const sesiones = mapaSesionesActivas.get(usuario.id) || []
     let estadoStr: 'Activo' | 'Inactivo' | 'Suspendido' = 'Suspendido'
     if (usuario.activo) {
-      estadoStr = sesiones.length > 0 ? 'Activo' : 'Inactivo'
+      estadoStr = 'Activo'
     }
 
     const cumpleBusqueda =

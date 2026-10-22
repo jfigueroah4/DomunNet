@@ -22,6 +22,7 @@ export interface Usuario {
   correo: string
   rol: RolUsuario | null
   estado: EstadoUsuario
+  enLinea?: boolean
   fechaCreacion: string
   ultimoAcceso?: string
   telefono?: string

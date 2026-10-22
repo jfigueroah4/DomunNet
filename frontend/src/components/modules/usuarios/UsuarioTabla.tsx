@@ -132,7 +132,20 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
                     <p className="text-[9.5px] text-gray-500 truncate mt-0.5">{usuario.correo}</p>
                   </div>
                 </div>
-                <UsuarioEstadoBadge estado={usuario.estado} />
+                <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                  <UsuarioEstadoBadge estado={usuario.estado} />
+                  {usuario.enLinea ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[8px] font-bold text-emerald-700 border border-emerald-200">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      En línea
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-gray-50 px-1.5 py-0.5 text-[8px] font-medium text-gray-400 border border-gray-100">
+                      <span className="h-1.5 w-1.5 rounded-full bg-gray-300" />
+                      Desconectado
+                    </span>
+                  )}
+                </div>
               </div>
 
               <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-gray-50 text-[9.5px]">
@@ -167,37 +180,39 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
                   <span>Editar</span>
                 </button>
 
-                {usuario.estado === 'Activo' && (
-                  <button
-                    type="button"
-                    onClick={() => onGestionarDispositivos?.(usuario)}
-                    className={`p-1.5 rounded-lg border text-[9.5px] font-semibold active:scale-95 cursor-pointer shadow-2xs relative ${
-                      (usuario.sesionesActivasCount || 0) > 1
-                        ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
-                        : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
-                    }`}
-                    title="Gestionar dispositivos conectados"
-                  >
-                    <Laptop size={12} className={(usuario.sesionesActivasCount || 0) > 1 ? 'text-emerald-600' : 'text-gray-600'} />
-                    {(usuario.sesionesActivasCount || 0) > 1 && (
-                      <span className="absolute -top-1 -right-1 flex h-3 w-3 items-center justify-center rounded-full bg-emerald-600 text-[8px] font-bold text-white shadow-2xs">
-                        {usuario.sesionesActivasCount}
-                      </span>
-                    )}
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => onGestionarDispositivos?.(usuario)}
+                  className={`p-1.5 rounded-lg border text-[9.5px] font-semibold active:scale-95 cursor-pointer shadow-2xs relative ${
+                    (usuario.sesionesActivasCount || 0) > 1
+                      ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+                      : (usuario.enLinea ? 'border-emerald-200 bg-emerald-50/50 text-emerald-700' : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50')
+                  }`}
+                  title={
+                    (usuario.sesionesActivasCount || 0) > 1
+                      ? `Gestionar ${usuario.sesionesActivasCount} dispositivos conectados`
+                      : 'Gestionar dispositivos y sesiones'
+                  }
+                >
+                  <Laptop size={12} className={(usuario.sesionesActivasCount || 0) > 0 || usuario.enLinea ? 'text-emerald-600' : 'text-gray-500'} />
+                  {(usuario.sesionesActivasCount || 0) > 1 && (
+                    <span className="absolute -top-1 -right-1 flex h-3 w-3 items-center justify-center rounded-full bg-emerald-600 text-[8px] font-bold text-white shadow-2xs">
+                      {usuario.sesionesActivasCount}
+                    </span>
+                  )}
+                </button>
 
-                {usuario.estado === 'Activo' && esGerenciaOAdmin && (
+                {esGerenciaOAdmin && (
                   <button
                     type="button"
                     onClick={() => canCloseSession && onCerrarSesion?.(usuario)}
                     disabled={!canCloseSession}
                     className={`p-1.5 rounded-lg border text-[9.5px] font-semibold active:scale-95 cursor-pointer shadow-2xs ${
-                      canCloseSession ? 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50' : 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed'
+                      canCloseSession ? 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:text-amber-600' : 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed'
                     }`}
-                    title="Cerrar sesión activa"
+                    title={isSelf ? 'No puedes cerrar tu propia sesión' : 'Desconectar todas las sesiones del usuario'}
                   >
-                    <LogOut size={12} className={canCloseSession ? 'text-gray-600' : 'text-gray-300'} />
+                    <LogOut size={12} className={canCloseSession ? 'text-gray-600 hover:text-amber-600' : 'text-gray-300'} />
                   </button>
                 )}
 
@@ -349,7 +364,20 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
                     <UsuarioRolBadge rol={usuario.rol} />
                   </td>
                   <td className="px-4 py-3 text-[10px]">
-                    <UsuarioEstadoBadge estado={usuario.estado} />
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <UsuarioEstadoBadge estado={usuario.estado} />
+                      {usuario.enLinea ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[8.5px] font-bold text-emerald-700 border border-emerald-200 shadow-2xs">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                          En línea
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-gray-50 px-1.5 py-0.5 text-[8.5px] font-medium text-gray-400 border border-gray-100">
+                          <span className="h-1.5 w-1.5 rounded-full bg-gray-300" />
+                          Desconectado
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-[10px] text-gray-500 font-medium">{fechaAcceso}</td>
                   <td className="px-4 py-3 text-[10px]">
@@ -377,35 +405,34 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
                       <button onClick={() => canEdit && onEditar(usuario)} className={`p-1 transition-colors ${canEdit ? 'text-gray-400 hover:text-blue-600 cursor-pointer' : 'text-gray-200 cursor-not-allowed'}`} title={canEdit ? 'Editar' : 'No puedes editar un Administrador'} disabled={!canEdit}>
                         <Edit2 size={13} />
                       </button>
-                      {usuario.estado === 'Activo' && (
+                      <button
+                        type="button"
+                        onClick={() => onGestionarDispositivos?.(usuario)}
+                        className={`p-1 transition-colors relative cursor-pointer ${
+                          (usuario.sesionesActivasCount || 0) > 1
+                            ? 'text-emerald-600 hover:text-emerald-700'
+                            : (usuario.enLinea ? 'text-emerald-500 hover:text-emerald-700' : 'text-gray-400 hover:text-emerald-600')
+                        }`}
+                        title={
+                          (usuario.sesionesActivasCount || 0) > 1
+                            ? `Gestionar ${usuario.sesionesActivasCount} dispositivos conectados`
+                            : (usuario.enLinea ? 'Dispositivo en línea - Gestionar sesiones' : 'Gestionar dispositivos y sesiones')
+                        }
+                      >
+                        <Laptop size={13} />
+                        {(usuario.sesionesActivasCount || 0) > 1 && (
+                          <span className="absolute -top-1 -right-1 flex h-3 w-3 items-center justify-center rounded-full bg-emerald-600 text-[8px] font-bold text-white shadow-2xs">
+                            {usuario.sesionesActivasCount}
+                          </span>
+                        )}
+                      </button>
+
+                      {esGerenciaOAdmin && (
                         <button
                           type="button"
-                          onClick={() => onGestionarDispositivos?.(usuario)}
-                          className={`p-1 transition-colors relative cursor-pointer ${
-                            (usuario.sesionesActivasCount || 0) > 1
-                              ? 'text-emerald-600 hover:text-emerald-700'
-                              : 'text-gray-400 hover:text-emerald-600'
-                          }`}
-                          title={
-                            (usuario.sesionesActivasCount || 0) > 1
-                              ? `Gestionar ${usuario.sesionesActivasCount} dispositivos conectados`
-                              : 'Dispositivos conectados'
-                          }
-                        >
-                          <Laptop size={13} />
-                          {(usuario.sesionesActivasCount || 0) > 1 && (
-                            <span className="absolute -top-1 -right-1 flex h-3 w-3 items-center justify-center rounded-full bg-emerald-600 text-[8px] font-bold text-white shadow-2xs">
-                              {usuario.sesionesActivasCount}
-                            </span>
-                          )}
-                        </button>
-                      )}
-
-                      {usuario.estado === 'Activo' && esGerenciaOAdmin && (
-                        <button
                           onClick={() => canCloseSession && onCerrarSesion?.(usuario)}
                           className={`p-1 transition-colors ${canCloseSession ? 'text-gray-400 hover:text-amber-600 cursor-pointer' : 'text-gray-200 cursor-not-allowed'}`}
-                          title={isSelf ? 'No puedes cerrar tu propia sesión desde esta tabla' : 'Cerrar sesión activa del usuario'}
+                          title={isSelf ? 'No puedes cerrar tu propia sesión desde esta tabla' : 'Desconectar todas las sesiones del usuario'}
                           disabled={!canCloseSession}
                         >
                           <LogOut size={13} />

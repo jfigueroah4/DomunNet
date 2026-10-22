@@ -185,26 +185,24 @@ export default function UsuariosPage() {
 
 
 
-  // Map effective state: Activo = currently using system, Inactivo = offline/not in system, Suspendido = suspended account
+  // Map effective state: Activo = cuenta habilitada, Suspendido = cuenta suspendida
   const usuariosConEstadoEfectivo = useMemo(() => {
     return usuarios.map((u) => {
       const isCuentaActiva = (u as any).activo !== false && u.estado !== 'Suspendido' && (u as any).estado !== 'Desactivado'
       if (!isCuentaActiva) {
-        return { ...u, estado: 'Suspendido' as EstadoUsuario }
+        return { ...u, estado: 'Suspendido' as EstadoUsuario, enLinea: false, sesionesActivasCount: 0 }
       }
       const isCurrentlyInThisBrowser = profile && (
         (u.id && u.id === profile.id) ||
         (u.correo && profile.correo && u.correo.toLowerCase() === profile.correo.toLowerCase())
-      );
-      const tieneSesiones = Boolean(
-        (u.sesionesActivasCount && u.sesionesActivasCount > 0) ||
-        u.estado === 'Activo' ||
-        isCurrentlyInThisBrowser
-      );
+      )
+      const count = u.sesionesActivasCount ?? ((u as any).enLinea ? 1 : 0)
+      const enLinea = Boolean(count > 0 || isCurrentlyInThisBrowser || (u as any).enLinea)
       return {
         ...u,
-        estado: (tieneSesiones ? 'Activo' : 'Inactivo') as EstadoUsuario,
-        sesionesActivasCount: u.sesionesActivasCount ?? (isCurrentlyInThisBrowser ? 1 : (tieneSesiones ? 1 : 0)),
+        estado: 'Activo' as EstadoUsuario,
+        enLinea,
+        sesionesActivasCount: count > 0 ? count : (enLinea ? 1 : 0),
       }
     })
   }, [usuarios, profile])
@@ -534,7 +532,8 @@ export default function UsuariosPage() {
     let chSeguridad: any = null;
     if (supabase) {
       try {
-        chSeguridad = supabase.channel('domun_usuarios_seguridad_changes')
+        const chName = `domun_usuarios_seguridad_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
+        chSeguridad = supabase.channel(chName)
           .on(
             'postgres_changes',
             { event: '*', schema: 'public', table: 'seguridad_log' },
@@ -548,6 +547,7 @@ export default function UsuariosPage() {
                         return {
                           ...u,
                           estado: updated.estado,
+                          enLinea: updated.enLinea ?? ((updated.sesionesActivasCount || 0) > 0),
                           sesionesActivasCount: updated.sesionesActivasCount,
                           dispositivosActivos: updated.dispositivosActivos,
                           ultimoAcceso: updated.ultimoAcceso,
@@ -592,24 +592,40 @@ export default function UsuariosPage() {
   const handleConfirmarCerrarSesion = async () => {
     if (!usuarioCerrarSesion) return;
     try {
-      await api.put(`/usuarios/${usuarioCerrarSesion.id}`, {
-        primer_nombre: usuarioCerrarSesion.primer_nombre,
-        segundo_nombre: usuarioCerrarSesion.segundo_nombre || null,
-        primer_apellido: usuarioCerrarSesion.primer_apellido,
-        segundo_apellido: usuarioCerrarSesion.segundo_apellido || null,
-        correo: usuarioCerrarSesion.correo,
-        telefono: usuarioCerrarSesion.telefono || '',
-        rol: usuarioCerrarSesion.rol,
-        estado: 'Inactivo',
-        username: usuarioCerrarSesion.username || null,
-        fecha_nacimiento: usuarioCerrarSesion.fecha_nacimiento || null,
-        direccion: usuarioCerrarSesion.direccion || null,
+      await api.post(`/usuarios/${usuarioCerrarSesion.id}/cerrar-sesion`, {
+        cerrarTodas: true,
       });
+
+      // Notificar realtime broadcast
+      if (supabase) {
+        try {
+          const ch = supabase.channel('domun_sesiones_control');
+          await ch.send({
+            type: 'broadcast',
+            event: 'cierre_sesion',
+            payload: {
+              usuarioId: usuarioCerrarSesion.id,
+              cerrarTodas: true,
+              mensaje: 'Tu sesión ha sido finalizada por un administrador. Se cerrará la sesión en 3 segundos...',
+              timestamp: Date.now(),
+            },
+          });
+        } catch (_) {}
+      }
+
       showSuccessToast(`Sesión cerrada exitosamente para ${usuarioCerrarSesion.primer_nombre} ${usuarioCerrarSesion.primer_apellido}`);
+      setUsuarios((prev) =>
+        prev.map((u) =>
+          u.id === usuarioCerrarSesion.id
+            ? { ...u, enLinea: false, sesionesActivasCount: 0, dispositivosActivos: [] }
+            : u
+        )
+      );
       await cargarUsuarios();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error al cerrar sesión del usuario:', error);
-      showErrorToast('No se pudo cerrar la sesión del usuario.');
+      const msg = error.response?.data?.message || error.response?.data?.error || 'No se pudo cerrar la sesión del usuario.';
+      showErrorToast(msg);
     } finally {
       setCloseSessionModalOpen(false);
       setUsuarioCerrarSesion(undefined);

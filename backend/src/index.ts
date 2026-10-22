@@ -95,6 +95,9 @@ app.use((error: any, _req: express.Request, res: express.Response, _next: expres
   if (error.type === 'entity.too.large' || error.status === 413) {
     return sendError(res, 413, 'El archivo o solicitud excede el tamaño máximo permitido (50MB)')
   }
+  if (error instanceof SyntaxError && (error as any).status === 400 && 'body' in error) {
+    return sendError(res, 400, 'JSON malformado en el cuerpo de la solicitud: revisa comas o llaves extra', error.message)
+  }
   return sendError(res, 500, 'Error interno del servidor', error.message)
 })
 
