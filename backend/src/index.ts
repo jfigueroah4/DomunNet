@@ -98,7 +98,7 @@ app.use((error: any, _req: express.Request, res: express.Response, _next: expres
   return sendError(res, 500, 'Error interno del servidor', error.message)
 })
 
-app.listen(PORT, '0.0.0.0', () => {
+app.listen(PORT, () => {
   console.log(`Servidor ejecutándose en puerto ${PORT}`)
   console.log(`Environment: ${entorno.modo}`)
 })
