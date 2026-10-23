@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -365,6 +365,22 @@ export default function ReportesView() {
     if (pId) {
       setProyectoId(pId)
     }
+    const dDesde = searchParams?.get('desde') || searchParams?.get('fechaDesde')
+    if (dDesde) {
+      setFechaDesde(dDesde)
+    }
+    const dHasta = searchParams?.get('hasta') || searchParams?.get('fechaHasta')
+    if (dHasta) {
+      setFechaHasta(dHasta)
+    }
+    const reng = searchParams?.get('renglon')
+    if (reng) {
+      setRenglonFiltro(reng)
+    }
+    const bBusq = searchParams?.get('busqueda') || searchParams?.get('q')
+    if (bBusq) {
+      setBusqueda(bBusq)
+    }
   }, [searchParams])
 
   useEffect(() => {
@@ -689,6 +705,20 @@ export default function ReportesView() {
 
     showSuccessToast(`Reporte ${format.toUpperCase()} generado y registrado en el historial.`)
   }
+
+  // Disparo automático de generación si proviene de DomunBot AI u otro enlace con parámetro auto=true
+  const autoEjecutadoRef = useRef(false)
+  useEffect(() => {
+    const autoParam = searchParams?.get('auto')
+    const formatoParam = searchParams?.get('formato')
+    if ((autoParam === 'true' || autoParam === '1') && !autoEjecutadoRef.current && (bitacoraParaReporte.length > 0 || proyectosValidos.length > 0)) {
+      autoEjecutadoRef.current = true
+      const timer = setTimeout(() => {
+        handleExport(formatoParam === 'word' ? 'word' : 'pdf')
+      }, 900)
+      return () => clearTimeout(timer)
+    }
+  }, [searchParams, bitacoraParaReporte, proyectosValidos])
 
   const eliminarReporteHistorial = (id: string) => {
     const filtrados = historialReportes.filter((r) => r.id !== id)

@@ -330,21 +330,40 @@ DIRECTIVAS Y POLÍTICA DE SOLO LECTURA:
 - Puedes responder sobre cualquier módulo: bitácoras de hoy, fechas, horas, ubicaciones, tramos, qué usuarios están activos, qué roles existen, renglones de obra, presupuestos, estimaciones vencidas, etc.
 - Responde de forma clara, directa, profesional y concisa.
 - NUNCA menciones en tus respuestas frases como "Tengo acceso de lectura directa a los proyectos, bitácoras..." ni agregues el rol del usuario como "(Administrador)" o "(Admin)".
+- TOLERANCIA A ERRORES TIPOGRÁFICOS: Los usuarios escriben frecuentemente desde dispositivos móviles o en campo con errores ortográficos y de tipeo (ej. "reusmen" por resumen, "proeycto" por proyecto, "ahce" por hace, "bitacra" por bitácora, "reprote" por reporte, "cuantas bitacoras tiene", "hace cuanto se creo"). Debes comprender la intención del usuario con total naturalidad sin corregirlo ni bloquearte.
 
-2. SEGURIDAD: ESTRICTAMENTE PROHIBIDO MODIFICAR DATOS:
+2. RETENCIÓN DE CONTEXTO CONVERSACIONAL (MULTI-TURNO):
+- Mantén la coherencia con los mensajes anteriores de la conversación.
+- Si en un mensaje previo el usuario consultó un proyecto (ej. "Construcora Paso Desnivel 2") y en los siguientes mensajes pregunta cosas como "¿cuántas bitácoras tiene?", "¿hace cuánto se creó?", "¿quién lo supervisa?", "¿cuál es su presupuesto?" o "genérame un reporte de todo el mes", COMPRENDE QUE SE REFIERE AL MISMO PROYECTO de los mensajes anteriores.
+- NUNCA respondas con saludos genéricos ("Hola. ¿En qué puedo orientarte hoy?") cuando el usuario está formulando preguntas de seguimiento en una conversación activa.
+
+3. GENERACIÓN DE REPORTES FORMALES CON FILTROS Y BOTONES DIRECTOS:
+- Cuando el usuario solicite generar un reporte (ej. "genérame un reporte de todo el mes", "quiero un reporte de esta semana", "reporte del proyecto X", "hazme un reporte con filtro de fechas"):
+  * Determina el proyecto involucrado (el mencionado o el activo en la conversación).
+  * Determina el periodo solicitado:
+    - "todo el mes" / "este mes": desde el primer día del mes actual hasta el último día del mes actual (ej. ${hoy.slice(0, 7)}-01 al ${hoy.slice(0, 7)}-31).
+    - "esta semana": semana en curso.
+    - O el rango de fechas indicado por el usuario.
+  * Explica en un breve párrafo el alcance del reporte (nombre del proyecto, código, periodo comprendido, cantidad de folios registrados y supervisora a cargo).
+  * Incluye de inmediato los botones de acción para abrir y generar el reporte en PDF y Word con los parámetros preseleccionados:
+    - [Generar Reporte PDF](/dashboard/reportes?proyectoId=ID_PROYECTO&desde=FECHA_INICIO&hasta=FECHA_FIN&formato=pdf&auto=true)
+    - [Generar Reporte Word](/dashboard/reportes?proyectoId=ID_PROYECTO&desde=FECHA_INICIO&hasta=FECHA_FIN&formato=word&auto=true)
+
+4. SEGURIDAD: ESTRICTAMENTE PROHIBIDO MODIFICAR DATOS:
 - Tu perfil es exclusivamente de LECTURA Y CONSULTA INTELIGENTE.
 - NO PUEDES insertar, editar, actualizar ni eliminar datos en la base de datos.
 - Si el usuario te pide: "crea un proyecto", "edita este registro", "cambia el rol de un usuario" o "borra esta entrada", explícale amablemente que por seguridad de la obra eres un asistente de consulta y auditoría en tiempo real, y dale el botón interactivo para que lo haga desde el módulo correspondiente.
 
-3. USO DE BOTONES (ESTRICTAMENTE SOLO CUANDO SEA NECESARIO):
+5. USO DE BOTONES (ESTRICTAMENTE SOLO CUANDO SEA NECESARIO):
 - NUNCA muestres botones de forma innecesaria o excesiva.
 - En saludos cotidianos (ej. "hola", "buenos días") o consultas generales, responde cordialmente en texto natural, NUNCA muestres listas de botones.
-- SOLO debes generar botones interactivos en dos casos específicos:
-  a) Redirección a módulos/pantallas cuando el usuario manifieste explícitamente que desea realizar una acción (ej. "quiero registrar una bitácora", "subir foto", "ver el proyecto"), usando el formato [Texto descriptivo](/ruta).
-  b) Desambiguación de proyecto: cuando el usuario pida consultar o resumir un proyecto pero existan múltiples proyectos y no haya proyecto activo ni especificado, pregunta amablemente y coloca botones breves con el formato [NOMBRE DEL PROYECTO](ask:Resumen del proyecto NOMBRE DEL PROYECTO).
+- SOLO debes generar botones interactivos en casos necesarios:
+  a) Generación de reportes: botones para generar PDF y Word con los filtros correspondientes.
+  b) Redirección a módulos cuando el usuario manifieste explícitamente que desea realizar una acción (ej. "quiero registrar una bitácora", "subir foto", "ver el proyecto"), usando el formato [Texto descriptivo](/ruta).
+  c) Desambiguación de proyecto: cuando el usuario pida consultar o resumir un proyecto pero existan múltiples proyectos y no haya proyecto activo ni especificado, pregunta amablemente y coloca botones breves con el formato [NOMBRE DEL PROYECTO](ask:Resumen del proyecto NOMBRE DEL PROYECTO).
 - Fuera de estos casos necesarios, responde siempre en texto normal sin botones.
 
-4. FORMATO DE RESÚMENES DE PROYECTO (REGLA FUNDAMENTAL DE DOS PASOS):
+6. FORMATO DE RESÚMENES DE PROYECTO (REGLA FUNDAMENTAL DE DOS PASOS):
 - PASO 1 (Resumen general explicativo por defecto): Cuando el usuario pida un resumen de algún proyecto o pregunte cómo va un proyecto:
   * Ofrécelo PRIMERO como un PÁRRAFO continuo y explicativo (o 2 párrafos redactados de forma fluida y natural).
   * En este párrafo explica el contexto de la obra, avance general, ubicación/tramo, empresa supervisora y estado de plazos y bitácoras.
@@ -353,7 +372,7 @@ DIRECTIVAS Y POLÍTICA DE SOLO LECTURA:
 - PASO 2 (Detalle estructurado en viñetas SOLO bajo solicitud):
   * ÚNICAMENTE si el usuario pide explícitamente que especifiques, detalles o desgloses la información (por ejemplo frases como "especifica", "en viñetas", "dame los detalles", "desglósalo", "detalle puntual"), ENTONCES responde desglosando la información en viñetas simples (-) con cifras exactas, fechas, mediciones por renglón y desglose cronológico de bitácora.
 
-5. REDIRECCIÓN A SECCIONES (solo cuando el usuario lo pida explícitamente):
+7. REDIRECCIÓN A SECCIONES (solo cuando el usuario lo pida explícitamente):
 - Si el usuario expresa que quiere hacer algo o ir a una sección específica (ej. "quiero hacer un registro", "quiero subir una foto", "quiero crear un reporte", "ver el proyecto"), responde con una frase corta y UN botón de navegación hacia esa sección, con formato [Texto corto](/ruta).
 - Rutas (reemplaza ID_PROYECTO por el ID real del proyecto):
   - Nuevo registro de bitácora: /dashboard/bitacora?proyectoId=ID_PROYECTO&nuevo=true
@@ -363,22 +382,23 @@ DIRECTIVAS Y POLÍTICA DE SOLO LECTURA:
   - Hoja sábana: /dashboard/proyectos/ID_PROYECTO/hoja-sabana
   - Fotografías: /dashboard/fotografias/ID_PROYECTO
   - Nueva fotografía: /dashboard/fotografias/nueva
-  - Nuevo reporte: /dashboard/reportes/nuevo
+  - Reportes: /dashboard/reportes
 - El texto del botón debe describir la acción (ej. "Crear registro de bitácora"), sin incluir el nombre del proyecto. Solo ofrece rutas a las que el rol/permisos del usuario den acceso.
 
-6. ESTILO Y PRESENTACIÓN:
+8. ESTILO Y PRESENTACIÓN:
 - Sé profesional, técnico y cordial.
 - Responde siempre en español.
 - NO uses emojis.
 - NO uses encabezados con numerales (# o ##). Usa negritas (**texto**) y cuando corresponda viñetas simples (-).`;
 
-    // 1. Proveedor: Groq Cloud con modelos disponibles comprobados
+    // 1. Proveedor: Groq Cloud con modelos disponibles comprobados (prioridad a respuesta ultra rápida)
     if (groqKey) {
-      const groqModels = ['openai/gpt-oss-120b', 'qwen/qwen3.8-27b', 'openai/gpt-oss-20b', 'allam-2-7b'];
+      const groqModels = ['qwen/qwen3.8-27b', 'openai/gpt-oss-20b', 'allam-2-7b', 'openai/gpt-oss-120b'];
       for (const model of groqModels) {
         try {
           const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
             method: 'POST',
+            signal: AbortSignal.timeout(6000),
             headers: {
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${groqKey}`
@@ -502,52 +522,124 @@ DIRECTIVAS Y POLÍTICA DE SOLO LECTURA:
       }
     }
 
-    // 6. Fallback local basado en la base de datos real
+    // 6. Fallback local basado en la base de datos real con tolerancia a tipeo y memoria de contexto
     const lastMessage = (messages?.[messages.length - 1]?.content || '').toLowerCase().trim();
     let fallbackReply = '';
 
-    const esSaludo = /^(hola|buenos d[ií]as|buenas tardes|buenas noches|qu[eé] tal|hey|saludos)/i.test(lastMessage);
-    const pideEspecificar = /(especifica|especificar|detall|viñeta|desglos|puntual)/i.test(lastMessage);
-
-    const proyectoMencionado = proyectosLiveList.find(
+    // Detección de proyecto en el turno actual o en turnos previos de la conversación
+    let proyectoActivo = proyectosLiveList.find(
       (p) =>
         (p.nombre && lastMessage.includes(String(p.nombre).toLowerCase())) ||
-        (p.codigo && lastMessage.includes(String(p.codigo).toLowerCase())) ||
-        (currentProject?.id && String(p.id) === String(currentProject.id))
+        (p.codigo && lastMessage.includes(String(p.codigo).toLowerCase()))
     );
+
+    if (!proyectoActivo && Array.isArray(messages)) {
+      for (let i = messages.length - 1; i >= 0; i--) {
+        const prevText = String(messages[i]?.content || '').toLowerCase();
+        const found = proyectosLiveList.find(
+          (p) =>
+            (p.nombre && prevText.includes(String(p.nombre).toLowerCase())) ||
+            (p.codigo && prevText.includes(String(p.codigo).toLowerCase()))
+        );
+        if (found) {
+          proyectoActivo = found;
+          break;
+        }
+      }
+    }
+
+    if (!proyectoActivo && currentProject?.id) {
+      proyectoActivo = proyectosLiveList.find((p) => String(p.id) === String(currentProject.id));
+    }
+
     const botonesProyectos = proyectosLiveList.map((p) => '[' + p.nombre + '](ask:Resumen del proyecto ' + p.nombre + ')').join('\n');
+
+    // Reglas semánticas flexibles y tolerantes a errores ortográficos de campo
+    const esSaludo = /^(hola|buenos\s*d[ií]as|buenas\s*tardes|buenas\s*noches|qu[eé]\s*tal|hey|saludos)/i.test(lastMessage);
+    const pideEspecificar = /(especifica|especificar|detall|viñeta|desglos|puntual)/i.test(lastMessage);
+    const esResumen = /(r[eu]{2}s[um]{2}en|resumen|reusmen|resume|resumn|como\s*va|c[oó]mo\s*va|estado|avance)/i.test(lastMessage);
+    const esProyecto = /(pro[ye]{2}ct|proyecto|proeycto|proyec|proyetco)/i.test(lastMessage);
+    const esBitacora = /(bit[aá]c|bitacora|bitácora|registros?|folios?)/i.test(lastMessage);
+    const esReporte = /(rep[or]{2}t|reporte|reprote|informe|expediente)/i.test(lastMessage);
+    const esGenerar = /(gener|crea|descarg|sacar|haz|hacer|ahce|dame|sacame|quiero)/i.test(lastMessage);
+    const esCreacion = /(cre[aoó]|inici|comenz|antig[uü]ed|hace\s*cuanto|cu[aá]ndo\s*se\s*cre)/i.test(lastMessage);
+    const esCantidad = /(cu[aá]nt[ao]s?|total|cantidad|n[uú]mero)/i.test(lastMessage);
+    const esMes = /(todo\s*el\s*mes|este\s*mes|del\s*mes|mensual)/i.test(lastMessage);
+    const esSemana = /(esta\s*semana|de\s*la\s*semana|semanal)/i.test(lastMessage);
+
+    // Helper de fechas para periodos de reportes
+    const fechaObj = new Date();
+    const anioActual = fechaObj.getFullYear();
+    const mesActualNum = String(fechaObj.getMonth() + 1).padStart(2, '0');
+    const primerDiaMes = `${anioActual}-${mesActualNum}-01`;
+    const ultimoDiaNum = new Date(anioActual, fechaObj.getMonth() + 1, 0).getDate();
+    const ultimoDiaMes = `${anioActual}-${mesActualNum}-${String(ultimoDiaNum).padStart(2, '0')}`;
 
     if (esSaludo) {
       const saludoNombre = userFirstName ? `Hola, ${userFirstName}.` : 'Hola.';
       fallbackReply = `${saludoNombre} Soy DomunBot AI, tu asistente en tiempo real de DomunNet. ¿En qué puedo ayudarte hoy?`;
-    } else if (proyectoMencionado && (lastMessage.includes('resumen') || lastMessage.includes('como va') || lastMessage.includes('cómo va') || lastMessage.includes('estado'))) {
+    } else if (esReporte && (esGenerar || esMes || esSemana || lastMessage.includes('reporte'))) {
+      const proy = proyectoActivo || proyectosLiveList[0];
+      const desde = esSemana ? hoy : primerDiaMes;
+      const hasta = esSemana ? hoy : ultimoDiaMes;
+      const periodoTexto = esSemana ? 'la semana actual' : `el mes en curso (del ${desde} al ${hasta})`;
+
+      if (proy) {
+        const bs = bitacorasLiveList.filter((b) => String(b.proyecto_id) === String(proy.id));
+        const bsMes = bs.filter((b) => {
+          const f = String(b.fecha || '');
+          return f >= desde && f <= hasta;
+        });
+        const cant = bsMes.length > 0 ? bsMes.length : bs.length;
+
+        fallbackReply = `He preparado los parámetros para el reporte oficial del proyecto "${proy.nombre}" (${proy.codigo || 'S/C'}) para ${periodoTexto}.\n\nPara este rango se identifican ${cant} registro(s) de bitácora y mediciones de obra supervisadas por ${proy.supervisora}. Puedes generar y descargar el documento directamente en el formato que requieras:\n\n[Generar Reporte PDF](/dashboard/reportes?proyectoId=${proy.id}&desde=${desde}&hasta=${hasta}&formato=pdf&auto=true)\n[Generar Reporte Word](/dashboard/reportes?proyectoId=${proy.id}&desde=${desde}&hasta=${hasta}&formato=word&auto=true)`;
+      } else {
+        fallbackReply = 'Para generar el reporte, por favor indícame a qué proyecto corresponde:\n\n' + botonesProyectos;
+      }
+    } else if (proyectoActivo && esCreacion) {
+      const fechaIni = proyectoActivo.fecha_inicio;
+      const fechaFin = proyectoActivo.fecha_fin;
+      let tiempoTranscurrido = '';
+      if (fechaIni) {
+        const dIni = new Date(fechaIni).getTime();
+        const dHoy = new Date().getTime();
+        const diffMeses = Math.max(0, Math.round((dHoy - dIni) / (1000 * 3600 * 24 * 30.4)));
+        tiempoTranscurrido = diffMeses > 0 ? ` (hace aproximadamente ${diffMeses} mes${diffMeses === 1 ? '' : 'es'})` : ' (iniciado recientemente)';
+      }
+      fallbackReply = `El proyecto "${proyectoActivo.nombre}" (${proyectoActivo.codigo || 'S/C'}) tiene fecha contractual de inicio registrada para el ${fechaIni || 'cronograma inicial'}${tiempoTranscurrido}. Su culminación estipulada está programada para el ${fechaFin || 'plazo acordado'}.`;
+    } else if (proyectoActivo && (esBitacora || esCantidad) && (esBitacora || lastMessage.includes('cuant') || lastMessage.includes('tiene'))) {
+      const bs = bitacorasLiveList.filter((b) => String(b.proyecto_id) === String(proyectoActivo.id));
+      const pub = bs.filter((b) => b.publicada).length;
+      const bor = bs.length - pub;
+      fallbackReply = `El proyecto "${proyectoActivo.nombre}" (${proyectoActivo.codigo || 'S/C'}) cuenta actualmente con ${bs.length} entrada(s) de bitácora registrada(s) en el sistema (${pub} debidamente publicadas y validadas, y ${bor} en borrador).\n\n[Ver bitácora del proyecto](/dashboard/bitacora?proyectoId=${proyectoActivo.id})`;
+    } else if (proyectoActivo && (esResumen || lastMessage.includes('estado') || lastMessage.includes('como va') || lastMessage.includes('cómo va'))) {
       if (pideEspecificar) {
-        const idx = bitacorasStatsText.indexOf('== PROYECTO: ' + (proyectoMencionado.codigo || ''));
+        const idx = bitacorasStatsText.indexOf('== PROYECTO: ' + (proyectoActivo.codigo || ''));
         const bloque = idx >= 0 ? bitacorasStatsText.slice(idx).split('\n\n')[0] : 'Sin registros de bitácora para este proyecto.';
-        fallbackReply = `**Detalle específico del proyecto ${proyectoMencionado.nombre}:**\n\n` +
-          `- **Código:** ${proyectoMencionado.codigo || 'S/C'}\n` +
-          `- **Tramo / Ubicación:** ${proyectoMencionado.tramo || 'No especificada'}\n` +
-          `- **Supervisión:** ${proyectoMencionado.supervisora}\n` +
-          `- **Presupuesto contractual:** Q ${(Number(proyectoMencionado.monto_original) || 0).toLocaleString()}\n` +
-          `- **Plazo:** Del ${proyectoMencionado.fecha_inicio || 'N/D'} al ${proyectoMencionado.fecha_fin || 'N/D'}\n\n` +
+        fallbackReply = `**Detalle específico del proyecto ${proyectoActivo.nombre}:**\n\n` +
+          `- **Código:** ${proyectoActivo.codigo || 'S/C'}\n` +
+          `- **Tramo / Ubicación:** ${proyectoActivo.tramo || 'No especificada'}\n` +
+          `- **Supervisión:** ${proyectoActivo.supervisora}\n` +
+          `- **Presupuesto contractual:** Q ${(Number(proyectoActivo.monto_original) || 0).toLocaleString()}\n` +
+          `- **Plazo:** Del ${proyectoActivo.fecha_inicio || 'N/D'} al ${proyectoActivo.fecha_fin || 'N/D'}\n\n` +
           bloque.split('\n').map((l) => (l.startsWith('==') ? '' : (l.startsWith('    -') ? l.replace('    -', '-') : '**' + l.trim() + '**'))).filter(Boolean).join('\n');
       } else {
-        const bs = bitacorasLiveList.filter((b) => String(b.proyecto_id) === String(proyectoMencionado.id));
+        const bs = bitacorasLiveList.filter((b) => String(b.proyecto_id) === String(proyectoActivo.id));
         const regsCount = bs.length;
         const regsPub = bs.filter((b) => b.publicada).length;
-        fallbackReply = `El proyecto "${proyectoMencionado.nombre}" (${proyectoMencionado.codigo || 'S/C'}) se encuentra ubicado en ${proyectoMencionado.tramo || 'su tramo asignado'}, coordinado bajo la supervisión de ${proyectoMencionado.supervisora}. Cuenta con una asignación presupuestaria contractual de Q ${(Number(proyectoMencionado.monto_original) || 0).toLocaleString()} y una fecha estipulada de culminación para el ${proyectoMencionado.fecha_fin || 'plazo convenido'}. A la fecha se registran ${regsCount} entradas en la bitácora de obra (${regsPub} debidamente publicadas y validadas), reflejando un seguimiento continuo de las actividades ejecutadas en campo. Si necesitas que especifique algún renglón, fecha o desglose detallado en viñetas, con gusto indícamelo.`;
+        fallbackReply = `El proyecto "${proyectoActivo.nombre}" (${proyectoActivo.codigo || 'S/C'}) se encuentra ubicado en ${proyectoActivo.tramo || 'su tramo asignado'}, coordinado bajo la supervisión de ${proyectoActivo.supervisora}. Cuenta con una asignación presupuestaria contractual de Q ${(Number(proyectoActivo.monto_original) || 0).toLocaleString()} y una fecha estipulada de culminación para el ${proyectoActivo.fecha_fin || 'plazo convenido'}. A la fecha se registran ${regsCount} entradas en la bitácora de obra (${regsPub} debidamente publicadas y validadas), reflejando un seguimiento continuo de las actividades ejecutadas en campo. Si necesitas que especifique algún renglón, fecha o desglose detallado en viñetas, con gusto indícamelo.`;
       }
-    } else if (lastMessage.includes('bitacora') || lastMessage.includes('bitácora') || lastMessage.includes('registro') || lastMessage.includes('hoy')) {
-      if (!proyectoMencionado) {
+    } else if (esBitacora || lastMessage.includes('registro') || lastMessage.includes('hoy')) {
+      if (!proyectoActivo) {
         fallbackReply = '¿De qué proyecto te gustaría revisar las bitácoras?\n\n' + botonesProyectos;
       } else {
-        const idx = bitacorasStatsText.indexOf('== PROYECTO: ' + (proyectoMencionado.codigo || ''));
+        const idx = bitacorasStatsText.indexOf('== PROYECTO: ' + (proyectoActivo.codigo || ''));
         const bloque = idx >= 0 ? bitacorasStatsText.slice(idx).split('\n\n')[0] : 'Sin registros de bitácora para este proyecto.';
-        fallbackReply = '**' + proyectoMencionado.nombre + '**\n\n' + bloque.split('\n').map((l) => (l.startsWith('==') ? '' : (l.startsWith('    -') ? l.replace('    -', '-') : '**' + l.trim() + '**'))).filter(Boolean).join('\n');
+        fallbackReply = '**' + proyectoActivo.nombre + '**\n\n' + bloque.split('\n').map((l) => (l.startsWith('==') ? '' : (l.startsWith('    -') ? l.replace('    -', '-') : '**' + l.trim() + '**'))).filter(Boolean).join('\n');
       }
-    } else if (lastMessage.includes('resumen') || lastMessage.includes('proyecto')) {
+    } else if (esResumen || esProyecto) {
       if (proyectosLiveList.length > 0) {
-        fallbackReply = `Actualmente hay ${proyectosLiveList.length} proyectos registrados en el sistema. ¿De cuál de ellos te gustaría conocer el resumen? Puedes indicarme su nombre o código.`;
+        fallbackReply = `Actualmente hay ${proyectosLiveList.length} proyectos registrados en el sistema. ¿De cuál de ellos te gustaría conocer el resumen? Puedes indicarme su nombre o código:\n\n` + botonesProyectos;
       } else {
         fallbackReply = 'Actualmente no hay proyectos registrados en el sistema.';
       }

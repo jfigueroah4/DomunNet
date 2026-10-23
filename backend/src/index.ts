@@ -59,7 +59,7 @@ app.use(express.json({ limit: '50mb' }))
 app.use(express.urlencoded({ extended: true, limit: '50mb' }))
 app.use(express.text({ type: 'text/plain', limit: '200mb' }))
 
-app.get('/health', (_req, res) => {
+app.get(['/health', '/api/v1/health'], (_req, res) => {
   sendResponse(
     res,
     200,

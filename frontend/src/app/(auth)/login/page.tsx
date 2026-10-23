@@ -71,9 +71,23 @@ export default function LoginPage() {
   const [showRememberedDropdown, setShowRememberedDropdown] = useState(false);
 
   useEffect(() => {
-    // Despertar el backend inmediatamente en segundo plano al cargar el login para eliminar cold starts
+    // Despertar el backend inmediatamente en segundo plano al cargar el login para eliminar cold starts en Render
     try {
-      api.get('/health', { timeout: 3500 }).catch(() => {});
+      api.get('/health', { timeout: 35000 }).catch(() => {});
+      if (typeof window !== 'undefined') {
+        fetch('https://domunnet-backend.onrender.com/health', { mode: 'no-cors' }).catch(() => {});
+      }
+    } catch (_) {}
+
+    // Limpiar bloqueo expirado si existía de intentos previos
+    try {
+      const storedLock = localStorage.getItem('domun_failed_login_attempts');
+      if (storedLock) {
+        const parsed = JSON.parse(storedLock);
+        if (parsed.lockUntil && Date.now() >= parsed.lockUntil) {
+          localStorage.removeItem('domun_failed_login_attempts');
+        }
+      }
     } catch (_) {}
 
     try {
@@ -162,7 +176,7 @@ export default function LoginPage() {
         dispositivo,
         cerrarOtrasSesiones: Boolean(cerrarOtrasSesiones),
       },
-      { timeout: 12000 }
+      { timeout: 45000 }
     );
 
     const token = res.data?.data?.token;
@@ -259,10 +273,11 @@ export default function LoginPage() {
       if (storedLock) {
         const { lockUntil } = JSON.parse(storedLock);
         if (lockUntil && Date.now() < lockUntil) {
-          if (process.env.NODE_ENV !== 'production') {
+          const minutosRestantes = Math.ceil((lockUntil - Date.now()) / (60 * 1000));
+          if (minutosRestantes <= 0) {
             localStorage.removeItem('domun_failed_login_attempts');
           } else {
-            showErrorToast(`Demasiados intentos fallidos. Su cuenta está bloqueada temporalmente durante 1 hora.`);
+            showErrorToast(`Demasiados intentos fallidos. Espera ${minutosRestantes} minuto(s) para reintentar.`);
             return;
           }
         }
@@ -281,12 +296,18 @@ export default function LoginPage() {
     setLoginStatusText('Ingresando...');
     const t1 = setTimeout(() => setLoginStatusText('Validando credenciales...'), 1800);
     const t2 = setTimeout(() => setLoginStatusText('Conectando con el servidor...'), 4500);
+    const t3 = setTimeout(() => setLoginStatusText('Iniciando servicio en la nube...'), 9000);
+    const t4 = setTimeout(() => setLoginStatusText('Casi listo, sincronizando...'), 18000);
 
     try {
       await iniciarSesion(username, password, formEl);
     } catch (error: any) {
       clearTimeout(t1);
       clearTimeout(t2);
+      clearTimeout(t3);
+      clearTimeout(t4);
+      clearTimeout(t3);
+      clearTimeout(t4);
       setEmailError(true);
       setPasswordError(true);
 
@@ -317,8 +338,8 @@ export default function LoginPage() {
         return;
       }
 
-      // Solo contar como credenciales incorrectas si el servidor respondió con 401 o 400
-      if (status === 401 || status === 400) {
+      // Solo contar como credenciales incorrectas si el servidor respondió con 401
+      if (status === 401) {
         let attempts = 1;
         let lockUntil: number | null = null;
         try {
@@ -336,9 +357,9 @@ export default function LoginPage() {
         }
 
         if (attempts >= 5) {
-          lockUntil = Date.now() + 3600 * 1000; // 1 hora de bloqueo
+          lockUntil = Date.now() + 3 * 60 * 1000; // 3 minutos de bloqueo temporal
           localStorage.setItem('domun_failed_login_attempts', JSON.stringify({ attempts, lockUntil }));
-          showErrorToast("Demasiados intentos fallidos. Su cuenta está bloqueada temporalmente durante 1 hora.");
+          showErrorToast("Demasiados intentos fallidos. Por favor espera 3 minutos antes de reintentar.");
         } else {
           localStorage.setItem('domun_failed_login_attempts', JSON.stringify({ attempts, lockUntil: null }));
           showErrorToast(`Credenciales incorrectas. Intento ${attempts} de 5.`);
@@ -356,29 +377,30 @@ export default function LoginPage() {
 
   return (
     <div 
-      className="fixed inset-0 w-full h-[100dvh] overflow-hidden overscroll-none flex flex-col items-center justify-center bg-[#140B07]"
+      className="fixed inset-0 w-full h-[100dvh] overflow-hidden overscroll-none flex flex-col items-center justify-center bg-[#1a0000]"
       style={{
         fontFamily: "'Poppins', sans-serif",
         touchAction: 'manipulation',
       }}
     >
-      {/* Fondo de alta resolución precargado con máxima prioridad y fijado al viewport */}
+      {/* Fondo con ilustración de camiones original - ultrarrápido y nítido (65KB) */}
       <div
-        aria-hidden="true"
-        className="fixed inset-0 overflow-hidden pointer-events-none select-none z-0"
+        className="absolute inset-x-0 bottom-[-80px] w-full h-[120vh] overflow-hidden pointer-events-none select-none z-0"
+        style={{
+          backgroundImage: 'url(/fondo_carretas.png)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center 40%',
+          backgroundAttachment: 'fixed',
+        }}
       >
-        <Image
-          src="/fondo.png"
-          alt="Fondo Carretera"
-          fill
-          priority
-          sizes="100vw"
-          quality={85}
-          className="object-cover object-center pointer-events-none"
-        />
-        {/* Capa de contraste oscuro para máxima nitidez y legibilidad */}
-        <div className="absolute inset-0 bg-black/45 pointer-events-none" />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-black/60 pointer-events-none" />
+        {/* Gradient overlay suave y animado */}
+        <div className="absolute inset-0 bg-gradient-to-br from-[#cc1111] via-[#9B0F06] to-[#e63b00] opacity-20 pointer-events-none" />
+
+        {/* Animated radial gradient pulse */}
+        <div className="absolute inset-0 animate-pulse-gradient bg-gradient-radial from-[rgba(200,0,0,0.1)] to-[rgba(80,0,0,0.15)] pointer-events-none" />
+
+        {/* Overlay oscuro para máxima legibilidad */}
+        <div className="absolute inset-0 bg-black/25 pointer-events-none" />
       </div>
 
 

@@ -10,6 +10,7 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
+  Clock,
   Eraser,
   ImagePlus,
   Loader2,
@@ -294,6 +295,7 @@ export function BitacoraForm({
 
   // Estado para opciones de observación
   const [observacionPreset, setObservacionPreset] = useState<string>('Otra...')
+  const [personalizarFecha, setPersonalizarFecha] = useState<boolean>(false)
 
   const fileInputFotoRef = useRef<HTMLInputElement>(null)
 
@@ -2016,6 +2018,144 @@ export function BitacoraForm({
                     <span className="text-[9px] sm:text-[9.5px] text-gray-500 font-mono bg-gray-50 border border-gray-200 px-2 py-0.5 rounded-md inline-block leading-relaxed" style={{ fontSize: '9px' }}>
                       {infoEstacionHelper.texto}
                     </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Opción para personalizar fecha del registro (estilo idéntico a img 2 con botón de reloj y despliegue interactivo) */}
+              <div className="border-b border-gray-100 pb-2 space-y-1">
+                <div className="flex items-center justify-between py-0.5 gap-2">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="text-[10px] font-bold text-gray-700" style={{ fontSize: '10px' }}>
+                      ¿Deseas cambiar la fecha del registro?
+                    </span>
+                    <span
+                      className="text-[9px] font-mono text-gray-500 bg-gray-100 px-1.5 py-0.2 rounded shrink-0"
+                      style={{ fontSize: '9px' }}
+                    >
+                      {fd.fecha === today ? 'Hoy' : fd.fecha}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    {/* Botón con ícono de reloj */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const nuevo = !personalizarFecha
+                        setPersonalizarFecha(nuevo)
+                        if (!nuevo) {
+                          set('fecha', today)
+                        }
+                      }}
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border text-[10px] font-medium transition-all cursor-pointer shadow-2xs ${
+                        personalizarFecha || fd.fecha !== today
+                          ? 'bg-[#9B0F06] text-white border-[#9B0F06]'
+                          : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-200 hover:border-gray-300'
+                      }`}
+                      title={personalizarFecha ? 'Cerrar y usar fecha de hoy' : 'Establecer fecha del registro'}
+                    >
+                      <Clock size={11} className={personalizarFecha || fd.fecha !== today ? 'text-white' : 'text-[#9B0F06]'} />
+                      <span className="text-[9px] font-semibold hidden xs:inline">
+                        {personalizarFecha ? 'Cerrar' : fd.fecha !== today ? 'Modificada' : 'Fecha'}
+                      </span>
+                    </button>
+
+                    {/* Switch interactivo idéntico al de suspensión (img 2) */}
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={personalizarFecha}
+                      onClick={() => {
+                        const nuevo = !personalizarFecha
+                        setPersonalizarFecha(nuevo)
+                        if (!nuevo) {
+                          set('fecha', today)
+                        }
+                      }}
+                      className={`relative inline-flex h-4.5 w-9 shrink-0 cursor-pointer rounded-full p-0.5 transition-colors duration-200 ease-in-out focus:outline-none ${
+                        personalizarFecha ? 'bg-[#9B0F06]' : 'bg-[#E9E9EA]'
+                      }`}
+                      title="Activar selector de fecha"
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                          personalizarFecha ? 'translate-x-4.5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Despliegue interactivo para establecer la fecha */}
+                {personalizarFecha && (
+                  <div className="pt-1.5 mt-1 border-t border-gray-100 space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-gray-50/80 p-2 rounded-xl border border-gray-200/80">
+                      <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                        <span className="text-[9.5px] font-bold text-gray-600 shrink-0" style={{ fontSize: '9.5px' }}>
+                          Fecha:
+                        </span>
+                        <input
+                          type="date"
+                          value={fd.fecha}
+                          onChange={(e) => {
+                            const val = e.target.value
+                            set('fecha', val || today)
+                          }}
+                          style={{ fontSize: '10px' }}
+                          className="bitacora-form-control w-full sm:w-auto rounded-lg border border-gray-200 bg-white px-2 py-1 text-[10px] font-mono text-gray-800 focus:outline-none focus:border-[#9B0F06]"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-1 shrink-0 self-end sm:self-center">
+                        <button
+                          type="button"
+                          onClick={() => set('fecha', today)}
+                          style={{ fontSize: '9px' }}
+                          className={`px-2 py-0.5 rounded-md border text-[9px] font-bold transition-colors cursor-pointer ${
+                            fd.fecha === today
+                              ? 'bg-[#9B0F06] text-white border-[#9B0F06]'
+                              : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-100'
+                          }`}
+                        >
+                          Hoy
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const d = new Date()
+                            d.setDate(d.getDate() - 1)
+                            const yStr = d.toISOString().split('T')[0]
+                            set('fecha', yStr)
+                          }}
+                          style={{ fontSize: '9px' }}
+                          className="px-2 py-0.5 rounded-md border border-gray-200 bg-white hover:bg-gray-100 text-gray-600 text-[9px] font-normal transition-colors cursor-pointer"
+                        >
+                          Ayer
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            set('fecha', today)
+                            setPersonalizarFecha(false)
+                          }}
+                          style={{ fontSize: '9px' }}
+                          className="px-1.5 py-0.5 text-[9px] text-gray-400 hover:text-[#9B0F06] transition-colors cursor-pointer"
+                          title="Restablecer a fecha de hoy y cerrar"
+                        >
+                          Reset
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between text-[9px] text-gray-400 px-0.5">
+                      <span>
+                        {fd.fecha === today ? 'Se registrará con la fecha actual de hoy.' : `Fecha seleccionada: ${fd.fecha}`}
+                      </span>
+                      {fd.fecha !== today && (
+                        <span className="text-[#9B0F06] font-semibold">Personalizada</span>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
