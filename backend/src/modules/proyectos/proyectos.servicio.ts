@@ -262,7 +262,8 @@ export async function actualizarEstadoProyecto(proyectoId: string, nuevoEstadoCo
           monto_original,
           empresa_contratista_id,
           fecha_inicio_contractual,
-          fecha_adjudicacion
+          fecha_adjudicacion,
+          tipo_obra
         )
       `)
       .eq('id', proyectoId)
@@ -293,6 +294,24 @@ export async function actualizarEstadoProyecto(proyectoId: string, nuevoEstadoCo
 
     if (!detalle.fecha_inicio_contractual || !detalle.fecha_adjudicacion) {
       throw new ValidationError('No se puede activar: Las fechas de Adjudicación e Inicio Contractual son obligatorias.', 'fechas_contractuales')
+    }
+
+    const esSabana = detalle.tipo_obra ? String(detalle.tipo_obra).toLowerCase().trim() === 'sabana' : true
+    if (esSabana) {
+      const { data: renglonesProy } = await clienteSupabase
+        .from('renglon_trabajo')
+        .select('id, cantidad_contractual, cantidad_ajustada, precio_unitario_directo')
+        .eq('proyecto_id', proyectoId)
+
+      const tieneRenglonValido = Array.isArray(renglonesProy) && renglonesProy.some((r) => {
+        const cant = Number(r.cantidad_ajustada ?? r.cantidad_contractual ?? 0)
+        const pu = Number(r.precio_unitario_directo ?? 0)
+        return cant > 0 && pu > 0
+      })
+
+      if (!tieneRenglonValido) {
+        throw new ValidationError('No se puede activar el proyecto en modo sábana: Ningún renglón tiene cantidad registrada (> 0). Debe registrar al menos un renglón con valor.', 'renglones')
+      }
     }
   }
 
@@ -1025,8 +1044,22 @@ export async function obtenerProyectoPorId(proyectoId: string) {
     estado: estadoCodigo,
     parametro_proyecto: paramRes.data || null,
     parametroProyecto: paramRes.data || null,
-    planTrabajo: mappedRenglones,
-    renglones: mappedRenglones,
+    planTrabajo: estadoCodigo === 'activo'
+      ? mappedRenglones.filter((r: any) => {
+          const cC = Number(r.cantidadContratada || 0)
+          const cA = Number(r.cantidadAjustada || cC)
+          const cE = Number(r.cantidadEjecutada || 0)
+          return cC > 0 || cA > 0 || cE > 0
+        })
+      : mappedRenglones,
+    renglones: estadoCodigo === 'activo'
+      ? mappedRenglones.filter((r: any) => {
+          const cC = Number(r.cantidadContratada || 0)
+          const cA = Number(r.cantidadAjustada || cC)
+          const cE = Number(r.cantidadEjecutada || 0)
+          return cC > 0 || cA > 0 || cE > 0
+        })
+      : mappedRenglones,
     tipoObra: detalle.tipo_obra ? String(detalle.tipo_obra).toLowerCase().trim() : (mappedRenglones.length > 0 ? 'sabana' : 'manual'),
     tipo_obra: detalle.tipo_obra ? String(detalle.tipo_obra).toLowerCase().trim() : (mappedRenglones.length > 0 ? 'sabana' : 'manual'),
     tieneSabana: (detalle.tipo_obra ? String(detalle.tipo_obra).toLowerCase().trim() === 'sabana' : true) && mappedRenglones.length > 0,
@@ -1423,6 +1456,19 @@ export async function crearProyecto(datosFormulario: any) {
         })
       : Promise.resolve(),
   ])
+
+  const esSabanaCreacion = datosFormulario.modoGestionFinanciera === 'sabana' || datosFormulario.tipoObra === 'sabana' || datosFormulario.tipo_obra === 'sabana' || datosFormulario.usarModoSabana !== false
+  if (estadoCodigo === 'activo' && esSabanaCreacion) {
+    const listaR = datosFormulario?.renglones || datosFormulario?.planTrabajo || datosFormulario?.renglones_seleccionados || []
+    const tieneRenglonValido = Array.isArray(listaR) && listaR.some((r: any) => {
+      const cant = Number(r.cantidadContratada ?? r.cantidadContractual ?? r.cantidad_contractual ?? 0)
+      const pu = Number(r.costoUnitarioDirecto ?? r.precioUnitario ?? r.precio_unitario_directo ?? 0)
+      return cant > 0 && pu > 0
+    })
+    if (!tieneRenglonValido) {
+      throw new ValidationError('No se puede crear el proyecto como activo en modo sábana: Ningún renglón tiene cantidad registrada (> 0). Debe registrar al menos un renglón con valor.', 'renglones')
+    }
+  }
 
   // 2. Insertar en tabla base `proyecto`
   const { data: proyecto, error: errorProyecto } = await clienteSupabase
@@ -2119,9 +2165,16 @@ async function guardarRenglonesProyecto(proyectoId: string, datosFormulario: any
       }
     }
 
-    // 2. Preparar registros para inserción
+    // 2. Preparar registros para inserción (solo renglones con cantidad > 0 para que los de 0 no aparezcan al estar activo)
+    const listaFiltrada = listaRenglones.filter((r: any) => {
+      const cantC = Number(r.cantidadContratada ?? r.cantidadContractual ?? r.cantidad_contractual ?? 0)
+      const cantA = Number(r.cantidadAjustada ?? r.cantidad_ajustada ?? cantC)
+      const cantE = Number(r.cantidadEjecutada ?? r.cantidad_ejecutada ?? 0)
+      return cantC > 0 || cantA > 0 || cantE > 0
+    })
+
     const construirFilas = (forzarPrecioCero: boolean) =>
-      listaRenglones.map((r: any) => {
+      listaFiltrada.map((r: any) => {
         const cod = r.codigoDGC || r.codigo || r.id || '101.01'
         const desc = r.descripcion || r.desc || r.nombre || 'Renglón de trabajo'
         const capRaw = r.capituloId || r.capitulo_id || 1
@@ -2145,8 +2198,8 @@ async function guardarRenglonesProyecto(proyectoId: string, datosFormulario: any
           descripcion: String(desc),
           capitulo_id: resolvedCapId,
           unidad_id: resolvedUnidadId,
-          cantidad_contractual: Number(r.cantidadContratada ?? r.cantidadContractual ?? r.cantidad_contractual ?? 1),
-          cantidad_ajustada: Number(r.cantidadAjustada ?? r.cantidadContratada ?? r.cantidad_ajustada ?? 1),
+          cantidad_contractual: Number(r.cantidadContratada ?? r.cantidadContractual ?? r.cantidad_contractual ?? 0),
+          cantidad_ajustada: Number(r.cantidadAjustada ?? r.cantidadContratada ?? r.cantidad_ajustada ?? 0),
           cantidad_ejecutada: Math.max(0, Number(ejecPreservada) || 0),
           precio_unitario_directo: forzarPrecioCero ? 0 : Number(r.costoUnitarioDirecto ?? r.precioUnitario ?? r.precio_unitario_directo ?? 0),
           aplica_indirectos: true,

@@ -2261,6 +2261,14 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
         .toLowerCase()
         .includes(busqueda.toLowerCase())
 
+      // En modo activo o ejecución actual, los renglones que tienen 0 no aparecen
+      if (modoVistaSabana === 'actual' || !esBorrador) {
+        const cantC = Number(r.cantidadContratada ?? 0)
+        const cantA = Number(r.cantidadAjustada ?? cantC)
+        const cantE = Number(r.cantidadEstePeriodo ?? 0) + Number(r.cantidadAcumuladaAnterior ?? 0)
+        if (cantC <= 0 && cantA <= 0 && cantE <= 0) return false
+      }
+
       return matchCap && matchEstado && matchTipo && matchMes && matchSearch
     })
 

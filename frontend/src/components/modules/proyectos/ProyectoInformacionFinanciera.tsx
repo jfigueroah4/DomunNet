@@ -937,6 +937,15 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
       if (filtroEstadoBitacora === 'en_bitacora') matchEstado = r.seleccionado !== false
       if (filtroEstadoBitacora === 'ocultos') matchEstado = r.seleccionado === false
 
+      // En proyecto activo, ocultar renglones que tengan cantidad en 0
+      const estProy = typeof proyecto?.estado === 'string' ? proyecto.estado.toLowerCase() : ''
+      if (estProy === 'activo') {
+        const cantC = Number(r.cantidadContratada ?? 0)
+        const cantA = Number(r.cantidadAjustada ?? cantC)
+        const cantE = Number(r.cantidadEstePeriodo ?? 0) + Number(r.cantidadAcumuladaAnterior ?? 0)
+        if (cantC <= 0 && cantA <= 0 && cantE <= 0) return false
+      }
+
       return matchCap && matchRenglon && matchTexto && matchEstado
     })
   }, [listaRenglones, listaRenglonesFuente, filtroCapitulo, filtroRenglon, busquedaTexto, filtroEstadoBitacora])

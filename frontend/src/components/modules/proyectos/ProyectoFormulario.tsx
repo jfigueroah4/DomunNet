@@ -2515,6 +2515,20 @@ export function ProyectoFormulario({
       newErrorMessages.supervisoraMesesPlazo = `El plazo de supervisión (${mesesSupervisionNum} meses) y de obra (${mesesObraNum} meses) no pueden diferir por más de 1 mes.`
     }
 
+    const usaModoSabanaActivo = (rolDomunActivo === 'supervisora' ? modoSupervision : modoObra) === 'sabana' || modoGestionFinanciera === 'sabana'
+    if (usaModoSabanaActivo) {
+      const tieneRenglonValido = renglonesProyecto.some((r) => {
+        const cant = Number(r.cantidadContratada || 0)
+        const pu = Number(r.costoUnitarioDirecto || 0)
+        return cant > 0 && pu > 0
+      })
+      if (!tieneRenglonValido) {
+        faltantes.push('Al menos un Renglón en Hoja Sábana con cantidad mayor a 0 (+1)')
+        newErrors.renglones = true
+        newErrorMessages.renglones = 'En modo Sábana debe registrar al menos un renglón con cantidad mayor a 0 para poder activar el proyecto.'
+      }
+    }
+
     setErrors(newErrors)
     setErrorMessages(newErrorMessages)
     return { valido: faltantes.length === 0, faltantes, newErrors, newErrorMessages }
@@ -2697,8 +2711,8 @@ export function ProyectoFormulario({
         ambito_plan_trabajo: ambito,
         montoPlanTrabajo: parseFloat(montoPlanTrabajo) || 0,
         monto_plan_trabajo: parseFloat(montoPlanTrabajo) || 0,
-        renglones: renglonesProyecto,
-        renglones_seleccionados: renglonesProyecto.filter((r) => r.seleccionado !== false),
+        renglones: estado === 'activo' ? renglonesProyecto.filter((r) => Number(r.cantidadContratada || 0) > 0) : renglonesProyecto,
+        renglones_seleccionados: renglonesProyecto.filter((r) => r.seleccionado !== false && (estado !== 'activo' || Number(r.cantidadContratada || 0) > 0)),
         estado: estado === 'activo' ? 'activo' : 'borrador',
         contratoEjecucion: contratoEjecucionData,
         contratoSupervision: contratoSupervisionData,
@@ -2753,7 +2767,7 @@ export function ProyectoFormulario({
         else if (check.newErrors.direccion || check.newErrors.departamentoId || check.newErrors.municipioId || check.newErrors.direccionFin) setPasoActual(2)
         else if (check.newErrors.entidadContratante || check.newErrors.empresaContratista || check.newErrors.empresaSupervisora) setPasoActual(3)
         else if (check.newErrors.fechaAdjudicacion) setPasoActual(4)
-        else if (check.newErrors.montoContractualOriginal || check.newErrors.fechaInicioContractual || check.newErrors.supervisoraMesesPlazo) setPasoActual(5)
+        else if (check.newErrors.montoContractualOriginal || check.newErrors.fechaInicioContractual || check.newErrors.supervisoraMesesPlazo || check.newErrors.renglones) setPasoActual(5)
         else if (check.newErrors.delegadoResidenteId) setPasoActual(6)
         return
       }
@@ -2971,8 +2985,8 @@ export function ProyectoFormulario({
       ambito_plan_trabajo: ambitoPlanTrabajo,
       montoPlanTrabajo: parseFloat(montoPlanTrabajo) || 0,
       monto_plan_trabajo: parseFloat(montoPlanTrabajo) || 0,
-      renglones: renglonesProyecto,
-      renglones_seleccionados: renglonesProyecto.filter((r) => r.seleccionado !== false),
+      renglones: estadoFinal === 'activo' ? renglonesProyecto.filter((r) => Number(r.cantidadContratada || 0) > 0) : renglonesProyecto,
+      renglones_seleccionados: renglonesProyecto.filter((r) => r.seleccionado !== false && (estadoFinal !== 'activo' || Number(r.cantidadContratada || 0) > 0)),
       estado: estadoFinal,
       contratoEjecucion: contratoEjecucionData,
       contratoSupervision: contratoSupervisionData,
