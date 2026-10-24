@@ -16,6 +16,7 @@ import {
   Eye,
   FileSpreadsheet,
   FileText,
+  Filter,
   FolderPlus,
   Layers,
   Lock,
@@ -61,6 +62,7 @@ export interface EstimacionFinancieraItem {
   perspectiva: 'ejecutora' | 'supervisora'
   fechaInicio: string
   fechaFin: string
+  fechaCorte?: string
   mes: string
   diasRetraso: number
   porcentajeRendimiento: number
@@ -117,6 +119,7 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
   // Filtros interactivos para el Gráfico Financiero (Curva S)
   const [perspectivaCurva, setPerspectivaCurva] = useState<'ejecutora' | 'supervisora'>('ejecutora')
   const [filtroAnioCurva, setFiltroAnioCurva] = useState<string>('todos')
+  const [modalFiltrosCurvaOpen, setModalFiltrosCurvaOpen] = useState(false)
   const [tipoMetricaCurva, setTipoMetricaCurva] = useState<'porcentaje' | 'monto'>('porcentaje')
   const [fechaDesdeCurva, setFechaDesdeCurva] = useState('')
   const [fechaHastaCurva, setFechaHastaCurva] = useState('')
@@ -291,7 +294,42 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
         } catch {}
       }
 
-      // 2. Cargar estimaciones de proyecto o manuales
+      // 2. Cargar estimaciones de proyecto (prioridad si vienen de API)
+      if (Array.isArray(pAny.estimaciones) && pAny.estimaciones.length > 0) {
+        pAny.estimaciones.forEach((e: any) => {
+          const num = e.numero || `Est. ${String(e.numeroEstimacion || 1).padStart(2, '0')}`
+          const bruto = Number(e.valorBrutoTrabajado || e.montoEstimacion || 0)
+          const pctAmort = Number(e.porcentajeAmortizacion ?? 20)
+          const amort = Number(e.montoAmortizacion ?? ((bruto * pctAmort) / 100))
+          const liq = Number(e.montoLiquidoAPagar ?? e.montoNetoPagar ?? (bruto - amort))
+          mapa.set(num, {
+            id: e.id || `est-${num}`,
+            numero: num,
+            nombreEstimacion: e.nombreEstimacion || `Estimación - ${num}`,
+            delegadoResidente: e.delegadoResidente || (nombreDelegadoProyecto !== '-' ? nombreDelegadoProyecto : 'Delegado Residente'),
+            perspectiva: (e.perspectiva as any) || 'ejecutora',
+            fechaInicio: e.fechaInicio || '',
+            fechaFin: e.fechaFin || e.fechaCorte || '',
+            mes: e.mes || 'Periodo',
+            diasRetraso: Number(e.diasRetraso || 0),
+            porcentajeRendimiento: Number(e.porcentajeRendimiento || 100),
+            calificacionDesempeno: (e.calificacionDesempeno as any) || 'bueno',
+            valorBrutoTrabajado: bruto,
+            porcentajeAmortizacion: pctAmort,
+            montoAmortizacion: amort,
+            montoLiquidoAPagar: liq,
+            saldoContractualRestante: Number(e.saldoContractualRestante || 0),
+            estado: e.estado || 'aprobada',
+            supervisadoPor: e.supervisadoPor || nombreEmpresaSupervisora,
+            observaciones: e.observaciones || '',
+          })
+        })
+        try {
+          localStorage.setItem(`domun_estimaciones_sabana_${proyecto.id}`, JSON.stringify(Array.from(mapa.values())))
+        } catch {}
+      }
+
+      // 3. Cargar estimaciones de proyecto o manuales
       const candidatas = [
         ...(Array.isArray(pAny.estimaciones) ? pAny.estimaciones : []),
         ...(Array.isArray(pAny.estimacionesManuales) ? pAny.estimacionesManuales : []),
@@ -842,9 +880,14 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
 
   const estimacionesFiltradas = useMemo(() => {
     return estimacionesGeneradas.filter((e) => {
-      if (e.perspectiva !== perspectivaEstimacion) return false
-      if (fechaDesdeEstimacion && e.fechaInicio < fechaDesdeEstimacion) return false
-      if (fechaHastaEstimacion && e.fechaFin > fechaHastaEstimacion) return false
+      const tieneEstimacionesExclusivasSupervisora = estimacionesGeneradas.some((item) => item.perspectiva === 'supervisora')
+      if (perspectivaEstimacion === 'supervisora') {
+        if (e.perspectiva !== 'supervisora' && tieneEstimacionesExclusivasSupervisora) return false
+      } else {
+        if (e.perspectiva === 'supervisora') return false
+      }
+      if (fechaDesdeEstimacion && e.fechaInicio && e.fechaInicio < fechaDesdeEstimacion) return false
+      if (fechaHastaEstimacion && e.fechaFin && e.fechaFin > fechaHastaEstimacion) return false
       return true
     })
   }, [estimacionesGeneradas, perspectivaEstimacion, fechaDesdeEstimacion, fechaHastaEstimacion])
@@ -958,38 +1001,59 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
     }
 
     const total = listaMeses.length
-    const estimacionesPerspectiva = estimacionesGeneradas.filter((e) => e.perspectiva === perspectivaCurva)
+    const estimacionesSupervisora = estimacionesGeneradas.filter((e) => e.perspectiva === 'supervisora')
+    const estimacionesPerspectiva = (perspectivaCurva === 'supervisora' && estimacionesSupervisora.length > 0)
+      ? estimacionesSupervisora
+      : estimacionesGeneradas
 
     let acumuladoEjecutado = 0
+    let ultimoMesConEstimacionIdx = -1
+
+    listaMeses.forEach((m, idx) => {
+      const hayEst = estimacionesPerspectiva.some((e) => {
+        const fFin = String(e.fechaFin || e.fechaCorte || '').trim()
+        if (fFin) {
+          const p = fFin.split('-').map(Number)
+          if (p.length >= 2 && p[0] && p[1]) {
+            return p[0] === m.año && (p[1] - 1) === m.mesIdx
+          }
+        }
+        return e.mes && e.mes.toLowerCase().includes(mesesCompletos[m.mesIdx].toLowerCase()) && e.mes.includes(String(m.año))
+      })
+      if (hayEst) {
+        ultimoMesConEstimacionIdx = idx
+      }
+    })
 
     return listaMeses.map((m, idx) => {
-      // Función S-curve contractual programada estándar
       const t = idx / Math.max(1, total - 1)
       const prog = Math.round((3 * t * t - 2 * t * t * t) * 10000) / 100
 
-      // Buscar si existen estimaciones asociadas a este mes o período
       const estsDelMes = estimacionesPerspectiva.filter((e) => {
-        const eFin = e.fechaFin ? new Date(e.fechaFin) : null
-        if (eFin && !isNaN(eFin.getTime())) {
-          return eFin.getFullYear() === m.año && eFin.getMonth() === m.mesIdx
+        const fFin = String(e.fechaFin || e.fechaCorte || '').trim()
+        if (fFin) {
+          const p = fFin.split('-').map(Number)
+          if (p.length >= 2 && p[0] && p[1]) {
+            return p[0] === m.año && (p[1] - 1) === m.mesIdx
+          }
         }
-        return e.mes.toLowerCase().includes(mesesCompletos[m.mesIdx].toLowerCase()) && e.mes.includes(String(m.año))
+        return e.mes && e.mes.toLowerCase().includes(mesesCompletos[m.mesIdx].toLowerCase()) && e.mes.includes(String(m.año))
       })
-
-      let real: number | null = null
-      let esCorte = false
 
       if (estsDelMes.length > 0) {
         estsDelMes.forEach((est) => {
           acumuladoEjecutado += Number(est.valorBrutoTrabajado) || 0
         })
-        real = montoBaseCurva > 0 ? Number(((acumuladoEjecutado / montoBaseCurva) * 100).toFixed(2)) : 0
-      } else if (acumuladoEjecutado > 0 && idx < total) {
-        real = montoBaseCurva > 0 ? Number(((acumuladoEjecutado / montoBaseCurva) * 100).toFixed(2)) : 0
       }
 
-      if (idx === total - 1 && real !== null) {
-        esCorte = true
+      let real: number | null = null
+      let esCorte = false
+
+      if (ultimoMesConEstimacionIdx >= 0 && idx <= ultimoMesConEstimacionIdx) {
+        real = montoBaseCurva > 0 ? Number(((acumuladoEjecutado / montoBaseCurva) * 100).toFixed(2)) : 0
+        if (idx === ultimoMesConEstimacionIdx) {
+          esCorte = true
+        }
       }
 
       const variacion = real !== null ? Number((real - prog).toFixed(2)) : null
@@ -1564,21 +1628,21 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
               <span className="text-[10px] font-extrabold uppercase tracking-wider text-gray-500">
                 PERSPECTIVA:
               </span>
-              <div className="inline-flex items-center gap-1 rounded-lg bg-gray-100/80 p-0.5 border border-gray-200/60 shadow-2xs">
+              <div className="grid grid-cols-2 w-full sm:w-auto items-center gap-1 rounded-lg bg-gray-100/80 p-0.5 border border-gray-200/60 shadow-2xs">
                 <button
                   type="button"
                   onClick={() => {
                     setPerspectivaEstimacion('ejecutora')
                     setPaginaEstimaciones(1)
                   }}
-                  className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[10px] font-bold transition-all duration-200 cursor-pointer ${
+                  className={`inline-flex items-center justify-center gap-1.5 rounded-md px-2.5 py-1 text-[10px] font-bold transition-all duration-200 cursor-pointer ${
                     perspectivaEstimacion === 'ejecutora'
                       ? 'bg-white text-[#9B0F06] border border-gray-200/80 shadow-xs'
                       : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/50 font-medium'
                   }`}
                 >
                   <Building2 size={11} className={perspectivaEstimacion === 'ejecutora' ? 'text-[#9B0F06]' : 'text-gray-500'} />
-                  <span className="text-[10px]">Empresa Ejecutora ({nombreEmpresaEjecutora})</span>
+                  <span className="text-[10px] truncate">Empresa Ejecutora</span>
                 </button>
                 <button
                   type="button"
@@ -1586,14 +1650,14 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
                     setPerspectivaEstimacion('supervisora')
                     setPaginaEstimaciones(1)
                   }}
-                  className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[10px] font-bold transition-all duration-200 cursor-pointer ${
+                  className={`inline-flex items-center justify-center gap-1.5 rounded-md px-2.5 py-1 text-[10px] font-bold transition-all duration-200 cursor-pointer ${
                     perspectivaEstimacion === 'supervisora'
                       ? 'bg-white text-[#9B0F06] border border-gray-200/80 shadow-xs'
                       : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/50 font-medium'
                   }`}
                 >
                   <UserCheck size={11} className={perspectivaEstimacion === 'supervisora' ? 'text-[#9B0F06]' : 'text-gray-500'} />
-                  <span className="text-[10px]">Empresa Supervisora ({nombreEmpresaSupervisora})</span>
+                  <span className="text-[10px] truncate">Empresa Supervisora</span>
                 </button>
               </div>
             </div>
@@ -1869,41 +1933,54 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
                 <span className="text-[10px] font-extrabold uppercase tracking-wider text-gray-500">
                   PERSPECTIVA:
                 </span>
-                <div className="inline-flex items-center gap-1 rounded-lg bg-gray-100/80 p-0.5 border border-gray-200/60 shadow-2xs">
+                <div className="grid grid-cols-2 w-full sm:w-auto items-center gap-1 rounded-lg bg-gray-100/80 p-0.5 border border-gray-200/60 shadow-2xs">
                   <button
                     type="button"
                     onClick={() => setPerspectivaCurva('ejecutora')}
-                    className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-[10.5px] font-bold transition-all duration-200 cursor-pointer ${
+                    className={`inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1 text-[10.5px] font-bold transition-all duration-200 cursor-pointer ${
                       perspectivaCurva === 'ejecutora'
                         ? 'bg-white text-[#9B0F06] border border-gray-200/80 shadow-xs'
                         : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/50 font-medium'
                     }`}
                   >
                     <Building2 size={12} className={perspectivaCurva === 'ejecutora' ? 'text-[#9B0F06]' : 'text-gray-500'} />
-                    <span>Empresa Ejecutora ({nombreEmpresaEjecutora})</span>
+                    <span className="truncate">Empresa Ejecutora</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setPerspectivaCurva('supervisora')}
-                    className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-[10.5px] font-bold transition-all duration-200 cursor-pointer ${
+                    className={`inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1 text-[10.5px] font-bold transition-all duration-200 cursor-pointer ${
                       perspectivaCurva === 'supervisora'
                         ? 'bg-white text-[#9B0F06] border border-gray-200/80 shadow-xs'
                         : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/50 font-medium'
                     }`}
                   >
                     <UserCheck size={12} className={perspectivaCurva === 'supervisora' ? 'text-[#9B0F06]' : 'text-gray-500'} />
-                    <span>Empresa Supervisora ({nombreEmpresaSupervisora})</span>
+                    <span className="truncate">Empresa Supervisora</span>
                   </button>
                 </div>
               </div>
 
-              <span className="text-[10.5px] text-gray-400 font-medium hidden sm:inline">
-                {puntosCurvaSFiltrados.length} {puntosCurvaSFiltrados.length === 1 ? 'mes registrado' : 'meses registrados'}
-              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setModalFiltrosCurvaOpen(true)}
+                  className="sm:hidden flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-gray-200 bg-white text-[10px] font-bold text-gray-700 shadow-2xs hover:bg-gray-50 cursor-pointer shrink-0"
+                >
+                  <Filter size={11} className="text-[#9B0F06]" />
+                  <span>Filtros</span>
+                  {(filtroAnioCurva !== 'todos' || fechaDesdeCurva || fechaHastaCurva || tipoMetricaCurva !== 'porcentaje') && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#9B0F06]" />
+                  )}
+                </button>
+                <span className="text-[10.5px] text-gray-400 font-medium hidden sm:inline">
+                  {puntosCurvaSFiltrados.length} {puntosCurvaSFiltrados.length === 1 ? 'mes registrado' : 'meses registrados'}
+                </span>
+              </div>
             </div>
 
             {/* Fila 2: Controles de Filtrado: Año, Métrica y Rango Temporal (Fila aparte como solicitado) */}
-            <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-gray-100 text-[10.5px]">
+            <div className="hidden sm:flex flex-wrap items-center gap-3 pt-2 border-t border-gray-100 text-[10.5px]">
               {/* Filtro por Año */}
               <div className="flex items-center gap-1.5">
                 <span className="text-[10.5px] text-gray-500 font-semibold">Año:</span>
@@ -2278,6 +2355,126 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
                 </div>
               )
             })()}
+
+            {/* Modal Bottom Sheet de Filtros Curva S en Móvil */}
+            {modalFiltrosCurvaOpen && (
+              <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-xs p-0 sm:p-4">
+                <div className="w-full sm:max-w-md bg-white rounded-t-2xl sm:rounded-2xl shadow-xl border border-gray-200 p-4 space-y-4 font-[Poppins] animate-in fade-in slide-in-from-bottom duration-200">
+                  <div className="flex items-center justify-between border-b border-gray-100 pb-2.5">
+                    <div className="flex items-center gap-2">
+                      <Filter size={14} className="text-[#9B0F06]" />
+                      <h3 className="text-xs font-bold text-gray-900">Filtros del Gráfico Financiero</h3>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setModalFiltrosCurvaOpen(false)}
+                      className="rounded-md p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 cursor-pointer"
+                    >
+                      <X size={15} />
+                    </button>
+                  </div>
+
+                  <div className="space-y-3 text-xs">
+                    {/* Filtro por Año */}
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1">
+                        Año Calendario
+                      </label>
+                      <select
+                        value={filtroAnioCurva}
+                        onChange={(e) => setFiltroAnioCurva(e.target.value)}
+                        className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-800 focus:border-[#9B0F06] focus:bg-white focus:outline-none cursor-pointer"
+                      >
+                        <option value="todos">Todos los Años</option>
+                        {aniosDisponiblesCurva.map((a) => (
+                          <option key={a} value={String(a)}>{a}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Métrica */}
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1">
+                        Tipo de Métrica
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setTipoMetricaCurva('porcentaje')}
+                          className={`py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
+                            tipoMetricaCurva === 'porcentaje'
+                              ? 'bg-[#9B0F06] text-white border-[#9B0F06] shadow-xs'
+                              : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                          }`}
+                        >
+                          % Acumulado
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setTipoMetricaCurva('monto')}
+                          className={`py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
+                            tipoMetricaCurva === 'monto'
+                              ? 'bg-[#9B0F06] text-white border-[#9B0F06] shadow-xs'
+                              : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                          }`}
+                        >
+                          Monto (Q)
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Rango de Fechas */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1">
+                          Fecha Desde
+                        </label>
+                        <input
+                          type="date"
+                          value={fechaDesdeCurva}
+                          onChange={(e) => setFechaDesdeCurva(e.target.value)}
+                          className="w-full rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-xs text-gray-800 focus:border-[#9B0F06] focus:bg-white focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1">
+                          Fecha Hasta
+                        </label>
+                        <input
+                          type="date"
+                          value={fechaHastaCurva}
+                          onChange={(e) => setFechaHastaCurva(e.target.value)}
+                          className="w-full rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-xs text-gray-800 focus:border-[#9B0F06] focus:bg-white focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFiltroAnioCurva('todos')
+                        setFechaDesdeCurva('')
+                        setFechaHastaCurva('')
+                        setTipoMetricaCurva('porcentaje')
+                      }}
+                      className="text-[11px] font-bold text-gray-500 hover:text-[#9B0F06] cursor-pointer"
+                    >
+                      Restablecer
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setModalFiltrosCurvaOpen(false)}
+                      className="rounded-lg bg-[#9B0F06] px-4 py-2 text-xs font-bold text-white hover:bg-[#7A0C0D] transition-colors cursor-pointer shadow-xs"
+                    >
+                      Aplicar Filtros
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
           </div>
         </div>
       )}

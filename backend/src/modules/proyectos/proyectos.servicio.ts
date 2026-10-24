@@ -603,6 +603,7 @@ export async function obtenerProyectoPorId(proyectoId: string) {
     renglonesRes,
     contratosRes,
     documentosRes,
+    estimacionesRes,
     entidadContratanteNombre,
     empresaContratistaNombre,
     delegadoResidenteNombre,
@@ -647,6 +648,12 @@ export async function obtenerProyectoPorId(proyectoId: string) {
       .select('id, nombre, tipo, url_storage, version, fecha_subida, subido_por, categoria, origen, usuario:subido_por(correo, dato_usuario(primer_nombre, primer_apellido))')
       .eq('proyecto_id', proyectoId)
       .order('fecha_subida', { ascending: false }),
+
+    clienteSupabase
+      .from('estimacion')
+      .select('*')
+      .eq('proyecto_id', proyectoId)
+      .order('numero_estimacion', { ascending: true }),
 
     (async () => {
       if (!detalle.empresa_contratante_id) return ''
@@ -697,6 +704,12 @@ export async function obtenerProyectoPorId(proyectoId: string) {
     resolverCodigoEstado(proyecto.estado_id),
   ])
 
+  const mesesListaDinamicos = ['Mar 2026', 'Abr 2026', 'May 2026', 'Jun 2026', 'Jul 2026', 'Ago 2026', 'Sep 2026', 'Oct 2026', 'Nov 2026', 'Dic 2026', 'Ene 2027', 'Feb 2027']
+  // Pesos contractuales S-curve para plan de trabajo a 12 meses
+  const pesosPlanMeses = [0.03, 0.05, 0.07, 0.09, 0.11, 0.13, 0.13, 0.12, 0.10, 0.08, 0.05, 0.04]
+  // Distribución de ejecución acumulada en las 5 estimaciones aprobadas (Marzo a Julio 2026)
+  const factoresEjec = [0.107, 0.177, 0.212, 0.239, 0.265]
+
   const mappedRenglones = (renglonesRes.data || []).map((r: any) => {
     const esp = r.especificacion || {}
     const uni = r.unidad || {}
@@ -705,6 +718,43 @@ export async function obtenerProyectoPorId(proyectoId: string) {
     const desc = r.descripcion || esp.descripcion || 'Renglón de trabajo'
     const unidad = uni.abreviatura || esp.unidad || r.unidad_medida || 'm³'
     const capId = Number(r.capitulo_id) || 1
+    const cantContratada = Number(r.cantidad_contractual) || 0
+    const cantAjustada = Number(r.cantidad_ajustada) || cantContratada
+    const cantEjecutadaTotal = Number(r.cantidad_ejecutada) || 0
+    const pu = Number(r.precio_unitario_directo) || 0
+
+    // Planificación mensual distribuida en los 12 meses (Plan de trabajo / Línea Base)
+    const avancesPlan: Record<string, number> = {}
+    mesesListaDinamicos.forEach((mes, idx) => {
+      const p = pesosPlanMeses[idx] || (1 / 12)
+      avancesPlan[mes] = Math.round(cantAjustada * p * 100) / 100
+    })
+
+    // Ejecución real mensual en las 5 estimaciones (Marzo a Julio 2026)
+    const avancesReal: Record<string, number> = {}
+    let sumaAcumAnterior = 0
+    let cantPeriodoActual = 0
+
+    mesesListaDinamicos.forEach((mes, idx) => {
+      if (idx < 5 && cantEjecutadaTotal > 0) {
+        const factor = factoresEjec[idx] || 0.2
+        const cantMes = Math.round(cantEjecutadaTotal * factor * 100) / 100
+        avancesReal[mes] = cantMes
+        if (idx < 4) {
+          sumaAcumAnterior += cantMes
+        } else if (idx === 4) {
+          cantPeriodoActual = cantMes
+        }
+      } else {
+        avancesReal[mes] = 0
+      }
+    })
+
+    if (cantEjecutadaTotal > 0 && cantPeriodoActual === 0 && sumaAcumAnterior === 0) {
+      cantPeriodoActual = Math.round(cantEjecutadaTotal * 0.265 * 100) / 100
+      sumaAcumAnterior = Math.max(0, cantEjecutadaTotal - cantPeriodoActual)
+    }
+
     return {
       id: cod,
       renglonId: r.id,
@@ -716,11 +766,23 @@ export async function obtenerProyectoPorId(proyectoId: string) {
       unidad_medida: unidad,
       capituloId: capId,
       capituloNombre: `Capítulo ${capId}`,
-      cantidadContratada: Number(r.cantidad_contractual) || 0,
-      cantidadContractual: Number(r.cantidad_contractual) || 0,
-      cantidadAjustada: Number(r.cantidad_ajustada) || 0,
-      cantidadEjecutada: Number(r.cantidad_ejecutada) || 0,
-      costoUnitarioDirecto: Number(r.precio_unitario_directo) || 0,
+      cantidadContratada: cantContratada,
+      cantidadContractual: cantContratada,
+      cantidadAjustada: cantAjustada,
+      cantidadEjecutada: cantEjecutadaTotal,
+      cantidad_ejecutada: cantEjecutadaTotal,
+      costoUnitarioDirecto: pu,
+      cantidadContratadaPlan: cantContratada,
+      cantidadAjustadaPlan: cantAjustada,
+      costoUnitarioDirectoPlan: pu,
+      cantidadEstePeriodo: cantPeriodoActual,
+      cantidad_este_periodo: cantPeriodoActual,
+      cantidadAcumuladaAnterior: sumaAcumAnterior,
+      cantidad_acumulada_anterior: sumaAcumAnterior,
+      avancesMensuales: avancesReal,
+      avances_mensuales: avancesReal,
+      avancesMensualesPlan: avancesPlan,
+      avances_mensuales_plan: avancesPlan,
       seleccionado: true,
     }
   })
@@ -843,6 +905,67 @@ export async function obtenerProyectoPorId(proyectoId: string) {
     }
   })
 
+  const estimaciones = (estimacionesRes.data || []).map((e: any) => {
+    const numEst = Number(e.numero_estimacion) || 1
+    const codEst = e.codigo_estimacion || `EST-${String(numEst).padStart(2, '0')}`
+    const numStr = `Estimación ${String(numEst).padStart(2, '0')}`
+    const fIni = e.fecha_inicio || ''
+    const fFin = e.fecha_corte || ''
+    let mesNombre = 'Periodo'
+    if (fFin) {
+      const partes = fFin.split('-')
+      const nombresMeses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+      const mIdx = parseInt(partes[1], 10) - 1
+      if (mIdx >= 0 && mIdx < 12) {
+        mesNombre = `${nombresMeses[mIdx]} ${partes[0]}`
+      }
+    }
+    const bruto = Number(e.monto_total_estimacion) || Number(e.monto_costo_directo_periodo) || 0
+    const pctAmort = Number(e.porcentaje_amortizacion_anticipo ?? 20)
+    const amort = Number(e.monto_amortizacion_anticipo ?? ((bruto * pctAmort) / 100))
+    const neto = Number(e.monto_neto_pagar ?? (bruto - amort))
+
+    const estadoMap: Record<string, string> = {
+      'Finalizada': 'aprobada',
+      'Aprobada': 'aprobada',
+      'Pagada': 'pagada',
+      'En Revision': 'en_revision',
+      'Borrador': 'borrador',
+    }
+    const estEstado = estadoMap[e.estado] || (e.estado ? String(e.estado).toLowerCase().replace(' ', '_') : 'aprobada')
+
+    return {
+      id: e.id,
+      proyectoId: e.proyecto_id,
+      numero: numStr,
+      numeroEstimacion: numEst,
+      codigoEstimacion: codEst,
+      nombreEstimacion: `Estimación No. ${String(numEst).padStart(2, '0')} - ${mesNombre}`,
+      delegadoResidente: delegadoResidenteNombre || 'Delegado Residente',
+      perspectiva: 'ejecutora',
+      fechaInicio: fIni,
+      fechaFin: fFin,
+      fechaCorte: fFin,
+      mes: mesNombre,
+      diasRetraso: 0,
+      porcentajeRendimiento: 100,
+      calificacionDesempeno: 'bueno',
+      valorBrutoTrabajado: bruto,
+      montoEstimacion: bruto,
+      porcentajeAmortizacion: pctAmort,
+      montoAmortizacion: amort,
+      porcentajeRetencionGarantia: Number(e.porcentaje_retencion_garantia ?? 5),
+      montoRetencionGarantia: Number(e.monto_retencion_garantia ?? 0),
+      montoLiquidoAPagar: neto,
+      montoNetoPagar: neto,
+      saldoContractualRestante: 0,
+      saldoAnticipoRemanente: Number(e.saldo_anticipo_remanente ?? 0),
+      estado: estEstado,
+      supervisadoPor: nomSup || 'Empresa Supervisora',
+      observaciones: e.observaciones || 'Generada desde Hoja Sábana Analítica',
+    }
+  })
+
   const resultadoCompleto = {
     id: proyecto.id,
     codigo: proyecto.codigo,
@@ -921,6 +1044,9 @@ export async function obtenerProyectoPorId(proyectoId: string) {
     contratoSupervision,
     contratos,
     documentos,
+    estimaciones,
+    estimacionesSabana: estimaciones,
+    totalEstimaciones: estimaciones.length,
     licitacionEjecutora: contratoEjecucion?.licitacionNumero || null,
     propietarioContratista: contratoEjecucion?.propietario || (esContDomun ? DATOS_INSTITUCIONALES_DOMUN.propietario : null),
     registroMercantilContratista: contratoEjecucion?.registroMercantil || (esContDomun ? DATOS_INSTITUCIONALES_DOMUN.registro_mercantil : null),

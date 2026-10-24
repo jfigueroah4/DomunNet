@@ -1644,7 +1644,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
             cantidadAjustadaPlan: Number(r.cantidadAjustadaPlan ?? r.cantidad_ajustada_plan ?? r.cantidadAjustada ?? r.cantidad_ajustada ?? 0),
             costoUnitarioDirectoPlan: Number(r.costoUnitarioDirectoPlan ?? r.precio_unitario_directo_plan ?? r.costoUnitarioDirecto ?? r.precio_unitario_directo ?? 0),
             cantidadEstePeriodo: Number(r.cantidadEstePeriodo ?? r.cantidad_este_periodo ?? 0),
-            cantidadAcumuladaAnterior: Number(r.cantidadAcumuladaAnterior ?? r.cantidad_ejecutada ?? 0),
+            cantidadAcumuladaAnterior: Number(r.cantidadAcumuladaAnterior ?? r.cantidad_acumulada_anterior ?? (r.cantidadEjecutada != null ? Math.max(0, Number(r.cantidadEjecutada) - Number(r.cantidadEstePeriodo || 0)) : (r.cantidad_ejecutada != null ? Math.max(0, Number(r.cantidad_ejecutada) - Number(r.cantidad_este_periodo || 0)) : 0))),
             avancesMensuales: r.avancesMensuales || r.avances_mensuales || {},
             avancesMensualesPlan: r.avancesMensualesPlan || r.avances_mensuales_plan || {},
           }))
@@ -2385,8 +2385,8 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
       const cantAjustada = isPlan ? (r.cantidadAjustadaPlan ?? r.cantidadAjustada) : r.cantidadAjustada
       const pu = isPlan ? (r.costoUnitarioDirectoPlan ?? r.costoUnitarioDirecto) : r.costoUnitarioDirecto
 
-      let cantPeriodo = isPlan ? 0 : r.cantidadEstePeriodo
-      let cantAcum = isPlan ? 0 : (r.cantidadAcumuladaAnterior || 0)
+      let cantPeriodo = isPlan ? 0 : Number(r.cantidadEstePeriodo || r.cantidad_este_periodo || 0)
+      let cantAcum = isPlan ? 0 : Number(r.cantidadAcumuladaAnterior || r.cantidad_acumulada_anterior || (r.cantidadEjecutada ? Math.max(0, r.cantidadEjecutada - cantPeriodo) : 0))
 
       if (!isPlan && numEstimacionFiltro !== 'todos') {
         const medEst = medicionesAnaliticas.filter(
@@ -4069,8 +4069,8 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                             const costoTotalDirectoG = Math.round(cantContratadaD * costoUnitF * 100) / 100
                             const costoTotalAjustadoH = Math.round(cantAjustadaE * costoUnitF * 100) / 100
 
-                            let cantEstePeriodoI = isPlanMode ? 0 : r.cantidadEstePeriodo
-                            let cantAcumAnteriorJ = isPlanMode ? 0 : (esEditando ? Number(datosEditando.cantidadAcumuladaAnterior ?? r.cantidadAcumuladaAnterior) : r.cantidadAcumuladaAnterior)
+                            let cantEstePeriodoI = isPlanMode ? 0 : Number(r.cantidadEstePeriodo || r.cantidad_este_periodo || 0)
+                            let cantAcumAnteriorJ = isPlanMode ? 0 : (esEditando ? Number(datosEditando.cantidadAcumuladaAnterior ?? r.cantidadAcumuladaAnterior) : Number(r.cantidadAcumuladaAnterior || r.cantidad_acumulada_anterior || (r.cantidadEjecutada ? Math.max(0, r.cantidadEjecutada - cantEstePeriodoI) : 0)))
 
                             if (!isPlanMode && numEstimacionFiltro !== 'todos') {
                               const medEst = medicionesAnaliticas.filter(
@@ -4309,9 +4309,10 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                                   }
 
                                   const objAvancesEdit = (datosEditando as any)[campoAvancesKey] || (r as any)[campoAvancesKey] || {}
+                                  const montoMes = Math.round(valMes * costoUnitF * 100) / 100
 
                                   return (
-                                    <td key={mes} className="px-2 py-1.5 text-right font-mono text-[8.5px] font-normal text-gray-600">
+                                    <td key={mes} className="px-2 py-1.5 text-right font-mono text-[8.5px] font-normal text-gray-600 whitespace-nowrap">
                                       {esEditando ? (
                                         <input
                                           type="text"
@@ -4331,7 +4332,9 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                                           className="w-16 rounded border-2 border-gray-700 bg-white px-1 py-0.5 text-right font-mono text-[9px] font-normal text-gray-900 focus:outline-none"
                                         />
                                       ) : (
-                                        <span>{valMes > 0 ? formatQuantity(valMes, r.unidad) : 'Q.00'}</span>
+                                        <span title={`${formatQuantity(valMes, r.unidad)} ${r.unidad}`}>
+                                          {montoMes > 0 ? `Q ${montoMes.toLocaleString('es-GT', { minimumFractionDigits: 2 })}` : 'Q 0.00'}
+                                        </span>
                                       )}
                                     </td>
                                   )
