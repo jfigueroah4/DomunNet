@@ -19,6 +19,7 @@ const FotografiaFormulario = dynamic(
 )
 import { apiGetDeduplicado } from '@/lib/api/cliente'
 import { esProyectoNoBorrador } from '@/lib/proyectos/estado'
+import { useAuthStore } from '@/stores/useAuthStore'
 
 export default function FotografiasDetail() {
   const params = useParams()
@@ -41,6 +42,22 @@ export default function FotografiasDetail() {
   const [fechaFin, setFechaFin] = useState('')
 
   const [mostrarFormulario, setMostrarFormulario] = useState(false)
+  const usuarioActual = useAuthStore((s: any) => s.profile)
+  const rolActualNorm = String(usuarioActual?.rol || '').toLowerCase().trim()
+  const esPersonalCampo =
+    rolActualNorm.includes('topograf') ||
+    rolActualNorm.includes('laborator') ||
+    rolActualNorm.includes('auxiliar') ||
+    rolActualNorm === 'campo' ||
+    rolActualNorm === 'inspector'
+
+  const noPuedeSubirEvidencia =
+    rolActualNorm.includes('ejecutora') ||
+    rolActualNorm.includes('contratista') ||
+    rolActualNorm.includes('supervis') ||
+    rolActualNorm.includes('contratante')
+
+  const puedeSubirEvidencia = !noPuedeSubirEvidencia
   const [proyectoApi, setProyectoApi] = useState<any>(null)
   const [proyectosDisponibles, setProyectosDisponibles] = useState<any[]>([])
   const [fotosCargadas, setFotosCargadas] = useState<any[]>([])
@@ -346,14 +363,39 @@ export default function FotografiasDetail() {
 
   const listaProyectosCombo = useMemo(() => {
     const rawList = proyectosDisponibles.length > 0 ? proyectosDisponibles : PROYECTOS_MOCK
-    const list = rawList.filter(esProyectoNoBorrador)
+    let list = rawList.filter(esProyectoNoBorrador)
     if (proyectoApi && !list.some((p: any) => String(p.id).toLowerCase() === String(proyectoApi.id).toLowerCase())) {
       if (esProyectoNoBorrador(proyectoApi)) {
-        return [proyectoApi, ...list]
+        list = [proyectoApi, ...list]
       }
     }
+    const esAdminOGerencia = rolActualNorm.includes('admin') || rolActualNorm.includes('gerenc') || (usuarioActual as any)?.nivel_permisos >= 100
+    if (!esAdminOGerencia && usuarioActual?.id) {
+      const uId = String(usuarioActual.id).toLowerCase()
+      const uEmail = String(usuarioActual.correo || '').toLowerCase()
+      const uNombre = (usuarioActual.nombre || `${usuarioActual.primer_nombre || ''} ${usuarioActual.primer_apellido || ''}`).toLowerCase().trim()
+
+      list = list.filter((proyecto: any) => {
+        const esResp = String(proyecto.responsable_id || proyecto.responsableId || proyecto.responsable || '').toLowerCase() === uId || String(proyecto.responsable_id || proyecto.responsableId || '').toLowerCase() === uEmail
+        const esDel = String(proyecto.delegadoResidenteId || proyecto.delegado_residente_id || '').toLowerCase() === uId || String(proyecto.delegadoResidenteId || proyecto.delegado_residente_id || '').toLowerCase() === uEmail
+        const enEquipo = Array.isArray(proyecto.equipo) && proyecto.equipo.some((m: any) => {
+          const mId = String(m.id || m.usuarioId || '').toLowerCase()
+          const mNom = String(m.nombre || '').toLowerCase()
+          return (mId && (mId === uId || mId === uEmail)) || (mNom && uNombre.length > 2 && mNom.includes(uNombre))
+        })
+        const coincideNombre =
+          (proyecto.responsable && typeof proyecto.responsable === 'string' && uNombre.length > 2 && proyecto.responsable.toLowerCase().includes(uNombre)) ||
+          (proyecto.delegadoResidente && typeof proyecto.delegadoResidente === 'string' && uNombre.length > 2 && proyecto.delegadoResidente.toLowerCase().includes(uNombre))
+        const enListaAsignados = Array.isArray(usuarioActual.proyectosAsignados) && usuarioActual.proyectosAsignados.some((pa: any) => {
+          const paStr = typeof pa === 'string' ? pa : (pa.id || pa.codigo || pa.nombre)
+          return paStr && (paStr === proyecto.id || paStr === proyecto.codigo || paStr === proyecto.nombre || paStr === proyecto.nombreOficial)
+        })
+
+        return esResp || esDel || enEquipo || coincideNombre || enListaAsignados
+      })
+    }
     return list
-  }, [proyectosDisponibles, proyectoApi])
+  }, [proyectosDisponibles, proyectoApi, rolActualNorm, usuarioActual])
 
   // Lista base de fotografías asociadas al proyecto
   const fotosBase = useMemo(() => {
@@ -377,6 +419,16 @@ export default function FotografiasDetail() {
     if (!fotosBase || fotosBase.length === 0) return []
 
     return fotosBase.filter((foto: any) => {
+      // Topógrafo, Laboratorista, Auxiliar solo pueden ver las fotos que ellos subieron
+      if (esPersonalCampo && usuarioActual) {
+        const uId = String(usuarioActual.id || '').toLowerCase()
+        const uNombre = (usuarioActual.nombre || `${usuarioActual.primer_nombre || ''} ${usuarioActual.primer_apellido || ''}`).toLowerCase().trim()
+        const fotoAutor = String(foto.autor || '').toLowerCase()
+        const esSuya =
+          String(foto.usuario_id || foto.usuarioId || foto.autor_id || foto.autorId || '').toLowerCase() === uId ||
+          (fotoAutor && uNombre.length > 2 && fotoAutor.includes(uNombre))
+        if (!esSuya) return false
+      }
       const textoBusqueda = busqueda.toLowerCase().trim()
       const matchBusqueda =
         textoBusqueda === '' ||
@@ -533,14 +585,16 @@ export default function FotografiasDetail() {
           </div>
 
           {/* Botón '+' Crear en la fila del título en móviles */}
-          <button
-            type="button"
-            onClick={() => router.push(`/dashboard/bitacora?nuevo=true${proyectoId ? `&proyectoId=${proyectoId}` : ''}`)}
-            className="flex sm:hidden items-center justify-center bg-[#9B0F06] text-white p-2 rounded-lg hover:bg-[#5E0006] transition-colors cursor-pointer shadow-xs shrink-0 self-center"
-            title="Nueva evidencia"
-          >
-            <Plus size={16} />
-          </button>
+          {puedeSubirEvidencia && (
+            <button
+              type="button"
+              onClick={() => router.push(`/dashboard/bitacora?nuevo=true${proyectoId ? `&proyectoId=${proyectoId}` : ''}`)}
+              className="flex sm:hidden items-center justify-center bg-[#9B0F06] text-white p-2 rounded-lg hover:bg-[#5E0006] transition-colors cursor-pointer shadow-xs shrink-0 self-center"
+              title="Nueva evidencia"
+            >
+              <Plus size={16} />
+            </button>
+          )}
         </div>
         
         <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
@@ -572,15 +626,17 @@ export default function FotografiasDetail() {
           )}
 
           {/* Botón Nueva Evidencia para pantallas medianas/grandes */}
-          <button
-            type="button"
-            onClick={() => router.push(`/dashboard/bitacora?nuevo=true${proyectoId ? `&proyectoId=${proyectoId}` : ''}`)}
-            className="hidden sm:flex items-center justify-center gap-1.5 bg-[#9B0F06] text-white text-xs font-bold px-3.5 py-2 rounded-lg hover:bg-[#5E0006] transition-colors cursor-pointer shadow-xs whitespace-nowrap shrink-0"
-            title="Nueva evidencia"
-          >
-            <Plus size={16} className="shrink-0" />
-            <span>Nueva evidencia</span>
-          </button>
+          {puedeSubirEvidencia && (
+            <button
+              type="button"
+              onClick={() => router.push(`/dashboard/bitacora?nuevo=true${proyectoId ? `&proyectoId=${proyectoId}` : ''}`)}
+              className="hidden sm:flex items-center justify-center gap-1.5 bg-[#9B0F06] text-white text-xs font-bold px-3.5 py-2 rounded-lg hover:bg-[#5E0006] transition-colors cursor-pointer shadow-xs whitespace-nowrap shrink-0"
+              title="Nueva evidencia"
+            >
+              <Plus size={16} className="shrink-0" />
+              <span>Nueva evidencia</span>
+            </button>
+          )}
 
           <div className="flex items-center gap-0.5 border border-gray-200 rounded-lg p-0.5 bg-white shrink-0 shadow-2xs font-[Poppins]">
             {([2, 3, 4] as const).map((num) => (

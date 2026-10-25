@@ -147,6 +147,34 @@ export async function obtenerProyectoControlador(req: Request, res: Response) {
 export async function obtenerProyectosControlador(req: Request, res: Response) {
   try {
     const proyectos = await obtenerProyectos()
+    const usuario = (req as any).usuario
+    if (usuario && usuario.rol) {
+      const rolNorm = String(usuario.rol).toLowerCase().trim()
+      const esAdminOGerencia = rolNorm.includes('admin') || rolNorm.includes('gerenc') || (usuario.nivel_permisos && usuario.nivel_permisos >= 100)
+      if (!esAdminOGerencia) {
+        const uId = String(usuario.sub || usuario.id || '').toLowerCase()
+        const uNom = String(usuario.nombre || '').toLowerCase().trim()
+        const proyectosFiltrados = proyectos.filter((p: any) => {
+          const respId = String(p.responsable_id || p.responsableId || '').toLowerCase()
+          const delId = String(p.delegadoResidenteId || p.delegado_residente_id || '').toLowerCase()
+          if (respId && respId === uId) return true
+          if (delId && delId === uId) return true
+          if (Array.isArray(p.equipo)) {
+            const enEquipo = p.equipo.some((m: any) => {
+              const mId = String(m.id || m.usuarioId || '').toLowerCase()
+              const mNom = String(m.nombre || '').toLowerCase()
+              return (mId && mId === uId) || (mNom && uNom.length > 2 && mNom.includes(uNom))
+            })
+            if (enEquipo) return true
+          }
+          if (Array.isArray(p.usuariosAsignadosIds)) {
+            if (p.usuariosAsignadosIds.some((id: string) => String(id).toLowerCase() === uId)) return true
+          }
+          return false
+        })
+        return sendResponse(res, 200, proyectosFiltrados, 'Proyectos obtenidos correctamente')
+      }
+    }
     return sendResponse(res, 200, proyectos, 'Proyectos obtenidos correctamente')
   } catch (error: any) {
     console.error('Error en obtenerProyectosControlador:', error)

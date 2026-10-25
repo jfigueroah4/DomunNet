@@ -76,7 +76,12 @@ export function formatearFecha(valor: string | null) {
   return fecha.toLocaleDateString('es-GT')
 }
 
-export function mapearUsuario(fila: FilaUsuarioJoin, nombreRol: string | null, sesionesActivas: any[] = []) {
+export function mapearUsuario(
+  fila: FilaUsuarioJoin,
+  nombreRol: string | null,
+  sesionesActivas: any[] = [],
+  proyectosAsignados: any[] = []
+) {
   const dato = Array.isArray(fila.dato_usuario) ? fila.dato_usuario[0] : fila.dato_usuario
   const primerNom = capitalizarNombrePropio(dato?.primer_nombre)
   const segundoNom = capitalizarNombrePropio(dato?.segundo_nombre)
@@ -92,7 +97,7 @@ export function mapearUsuario(fila: FilaUsuarioJoin, nombreRol: string | null, s
 
   let estadoCalculado: 'Activo' | 'Inactivo' | 'Suspendido' = 'Suspendido'
   if (fila.activo) {
-    estadoCalculado = 'Activo'
+    estadoCalculado = sesionesActivas.length > 0 ? 'Activo' : 'Inactivo'
   }
 
   return {
@@ -111,7 +116,7 @@ export function mapearUsuario(fila: FilaUsuarioJoin, nombreRol: string | null, s
     activo: fila.activo,
     estado: estadoCalculado,
     enLinea: sesionesActivas.length > 0,
-    proyectosAsignados: [],
+    proyectosAsignados: proyectosAsignados,
     sesionesActivasCount: sesionesActivas.length,
     dispositivosActivos: sesionesActivas,
     ultimoAcceso: formatearFecha(fila.ultimo_acceso),
@@ -163,7 +168,7 @@ async function obtenerUsuariosBase() {
 
 export async function listarUsuarios(filtros: FiltrosUsuarios = {}) {
   const ochoHorasAtras = new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString()
-  const [usuarios, mapaRoles, resLogs] = await Promise.all([
+  const [usuarios, mapaRoles, resLogs, resProyUsuarios, resDelegados] = await Promise.all([
     obtenerUsuariosBase(),
     obtenerRolesPorId(),
     clienteSupabase
@@ -173,7 +178,41 @@ export async function listarUsuarios(filtros: FiltrosUsuarios = {}) {
       .in('accion', ['login', 'logout'])
       .gte('fecha_hora', ochoHorasAtras)
       .order('fecha_hora', { ascending: false }),
+    clienteSupabase
+      .from('proyecto_usuario')
+      .select('usuario_id, rol_proyecto, proyecto:proyecto_id(id, codigo, nombre)'),
+    clienteSupabase
+      .from('proyecto_detalle')
+      .select('delegado_residente_id, proyecto_id, nombre_oficial, proyecto:proyecto_id(id, codigo, nombre)'),
   ])
+
+  const mapaProyectosUsuario = new Map<string, any[]>()
+  for (const pu of (resProyUsuarios.data || [])) {
+    if (!pu.usuario_id || !pu.proyecto) continue
+    const p = pu.proyecto as any
+    if (!mapaProyectosUsuario.has(pu.usuario_id)) mapaProyectosUsuario.set(pu.usuario_id, [])
+    mapaProyectosUsuario.get(pu.usuario_id)!.push({
+      id: p.id,
+      codigo: p.codigo,
+      nombre: p.nombre,
+      rol: pu.rol_proyecto || 'Asignado',
+    })
+  }
+
+  for (const pd of (resDelegados.data || [])) {
+    if (!pd.delegado_residente_id || !pd.proyecto) continue
+    const p = pd.proyecto as any
+    if (!mapaProyectosUsuario.has(pd.delegado_residente_id)) mapaProyectosUsuario.set(pd.delegado_residente_id, [])
+    const existing = mapaProyectosUsuario.get(pd.delegado_residente_id)!
+    if (!existing.some((x: any) => x.id === p.id)) {
+      existing.push({
+        id: p.id,
+        codigo: p.codigo,
+        nombre: pd.nombre_oficial || p.nombre,
+        rol: 'Delegado Residente',
+      })
+    }
+  }
 
   const mapaLogs = new Map<string, any[]>()
   for (const l of resLogs.data || []) {
@@ -215,7 +254,7 @@ export async function listarUsuarios(filtros: FiltrosUsuarios = {}) {
     const sesiones = mapaSesionesActivas.get(usuario.id) || []
     let estadoStr: 'Activo' | 'Inactivo' | 'Suspendido' = 'Suspendido'
     if (usuario.activo) {
-      estadoStr = 'Activo'
+      estadoStr = sesiones.length > 0 ? 'Activo' : 'Inactivo'
     }
 
     const cumpleBusqueda =
@@ -228,7 +267,7 @@ export async function listarUsuarios(filtros: FiltrosUsuarios = {}) {
     const cumpleEstado = !filtros.estado || filtros.estado === 'Todos' || estadoStr === filtros.estado
 
     return cumpleBusqueda && cumpleRol && cumpleEstado
-  }).map((usuario) => mapearUsuario(usuario, usuario.rol_id ? mapaRoles.get(usuario.rol_id) || null : null, mapaSesionesActivas.get(usuario.id) || []))
+  }).map((usuario) => mapearUsuario(usuario, usuario.rol_id ? mapaRoles.get(usuario.rol_id) || null : null, mapaSesionesActivas.get(usuario.id) || [], mapaProyectosUsuario.get(usuario.id) || []))
 }
 
 export async function obtenerUsuarioPorId(id: string) {

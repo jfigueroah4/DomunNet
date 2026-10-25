@@ -65,9 +65,31 @@ export class HojaSabanaServicio {
     }
 
     const enMemoria = medicionesAnaliticasMemoriaStore.get(proyectoId) || []
-    return enMemoria.filter((m) => {
-      const matchEst = !estimacionNum || m.estimacionNum === estimacionNum || m.estimacion_num === estimacionNum
-      const matchCod = !codigoDGC || m.codigoDGC === codigoDGC || m.codigo_dgc === codigoDGC
+    if (enMemoria.length > 0) {
+      return enMemoria.filter((m) => {
+        const matchEst = !estimacionNum || m.estimacionNum === estimacionNum || m.estimacion_num === estimacionNum
+        const matchCod = !codigoDGC || m.codigoDGC === codigoDGC || m.codigo_dgc === codigoDGC
+        return matchEst && matchCod
+      })
+    }
+
+    // Mediciones analíticas analíticas de campo por renglón y estimación (Memoria de Cálculo)
+    const MEDICIONES_SEMILLA = [
+      { id: 'med-01', proyecto_id: proyectoId, codigo_dgc: '201.03 (b)', descripcion: 'Retiro de Pavimento, Aceras y Otros (OTS-3)', estacion_inicio: '14+200', estacion_fin: '14+700', longitud_l: 500, ancho_a: 7.3, altura_h: 0.15, lado_via: 'Sección Completa', multiplicador: 1, descuento: 0, tipo_descuento: 'monto', cantidad_calculada: 547.5, unidad: 'm³', origen_tipo: 'Libreta', referencia_origen: 'Libreta topográfica N° 01 - Est. 01', estimacion_num: 'Estimación 01', mes_periodo: 'Mar 2026', observaciones: 'Espesor verificado mediante calas de prueba en carril derecho.' },
+      { id: 'med-02', proyecto_id: proyectoId, codigo_dgc: '202.02', descripcion: 'Limpia chapeo y destronque', estacion_inicio: '14+000', estacion_fin: '15+500', longitud_l: 1500, ancho_a: 10, altura_h: 1, lado_via: 'Sección Completa', multiplicador: 1, descuento: 0, tipo_descuento: 'monto', cantidad_calculada: 1.5, unidad: 'Ha', origen_tipo: 'Plano', referencia_origen: 'Anotación Bitácora N° 03', estimacion_num: 'Estimación 01', mes_periodo: 'Mar 2026', observaciones: 'Despeje de derecho de vía conforme a planos constructivos.' },
+      { id: 'med-03', proyecto_id: proyectoId, codigo_dgc: '203.03 (a)', descripcion: 'Excavación No Clasificada(OC-2)(OC-3)', estacion_inicio: '14+300', estacion_fin: '15+100', longitud_l: 800, ancho_a: 8.5, altura_h: 1.4, lado_via: 'Lado Izquierdo', multiplicador: 1, descuento: 0, tipo_descuento: 'monto', cantidad_calculada: 9520, unidad: 'm³', origen_tipo: 'Libreta', referencia_origen: 'Libreta de nivelación N° 04', estimacion_num: 'Estimación 02', mes_periodo: 'Abr 2026', observaciones: 'Sección transversal verificada con estación total en talud.' },
+      { id: 'med-04', proyecto_id: proyectoId, codigo_dgc: '203.03 (b)', descripcion: 'Excavación No Clasificada de Desperdicio (OTS-1)(OTS-2)(OTS-3)', estacion_inicio: '14+800', estacion_fin: '15+600', longitud_l: 800, ancho_a: 7.5, altura_h: 1.2, lado_via: 'Sección Completa', multiplicador: 1, descuento: 0, tipo_descuento: 'monto', cantidad_calculada: 7200, unidad: 'm³', origen_tipo: 'Libreta', referencia_origen: 'Reporte de volquetes N° 12', estimacion_num: 'Estimación 02', mes_periodo: 'Abr 2026', observaciones: 'Material transportado a botadero autorizado.' },
+      { id: 'med-05', proyecto_id: proyectoId, codigo_dgc: '203.03 (c)', descripcion: 'Excavación No Clasificada para Préstamo', estacion_inicio: '15+000', estacion_fin: '16+000', longitud_l: 1000, ancho_a: 9.0, altura_h: 1.5, lado_via: 'Sección Completa', multiplicador: 1, descuento: 0, tipo_descuento: 'monto', cantidad_calculada: 13500, unidad: 'm³', origen_tipo: 'Libreta', referencia_origen: 'Registro densímetro nuclear N° 08', estimacion_num: 'Estimación 03', mes_periodo: 'May 2026', observaciones: 'Densidad in-situ mayor al 95% de la prueba Proctor estándar.' },
+      { id: 'med-06', proyecto_id: proyectoId, codigo_dgc: '203.04 (g)', descripcion: 'Cortes en Roca (OTS-1)(OTS-2)(OTS3)', estacion_inicio: '15+400', estacion_fin: '16+100', longitud_l: 700, ancho_a: 6.5, altura_h: 2.0, lado_via: 'Lado Derecho', multiplicador: 1, descuento: 0, tipo_descuento: 'monto', cantidad_calculada: 9100, unidad: 'm³', origen_tipo: 'Libreta', referencia_origen: 'Control de voladura N° 06', estimacion_num: 'Estimación 03', mes_periodo: 'May 2026', observaciones: 'Volumen derivado de perforación y voladura en banco de roca dura.' },
+      { id: 'med-07', proyecto_id: proyectoId, codigo_dgc: '203.03 (d)', descripcion: 'Sub-Excavación', estacion_inicio: '15+800', estacion_fin: '16+600', longitud_l: 800, ancho_a: 7.3, altura_h: 0.6, lado_via: 'Sección Completa', multiplicador: 1, descuento: 0, tipo_descuento: 'monto', cantidad_calculada: 3504, unidad: 'm³', origen_tipo: 'Libreta', referencia_origen: 'Anotación Bitácora N° 18', estimacion_num: 'Estimación 04', mes_periodo: 'Jun 2026', observaciones: 'Reemplazo de estrato fangoso arcilloso bajo subrasante.' },
+      { id: 'med-08', proyecto_id: proyectoId, codigo_dgc: '203.04 (h)', descripcion: 'Contracunetas (OC-1)(OC-3)', estacion_inicio: '15+200', estacion_fin: '16+400', longitud_l: 1200, ancho_a: 1.0, altura_h: 0.6, lado_via: 'Lado Izquierdo', multiplicador: 1, descuento: 0, tipo_descuento: 'monto', cantidad_calculada: 720, unidad: 'm', origen_tipo: 'Plano', referencia_origen: 'Plano hidráulico D-04', estimacion_num: 'Estimación 04', mes_periodo: 'Jun 2026', observaciones: 'Contracuneta revestida de concreto para protección de taludes.' },
+      { id: 'med-09', proyecto_id: proyectoId, codigo_dgc: '204.02', descripcion: 'Excavación de canales (oc-1)(oc-3)', estacion_inicio: '14+200', estacion_fin: '16+200', longitud_l: 2000, ancho_a: 1.8, altura_h: 0.8, lado_via: 'Sección Completa', multiplicador: 1, descuento: 0, tipo_descuento: 'monto', cantidad_calculada: 2880, unidad: 'm³', origen_tipo: 'Libreta', referencia_origen: 'Bitácora N° 25 - Est. 05', estimacion_num: 'Estimación 05', mes_periodo: 'Jul 2026', observaciones: 'Canal de desagüe principal con sección trapecial completada.' },
+      { id: 'med-10', proyecto_id: proyectoId, codigo_dgc: '155.07', descripcion: 'Mantenimiento de la carretera durante la ejecución del trabajo', estacion_inicio: '0+000', estacion_fin: '10+000', longitud_l: 10000, ancho_a: 1, altura_h: 1, lado_via: 'Sección Completa', multiplicador: 1, descuento: 0, tipo_descuento: 'monto', cantidad_calculada: 1, unidad: 'u', origen_tipo: 'Plano', referencia_origen: 'Certificación de paso vehicular expedida por supervisión', estimacion_num: 'Estimación 05', mes_periodo: 'Jul 2026', observaciones: 'Paso continuo garantizado durante el mes de julio sin interrupciones.' },
+    ]
+
+    return MEDICIONES_SEMILLA.filter((m) => {
+      const matchEst = !estimacionNum || m.estimacion_num === estimacionNum || m.mes_periodo === estimacionNum
+      const matchCod = !codigoDGC || m.codigo_dgc === codigoDGC
       return matchEst && matchCod
     })
   }

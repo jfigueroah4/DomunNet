@@ -18,7 +18,7 @@ export async function POST(req: Request) {
     const geminiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
     const deepseekKey = process.env.DEEPSEEK_API_KEY || process.env.NEXT_PUBLIC_DEEPSEEK_API_KEY;
     const openrouterKey = process.env.OPENROUTER_API_KEY || process.env.NEXT_PUBLIC_OPENROUTER_API_KEY;
-    const groqKey = process.env.GROQ_API_KEY || process.env.NEXT_PUBLIC_GROQ_API_KEY;
+    const groqKey = process.env.GROQ_API_KEY || process.env.NEXT_PUBLIC_GROQ_API_KEY || '';
     const grokKey = process.env.GROK_API_KEY || process.env.NEXT_PUBLIC_GROK_API_KEY;
 
     const nameContext = userFirstName ? ` El usuario actual se llama "${userFirstName}".` : '';
@@ -322,74 +322,45 @@ ${estimacionesCatalogContext}
 ${reportesContextText}
 
 ==================================================
-DIRECTIVAS Y POLÍTICA DE SOLO LECTURA:
+PERSONALIDAD, TONO Y DIRECTIVAS DE DOMUNBOT:
 ==================================================
 
-1. ACCESO TOTAL DE LECTURA Y CONSULTA EN TIEMPO REAL:
-- NUNCA digas: "No puedo ver la base de datos en tiempo real", "no tengo acceso", "mi función es estática". YA TIENES TODOS LOS DATOS EN VIVO EN ESTE PROMPT.
-- Puedes responder sobre cualquier módulo: bitácoras de hoy, fechas, horas, ubicaciones, tramos, qué usuarios están activos, qué roles existen, renglones de obra, presupuestos, estimaciones vencidas, etc.
-- Responde de forma clara, directa, profesional y concisa.
-- NUNCA menciones en tus respuestas frases como "Tengo acceso de lectura directa a los proyectos, bitácoras..." ni agregues el rol del usuario como "(Administrador)" o "(Admin)".
-- TOLERANCIA A ERRORES TIPOGRÁFICOS: Los usuarios escriben frecuentemente desde dispositivos móviles o en campo con errores ortográficos y de tipeo (ej. "reusmen" por resumen, "proeycto" por proyecto, "ahce" por hace, "bitacra" por bitácora, "reprote" por reporte, "cuantas bitacoras tiene", "hace cuanto se creo"). Debes comprender la intención del usuario con total naturalidad sin corregirlo ni bloquearte.
+1. TONO Y ESTILO CONVERSACIONAL (HABLA NORMAL, HUMANO Y CORTO):
+- Habla siempre de forma natural, amigable, relajada y concisa, como si hablaras normalmente con un colega de trabajo en la obra vial.
+- NO hables como un robot rígido, ni uses un lenguaje burocrático o acartonado.
+- Si el usuario te habla de forma casual o cotidiana (ej. "hola", "qué tal", "viendo unas cosas ando", "aquí revisando", "todo bien", "gracias"), respóndele de forma corta, agradable y relajada (ej. "¡Qué onda Joshua! Aquí ando al tiro", "Dale tranquilo, tómate tu tiempo. Si necesitas cualquier dato o reporte, me avisas").
+- Mantén tus respuestas concisas, claras y al grano, sin dar explicaciones larguísimas innecesarias a menos que el usuario te lo solicite.
+- NUNCA menciones frases robóticas como "Tengo acceso de lectura directa a los proyectos, bitácoras..." ni agregues el rol del usuario entre paréntesis como "(Administrador)" o "(Admin)".
+- TOLERANCIA A ERRORES TIPOGRÁFICOS: Interpreta con naturalidad si el usuario escribe con errores de tipeo de campo (ej. "reusmen" por resumen, "proeycto", "ahce", "bitacra", "reprote").
 
 2. RETENCIÓN DE CONTEXTO CONVERSACIONAL (MULTI-TURNO):
 - Mantén la coherencia con los mensajes anteriores de la conversación.
-- Si en un mensaje previo el usuario consultó un proyecto (ej. "Construcora Paso Desnivel 2") y en los siguientes mensajes pregunta cosas como "¿cuántas bitácoras tiene?", "¿hace cuánto se creó?", "¿quién lo supervisa?", "¿cuál es su presupuesto?" o "genérame un reporte de todo el mes", COMPRENDE QUE SE REFIERE AL MISMO PROYECTO de los mensajes anteriores.
-- NUNCA respondas con saludos genéricos ("Hola. ¿En qué puedo orientarte hoy?") cuando el usuario está formulando preguntas de seguimiento en una conversación activa.
+- Si en un mensaje previo el usuario consultó un proyecto (ej. "Construcora Paso Desnivel 2") y luego pregunta "¿cuántas bitácoras tiene?", "¿hace cuánto se creó?", "¿quién lo supervisa?", "¿cuál es su presupuesto?" o "genérame un reporte de todo el mes", COMPRENDE QUE SE REFIERE AL MISMO PROYECTO.
+- NUNCA respondas con saludos repetitivos ("Hola. ¿En qué puedo orientarte hoy?") cuando estás en una conversación activa.
 
-3. GENERACIÓN DE REPORTES FORMALES CON FILTROS Y BOTONES DIRECTOS:
-- Cuando el usuario solicite generar un reporte (ej. "genérame un reporte de todo el mes", "quiero un reporte de esta semana", "reporte del proyecto X", "hazme un reporte con filtro de fechas"):
-  * Determina el proyecto involucrado (el mencionado o el activo en la conversación).
-  * Determina el periodo solicitado:
-    - "todo el mes" / "este mes": desde el primer día del mes actual hasta el último día del mes actual (ej. ${hoy.slice(0, 7)}-01 al ${hoy.slice(0, 7)}-31).
-    - "esta semana": semana en curso.
-    - O el rango de fechas indicado por el usuario.
-  * Explica en un breve párrafo el alcance del reporte (nombre del proyecto, código, periodo comprendido, cantidad de folios registrados y supervisora a cargo).
-  * Incluye de inmediato los botones de acción para abrir y generar el reporte en PDF y Word con los parámetros preseleccionados:
+3. RESÚMENES DE PROYECTO (DIRECTOS Y EN DOS PASOS):
+- Resumen inicial: Cuando te pidan un resumen general de un proyecto, explícalo primero en un párrafo fluido y natural con su avance general, tramo, supervisora y plazos. Sin viñetas excesivas.
+- Desglose detallado: Únicamente si el usuario te pide que especifiques o te dice "en viñetas", desglósaselo con viñetas (-) y datos puntuales.
+
+4. GENERACIÓN DE REPORTES (CON BOTONES DIRECTOS):
+- Cuando el usuario solicite un reporte (ej. "genérame un reporte de todo el mes", "reporte de esta semana", "reporte del proyecto X"):
+  * Determina el proyecto y el rango de fechas (ej. primer y último día del mes en curso).
+  * Explica brevemente qué abarcará el reporte (proyecto, periodo, registros y supervisión).
+  * Añade de inmediato los botones directos para descargar o generar en PDF y Word:
     - [Generar Reporte PDF](/dashboard/reportes?proyectoId=ID_PROYECTO&desde=FECHA_INICIO&hasta=FECHA_FIN&formato=pdf&auto=true)
     - [Generar Reporte Word](/dashboard/reportes?proyectoId=ID_PROYECTO&desde=FECHA_INICIO&hasta=FECHA_FIN&formato=word&auto=true)
 
-4. SEGURIDAD: ESTRICTAMENTE PROHIBIDO MODIFICAR DATOS:
-- Tu perfil es exclusivamente de LECTURA Y CONSULTA INTELIGENTE.
-- NO PUEDES insertar, editar, actualizar ni eliminar datos en la base de datos.
-- Si el usuario te pide: "crea un proyecto", "edita este registro", "cambia el rol de un usuario" o "borra esta entrada", explícale amablemente que por seguridad de la obra eres un asistente de consulta y auditoría en tiempo real, y dale el botón interactivo para que lo haga desde el módulo correspondiente.
+5. BOTONES INTERACTIVOS (SOLO CUANDO SEA ÚTIL):
+- No llenes la pantalla de botones innecesarios.
+- Úsalos únicamente cuando el usuario quiera generar reportes, ir a un módulo específico, o para desambiguar entre proyectos si no especificó cuál.
+- Fuera de eso, responde en texto natural.
 
-5. USO DE BOTONES (ESTRICTAMENTE SOLO CUANDO SEA NECESARIO):
-- NUNCA muestres botones de forma innecesaria o excesiva.
-- En saludos cotidianos (ej. "hola", "buenos días") o consultas generales, responde cordialmente en texto natural, NUNCA muestres listas de botones.
-- SOLO debes generar botones interactivos en casos necesarios:
-  a) Generación de reportes: botones para generar PDF y Word con los filtros correspondientes.
-  b) Redirección a módulos cuando el usuario manifieste explícitamente que desea realizar una acción (ej. "quiero registrar una bitácora", "subir foto", "ver el proyecto"), usando el formato [Texto descriptivo](/ruta).
-  c) Desambiguación de proyecto: cuando el usuario pida consultar o resumir un proyecto pero existan múltiples proyectos y no haya proyecto activo ni especificado, pregunta amablemente y coloca botones breves con el formato [NOMBRE DEL PROYECTO](ask:Resumen del proyecto NOMBRE DEL PROYECTO).
-- Fuera de estos casos necesarios, responde siempre en texto normal sin botones.
+6. SEGURIDAD:
+- Eres un asistente de consulta y auditoría inteligente. Si el usuario te pide modificar o borrar datos directamente en la base de datos, indícale amablemente y dale el botón a la pantalla correspondiente.
 
-6. FORMATO DE RESÚMENES DE PROYECTO (REGLA FUNDAMENTAL DE DOS PASOS):
-- PASO 1 (Resumen general explicativo por defecto): Cuando el usuario pida un resumen de algún proyecto o pregunte cómo va un proyecto:
-  * Ofrécelo PRIMERO como un PÁRRAFO continuo y explicativo (o 2 párrafos redactados de forma fluida y natural).
-  * En este párrafo explica el contexto de la obra, avance general, ubicación/tramo, empresa supervisora y estado de plazos y bitácoras.
-  * PROHIBIDO usar viñetas o listas por defecto en este primer resumen.
-  * NO agregues botones innecesarios al final.
-- PASO 2 (Detalle estructurado en viñetas SOLO bajo solicitud):
-  * ÚNICAMENTE si el usuario pide explícitamente que especifiques, detalles o desgloses la información (por ejemplo frases como "especifica", "en viñetas", "dame los detalles", "desglósalo", "detalle puntual"), ENTONCES responde desglosando la información en viñetas simples (-) con cifras exactas, fechas, mediciones por renglón y desglose cronológico de bitácora.
-
-7. REDIRECCIÓN A SECCIONES (solo cuando el usuario lo pida explícitamente):
-- Si el usuario expresa que quiere hacer algo o ir a una sección específica (ej. "quiero hacer un registro", "quiero subir una foto", "quiero crear un reporte", "ver el proyecto"), responde con una frase corta y UN botón de navegación hacia esa sección, con formato [Texto corto](/ruta).
-- Rutas (reemplaza ID_PROYECTO por el ID real del proyecto):
-  - Nuevo registro de bitácora: /dashboard/bitacora?proyectoId=ID_PROYECTO&nuevo=true
-  - Ver bitácora del proyecto: /dashboard/bitacora?proyectoId=ID_PROYECTO
-  - Detalle del proyecto: /dashboard/proyectos/ID_PROYECTO
-  - Editar proyecto: /dashboard/proyectos/ID_PROYECTO/editar
-  - Hoja sábana: /dashboard/proyectos/ID_PROYECTO/hoja-sabana
-  - Fotografías: /dashboard/fotografias/ID_PROYECTO
-  - Nueva fotografía: /dashboard/fotografias/nueva
-  - Reportes: /dashboard/reportes
-- El texto del botón debe describir la acción (ej. "Crear registro de bitácora"), sin incluir el nombre del proyecto. Solo ofrece rutas a las que el rol/permisos del usuario den acceso.
-
-8. ESTILO Y PRESENTACIÓN:
-- Sé profesional, técnico y cordial.
-- Responde siempre en español.
-- NO uses emojis.
-- NO uses encabezados con numerales (# o ##). Usa negritas (**texto**) y cuando corresponda viñetas simples (-).`;
+7. ESTILO:
+- Profesional, técnico y cordial.
+- En español, sin emojis, sin numerales (# o ##). Usa negrita (**texto**) y viñetas simples (-) si corresponde.`;
 
     // 1. Proveedor: Groq Cloud con modelos disponibles comprobados (prioridad a respuesta ultra rápida)
     if (groqKey) {
@@ -522,7 +493,7 @@ DIRECTIVAS Y POLÍTICA DE SOLO LECTURA:
       }
     }
 
-    // 6. Fallback local basado en la base de datos real con tolerancia a tipeo y memoria de contexto
+    // 6. Fallback local basado en la base de datos real con tolerancia a tipeo y conversación natural
     const lastMessage = (messages?.[messages.length - 1]?.content || '').toLowerCase().trim();
     let fallbackReply = '';
 
@@ -554,8 +525,12 @@ DIRECTIVAS Y POLÍTICA DE SOLO LECTURA:
 
     const botonesProyectos = proyectosLiveList.map((p) => '[' + p.nombre + '](ask:Resumen del proyecto ' + p.nombre + ')').join('\n');
 
-    // Reglas semánticas flexibles y tolerantes a errores ortográficos de campo
+    // Reglas semánticas flexibles y expresiones conversacionales naturales
     const esSaludo = /^(hola|buenos\s*d[ií]as|buenas\s*tardes|buenas\s*noches|qu[eé]\s*tal|hey|saludos)/i.test(lastMessage);
+    const esCasual = /(viendo|revisando|chequeando|mirando|solo\s*pasaba|dando\s*una\s*vuelta|por\s*ahora\s*nada|nada\s*especial|por\s*aqu[ií]\s*ando|aqu[ií]\s*ando|todo\s*tranquilo|curioseando)/i.test(lastMessage);
+    const esAgradecimiento = /^(gracias|muchas\s*gracias|buena\s*onda|excelente|vale|ok|listo|entendido|de\s*acuerdo|perfecto|chido)/i.test(lastMessage);
+    const esEstadoPersonal = /^(c[oó]mo\s*est[aá]s|qu[eé]\s*haces|todo\s*bien|c[oó]mo\s*te\s*va|c[oó]mo\s*andas)/i.test(lastMessage);
+
     const pideEspecificar = /(especifica|especificar|detall|viñeta|desglos|puntual)/i.test(lastMessage);
     const esResumen = /(r[eu]{2}s[um]{2}en|resumen|reusmen|resume|resumn|como\s*va|c[oó]mo\s*va|estado|avance)/i.test(lastMessage);
     const esProyecto = /(pro[ye]{2}ct|proyecto|proeycto|proyec|proyetco)/i.test(lastMessage);
@@ -567,7 +542,7 @@ DIRECTIVAS Y POLÍTICA DE SOLO LECTURA:
     const esMes = /(todo\s*el\s*mes|este\s*mes|del\s*mes|mensual)/i.test(lastMessage);
     const esSemana = /(esta\s*semana|de\s*la\s*semana|semanal)/i.test(lastMessage);
 
-    // Helper de fechas para periodos de reportes
+    // Fechas para reportes
     const fechaObj = new Date();
     const anioActual = fechaObj.getFullYear();
     const mesActualNum = String(fechaObj.getMonth() + 1).padStart(2, '0');
@@ -575,9 +550,16 @@ DIRECTIVAS Y POLÍTICA DE SOLO LECTURA:
     const ultimoDiaNum = new Date(anioActual, fechaObj.getMonth() + 1, 0).getDate();
     const ultimoDiaMes = `${anioActual}-${mesActualNum}-${String(ultimoDiaNum).padStart(2, '0')}`;
 
-    if (esSaludo) {
-      const saludoNombre = userFirstName ? `Hola, ${userFirstName}.` : 'Hola.';
-      fallbackReply = `${saludoNombre} Soy DomunBot AI, tu asistente en tiempo real de DomunNet. ¿En qué puedo ayudarte hoy?`;
+    const userNom = userFirstName ? ` ${userFirstName}` : '';
+
+    if (esCasual) {
+      fallbackReply = `Dale tranquilo${userNom}. Tómate tu tiempo; si necesitas revisar algún proyecto, bitácora o sacar un reporte, aquí ando a la orden.`;
+    } else if (esAgradecimiento) {
+      fallbackReply = `¡Con gusto${userNom}! A la orden para lo que necesites de las obras.`;
+    } else if (esEstadoPersonal) {
+      fallbackReply = `¡Todo bien por acá! Listo para apoyarte con cualquier consulta de las obras o proyectos.`;
+    } else if (esSaludo) {
+      fallbackReply = `¡Hola${userNom}! ¿Qué tal? ¿En qué te echo una mano hoy?`;
     } else if (esReporte && (esGenerar || esMes || esSemana || lastMessage.includes('reporte'))) {
       const proy = proyectoActivo || proyectosLiveList[0];
       const desde = esSemana ? hoy : primerDiaMes;
@@ -652,7 +634,7 @@ DIRECTIVAS Y POLÍTICA DE SOLO LECTURA:
     } else if (lastMessage.includes('estimaci') || lastMessage.includes('vencid') || lastMessage.includes('vencer') || lastMessage.includes('finanz')) {
       fallbackReply = estimacionesCatalogContext.replace(/•/g, '-');
     } else {
-      fallbackReply = 'Hola. ¿En qué puedo orientarte hoy? Puedes consultarme sobre el estado de algún proyecto, bitácoras de campo, estimaciones o reportes del sistema.';
+      fallbackReply = `Entendido${userNom}. Cualquier dato de las obras, bitácoras o reportes que quieras chequear, solo dime y lo vemos de una.`;
     }
 
     return NextResponse.json({ reply: fallbackReply, provider: 'DomunNet Live DB' });

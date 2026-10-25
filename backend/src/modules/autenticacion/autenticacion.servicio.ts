@@ -385,6 +385,19 @@ export async function iniciarSesion(
     })
   }
 
+  try {
+    const ch = clienteSupabase.channel('domun_sesiones_control')
+    await ch.send({
+      type: 'broadcast',
+      event: 'sesion_iniciada',
+      payload: {
+        usuarioId: usuarioFila.id,
+        deviceId: deviceIdActual,
+        timestamp: Date.now(),
+      },
+    })
+  } catch (_) {}
+
   return {
     token,
     usuario: {
@@ -450,6 +463,19 @@ export async function cerrarSesionUsuario(usuarioId?: string, deviceId?: string,
         fecha_hora: new Date().toISOString(),
         detalles: { device_id: deviceId, session_id: sessionId },
       })
+      try {
+        const ch = clienteSupabase.channel('domun_sesiones_control')
+        await ch.send({
+          type: 'broadcast',
+          event: 'cierre_sesion',
+          payload: {
+            usuarioId,
+            deviceId,
+            sessionId,
+            timestamp: Date.now(),
+          },
+        })
+      } catch (_) {}
     }
   } catch (error) {
     console.error('[autenticacion.servicio] Error en cerrarSesionUsuario:', error)

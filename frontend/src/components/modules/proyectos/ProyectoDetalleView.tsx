@@ -1074,7 +1074,44 @@ export function ProyectoDetalleView({ proyecto: initialProyecto, slugId }: { pro
   const [proyecto, setProyecto] = useState<ProyectoType | undefined>(initialProyecto)
   const [cargandoProyecto, setCargandoProyecto] = useState(!initialProyecto)
   const [activandoProyecto, setActivandoProyecto] = useState(false)
-  const canEdit = user?.rol !== 'contratante' && user?.rol !== 'contratista'
+  const canEdit = useMemo(() => {
+    if (!user) return false
+    const rolNorm = (user.rol || '').toLowerCase().trim()
+    // Administrador y Gerencia siempre pueden editar
+    if (rolNorm.includes('admin') || rolNorm.includes('gerenc') || (user as any).nivel_permisos >= 100) {
+      return true
+    }
+    // Contratante, Ejecutora, Supervisora, Topógrafo, Laboratorista, Auxiliar NO pueden editar proyectos
+    if (
+      rolNorm.includes('contratante') ||
+      rolNorm.includes('ejecutora') ||
+      rolNorm.includes('contratista') ||
+      rolNorm.includes('supervis') ||
+      rolNorm.includes('topograf') ||
+      rolNorm.includes('laborator') ||
+      rolNorm.includes('auxiliar')
+    ) {
+      return false
+    }
+    // Ingeniero Residente: NO puede editar la info del proyecto por defecto.
+    // Solo puede editar si está asignado específicamente como Delegado/Ingeniero Residente en el formulario del proyecto.
+    if (rolNorm.includes('residente') || rolNorm.includes('delegado')) {
+      const uId = String(user.id || '').toLowerCase()
+      const uNombre = (user.nombre || `${(user as any)?.primerNombre || (user as any)?.primer_nombre || ''} ${(user as any)?.primerApellido || (user as any)?.primer_apellido || ''}`).toLowerCase().trim()
+      const delId = String((proyecto as any)?.delegadoResidenteId || (proyecto as any)?.delegado_residente_id || '').toLowerCase()
+      const delNombre = String(proyecto?.delegadoResidente || (proyecto as any)?.delegado_residente || '').toLowerCase().trim()
+      const respId = String((proyecto as any)?.responsableId || (proyecto as any)?.responsable_id || '').toLowerCase()
+
+      const esDelegadoAsignado =
+        (delId && delId === uId) ||
+        (respId && respId === uId) ||
+        (delNombre && uNombre.length > 2 && (delNombre.includes(uNombre) || uNombre.includes(delNombre)))
+
+      return Boolean(esDelegadoAsignado)
+    }
+
+    return false
+  }, [user, proyecto])
   const canManageTeam = String(user?.rol).toLowerCase() === 'administrador' || String(user?.rol).toLowerCase() === 'gerencia'
 
   useEffect(() => {

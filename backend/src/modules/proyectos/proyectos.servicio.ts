@@ -726,8 +726,21 @@ export async function obtenerProyectoPorId(proyectoId: string) {
   const mesesListaDinamicos = ['Mar 2026', 'Abr 2026', 'May 2026', 'Jun 2026', 'Jul 2026', 'Ago 2026', 'Sep 2026', 'Oct 2026', 'Nov 2026', 'Dic 2026', 'Ene 2027', 'Feb 2027']
   // Pesos contractuales S-curve para plan de trabajo a 12 meses
   const pesosPlanMeses = [0.03, 0.05, 0.07, 0.09, 0.11, 0.13, 0.13, 0.12, 0.10, 0.08, 0.05, 0.04]
-  // Distribución de ejecución acumulada en las 5 estimaciones aprobadas (Marzo a Julio 2026)
-  const factoresEjec = [0.107, 0.177, 0.212, 0.239, 0.265]
+
+  // Distribución realista y diferenciada por capítulo para las 5 estimaciones aprobadas (Marzo a Julio 2026)
+  // Cada capítulo sigue la secuencia constructiva real de obra vial:
+  const factoresPorCapitulo: Record<number, number[]> = {
+    1: [0.32, 0.35, 0.18, 0.10, 0.05], // Preliminares / Control del trabajo (alta al inicio)
+    2: [0.10, 0.26, 0.34, 0.18, 0.12], // Movimiento de tierras y excavación (pico en meses 2 y 3)
+    3: [0.05, 0.15, 0.35, 0.28, 0.17], // Terraplenes y estructuras (meses 3 y 4)
+    4: [0.08, 0.16, 0.26, 0.28, 0.22], // Estructuras puentes
+    5: [0.02, 0.08, 0.24, 0.38, 0.28], // Sub-bases y bases (sube en mes 4 y 5)
+    6: [0.00, 0.04, 0.16, 0.40, 0.40], // Pavimentos asfálticos (concentrado al final)
+    7: [0.00, 0.05, 0.15, 0.40, 0.40], // Pavimentos rígidos
+    8: [0.14, 0.24, 0.28, 0.20, 0.14], // Estructuras de drenaje (continuo meses 2, 3, 4)
+    9: [0.00, 0.05, 0.15, 0.35, 0.45], // Señalización y obras complementarias
+  }
+  const factoresDefault = [0.12, 0.20, 0.26, 0.24, 0.18]
 
   const mappedRenglones = (renglonesRes.data || []).map((r: any) => {
     const esp = r.especificacion || {}
@@ -749,14 +762,15 @@ export async function obtenerProyectoPorId(proyectoId: string) {
       avancesPlan[mes] = Math.round(cantAjustada * p * 100) / 100
     })
 
-    // Ejecución real mensual en las 5 estimaciones (Marzo a Julio 2026)
+    // Ejecución real mensual en las 5 estimaciones (Marzo a Julio 2026) con variación según especialidad
     const avancesReal: Record<string, number> = {}
+    const factoresAplicados = factoresPorCapitulo[capId] || factoresDefault
     let sumaAcumAnterior = 0
     let cantPeriodoActual = 0
 
     mesesListaDinamicos.forEach((mes, idx) => {
       if (idx < 5 && cantEjecutadaTotal > 0) {
-        const factor = factoresEjec[idx] || 0.2
+        const factor = factoresAplicados[idx] || 0.2
         const cantMes = Math.round(cantEjecutadaTotal * factor * 100) / 100
         avancesReal[mes] = cantMes
         if (idx < 4) {
@@ -1173,6 +1187,7 @@ export async function obtenerProyectos() {
         bitacora_entrada ( id ),
         bitacora_avance ( id ),
         bitacora_pendiente ( id ),
+        proyecto_usuario ( usuario_id, rol_proyecto ),
         proyecto_detalle (
           nombre_oficial,
           descripcion_proyecto,
@@ -1368,6 +1383,12 @@ export async function obtenerProyectos() {
       tieneBitacoras,
       esEliminable,
       motivoNoEliminable,
+      usuariosAsignadosIds: Array.isArray(p.proyecto_usuario) ? p.proyecto_usuario.map((pu: any) => pu.usuario_id) : [],
+      equipo: Array.isArray(p.proyecto_usuario) ? p.proyecto_usuario.map((pu: any) => ({
+        id: pu.usuario_id,
+        usuarioId: pu.usuario_id,
+        rol: pu.rol_proyecto,
+      })) : [],
     }
   })
 

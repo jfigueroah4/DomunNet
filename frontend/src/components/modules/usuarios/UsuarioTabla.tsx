@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react'
-import { Trash2, Edit2, Eye, UserX, LogOut, CheckCircle, Laptop } from 'lucide-react'
+import { Trash2, Edit2, Eye, UserX, LogOut, CheckCircle, Laptop, FolderOpen, X } from 'lucide-react'
+import { Portal } from '@/components/ui/Portal'
 import { Usuario } from '@/types/usuario'
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useRolesStore } from '@/stores/useRolesStore';
@@ -31,6 +32,7 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
 
   const [sortColumn, setSortColumn] = useState<string>('');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [usuarioVerProyectos, setUsuarioVerProyectos] = useState<Usuario | null>(null);
 
   const handleSort = (column: string) => {
     if (sortColumn === column) {
@@ -117,7 +119,7 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
           }
 
           const canEdit = isOwner || miRolNorm === 'administrador' || miRolNorm === 'admin' || canDelete;
-          const canCloseSession = !isSelf && (isOwner || miRolNorm === 'administrador' || miRolNorm === 'gerencia');
+          const canCloseSession = !isSelf && (isOwner || miRolNorm === 'administrador' || miRolNorm === 'gerencia') && usuario.estado === 'Activo';
           const esSuspendido = usuario.estado === 'Suspendido' || (usuario as any).activo === false;
 
           return (
@@ -133,26 +135,41 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                  <UsuarioEstadoBadge estado={usuario.estado} />
-                  {usuario.enLinea ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[8px] font-bold text-emerald-700 border border-emerald-200">
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                      En línea
-                    </span>
+                  {usuario.estado === 'Suspendido' ? (
+                    <UsuarioEstadoBadge estado="Suspendido" />
+                  ) : usuario.enLinea ? (
+                    <>
+                      <UsuarioEstadoBadge estado="Activo" />
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[8px] font-bold text-emerald-700 border border-emerald-200">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        En línea
+                      </span>
+                    </>
                   ) : (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-gray-50 px-1.5 py-0.5 text-[8px] font-medium text-gray-400 border border-gray-100">
-                      <span className="h-1.5 w-1.5 rounded-full bg-gray-300" />
-                      Desconectado
-                    </span>
+                    <>
+                      <UsuarioEstadoBadge estado="Inactivo" />
+                      <span className="inline-flex items-center gap-1 rounded-full bg-gray-50 px-1.5 py-0.5 text-[8px] font-medium text-gray-500 border border-gray-200">
+                        <span className="h-1.5 w-1.5 rounded-full bg-gray-300" />
+                        Desconectado
+                      </span>
+                    </>
                   )}
                 </div>
               </div>
 
               <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-gray-50 text-[9.5px]">
                 <UsuarioRolBadge rol={usuario.rol} />
-                <span className="text-[9.5px] text-gray-500 font-medium">
-                  {proyectosCount} {proyectosCount === 1 ? 'proyecto' : 'proyectos'}
-                </span>
+                <button
+                  type="button"
+                  onClick={() => setUsuarioVerProyectos(usuario)}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-50 hover:bg-red-50 text-gray-700 hover:text-[#9B0F06] border border-gray-200 hover:border-red-200 transition-colors cursor-pointer text-[9.5px] font-medium"
+                  title="Ver proyectos enlazados"
+                >
+                  <FolderOpen size={10} className={proyectosCount > 0 ? "text-[#9B0F06]" : "text-gray-400"} />
+                  <span className={proyectosCount > 0 ? "font-bold text-[#9B0F06]" : "text-gray-400"}>
+                    {proyectosCount} {proyectosCount === 1 ? 'proyecto' : 'proyectos'}
+                  </span>
+                </button>
                 <span className="text-[9.5px] text-gray-400">· Acceso: {fechaAcceso}</span>
               </div>
 
@@ -365,33 +382,43 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
                   </td>
                   <td className="px-4 py-3 text-[10px]">
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <UsuarioEstadoBadge estado={usuario.estado} />
-                      {usuario.enLinea ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[8.5px] font-bold text-emerald-700 border border-emerald-200 shadow-2xs">
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                          En línea
-                        </span>
+                      {usuario.estado === 'Suspendido' ? (
+                        <UsuarioEstadoBadge estado="Suspendido" />
+                      ) : usuario.enLinea ? (
+                        <>
+                          <UsuarioEstadoBadge estado="Activo" />
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[8.5px] font-bold text-emerald-700 border border-emerald-200 shadow-2xs">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            En línea
+                          </span>
+                        </>
                       ) : (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-gray-50 px-1.5 py-0.5 text-[8.5px] font-medium text-gray-400 border border-gray-100">
-                          <span className="h-1.5 w-1.5 rounded-full bg-gray-300" />
-                          Desconectado
-                        </span>
+                        <>
+                          <UsuarioEstadoBadge estado="Inactivo" />
+                          <span className="inline-flex items-center gap-1 rounded-full bg-gray-50 px-1.5 py-0.5 text-[8.5px] font-medium text-gray-500 border border-gray-200 shadow-2xs">
+                            <span className="h-1.5 w-1.5 rounded-full bg-gray-300" />
+                            Desconectado
+                          </span>
+                        </>
                       )}
                     </div>
                   </td>
                   <td className="px-4 py-3 text-[10px] text-gray-500 font-medium">{fechaAcceso}</td>
                   <td className="px-4 py-3 text-[10px]">
-                    {proyectosCount > 0 ? (
-                      <>
-                        <span className="font-bold text-[#9B0F06]">{proyectosCount}</span>{' '}
-                        <span className="font-semibold text-gray-800">proyecto{proyectosCount !== 1 ? 's' : ''}</span>
-                      </>
-                    ) : (
-                      <>
-                        <span className="font-medium text-gray-400">0</span>{' '}
-                        <span className="text-gray-400">proyectos</span>
-                      </>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => setUsuarioVerProyectos(usuario)}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-gray-50 hover:bg-red-50 text-gray-700 hover:text-[#9B0F06] border border-gray-200 hover:border-red-200 transition-colors cursor-pointer group shadow-2xs"
+                      title={proyectosCount > 0 ? "Ver proyectos enlazados a este usuario" : "Ver asignación de proyectos"}
+                    >
+                      <FolderOpen size={12} className={proyectosCount > 0 ? "text-[#9B0F06]" : "text-gray-400"} />
+                      <span className={proyectosCount > 0 ? "font-bold text-[#9B0F06]" : "font-medium text-gray-400"}>
+                        {proyectosCount}
+                      </span>
+                      <span className="font-semibold text-gray-700 group-hover:text-[#9B0F06]">
+                        proyecto{proyectosCount !== 1 ? 's' : ''}
+                      </span>
+                    </button>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-1">
@@ -492,6 +519,112 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
         </table>
       </div>
     </div>
+
+      {/* MODAL: PROYECTOS ENLAZADOS AL USUARIO */}
+      {usuarioVerProyectos && (
+        <Portal>
+          <div
+            className="fixed inset-0 z-[140] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs font-[Poppins] animate-fadeIn"
+            onClick={() => setUsuarioVerProyectos(null)}
+          >
+            <div
+              className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl border border-gray-200 font-sans space-y-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-red-50 text-[#9B0F06]">
+                    <FolderOpen size={18} />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold text-gray-900 uppercase">
+                      Proyectos Enlazados
+                    </h3>
+                    <p className="text-[10px] text-gray-500 font-medium">
+                      {usuarioVerProyectos.nombre} · <span className="font-bold text-gray-700">{usuarioVerProyectos.rol}</span>
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setUsuarioVerProyectos(null)}
+                  className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 cursor-pointer transition-colors"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="max-h-[360px] overflow-y-auto space-y-2 pr-1 text-xs">
+                {(() => {
+                  const proys = (usuarioVerProyectos as any).proyectosAsignados || []
+                  if (proys.length === 0) {
+                    return (
+                      <div className="py-8 text-center space-y-2">
+                        <FolderOpen size={28} className="text-gray-300 mx-auto" />
+                        <p className="text-xs font-bold text-gray-700">Sin proyectos enlazados</p>
+                        <p className="text-[10px] text-gray-400 max-w-xs mx-auto">
+                          Este usuario no se encuentra asignado como responsable, delegado ni miembro de equipo en ningún proyecto activo.
+                        </p>
+                      </div>
+                    )
+                  }
+
+                  return proys.map((p: any, idx: number) => {
+                    const pNombre = typeof p === 'string' ? p : (p.nombre || p.nombreOficial || p.codigo || 'Proyecto')
+                    const pCodigo = typeof p === 'object' ? p.codigo : null
+                    const pRol = typeof p === 'object' && p.rol ? p.rol : (usuarioVerProyectos.rol || 'Asignado')
+                    const pId = typeof p === 'object' ? p.id : null
+
+                    return (
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between gap-3 p-3 rounded-xl border border-gray-200 bg-gray-50/60 hover:bg-white hover:border-[#9B0F06]/40 transition-all shadow-2xs"
+                      >
+                        <div className="min-w-0 flex-1 space-y-0.5">
+                          <div className="flex items-center gap-1.5">
+                            {pCodigo && (
+                              <span className="font-mono text-[8.5px] font-bold px-1.5 py-0.2 rounded bg-red-100 text-[#9B0F06]">
+                                {pCodigo}
+                              </span>
+                            )}
+                            <span className="text-[8.5px] font-semibold text-gray-500 uppercase">
+                              Rol: {pRol}
+                            </span>
+                          </div>
+                          <p className="text-xs font-bold text-gray-900 truncate" title={pNombre}>
+                            {pNombre}
+                          </p>
+                        </div>
+
+                        <a
+                          href={pId ? `/dashboard/proyectos/${pId}` : `/dashboard/proyectos?buscar=${encodeURIComponent(pCodigo || pNombre)}`}
+                          className="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-[10px] font-bold text-gray-700 shadow-2xs hover:bg-[#9B0F06] hover:text-white hover:border-[#9B0F06] transition-colors shrink-0 cursor-pointer"
+                        >
+                          <Eye size={11} />
+                          <span>Ver Proyecto</span>
+                        </a>
+                      </div>
+                    )
+                  })
+                })()}
+              </div>
+
+              <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                <span className="text-[10px] text-gray-400 font-medium">
+                  {((usuarioVerProyectos as any).proyectosAsignados || []).length} proyectos vinculados
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setUsuarioVerProyectos(null)}
+                  className="rounded-lg border border-gray-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 cursor-pointer transition-colors"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        </Portal>
+      )}
     </div>
   )
 })

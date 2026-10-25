@@ -330,32 +330,39 @@ export function ProyectosView() {
   }
 
   const usuario = useAuthStore((s: any) => s.profile)
-  const esResidenteODelegado = useMemo(() => {
+  const esAdminOGerencia = useMemo(() => {
     const rolStr = (usuario?.rol || '').toLowerCase().trim()
-    const cargoStr = (usuario?.cargo || '').toLowerCase().trim()
-    return (
-      rolStr.includes('residente') ||
-      rolStr.includes('delegado') ||
-      cargoStr.includes('residente') ||
-      cargoStr.includes('delegado')
-    ) && !rolStr.includes('admin') && !rolStr.includes('director') && !rolStr.includes('gerencia')
+    return rolStr.includes('admin') || rolStr.includes('gerenc') || (usuario as any)?.nivel_permisos >= 100
   }, [usuario])
+
+  const puedeCrearProyecto = esAdminOGerencia
 
   const proyectosFiltrados = useMemo(() => {
     return proyectosReales.filter((proyecto) => {
-      // Si es Residente o Delegado, solo ver proyectos donde esté asignado (o borradores recién creados sin asignar)
-      if (esResidenteODelegado && usuario?.id) {
+      // Si no es Administrador ni Gerencia, SOLO puede ver los proyectos a los que está asignado
+      if (!esAdminOGerencia && usuario?.id) {
         const pAny = proyecto as any
-        const uId = usuario.id
+        const uId = String(usuario.id || '').toLowerCase()
+        const uEmail = String(usuario.correo || '').toLowerCase()
         const uNombre = (usuario.nombre || `${usuario.primer_nombre || ''} ${usuario.primer_apellido || ''}`).toLowerCase().trim()
 
-        const esResp = pAny.responsable_id === uId || pAny.responsableId === uId || pAny.responsable === uId
-        const esDel = pAny.delegadoResidenteId === uId || pAny.delegado_residente_id === uId
-        const enEquipo = Array.isArray(pAny.equipo) && pAny.equipo.some((m: any) => m.id === uId || m.usuarioId === uId || (m.nombre && m.nombre.toLowerCase().trim().includes(uNombre)))
-        const coincideNombre = pAny.responsable && typeof pAny.responsable === 'string' && uNombre.length > 2 && pAny.responsable.toLowerCase().includes(uNombre)
-        const esBorradorSinAsignar = proyecto.estado === 'borrador' && !pAny.responsable_id && !pAny.delegadoResidenteId
+        const esResp = String(pAny.responsable_id || pAny.responsableId || pAny.responsable || '').toLowerCase() === uId || String(pAny.responsable_id || pAny.responsableId || '').toLowerCase() === uEmail
+        const esDel = String(pAny.delegadoResidenteId || pAny.delegado_residente_id || '').toLowerCase() === uId || String(pAny.delegadoResidenteId || pAny.delegado_residente_id || '').toLowerCase() === uEmail
+        const enEquipo = Array.isArray(pAny.equipo) && pAny.equipo.some((m: any) => {
+          const mId = String(m.id || m.usuarioId || '').toLowerCase()
+          const mNom = String(m.nombre || '').toLowerCase()
+          return (mId && (mId === uId || mId === uEmail)) || (mNom && uNombre.length > 2 && mNom.includes(uNombre))
+        })
+        const coincideNombre =
+          (pAny.responsable && typeof pAny.responsable === 'string' && uNombre.length > 2 && pAny.responsable.toLowerCase().includes(uNombre)) ||
+          (pAny.delegadoResidente && typeof pAny.delegadoResidente === 'string' && uNombre.length > 2 && pAny.delegadoResidente.toLowerCase().includes(uNombre))
 
-        if (!esResp && !esDel && !enEquipo && !coincideNombre && !esBorradorSinAsignar) {
+        const enListaAsignados = Array.isArray(usuario.proyectosAsignados) && usuario.proyectosAsignados.some((pa: any) => {
+          const paStr = typeof pa === 'string' ? pa : (pa.id || pa.codigo || pa.nombre)
+          return paStr && (paStr === proyecto.id || paStr === proyecto.codigo || paStr === proyecto.nombre || paStr === (proyecto as any).nombreOficial)
+        })
+
+        if (!esResp && !esDel && !enEquipo && !coincideNombre && !enListaAsignados) {
           return false
         }
       }
@@ -407,7 +414,7 @@ export function ProyectosView() {
 
       return matchBusqueda && matchEstado && matchDepa && matchMuni && matchFecha
     })
-  }, [proyectosReales, busqueda, proyectoFiltroId, estadoFiltro, filtroDepa, filtroMuni, filtroFechaInicio, filtroFechaFin, esResidenteODelegado, usuario])
+  }, [proyectosReales, busqueda, proyectoFiltroId, estadoFiltro, filtroDepa, filtroMuni, filtroFechaInicio, filtroFechaFin, esAdminOGerencia, usuario])
 
   const proyectosEliminables = useMemo(() => {
     return proyectosFiltrados.filter((p) => esProyectoEliminable(p).puedeEliminar)
@@ -532,7 +539,7 @@ export function ProyectosView() {
               <span className="inline xs:hidden sm:hidden">Empresas</span>
             </button>
             
-            {!esResidenteODelegado && (
+            {puedeCrearProyecto && (
               <button
                 type="button"
                 onClick={() => router.push('/dashboard/proyectos/nuevo')}

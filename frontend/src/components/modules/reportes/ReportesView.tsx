@@ -16,7 +16,9 @@ import {
   X,
   Map as LucideMap,
   History,
+  MessageSquare,
 } from 'lucide-react'
+import { ReportesObservacionesContratante } from './ReportesObservacionesContratante'
 import { BITACORA_MOCK } from '@/data/bitacora.mock'
 import { FOTOGRAFIAS_MOCK } from '@/data/fotografias.mock'
 import { PROYECTOS_MOCK } from '@/data/proyectos.mock'
@@ -771,6 +773,14 @@ export default function ReportesView() {
 
         {/* Acciones: Historial (icono sin fondo a la par del botón de estadísticas) */}
         <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+          <a
+            href="#seccion-observaciones-contratante"
+            className="p-1.5 rounded-lg text-gray-600 hover:text-blue-700 hover:bg-blue-50 transition-colors cursor-pointer active:scale-95 border border-transparent"
+            title="Ir al Espacio de Observaciones del Contratante"
+          >
+            <MessageSquare size={18} />
+          </a>
+
           <button
             type="button"
             onClick={() => setModalHistorialAbierto(true)}
@@ -875,6 +885,14 @@ export default function ReportesView() {
           </div>
         </div>
       </section>
+
+      {/* ESPACIO DE OBSERVACIONES Y COMENTARIOS DEL CONTRATANTE */}
+      <div id="seccion-observaciones-contratante">
+        <ReportesObservacionesContratante
+          proyectoIdActual={String(proyectoId)}
+          proyectosList={proyectosValidos}
+        />
+      </div>
 
       {/* MODAL DE HISTORIAL DE REPORTES REALIZADOS */}
       <ReportesHistorialModal

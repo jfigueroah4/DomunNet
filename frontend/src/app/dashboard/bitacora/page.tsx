@@ -22,6 +22,7 @@ import { RegistroBitacora, TipoBitacora, EstadoBitacora } from '@/types/bitacora
 import { BitacoraFiltros } from '@/components/modules/bitacora/BitacoraFiltros'
 import { BitacoraCard } from '@/components/modules/bitacora/BitacoraCard'
 import { BitacoraEstadoBadge } from '@/components/modules/bitacora/BitacoraEstadoBadge'
+import { BitacoraCalendarioModal } from '@/components/modules/bitacora/BitacoraCalendarioModal'
 const BitacoraForm = dynamic(
   () => import('@/components/modules/bitacora/BitacoraForm').then((mod) => mod.BitacoraForm),
   { ssr: false }
@@ -44,13 +45,20 @@ export default function BitacoraPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const usuario = useAuthStore((s) => s.profile)
-  const rolUsuario = (usuario?.rol || '').toLowerCase()
-  const esAdmin = rolUsuario.includes('admin') || rolUsuario.includes('director')
-  const esResidente = rolUsuario.includes('residente')
-  const esRolCampoRestringido = !esAdmin && !esResidente
+  const rolUsuario = (usuario?.rol || '').toLowerCase().trim()
+  const esAdmin = rolUsuario.includes('admin') || rolUsuario.includes('director') || rolUsuario.includes('gerenc')
+  const esPersonalCampo =
+    rolUsuario.includes('topograf') ||
+    rolUsuario.includes('laborator') ||
+    rolUsuario.includes('auxiliar') ||
+    rolUsuario === 'campo' ||
+    rolUsuario === 'inspector'
+  const esRolCampoRestringido = esPersonalCampo
 
   const [vista, setVista] = useState<'lista' | 'crear'>('lista')
   const [registrosApi, setRegistrosApi] = useState<any[]>([])
+  const [proyectosList, setProyectosList] = useState<any[]>([])
+  const [modalCalendarioAbierto, setModalCalendarioAbierto] = useState(false)
 
   const cargarRegistros = async () => {
     try {
@@ -82,6 +90,31 @@ export default function BitacoraPage() {
           : []
 
       const proyectosOperativos = proysBD.filter(esProyectoNoBorrador)
+      const uId = String(usuario?.id || '').toLowerCase()
+      const uEmail = String(usuario?.correo || '').toLowerCase()
+      const uNombre = (usuario?.nombre || `${(usuario as any)?.primerNombre || (usuario as any)?.primer_nombre || ''} ${(usuario as any)?.primerApellido || (usuario as any)?.primer_apellido || ''}`).toLowerCase().trim()
+
+      const proyectosValidos = esAdmin
+        ? proyectosOperativos
+        : proyectosOperativos.filter((p: any) => {
+            const esResp = String(p.responsable_id || p.responsableId || p.responsable || '').toLowerCase() === uId || String(p.responsable_id || p.responsableId || '').toLowerCase() === uEmail
+            const esDel = String(p.delegadoResidenteId || p.delegado_residente_id || '').toLowerCase() === uId || String(p.delegadoResidenteId || p.delegado_residente_id || '').toLowerCase() === uEmail
+            const enEquipo = Array.isArray(p.equipo) && p.equipo.some((m: any) => {
+              const mId = String(m.id || m.usuarioId || '').toLowerCase()
+              const mNom = String(m.nombre || '').toLowerCase()
+              return (mId && (mId === uId || mId === uEmail)) || (mNom && uNombre.length > 2 && mNom.includes(uNombre))
+            })
+            const coincideNombre =
+              (p.responsable && typeof p.responsable === 'string' && uNombre.length > 2 && p.responsable.toLowerCase().includes(uNombre)) ||
+              (p.delegadoResidente && typeof p.delegadoResidente === 'string' && uNombre.length > 2 && p.delegadoResidente.toLowerCase().includes(uNombre))
+            const enListaAsignados = Array.isArray((usuario as any)?.proyectosAsignados) && (usuario as any).proyectosAsignados.some((pa: any) => {
+              const paStr = typeof pa === 'string' ? pa : (pa.id || pa.codigo || pa.nombre)
+              return paStr && (paStr === p.id || paStr === p.codigo || paStr === p.nombre || paStr === p.nombreOficial)
+            })
+            return esResp || esDel || enEquipo || coincideNombre || enListaAsignados
+          })
+
+      setProyectosList(proyectosValidos)
 
       // Mapa de proyectos y usuarios
       const proyMap = new Map<string, { codigo: string; nombre: string }>()
@@ -242,7 +275,7 @@ export default function BitacoraPage() {
 
   // Ocultar BottomNavbar en modales y drawer en mobile
   useEffect(() => {
-    const hayModalAbierto = Boolean(drawerRegistro || fotoExpandida || modalMapaGTAbierto || modalEliminarAbierto)
+    const hayModalAbierto = Boolean(drawerRegistro || fotoExpandida || modalMapaGTAbierto || modalEliminarAbierto || modalCalendarioAbierto)
     setOcultarBottomNav(hayModalAbierto)
     return () => {
       setOcultarBottomNav(false)
@@ -265,6 +298,15 @@ export default function BitacoraPage() {
   const [paginaActual, setPaginaActual] = useState(1)
   const [registrosPorPagina, setRegistrosPorPagina] = useState(15)
 
+  // Proyecto activo seleccionado y sus registros para el calendario de obra
+  const proyectoActualObj = useMemo(() => {
+    return proyectosList.find((p) => String(p.id) === String(proyectoId)) || proyectosList[0] || null
+  }, [proyectosList, proyectoId])
+
+  const registrosProyectoActual = useMemo(() => {
+    return registrosApi.filter((b) => !proyectoId || String(b.proyectoId || b.proyecto_id) === String(proyectoId))
+  }, [registrosApi, proyectoId])
+
   // Reset de página cuando cambian los filtros
   useEffect(() => {
     setPaginaActual(1)
@@ -274,13 +316,25 @@ export default function BitacoraPage() {
   const registrosFiltrados = useMemo(() => {
     const registrosBase: any[] = registrosApi
     if (registrosBase.length === 0) return []
+    const idsProyectosPermitidos = new Set(proyectosList.map((p) => String(p.id)))
+
     return registrosBase.filter((registro: any) => {
-      // Restricción por rol de campo (solo sus propios registros)
+      // Si no es admin, solo ver registros de proyectos asignados
+      if (!esAdmin && usuario && idsProyectosPermitidos.size > 0) {
+        const pIdReg = String(registro.proyectoId || registro.proyecto_id || '')
+        if (pIdReg && !idsProyectosPermitidos.has(pIdReg)) {
+          return false
+        }
+      }
+
+      // Restricción por rol de campo (solo sus propios registros de bitácora)
       if (esRolCampoRestringido && usuario) {
+        const uId = String(usuario.id || '').toLowerCase()
+        const uNom = (usuario.nombre || `${(usuario as any)?.primerNombre || (usuario as any)?.primer_nombre || ''} ${(usuario as any)?.primerApellido || (usuario as any)?.primer_apellido || ''}`).toLowerCase().trim()
+        const regAutor = String(registro.autor || '').toLowerCase()
         const esAutor =
-          registro.autor_id === usuario.id ||
-          registro.autorId === usuario.id ||
-          (registro.autor && String(registro.autor).toLowerCase().includes((usuario.nombre || '').toLowerCase()))
+          String(registro.autor_id || registro.autorId || registro.usuario_id || '').toLowerCase() === uId ||
+          (regAutor && uNom.length > 2 && regAutor.includes(uNom))
         if (!esAutor) return false
       }
 
@@ -340,6 +394,36 @@ export default function BitacoraPage() {
       )
     })
   }, [registrosApi, busqueda, tipo, proyectoId, estado, fechaDesde, fechaHasta, usuarioFiltro, rolFiltro, esRolCampoRestringido, usuario])
+
+  // Navegación secuencial de registros dentro del drawer (Anterior / Siguiente)
+  const indiceRegistroActual = useMemo(() => {
+    if (!drawerRegistro) return -1
+    return registrosFiltrados.findIndex((r) => String(r.id) === String(drawerRegistro.id))
+  }, [drawerRegistro, registrosFiltrados])
+
+  const registroAnterior = useMemo(() => {
+    if (indiceRegistroActual <= 0) return null
+    return registrosFiltrados[indiceRegistroActual - 1]
+  }, [indiceRegistroActual, registrosFiltrados])
+
+  const registroSiguiente = useMemo(() => {
+    if (indiceRegistroActual < 0 || indiceRegistroActual >= registrosFiltrados.length - 1) return null
+    return registrosFiltrados[indiceRegistroActual + 1]
+  }, [indiceRegistroActual, registrosFiltrados])
+
+  // Navegación con teclado (Flechas Izquierda / Derecha) cuando el drawer está activo
+  useEffect(() => {
+    if (!drawerRegistro) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft' && registroAnterior) {
+        setDrawerRegistro(registroAnterior)
+      } else if (e.key === 'ArrowRight' && registroSiguiente) {
+        setDrawerRegistro(registroSiguiente)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [drawerRegistro, registroAnterior, registroSiguiente])
 
   // Métodos de Selección Múltiple y Eliminación
   const toggleSeleccionarRegistro = (id: string) => {
@@ -545,6 +629,7 @@ export default function BitacoraPage() {
           }}
           modoSeleccion={modoSeleccion}
           setModoSeleccion={setModoSeleccion}
+          onAbrirCalendario={() => setModalCalendarioAbierto(true)}
         />
 
         {modoSeleccion && (
@@ -677,14 +762,41 @@ export default function BitacoraPage() {
                     </p>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setDrawerRegistro(null)}
-                    className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-200 hover:text-gray-700 transition-colors cursor-pointer"
-                    title="Cerrar detalle"
-                  >
-                    <X size={16} />
-                  </button>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {/* Botones de navegación Anterior / Siguiente en el Header */}
+                    <div className="flex items-center bg-white border border-gray-200 rounded-lg shadow-2xs p-0.5">
+                      <button
+                        type="button"
+                        disabled={!registroAnterior}
+                        onClick={() => setDrawerRegistro(registroAnterior)}
+                        className="p-1 rounded text-gray-500 hover:text-gray-900 hover:bg-gray-100 disabled:opacity-25 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                        title={registroAnterior ? `Registro anterior (${registroAnterior.fecha})` : 'No hay registro anterior'}
+                      >
+                        <ChevronLeft size={15} />
+                      </button>
+                      <span className="text-[9.5px] font-mono font-bold text-gray-600 px-1.5">
+                        {indiceRegistroActual + 1}/{registrosFiltrados.length}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={!registroSiguiente}
+                        onClick={() => setDrawerRegistro(registroSiguiente)}
+                        className="p-1 rounded text-gray-500 hover:text-gray-900 hover:bg-gray-100 disabled:opacity-25 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                        title={registroSiguiente ? `Registro siguiente (${registroSiguiente.fecha})` : 'No hay registro siguiente'}
+                      >
+                        <ChevronRight size={15} />
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setDrawerRegistro(null)}
+                      className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-200 hover:text-gray-700 transition-colors cursor-pointer"
+                      title="Cerrar detalle"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
                 </div>
 
                 {/* Drawer Body - Scrollable Content */}
@@ -867,6 +979,48 @@ export default function BitacoraPage() {
                   </div>
                 </div>
 
+                {/* Apartado de Navegación entre Registros (Anterior / Siguiente) */}
+                <div className="px-3 sm:px-4 py-2 border-t border-gray-200 bg-white flex items-center justify-between gap-2 text-xs font-[Poppins]">
+                  <button
+                    type="button"
+                    disabled={!registroAnterior}
+                    onClick={() => setDrawerRegistro(registroAnterior)}
+                    className="flex-1 inline-flex items-center justify-start gap-1.5 px-2.5 py-1.5 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer shadow-2xs active:scale-95 text-left min-w-0"
+                    title={registroAnterior ? `Ver registro anterior (${registroAnterior.fecha})` : 'No hay registro anterior'}
+                  >
+                    <ChevronLeft size={15} className="stroke-[2.5] text-[#9B0F06] shrink-0" />
+                    <div className="min-w-0">
+                      <span className="text-[8.5px] text-gray-400 font-bold block uppercase tracking-wider">Anterior</span>
+                      <span className="text-[10px] font-semibold text-gray-800 truncate block max-w-[100px] sm:max-w-[160px]">
+                        {registroAnterior ? (registroAnterior.fecha || 'Registro previo') : 'Ninguno'}
+                      </span>
+                    </div>
+                  </button>
+
+                  <div className="px-1.5 text-center shrink-0">
+                    <span className="text-[8.5px] font-mono text-gray-400 block uppercase tracking-wider">Registro</span>
+                    <span className="text-[10.5px] font-bold text-gray-800 font-mono">
+                      {indiceRegistroActual + 1} / {registrosFiltrados.length}
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={!registroSiguiente}
+                    onClick={() => setDrawerRegistro(registroSiguiente)}
+                    className="flex-1 inline-flex items-center justify-end gap-1.5 px-2.5 py-1.5 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer shadow-2xs active:scale-95 text-right min-w-0"
+                    title={registroSiguiente ? `Ver registro siguiente (${registroSiguiente.fecha})` : 'No hay registro siguiente'}
+                  >
+                    <div className="min-w-0">
+                      <span className="text-[8.5px] text-gray-400 font-bold block uppercase tracking-wider">Siguiente</span>
+                      <span className="text-[10px] font-semibold text-gray-800 truncate block max-w-[100px] sm:max-w-[160px]">
+                        {registroSiguiente ? (registroSiguiente.fecha || 'Registro siguiente') : 'Ninguno'}
+                      </span>
+                    </div>
+                    <ChevronRight size={15} className="stroke-[2.5] text-[#9B0F06] shrink-0" />
+                  </button>
+                </div>
+
                 {/* Drawer Footer */}
                 <div className="p-3 border-t border-gray-200 bg-gray-50 flex items-center justify-between gap-3 font-[Poppins]">
                   <button
@@ -976,6 +1130,21 @@ export default function BitacoraPage() {
           </div>
         </Portal>
       )}
+
+      {/* VISTA DE CALENDARIO FLOTANTE CON DÍAS LABORADOS Y SUSPENDIDOS */}
+      <BitacoraCalendarioModal
+        abierto={modalCalendarioAbierto}
+        onCerrar={() => setModalCalendarioAbierto(false)}
+        proyecto={proyectoActualObj}
+        registrosBitacora={registrosProyectoActual}
+        onFiltrarFecha={(f) => {
+          setFechaDesde(f)
+          setFechaHasta(f)
+        }}
+        onCrearRegistroEnFecha={(f) => {
+          router.push(`/dashboard/bitacora?nuevo=true&fecha=${f}`)
+        }}
+      />
 
       {/* MODAL / LIGHTBOX DE FOTOGRAFÍA EXPANDIDA A PANTALLA COMPLETA */}
       {fotoExpandida && (

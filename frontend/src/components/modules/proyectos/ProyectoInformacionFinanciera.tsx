@@ -120,7 +120,7 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
   const [perspectivaCurva, setPerspectivaCurva] = useState<'ejecutora' | 'supervisora'>('ejecutora')
   const [filtroAnioCurva, setFiltroAnioCurva] = useState<string>('todos')
   const [modalFiltrosCurvaOpen, setModalFiltrosCurvaOpen] = useState(false)
-  const [tipoMetricaCurva, setTipoMetricaCurva] = useState<'porcentaje' | 'monto'>('porcentaje')
+  const [tipoMetricaCurva, setTipoMetricaCurva] = useState<'porcentaje' | 'monto' | 'comparativa'>('porcentaje')
   const [fechaDesdeCurva, setFechaDesdeCurva] = useState('')
   const [fechaHastaCurva, setFechaHastaCurva] = useState('')
 
@@ -191,13 +191,7 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
     pAny.tipoObra === 'manual' ||
     pAny.tipo_obra === 'manual' ||
     pAny.usarModoSabana === false
-  const ambitoPlanTrabajo = pAny.ambitoPlanTrabajo || pAny.ambito_plan_trabajo || 'obra'
   const esModoSabana = (pAny.modoGestionFinanciera === 'sabana' || pAny.usarModoSabana === true) && !modoManual
-  const perspectivaTieneSabana = (
-    (perspectivaEstimacion === 'ejecutora' && (pAny.modoObra === 'sabana' || (pAny.modoObra === undefined && esModoSabana && ambitoPlanTrabajo === 'obra'))) ||
-    (perspectivaEstimacion === 'supervisora' && (pAny.modoSupervision === 'sabana' || (pAny.modoSupervision === undefined && esModoSabana && ambitoPlanTrabajo === 'supervision')))
-  )
-  const perspectivaEsManual = !perspectivaTieneSabana
 
   // Capítulos Libro Azul DGC + Capítulos personalizados creados en este proyecto
   const [capitulosProyecto, setCapitulosProyecto] = useState<Array<{ id: number; nombre: string }>>(() => {
@@ -231,6 +225,8 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
   const [modalEstimacionManualOpen, setModalEstimacionManualOpen] = useState(false)
   const [estimacionEnEdicion, setEstimacionEnEdicion] = useState<EstimacionFinancieraItem | null>(null)
   const [estimacionParaEliminar, setEstimacionParaEliminar] = useState<EstimacionFinancieraItem | null>(null)
+  const [drawerEstimacionVer, setDrawerEstimacionVer] = useState<EstimacionFinancieraItem | null>(null)
+  
 
   // Formulario modal de estimación manual
   const [formEstNumero, setFormEstNumero] = useState('')
@@ -1038,6 +1034,11 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
       const t = idx / Math.max(1, total - 1)
       const prog = Math.round((3 * t * t - 2 * t * t * t) * 10000) / 100
 
+      const tPrev = idx === 0 ? 0 : (idx - 1) / Math.max(1, total - 1)
+      const progPrev = idx === 0 ? 0 : Math.round((3 * tPrev * tPrev - 2 * tPrev * tPrev * tPrev) * 10000) / 100
+      const progMesPct = Math.max(0, prog - progPrev)
+      const montoEsperadoMes = (montoBaseCurva * progMesPct) / 100
+
       const estsDelMes = estimacionesPerspectiva.filter((e) => {
         const fFin = String(e.fechaFin || e.fechaCorte || '').trim()
         if (fFin) {
@@ -1048,6 +1049,8 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
         }
         return e.mes && e.mes.toLowerCase().includes(mesesCompletos[m.mesIdx].toLowerCase()) && e.mes.includes(String(m.año))
       })
+
+      const montoEstimadoMes = estsDelMes.reduce((acc, e) => acc + (Number(e.valorBrutoTrabajado) || 0), 0)
 
       if (estsDelMes.length > 0) {
         estsDelMes.forEach((est) => {
@@ -1068,6 +1071,7 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
       const variacion = real !== null ? Number((real - prog).toFixed(2)) : null
       const montoProg = montoBaseCurva * (prog / 100)
       const montoReal = real !== null ? acumuladoEjecutado : null
+      const nombreEstimacionMes = estsDelMes.map((e) => e.numero).join(', ')
 
       return {
         mes: m.mes,
@@ -1080,6 +1084,10 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
         variacion,
         montoProg,
         montoReal,
+        montoEsperadoMes,
+        montoEstimadoMes,
+        nombreEstimacionMes,
+        tieneEstimacion: estsDelMes.length > 0,
       }
     })
   }, [proyecto, estimacionesGeneradas, perspectivaCurva, montoBaseCurva])
@@ -1757,78 +1765,63 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
                     </tr>
                   ) : (
                     estimacionesPaginadas.map((est) => (
-                      <tr key={est.id} className="hover:bg-red-50/30 transition-colors">
-                        {/* No. Estimación & Nombre */}
+                      <tr key={est.id} className="hover:bg-gray-50/70 transition-colors">
+                        {/* No. Estimación & Nombre (Sin badge de estado, todo en negro) */}
                         <td className="px-2.5 py-1.5 font-sans">
                           <div className="flex items-center gap-1">
                             <span className="font-bold text-gray-900">{est.numero}</span>
-                            <span className={`text-[8px] font-mono px-1 py-0.2 rounded font-bold uppercase ${
-                              est.estado === 'borrador' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
-                            }`}>
-                              {est.estado}
-                            </span>
                           </div>
-                          <p className="text-[9px] text-gray-500 font-medium truncate max-w-[180px]" title={est.nombreEstimacion}>
+                          <p className="text-[9px] text-gray-600 font-medium truncate max-w-[180px]" title={est.nombreEstimacion}>
                             {est.nombreEstimacion}
                           </p>
                         </td>
 
                         {/* Delegado Residente */}
                         <td className="px-2.5 py-1.5 font-sans">
-                          <div className="flex items-center gap-1 text-gray-800 font-semibold text-[9.5px]">
-                            <User size={9} className="text-[#9B0F06] shrink-0" />
+                          <div className="flex items-center gap-1 text-gray-900 font-semibold text-[9.5px]">
+                            <User size={9} className="text-gray-700 shrink-0" />
                             <span className="truncate max-w-[120px]">{est.delegadoResidente}</span>
                           </div>
-                          <p className="text-[8px] text-gray-400 font-normal truncate max-w-[120px]">{est.supervisadoPor}</p>
+                          <p className="text-[8px] text-gray-500 font-normal truncate max-w-[120px]">{est.supervisadoPor}</p>
                         </td>
 
                         {/* Período */}
-                        <td className="px-2.5 py-1.5 font-mono text-[9px] text-gray-600">
+                        <td className="px-2.5 py-1.5 font-mono text-[9px] text-gray-900">
                           <div className="flex items-center gap-1">
-                            <Calendar size={9} className="text-gray-400 shrink-0" />
+                            <Calendar size={9} className="text-gray-500 shrink-0" />
                             <span>{est.fechaInicio} al {est.fechaFin}</span>
                           </div>
-                          <span className="text-[8px] text-gray-400 block font-sans">{est.mes}</span>
+                          <span className="text-[8px] text-gray-500 block font-sans">{est.mes}</span>
                         </td>
 
-                        {/* Retraso */}
+                        {/* Retraso (en color negro) */}
                         <td className="px-2.5 py-1.5 text-center font-sans">
                           {est.diasRetraso === 0 ? (
-                            <span className="text-emerald-700 font-semibold text-[9px] inline-flex items-center gap-0.5">
-                              <CheckCircle2 size={9} />
+                            <span className="text-gray-900 font-semibold text-[9px] inline-flex items-center gap-0.5">
+                              <CheckCircle2 size={9} className="text-gray-700" />
                               En tiempo (0d)
                             </span>
                           ) : (
-                            <span className={`font-semibold text-[9px] inline-flex items-center gap-0.5 ${
-                              est.diasRetraso <= 5 ? 'text-amber-700' : 'text-[#9B0F06]'
-                            }`}>
-                              <AlertTriangle size={9} />
+                            <span className="text-gray-900 font-semibold text-[9px] inline-flex items-center gap-0.5">
+                              <AlertTriangle size={9} className="text-gray-700" />
                               +{est.diasRetraso}d retraso
                             </span>
                           )}
                         </td>
 
-                        {/* Rendimiento / Calificación */}
+                        {/* Rendimiento (en color negro) */}
                         <td className="px-2.5 py-1.5 text-center font-sans">
-                          <span
-                            className={`font-bold text-[9px] ${
-                              est.calificacionDesempeno === 'bueno'
-                                ? 'text-emerald-700'
-                                : est.calificacionDesempeno === 'regular'
-                                ? 'text-amber-700'
-                                : 'text-[#9B0F06]'
-                            }`}
-                          >
+                          <span className="font-bold text-[9px] text-gray-900">
                             {est.porcentajeRendimiento.toFixed(1)}% ({est.calificacionDesempeno.toUpperCase()})
                           </span>
                         </td>
 
-                        {/* Anticipo Aplicado (Monto + %) */}
+                        {/* Anticipo Aplicado (en color negro) */}
                         <td className="px-2.5 py-1.5 text-right">
-                          <span className="text-amber-800 font-semibold block font-mono text-[9.5px]">
+                          <span className="text-gray-900 font-semibold block font-mono text-[9.5px]">
                             − Q {est.montoAmortizacion.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
                           </span>
-                          <span className="text-[7.5px] text-gray-400 font-sans">
+                          <span className="text-[7.5px] text-gray-500 font-sans">
                             ({est.porcentajeAmortizacion.toFixed(0)}% amortizado)
                           </span>
                         </td>
@@ -1838,42 +1831,31 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
                           Q {est.valorBrutoTrabajado.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
                         </td>
 
-                        {/* Monto Líquido a Pagar */}
-                        <td className="px-2.5 py-1.5 text-right font-black text-[#9B0F06] font-mono text-[9.5px]">
+                        {/* Monto Líquido a Pagar (en color negro) */}
+                        <td className="px-2.5 py-1.5 text-right font-bold text-gray-900 font-mono text-[9.5px]">
                           Q {est.montoLiquidoAPagar.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
                         </td>
 
-                        {/* Saldo Contractual */}
-                        <td className="px-2.5 py-1.5 text-right font-medium text-gray-600 font-mono text-[9px]">
+                        {/* Saldo Contractual (en color negro) */}
+                        <td className="px-2.5 py-1.5 text-right font-medium text-gray-900 font-mono text-[9px]">
                           Q {est.saldoContractualRestante.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
                         </td>
 
-                        {/* Botón Acción: Ojo, Editar y Eliminar (solo en borrador) */}
+                        {/* Botón Acción: Ver abre Drawer ahí mismo, Editar y Eliminar */}
                         <td className="px-2.5 py-1.5 text-center font-sans">
                           <div className="flex items-center justify-center gap-1">
                             <button
                               type="button"
-                              onClick={() => {
-                                if (perspectivaEsManual) {
-                                  handleAbrirEditarEstimacionManual(est)
-                                } else {
-                                  navegarAHojaSabana({ estimacion: est.numero })
-                                }
-                              }}
-                              disabled={!perspectivaEsManual && !tieneAccesoHojaSabana}
-                              className={`inline-flex h-6 w-6 items-center justify-center rounded transition-colors ${
-                                perspectivaEsManual || tieneAccesoHojaSabana
-                                  ? 'text-gray-600 hover:text-[#9B0F06] hover:bg-red-50 cursor-pointer shadow-2xs'
-                                  : 'text-gray-300 cursor-not-allowed'
-                              }`}
-                              title={perspectivaEsManual ? `Ver detalles de ${est.numero}` : (tieneAccesoHojaSabana ? `Ver Hoja Sábana para ${est.numero}` : 'Solo el Delegado Residente o Administrador tiene acceso')}
+                              onClick={() => setDrawerEstimacionVer(est)}
+                              className="inline-flex h-6 w-6 items-center justify-center rounded text-gray-700 hover:text-black hover:bg-gray-100 cursor-pointer transition-colors shadow-2xs"
+                              title={`Ver detalles de ${est.numero}`}
                             >
-                              {perspectivaEsManual || tieneAccesoHojaSabana ? <Eye size={13} /> : <Lock size={12} />}
+                              <Eye size={13} />
                             </button>
                             <button
                               type="button"
                               onClick={() => handleAbrirEditarEstimacionManual(est)}
-                              className="inline-flex h-6 w-6 items-center justify-center rounded text-amber-700 hover:bg-amber-50 cursor-pointer transition-colors shadow-2xs"
+                              className="inline-flex h-6 w-6 items-center justify-center rounded text-gray-700 hover:text-black hover:bg-gray-100 cursor-pointer transition-colors shadow-2xs"
                               title="Editar estimación"
                             >
                               <Edit2 size={11} />
@@ -1882,7 +1864,7 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
                               <button
                                 type="button"
                                 onClick={() => setEstimacionParaEliminar(est)}
-                                className="inline-flex h-6 w-6 items-center justify-center rounded text-red-600 hover:bg-red-50 hover:text-red-700 cursor-pointer transition-colors shadow-2xs"
+                                className="inline-flex h-6 w-6 items-center justify-center rounded text-gray-700 hover:text-red-700 hover:bg-red-50 cursor-pointer transition-colors shadow-2xs"
                                 title={`Eliminar ${est.numero} (Permitido en estado Borrador)`}
                               >
                                 <Trash2 size={11} />
@@ -2005,7 +1987,7 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
                 </select>
               </div>
 
-              {/* Selector de Métrica (% vs Monto Q) */}
+              {/* Selector de Métrica (% vs Monto Q vs Comparativa Plan) */}
               <div className="inline-flex items-center gap-0.5 rounded-md bg-gray-100 p-0.5 border border-gray-200">
                 <button
                   type="button"
@@ -2028,6 +2010,18 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
                   }`}
                 >
                   Monto (Q)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTipoMetricaCurva('comparativa')}
+                  className={`px-2.5 py-1 rounded text-[10px] font-bold transition-all cursor-pointer ${
+                    tipoMetricaCurva === 'comparativa'
+                      ? 'bg-white text-[#9B0F06] shadow-2xs'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                  title="Comparar estimaciones con el monto esperado en el plan de trabajo"
+                >
+                  Estimado vs Esperado (Plan)
                 </button>
               </div>
 
@@ -2075,10 +2069,16 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
             <div className="flex flex-wrap items-center justify-between border-b border-gray-100 pb-2 gap-2">
               <div>
                 <h2 className="text-xs font-black tracking-wide text-gray-900 uppercase">
-                  PROGRAMADO / EJECUTADO ACUMULADO MENSUAL ({perspectivaCurva === 'ejecutora' ? 'CONTRATO DE OBRA' : 'CONTRATO DE SUPERVISIÓN'})
+                  {tipoMetricaCurva === 'comparativa'
+                    ? `COMPARATIVA ESTIMACIÓN VS PLAN ESPERADO (${perspectivaCurva === 'ejecutora' ? 'CONTRATO DE OBRA' : 'CONTRATO DE SUPERVISIÓN'})`
+                    : `PROGRAMADO / EJECUTADO ACUMULADO MENSUAL (${perspectivaCurva === 'ejecutora' ? 'CONTRATO DE OBRA' : 'CONTRATO DE SUPERVISIÓN'})`}
                 </h2>
                 <p className="text-[9px] text-gray-400">
-                  {tipoMetricaCurva === 'porcentaje' ? 'Curva de avance porcentual contractual acumulado' : 'Curva de avance monetario acumulado (Q)'}
+                  {tipoMetricaCurva === 'porcentaje'
+                    ? 'Curva de avance porcentual contractual acumulado'
+                    : tipoMetricaCurva === 'monto'
+                    ? 'Curva de avance monetario acumulado (Q)'
+                    : 'Comparativa mensual directa del monto de estimaciones ejecutadas vs monto esperado en el plan de trabajo (Q)'}
                 </p>
               </div>
               <div className="text-right">
@@ -2089,7 +2089,7 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
               </div>
             </div>
 
-            {/* Contenedor SVG Responsivo de la Curva S */}
+            {/* Contenedor SVG Responsivo de la Curva S y Comparativa */}
             <div className="relative w-full bg-white rounded-lg p-2 select-none overflow-x-auto">
               <div className="w-full min-w-[650px]">
                 {(() => {
@@ -2105,6 +2105,141 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
                   const svgWidth = Math.max(760, total * 48)
                   const xStep = (svgWidth - 90) / Math.max(1, total - 1)
                   const esPorcentaje = tipoMetricaCurva === 'porcentaje'
+                  const esComparativa = tipoMetricaCurva === 'comparativa'
+
+                  if (esComparativa) {
+                    const maxVal = Math.max(
+                      1,
+                      ...puntosCurvaSFiltrados.map((p) => Math.max(p.montoEsperadoMes || 0, p.montoEstimadoMes || 0))
+                    ) * 1.2
+                    const barGroupWidth = Math.min(28, Math.max(16, xStep * 0.45))
+                    const barW = barGroupWidth / 2 - 1
+
+                    const ticksY = [0, 0.25, 0.5, 0.75, 1.0].map((f) => {
+                      const val = f * maxVal
+                      const y = 175 - (val / maxVal) * 145
+                      const labelQ = val >= 1_000_000
+                        ? `Q ${(val / 1_000_000).toFixed(1)}M`
+                        : val >= 1_000
+                        ? `Q ${(val / 1000).toFixed(0)}k`
+                        : `Q ${val.toFixed(0)}`
+                      return { y, label: labelQ }
+                    })
+
+                    return (
+                      <svg viewBox={`0 0 ${svgWidth} 250`} className="w-full h-auto max-h-[320px] overflow-visible">
+                        {/* Cuadrícula Horizontal Y */}
+                        {ticksY.map((t, idx) => (
+                          <g key={idx}>
+                            <line x1="50" y1={t.y} x2={svgWidth - 20} y2={t.y} stroke="#e5e7eb" strokeWidth="1" />
+                            <text x="44" y={t.y + 3} textAnchor="end" fontSize="8" fill="#4b5563" fontFamily="sans-serif" fontWeight="500">
+                              {t.label}
+                            </text>
+                          </g>
+                        ))}
+
+                        {/* Ejes X y Y */}
+                        <line x1="50" y1="30" x2="50" y2="175" stroke="#d1d5db" strokeWidth="1.5" />
+                        <line x1="50" y1="175" x2={svgWidth - 20} y2="175" stroke="#d1d5db" strokeWidth="1.5" />
+
+                        {/* Columnas de Comparación por Mes */}
+                        {puntosCurvaSFiltrados.map((pt, idx) => {
+                          const xCenter = 55 + idx * xStep
+                          const hEsperado = Math.max(0, Math.min(145, ((pt.montoEsperadoMes || 0) / maxVal) * 145))
+                          const yEsperado = 175 - hEsperado
+
+                          const hEstimado = Math.max(0, Math.min(145, ((pt.montoEstimadoMes || 0) / maxVal) * 145))
+                          const yEstimado = 175 - hEstimado
+
+                          const x1 = xCenter - barGroupWidth / 2
+                          const x2 = xCenter + 1
+
+                          const dif = (pt.montoEstimadoMes || 0) - (pt.montoEsperadoMes || 0)
+                          const tieneDatoReal = pt.tieneEstimacion || pt.real !== null
+
+                          return (
+                            <g
+                              key={`comp-${idx}`}
+                              className="cursor-pointer transition-opacity hover:opacity-90"
+                              onMouseEnter={(e) => {
+                                const rect = e.currentTarget.getBoundingClientRect()
+                                setTooltipCurva({
+                                  x: rect.left,
+                                  y: rect.top,
+                                  visible: true,
+                                  data: {
+                                    ...pt,
+                                    esComparativa: true,
+                                  },
+                                })
+                              }}
+                              onMouseLeave={() => setTooltipCurva(null)}
+                            >
+                              {/* Barra Azul: Monto Esperado en Plan */}
+                              <rect
+                                x={x1}
+                                y={yEsperado}
+                                width={barW}
+                                height={hEsperado}
+                                rx="2"
+                                fill="#2563eb"
+                                opacity="0.85"
+                              />
+
+                              {/* Barra Borgoña: Monto Estimación Real */}
+                              <rect
+                                x={x2}
+                                y={yEstimado}
+                                width={barW}
+                                height={hEstimado}
+                                rx="2"
+                                fill={tieneDatoReal ? '#9B0F06' : '#e5e7eb'}
+                                stroke={tieneDatoReal ? '#7a0c05' : '#d1d5db'}
+                                strokeWidth="0.5"
+                                strokeDasharray={tieneDatoReal ? undefined : '2,2'}
+                              />
+
+                              {/* Indicador de Desfase / Adelanto flotante si hay estimación */}
+                              {tieneDatoReal && pt.montoEstimadoMes > 0 && (
+                                <text
+                                  x={xCenter}
+                                  y={Math.min(yEsperado, yEstimado) - 5}
+                                  textAnchor="middle"
+                                  fontSize="7"
+                                  fontWeight="bold"
+                                  fill={dif >= 0 ? '#047857' : '#9B0F06'}
+                                  fontFamily="sans-serif"
+                                >
+                                  {dif >= 0 ? '+' : ''}{dif >= 1_000_000 ? `Q${(dif / 1_000_000).toFixed(1)}M` : `Q${(dif / 1000).toFixed(0)}k`}
+                                </text>
+                              )}
+                            </g>
+                          )
+                        })}
+
+                        {/* Etiquetas Eje X Verticales / Rotadas */}
+                        {puntosCurvaSFiltrados.map((pt, idx) => {
+                          const xCenter = 55 + idx * xStep
+                          return (
+                            <g key={`lbl-${idx}`} transform={`translate(${xCenter}, 185) rotate(-90)`}>
+                              <text
+                                x="0"
+                                y="3"
+                                textAnchor="end"
+                                fontSize="7.5"
+                                fill={pt.tieneEstimacion ? '#9B0F06' : '#4b5563'}
+                                fontWeight={pt.tieneEstimacion ? 'bold' : 'normal'}
+                                fontFamily="sans-serif"
+                              >
+                                {pt.nombreEstimacionMes ? `${pt.fecha} (${pt.nombreEstimacionMes})` : pt.fecha}
+                              </text>
+                            </g>
+                          )
+                        })}
+                      </svg>
+                    )
+                  }
+
                   const maxMonto = Math.max(1, montoBaseCurva * 1.2)
 
                   const ptsProg = puntosCurvaSFiltrados.map((p, idx) => {
@@ -2247,58 +2382,99 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
               {/* Tooltip Flotante */}
               {tooltipCurva && tooltipCurva.visible && (
                 <div
-                  className="absolute z-30 pointer-events-none rounded-lg border border-gray-200 bg-white/95 p-2 shadow-lg backdrop-blur-md transition-all font-sans text-[10px]"
+                  className="absolute z-30 pointer-events-none rounded-lg border border-gray-200 bg-white/95 p-2.5 shadow-lg backdrop-blur-md transition-all font-sans text-[10px]"
                   style={{
                     left: '50%',
                     top: '10px',
                     transform: 'translateX(-50%)',
-                    minWidth: '240px',
+                    minWidth: '260px',
                   }}
                 >
-                  <div className="flex items-center justify-between border-b border-gray-100 pb-0.5 mb-1">
+                  <div className="flex items-center justify-between border-b border-gray-100 pb-0.5 mb-1.5">
                     <span className="font-extrabold text-gray-900">{tooltipCurva.data.mes}</span>
-                    {tooltipCurva.data.esCorte && (
+                    {tooltipCurva.data.nombreEstimacionMes ? (
+                      <span className="rounded bg-red-100 text-[#9B0F06] font-bold px-1.5 py-0.2 text-[8px]">
+                        {tooltipCurva.data.nombreEstimacionMes}
+                      </span>
+                    ) : tooltipCurva.data.esCorte ? (
                       <span className="rounded bg-red-100 text-[#9B0F06] font-black px-1 text-[7.5px] uppercase">
                         Corte Actual
                       </span>
-                    )}
+                    ) : null}
                   </div>
 
-                  <div className="space-y-0.5 font-mono text-[9.5px]">
-                    <div className="flex justify-between text-blue-700">
-                      <span className="font-sans font-semibold">Programado:</span>
-                      <span className="font-bold">
-                        {tooltipCurva.data.prog.toFixed(2)}% (Q {tooltipCurva.data.montoProg.toLocaleString('es-GT', { minimumFractionDigits: 2 })})
-                      </span>
-                    </div>
-
-                    {tooltipCurva.data.real !== null ? (
-                      <>
-                        <div className="flex justify-between text-[#9B0F06]">
-                          <span className="font-sans font-semibold">Ejecutado:</span>
-                          <span className="font-bold">
-                            {tooltipCurva.data.real.toFixed(2)}% (Q {(tooltipCurva.data.montoReal ?? 0).toLocaleString('es-GT', { minimumFractionDigits: 2 })})
-                          </span>
-                        </div>
-
-                        <div className="mt-1 pt-0.5 border-t border-gray-100 flex items-center justify-between font-sans">
-                          <span className="font-bold text-gray-600">Variación:</span>
-                          <span
-                            className={`font-black text-[8.5px] ${
-                              tooltipCurva.data.variacion >= 0 ? 'text-emerald-700' : 'text-[#9B0F06]'
-                            }`}
-                          >
-                            {tooltipCurva.data.variacion >= 0 ? '+' : ''}
-                            {tooltipCurva.data.variacion.toFixed(2)}% {tooltipCurva.data.variacion >= 0 ? '(Adelanto)' : '(Retraso)'}
-                          </span>
-                        </div>
-                      </>
-                    ) : (
-                      <div className="mt-0.5 text-center text-gray-400 font-sans italic text-[8.5px]">
-                        Proyección futura
+                  {tooltipCurva.data.esComparativa || tipoMetricaCurva === 'comparativa' ? (
+                    <div className="space-y-1 font-mono text-[9.5px]">
+                      <div className="flex justify-between text-blue-700">
+                        <span className="font-sans font-semibold">Esperado (Plan de Trabajo):</span>
+                        <span className="font-bold">
+                          Q {(tooltipCurva.data.montoEsperadoMes || 0).toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                        </span>
                       </div>
-                    )}
-                  </div>
+
+                      <div className="flex justify-between text-[#9B0F06]">
+                        <span className="font-sans font-semibold">Estimación Ejecutada:</span>
+                        <span className="font-bold">
+                          {tooltipCurva.data.tieneEstimacion || tooltipCurva.data.real !== null
+                            ? `Q ${(tooltipCurva.data.montoEstimadoMes || 0).toLocaleString('es-GT', { minimumFractionDigits: 2 })}`
+                            : 'Pendiente de registro'}
+                        </span>
+                      </div>
+
+                      {(tooltipCurva.data.tieneEstimacion || tooltipCurva.data.real !== null) && (
+                        <div className="mt-1 pt-1 border-t border-gray-100 flex items-center justify-between font-sans">
+                          <span className="font-bold text-gray-600">Diferencia:</span>
+                          {(() => {
+                            const dif = (tooltipCurva.data.montoEstimadoMes || 0) - (tooltipCurva.data.montoEsperadoMes || 0)
+                            const pct = tooltipCurva.data.montoEsperadoMes > 0
+                              ? ((tooltipCurva.data.montoEstimadoMes || 0) / tooltipCurva.data.montoEsperadoMes) * 100
+                              : 100
+                            return (
+                              <span className={`font-black text-[9px] ${dif >= 0 ? 'text-emerald-700' : 'text-[#9B0F06]'}`}>
+                                {dif >= 0 ? '+' : ''}Q {dif.toLocaleString('es-GT', { minimumFractionDigits: 2 })} ({pct.toFixed(1)}%)
+                              </span>
+                            )
+                          })()}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-0.5 font-mono text-[9.5px]">
+                      <div className="flex justify-between text-blue-700">
+                        <span className="font-sans font-semibold">Esperado (Plan):</span>
+                        <span className="font-bold">
+                          {tooltipCurva.data.prog.toFixed(2)}% (Q {tooltipCurva.data.montoProg.toLocaleString('es-GT', { minimumFractionDigits: 2 })})
+                        </span>
+                      </div>
+
+                      {tooltipCurva.data.real !== null ? (
+                        <>
+                          <div className="flex justify-between text-[#9B0F06]">
+                            <span className="font-sans font-semibold">Estimación Real:</span>
+                            <span className="font-bold">
+                              {tooltipCurva.data.real.toFixed(2)}% (Q {(tooltipCurva.data.montoReal ?? 0).toLocaleString('es-GT', { minimumFractionDigits: 2 })})
+                            </span>
+                          </div>
+
+                          <div className="mt-1 pt-0.5 border-t border-gray-100 flex items-center justify-between font-sans">
+                            <span className="font-bold text-gray-600">Variación:</span>
+                            <span
+                              className={`font-black text-[8.5px] ${
+                                tooltipCurva.data.variacion >= 0 ? 'text-emerald-700' : 'text-[#9B0F06]'
+                              }`}
+                            >
+                              {tooltipCurva.data.variacion >= 0 ? '+' : ''}
+                              {tooltipCurva.data.variacion.toFixed(2)}% {tooltipCurva.data.variacion >= 0 ? '(Adelanto)' : '(Retraso)'}
+                            </span>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="mt-0.5 text-center text-gray-400 font-sans italic text-[8.5px]">
+                          Proyección futura
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -2306,12 +2482,20 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
             {/* Leyenda en la parte inferior centrada */}
             <div className="flex items-center justify-center gap-6 pt-2 border-t border-gray-100 text-[10px] font-semibold">
               <span className="flex items-center gap-2 text-gray-700">
-                <span className="h-0.5 w-6 bg-[#2563eb] inline-block rounded" />
-                {tipoMetricaCurva === 'porcentaje' ? '% Prog Acum Mensual' : 'Monto Prog Acumulado (Q)'}
+                <span className={`inline-block rounded ${tipoMetricaCurva === 'comparativa' ? 'h-2.5 w-3 bg-[#2563eb]' : 'h-0.5 w-6 bg-[#2563eb]'}`} />
+                {tipoMetricaCurva === 'porcentaje'
+                  ? '% Esperado Acumulado (Plan de Trabajo)'
+                  : tipoMetricaCurva === 'monto'
+                  ? 'Monto Esperado Acumulado (Plan de Trabajo)'
+                  : 'Monto Esperado Mensual (Plan de Trabajo)'}
               </span>
               <span className="flex items-center gap-2 text-gray-700">
-                <span className="h-0.5 w-6 bg-[#9B0F06] inline-block rounded" />
-                {tipoMetricaCurva === 'porcentaje' ? '% Ejecut Acum Mensual' : 'Monto Ejecut Acumulado (Q)'}
+                <span className={`inline-block rounded ${tipoMetricaCurva === 'comparativa' ? 'h-2.5 w-3 bg-[#9B0F06]' : 'h-0.5 w-6 bg-[#9B0F06]'}`} />
+                {tipoMetricaCurva === 'porcentaje'
+                  ? '% Estimaciones Acumulado (Ejecutado)'
+                  : tipoMetricaCurva === 'monto'
+                  ? 'Monto Estimaciones Acumulado (Ejecutado)'
+                  : 'Monto Estimación Ejecutada'}
               </span>
             </div>
 
@@ -2365,6 +2549,81 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
               )
             })()}
 
+            {/* Tabla Comparativa Detallada Mes a Mes cuando la métrica comparativa está activa */}
+            {tipoMetricaCurva === 'comparativa' && (
+              <div className="mt-3 space-y-2 pt-2 border-t border-gray-100">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold text-gray-900 uppercase">
+                    Detalle Comparativo: Estimación vs Esperado en Plan de Trabajo
+                  </h3>
+                  <span className="text-[10px] text-gray-500 font-medium">
+                    {puntosCurvaSFiltrados.filter((p) => p.tieneEstimacion || p.real !== null).length} períodos con estimación registrada
+                  </span>
+                </div>
+
+                <div className="overflow-x-auto rounded-lg border border-gray-200">
+                  <table className="w-full text-left font-sans text-[10px]">
+                    <thead>
+                      <tr className="border-b border-gray-200 bg-gray-50 text-[8px] font-extrabold uppercase tracking-wider text-gray-600">
+                        <th className="px-3 py-1.5">Período / Mes</th>
+                        <th className="px-3 py-1.5">Estimación</th>
+                        <th className="px-3 py-1.5 text-right">Monto Esperado (Plan)</th>
+                        <th className="px-3 py-1.5 text-right">Monto Estimación (Real)</th>
+                        <th className="px-3 py-1.5 text-right">Diferencia (Q)</th>
+                        <th className="px-3 py-1.5 text-center">Cumplimiento</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 font-mono text-[9.5px]">
+                      {puntosCurvaSFiltrados.map((p, idx) => {
+                        const tieneReal = p.tieneEstimacion || p.real !== null
+                        const dif = (p.montoEstimadoMes || 0) - (p.montoEsperadoMes || 0)
+                        const pct = p.montoEsperadoMes > 0
+                          ? ((p.montoEstimadoMes || 0) / p.montoEsperadoMes) * 100
+                          : 100
+
+                        return (
+                          <tr key={idx} className="hover:bg-gray-50/60 transition-colors">
+                            <td className="px-3 py-1.5 font-sans font-semibold text-gray-900">
+                              {p.mes}
+                            </td>
+                            <td className="px-3 py-1.5 font-sans">
+                              {p.nombreEstimacionMes ? (
+                                <span className="font-bold text-gray-900">{p.nombreEstimacionMes}</span>
+                              ) : (
+                                <span className="text-gray-400 font-sans italic text-[8.5px]">Sin estimación</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-1.5 text-right text-gray-900 font-semibold">
+                              Q {(p.montoEsperadoMes || 0).toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                            </td>
+                            <td className="px-3 py-1.5 text-right font-bold text-gray-900">
+                              {tieneReal
+                                ? `Q ${(p.montoEstimadoMes || 0).toLocaleString('es-GT', { minimumFractionDigits: 2 })}`
+                                : <span className="text-gray-400 font-sans font-normal italic text-[8.5px]">Proyección</span>}
+                            </td>
+                            <td className="px-3 py-1.5 text-right font-bold text-gray-900">
+                              {tieneReal
+                                ? `${dif >= 0 ? '+' : ''}Q ${dif.toLocaleString('es-GT', { minimumFractionDigits: 2 })}`
+                                : '—'}
+                            </td>
+                            <td className="px-3 py-1.5 text-center font-sans">
+                              {tieneReal ? (
+                                <span className="font-bold text-[9px] text-gray-900">
+                                  {pct.toFixed(1)}% {dif >= 0 ? '(Adelanto)' : '(Desfase)'}
+                                </span>
+                              ) : (
+                                <span className="text-gray-400 text-[8.5px] italic">Pendiente</span>
+                              )}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
             {/* Modal Bottom Sheet de Filtros Curva S en Móvil */}
             {modalFiltrosCurvaOpen && (
               <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-xs p-0 sm:p-4">
@@ -2406,28 +2665,39 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
                       <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1">
                         Tipo de Métrica
                       </label>
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-3 gap-1.5">
                         <button
                           type="button"
                           onClick={() => setTipoMetricaCurva('porcentaje')}
-                          className={`py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
+                          className={`py-2 px-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer border text-center ${
                             tipoMetricaCurva === 'porcentaje'
                               ? 'bg-[#9B0F06] text-white border-[#9B0F06] shadow-xs'
                               : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
                           }`}
                         >
-                          % Acumulado
+                          % Acum.
                         </button>
                         <button
                           type="button"
                           onClick={() => setTipoMetricaCurva('monto')}
-                          className={`py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
+                          className={`py-2 px-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer border text-center ${
                             tipoMetricaCurva === 'monto'
                               ? 'bg-[#9B0F06] text-white border-[#9B0F06] shadow-xs'
                               : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
                           }`}
                         >
                           Monto (Q)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setTipoMetricaCurva('comparativa')}
+                          className={`py-2 px-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer border text-center ${
+                            tipoMetricaCurva === 'comparativa'
+                              ? 'bg-[#9B0F06] text-white border-[#9B0F06] shadow-xs'
+                              : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                          }`}
+                        >
+                          Plan Esperado
                         </button>
                       </div>
                     </div>
@@ -3331,6 +3601,247 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        </Portal>
+      )}
+
+      {/* DRAWER: VER DETALLE DE ESTIMACIÓN */}
+      {drawerEstimacionVer && (
+        <Portal>
+          <div
+            className="fixed inset-0 z-[125] flex justify-end bg-black/60 backdrop-blur-xs font-[Poppins] animate-fadeIn"
+            onClick={() => setDrawerEstimacionVer(null)}
+          >
+            <div
+              className="w-full max-w-lg bg-white h-full shadow-2xl flex flex-col font-sans overflow-hidden border-l border-gray-200"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50/80 px-4 py-3 shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-50 text-[#9B0F06]">
+                    <Receipt size={18} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-xs font-bold text-gray-900 uppercase">
+                        {drawerEstimacionVer.numero}
+                      </h3>
+                    </div>
+                    <p className="text-[10px] text-gray-500 font-medium truncate max-w-[280px]">
+                      {drawerEstimacionVer.nombreEstimacion}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setDrawerEstimacionVer(null)}
+                  className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-200 hover:text-gray-700 cursor-pointer transition-colors"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Contenido scrolleable */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-4 text-xs font-[Poppins]">
+                {/* 4 Cards Métricas Financieras Principales */}
+                <div className="grid grid-cols-2 gap-2 font-mono">
+                  <div className="rounded-xl border border-gray-200 bg-gray-50/60 p-2.5">
+                    <span className="text-[8px] font-bold uppercase tracking-wider text-gray-500 font-sans block">
+                      Valor Bruto Trabajado
+                    </span>
+                    <p className="text-[13px] font-bold text-gray-900 mt-0.5">
+                      Q {drawerEstimacionVer.valorBrutoTrabajado.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                    </p>
+                    <span className="text-[7.5px] text-gray-400 font-sans">
+                      Monto devengado
+                    </span>
+                  </div>
+
+                  <div className="rounded-xl border border-gray-200 bg-gray-50/60 p-2.5">
+                    <span className="text-[8px] font-bold uppercase tracking-wider text-gray-500 font-sans block">
+                      Anticipo Aplicado ({drawerEstimacionVer.porcentajeAmortizacion}%)
+                    </span>
+                    <p className="text-[13px] font-bold text-gray-900 mt-0.5">
+                      − Q {drawerEstimacionVer.montoAmortizacion.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                    </p>
+                    <span className="text-[7.5px] text-gray-400 font-sans">
+                      Amortización contractual
+                    </span>
+                  </div>
+
+                  <div className="rounded-xl border border-gray-200 bg-gray-50/60 p-2.5">
+                    <span className="text-[8px] font-bold uppercase tracking-wider text-gray-500 font-sans block">
+                      Líquido a Pagar
+                    </span>
+                    <p className="text-[13px] font-bold text-gray-900 mt-0.5">
+                      Q {drawerEstimacionVer.montoLiquidoAPagar.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                    </p>
+                    <span className="text-[7.5px] text-gray-400 font-sans">
+                      Monto neto a desembolsar
+                    </span>
+                  </div>
+
+                  <div className="rounded-xl border border-gray-200 bg-gray-50/60 p-2.5">
+                    <span className="text-[8px] font-bold uppercase tracking-wider text-gray-500 font-sans block">
+                      Saldo Contractual Restante
+                    </span>
+                    <p className="text-[13px] font-bold text-gray-900 mt-0.5">
+                      Q {drawerEstimacionVer.saldoContractualRestante.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                    </p>
+                    <span className="text-[7.5px] text-gray-400 font-sans">
+                      Saldo por devengar
+                    </span>
+                  </div>
+                </div>
+
+                {/* Comparativa con Plan de Trabajo para esta Estimación */}
+                {(() => {
+                  const pMes = puntosCurvaS.find((p) => {
+                    const fFin = String(drawerEstimacionVer.fechaFin || drawerEstimacionVer.fechaCorte || '').trim()
+                    if (fFin) {
+                      const partes = fFin.split('-').map(Number)
+                      if (partes.length >= 2 && partes[0] && partes[1]) {
+                        return p.año === partes[0] && p.date.getMonth() === (partes[1] - 1)
+                      }
+                    }
+                    return drawerEstimacionVer.mes && drawerEstimacionVer.mes.toLowerCase().includes(p.mes.toLowerCase())
+                  })
+
+                  const esperadoMes = pMes?.montoEsperadoMes || (montoBaseCurva * 0.1)
+                  const estimadoMes = drawerEstimacionVer.valorBrutoTrabajado
+                  const dif = estimadoMes - esperadoMes
+                  const pctCumpl = esperadoMes > 0 ? (estimadoMes / esperadoMes) * 100 : 100
+
+                  return (
+                    <div className="rounded-xl border border-gray-200 bg-white p-3 space-y-2">
+                      <div className="flex items-center justify-between border-b border-gray-100 pb-1.5">
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-gray-500">
+                          Comparativa vs Plan de Trabajo Esperado
+                        </span>
+                        <span className="text-[9px] font-bold text-gray-900">
+                          {pctCumpl.toFixed(1)}% cumplimiento
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 font-mono text-[10px]">
+                        <div>
+                          <span className="text-[8px] text-gray-400 font-sans block">Esperado (Plan)</span>
+                          <span className="font-semibold text-gray-900">
+                            Q {esperadoMes.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-[8px] text-gray-400 font-sans block">Estimado (Real)</span>
+                          <span className="font-semibold text-gray-900">
+                            Q {estimadoMes.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-[8px] text-gray-400 font-sans block">Variación</span>
+                          <span className="font-bold text-gray-900">
+                            {dif >= 0 ? '+' : ''}Q {dif.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })()}
+
+                {/* Datos Operativos y Desempeño */}
+                <div className="rounded-xl border border-gray-200 bg-white p-3 space-y-2.5">
+                  <h4 className="text-[9px] font-bold uppercase tracking-wider text-gray-500">
+                    Datos Operativos y Período
+                  </h4>
+                  <div className="space-y-2 text-[10.5px]">
+                    <div className="flex items-center justify-between py-1 border-b border-gray-100">
+                      <span className="text-gray-500">Período de Ejecución:</span>
+                      <span className="font-medium text-gray-900">
+                        {drawerEstimacionVer.fechaInicio || 'N/A'} al {drawerEstimacionVer.fechaFin || 'N/A'} ({drawerEstimacionVer.mes})
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between py-1 border-b border-gray-100">
+                      <span className="text-gray-500">Delegado Residente:</span>
+                      <span className="font-medium text-gray-900">
+                        {drawerEstimacionVer.delegadoResidente}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between py-1 border-b border-gray-100">
+                      <span className="text-gray-500">Supervisado Por:</span>
+                      <span className="font-medium text-gray-900">
+                        {drawerEstimacionVer.supervisadoPor || 'Empresa Supervisora'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between py-1 border-b border-gray-100">
+                      <span className="text-gray-500">Cumplimiento de Plazo:</span>
+                      <span className="font-medium text-gray-900">
+                        {drawerEstimacionVer.diasRetraso === 0 ? 'En tiempo (0 días de retraso)' : `${drawerEstimacionVer.diasRetraso} días de retraso`}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between py-1">
+                      <span className="text-gray-500">Rendimiento Operativo:</span>
+                      <span className="font-bold text-gray-900">
+                        {drawerEstimacionVer.porcentajeRendimiento.toFixed(1)}% ({drawerEstimacionVer.calificacionDesempeno.toUpperCase()})
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Observaciones */}
+                <div className="rounded-xl border border-gray-200 bg-white p-3 space-y-1">
+                  <h4 className="text-[9px] font-bold uppercase tracking-wider text-gray-500">
+                    Observaciones Técnicas
+                  </h4>
+                  <p className="text-[10px] text-gray-700 leading-relaxed font-sans">
+                    {drawerEstimacionVer.observaciones || 'Sin observaciones técnicas adicionales registradas para este período.'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Footer con Acciones */}
+              <div className="flex items-center justify-between gap-2 border-t border-gray-200 bg-gray-50/80 p-3 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setDrawerEstimacionVer(null)}
+                  className="rounded-lg border border-gray-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-100 cursor-pointer transition-colors"
+                >
+                  Cerrar
+                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const est = drawerEstimacionVer
+                      setDrawerEstimacionVer(null)
+                      handleAbrirEditarEstimacionManual(est)
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 cursor-pointer transition-colors"
+                  >
+                    <Edit2 size={12} />
+                    <span>Editar</span>
+                  </button>
+
+                  {tieneAccesoHojaSabana && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const num = drawerEstimacionVer.numero
+                        setDrawerEstimacionVer(null)
+                        navegarAHojaSabana({ estimacion: num })
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-[#9B0F06] px-3.5 py-1.5 text-xs font-bold text-white hover:bg-[#7a0c05] cursor-pointer transition-colors shadow-xs"
+                    >
+                      <FileSpreadsheet size={13} />
+                      <span>Abrir Hoja Sábana</span>
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </Portal>

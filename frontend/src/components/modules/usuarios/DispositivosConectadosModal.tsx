@@ -263,20 +263,10 @@ export function DispositivosConectadosModal({
                 return (
                   <div
                     key={sesion.id || sesion.deviceId || idx}
-                    className={`rounded-2xl border p-4 transition-all flex items-center justify-between gap-3 shadow-2xs ${
-                      sesion.esDispositivoActual
-                        ? 'border-emerald-300 bg-emerald-50/30 ring-1 ring-emerald-200/60'
-                        : 'border-gray-200 bg-white hover:border-gray-300'
-                    }`}
+                    className="rounded-2xl border border-gray-200 bg-white p-4 transition-all flex items-center justify-between gap-3 shadow-2xs hover:border-gray-300"
                   >
                     {/* Icono */}
-                    <div
-                      className={`h-11 w-11 rounded-2xl flex items-center justify-center shrink-0 ${
-                        sesion.esDispositivoActual
-                          ? 'bg-emerald-100 text-emerald-700'
-                          : 'bg-gray-100 text-gray-600'
-                      }`}
-                    >
+                    <div className="h-11 w-11 rounded-2xl flex items-center justify-center shrink-0 bg-gray-100 text-gray-700">
                       {esMovil ? <Smartphone size={22} /> : <Laptop size={22} />}
                     </div>
 
@@ -287,8 +277,8 @@ export function DispositivosConectadosModal({
                           {sesion.dispositivo || `Dispositivo ${idx + 1}`}
                         </span>
                         {sesion.esDispositivoActual && (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 shadow-2xs">
-                            <CheckCircle2 size={11} className="text-emerald-600" />
+                          <span className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-700">
+                            <CheckCircle2 size={11} className="text-gray-500" />
                             Este dispositivo
                           </span>
                         )}
@@ -318,12 +308,12 @@ export function DispositivosConectadosModal({
                           type="button"
                           onClick={() => handleCerrarSesion(sesion)}
                           disabled={esCerrando || cerrandoTodas}
-                          className="px-3.5 py-1.5 text-xs font-bold text-[#DC2626] border border-[#FCA5A5] rounded-xl bg-white hover:bg-red-50 hover:border-red-400 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs disabled:opacity-50"
+                          className="px-3.5 py-1.5 text-xs font-semibold text-gray-700 border border-gray-200 rounded-xl bg-white hover:bg-gray-100 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs disabled:opacity-50"
                         >
                           {esCerrando ? (
-                            <Loader2 size={13} className="animate-spin text-red-600" />
+                            <Loader2 size={13} className="animate-spin text-gray-600" />
                           ) : (
-                            <LogOut size={13} className="text-red-600 rotate-180" />
+                            <LogOut size={13} className="text-gray-500 rotate-180" />
                           )}
                           <span>Cerrar sesión</span>
                         </button>

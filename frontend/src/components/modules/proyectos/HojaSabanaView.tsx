@@ -1231,6 +1231,19 @@ const GENERAR_RENGLONES_VACIOS = (): RenglonDetalladoSabana[] => {
   }))
 }
 
+export const GENERAR_MEDICIONES_ANALITICAS_DEFAULT = (proyectoId?: string): MedicionAnaliticaCampo[] => [
+  { id: 'med-01', codigoDGC: '201.03 (b)', descripcionRenglon: 'Retiro de Pavimento, Aceras y Otros (OTS-3)', estacionInicio: '14+200', estacionFin: '14+700', longitudL: 500, anchoA: 7.3, alturaH: 0.15, ladoVia: 'Sección Completa', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 547.5, unidad: 'm³', origenTipo: 'Libreta', referenciaOrigen: 'Libreta topográfica N° 01 - Est. 01', numEstimacion: 'Estimación 01', mesPeriodo: 'Mar 2026', observaciones: 'Espesor verificado mediante calas de prueba en carril derecho.', fechaMedicion: '2026-03-25' },
+  { id: 'med-02', codigoDGC: '202.02', descripcionRenglon: 'Limpia chapeo y destronque', estacionInicio: '14+000', estacionFin: '15+500', longitudL: 1500, anchoA: 10, alturaH: 1, ladoVia: 'Sección Completa', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 1.5, unidad: 'Ha', origenTipo: 'Plano', referenciaOrigen: 'Anotación Bitácora N° 03', numEstimacion: 'Estimación 01', mesPeriodo: 'Mar 2026', observaciones: 'Despeje de derecho de vía conforme a planos constructivos.', fechaMedicion: '2026-03-28' },
+  { id: 'med-03', codigoDGC: '203.03 (a)', descripcionRenglon: 'Excavación No Clasificada(OC-2)(OC-3)', estacionInicio: '14+300', estacionFin: '15+100', longitudL: 800, anchoA: 8.5, alturaH: 1.4, ladoVia: 'Lado Izquierdo', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 9520, unidad: 'm³', origenTipo: 'Libreta', referenciaOrigen: 'Libreta de nivelación N° 04', numEstimacion: 'Estimación 02', mesPeriodo: 'Abr 2026', observaciones: 'Sección transversal verificada con estación total en talud.', fechaMedicion: '2026-04-20' },
+  { id: 'med-04', codigoDGC: '203.03 (b)', descripcionRenglon: 'Excavación No Clasificada de Desperdicio (OTS-1)(OTS-2)(OTS-3)', estacionInicio: '14+800', estacionFin: '15+600', longitudL: 800, anchoA: 7.5, alturaH: 1.2, ladoVia: 'Sección Completa', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 7200, unidad: 'm³', origenTipo: 'Libreta', referenciaOrigen: 'Reporte de volquetes N° 12', numEstimacion: 'Estimación 02', mesPeriodo: 'Abr 2026', observaciones: 'Material transportado a botadero autorizado.', fechaMedicion: '2026-04-24' },
+  { id: 'med-05', codigoDGC: '203.03 (c)', descripcionRenglon: 'Excavación No Clasificada para Préstamo', estacionInicio: '15+000', estacionFin: '16+000', longitudL: 1000, anchoA: 9.0, alturaH: 1.5, ladoVia: 'Sección Completa', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 13500, unidad: 'm³', origenTipo: 'Libreta', referenciaOrigen: 'Registro densímetro nuclear N° 08', numEstimacion: 'Estimación 03', mesPeriodo: 'May 2026', observaciones: 'Densidad in-situ mayor al 95% de la prueba Proctor estándar.', fechaMedicion: '2026-05-18' },
+  { id: 'med-06', codigoDGC: '203.04 (g)', descripcionRenglon: 'Cortes en Roca (OTS-1)(OTS-2)(OTS3)', estacionInicio: '15+400', estacionFin: '16+100', longitudL: 700, anchoA: 6.5, alturaH: 2.0, ladoVia: 'Lado Derecho', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 9100, unidad: 'm³', origenTipo: 'Libreta', referenciaOrigen: 'Control de voladura N° 06', numEstimacion: 'Estimación 03', mesPeriodo: 'May 2026', observaciones: 'Volumen derivado de perforación y voladura en banco de roca dura.', fechaMedicion: '2026-05-22' },
+  { id: 'med-07', codigoDGC: '203.03 (d)', descripcionRenglon: 'Sub-Excavación', estacionInicio: '15+800', estacionFin: '16+600', longitudL: 800, anchoA: 7.3, alturaH: 0.6, ladoVia: 'Sección Completa', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 3504, unidad: 'm³', origenTipo: 'Libreta', referenciaOrigen: 'Anotación Bitácora N° 18', numEstimacion: 'Estimación 04', mesPeriodo: 'Jun 2026', observaciones: 'Reemplazo de estrato fangoso arcilloso bajo subrasante.', fechaMedicion: '2026-06-19' },
+  { id: 'med-08', codigoDGC: '203.04 (h)', descripcionRenglon: 'Contracunetas (OC-1)(OC-3)', estacionInicio: '15+200', estacionFin: '16+400', longitudL: 1200, anchoA: 1.0, alturaH: 0.6, ladoVia: 'Lado Izquierdo', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 720, unidad: 'm', origenTipo: 'Plano', referenciaOrigen: 'Plano hidráulico D-04', numEstimacion: 'Estimación 04', mesPeriodo: 'Jun 2026', observaciones: 'Contracuneta revestida de concreto para protección de taludes.', fechaMedicion: '2026-06-25' },
+  { id: 'med-09', codigoDGC: '204.02', descripcionRenglon: 'Excavación de canales (oc-1)(oc-3)', estacionInicio: '14+200', estacionFin: '16+200', longitudL: 2000, anchoA: 1.8, alturaH: 0.8, ladoVia: 'Sección Completa', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 2880, unidad: 'm³', origenTipo: 'Libreta', referenciaOrigen: 'Bitácora N° 25 - Est. 05', numEstimacion: 'Estimación 05', mesPeriodo: 'Jul 2026', observaciones: 'Canal de desagüe principal con sección trapecial completada.', fechaMedicion: '2026-07-21' },
+  { id: 'med-10', codigoDGC: '155.07', descripcionRenglon: 'Mantenimiento de la carretera durante la ejecución del trabajo', estacionInicio: '0+000', estacionFin: '10+000', longitudL: 10000, anchoA: 1, alturaH: 1, ladoVia: 'Sección Completa', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 1, unidad: 'u', origenTipo: 'Plano', referenciaOrigen: 'Certificación de paso vehicular expedida por supervisión', numEstimacion: 'Estimación 05', mesPeriodo: 'Jul 2026', observaciones: 'Paso continuo garantizado durante el mes de julio sin interrupciones.', fechaMedicion: '2026-07-28' },
+]
+
 // Trabajos Pendientes (cargados dinámicamente desde el backend)
 export const TRABAJOS_PENDIENTES_MOCK: TrabajoPendienteBolsa[] = []
 
@@ -1735,7 +1748,11 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
               bitacoraEntradaId: m.bitacora_entrada_id || m.bitacoraEntradaId || undefined,
             }))
             setMedicionesAnaliticas(mapeadas)
+          } else {
+            setMedicionesAnaliticas(GENERAR_MEDICIONES_ANALITICAS_DEFAULT(targetId))
           }
+        } else {
+          setMedicionesAnaliticas(GENERAR_MEDICIONES_ANALITICAS_DEFAULT(targetId))
         }
       } catch (e) {
         console.warn('Error en carga de datos:', e)
@@ -1811,7 +1828,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
     return () => clearTimeout(timer)
   }, [renglones, proyectoIdSeleccionado, id, proyecto?.nombre, estimacionEnProgreso, diasRestantesEstimacion])
 
-  const [medicionesAnaliticas, setMedicionesAnaliticas] = useState<MedicionAnaliticaCampo[]>([])
+  const [medicionesAnaliticas, setMedicionesAnaliticas] = useState<MedicionAnaliticaCampo[]>(() => GENERAR_MEDICIONES_ANALITICAS_DEFAULT())
   const [trabajosPendientes, setTrabajosPendientes] = useState<TrabajoPendienteBolsa[]>([])
 
   const [capitulosLista, setCapitulosLista] = useState(CAPITULOS_LIBRO_AZUL)
@@ -6790,8 +6807,8 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
       {/* MODAL MODIFICAR PLAZO / INICIAR REPLANIFICACIÓN */}
       {modalModificarPlazoOpen && (
         <ModalPortal>
-          <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs font-[Poppins]" onClick={() => setModalModificarPlazoOpen(false)}>
-            <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl space-y-4 border border-gray-100 animate-fadeIn" onClick={(e) => e.stopPropagation()}>
+          <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 p-4 sm:p-6 backdrop-blur-xs font-[Poppins]" onClick={() => setModalModificarPlazoOpen(false)}>
+            <div className="w-full max-w-2xl rounded-3xl bg-white p-6 sm:p-7 shadow-2xl space-y-5 border border-gray-100 animate-fadeIn" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between border-b border-gray-100 pb-3">
                 <div className="flex items-center gap-2">
                   <Calendar size={18} className="text-[#9B0F06]" />
@@ -6808,53 +6825,82 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                 </button>
               </div>
 
-              <div className="space-y-3 text-xs">
+              <div className="space-y-4 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {proyecto?.estado === 'pausado' ? (
+                    <>
+                      <div>
+                        <label className="text-xs font-bold text-gray-800 mb-1.5 block">
+                          Fecha de Reanudación <span className="text-[#9B0F06]">*</span>
+                        </label>
+                        <input
+                          type="date"
+                          required
+                          value={formFechaReanudacion}
+                          onChange={(e) => setFormFechaReanudacion(e.target.value)}
+                          className="w-full border border-gray-200 rounded-xl p-2.5 text-xs text-gray-800 focus:outline-none focus:border-[#9B0F06] focus:ring-1 focus:ring-[#9B0F06]/20 transition-all"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-gray-800 mb-1.5 block">Nueva Fecha Final Contractual *</label>
+                        <input
+                          type="date"
+                          value={formNuevaFechaFin}
+                          onChange={(e) => setFormNuevaFechaFin(e.target.value)}
+                          className="w-full border border-gray-200 rounded-xl p-2.5 text-xs text-gray-800 focus:outline-none focus:border-[#9B0F06] focus:ring-1 focus:ring-[#9B0F06]/20 transition-all"
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div>
+                        <label className="text-xs font-bold text-gray-800 mb-1.5 block">Nueva Fecha Final Contractual *</label>
+                        <input
+                          type="date"
+                          value={formNuevaFechaFin}
+                          onChange={(e) => setFormNuevaFechaFin(e.target.value)}
+                          className="w-full border border-gray-200 rounded-xl p-2.5 text-xs text-gray-800 focus:outline-none focus:border-[#9B0F06] focus:ring-1 focus:ring-[#9B0F06]/20 transition-all"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-gray-800 mb-1.5 block">Motivo de la Modificación</label>
+                        <select
+                          value={formMotivoPlazo}
+                          onChange={(e: any) => setFormMotivoPlazo(e.target.value)}
+                          className="w-full border border-gray-200 rounded-xl p-2.5 text-xs text-gray-800 focus:outline-none focus:border-[#9B0F06] focus:ring-1 focus:ring-[#9B0F06]/20 bg-white cursor-pointer transition-all"
+                        >
+                          <option value="ampliacion">Ampliación de Plazo (Prórroga)</option>
+                          <option value="retraso">Ajuste por Fuerza Mayor / Clima</option>
+                          <option value="orden_cambio">Orden de Cambio / Modificativo</option>
+                        </select>
+                      </div>
+                    </>
+                  )}
+                </div>
+
                 {proyecto?.estado === 'pausado' && (
                   <div>
-                    <label className="text-[10.5px] font-bold text-gray-800 mb-1 block">
-                      Fecha de Reanudación <span className="text-[#9B0F06]">* (OBLIGATORIA)</span>
-                    </label>
-                    <input
-                      type="date"
-                      required
-                      value={formFechaReanudacion}
-                      onChange={(e) => setFormFechaReanudacion(e.target.value)}
-                      className="w-full border border-gray-200 rounded-xl p-2 text-xs text-gray-800 focus:outline-none focus:border-[#9B0F06]"
-                    />
+                    <label className="text-xs font-bold text-gray-800 mb-1.5 block">Motivo de la Modificación</label>
+                    <select
+                      value={formMotivoPlazo}
+                      onChange={(e: any) => setFormMotivoPlazo(e.target.value)}
+                      className="w-full border border-gray-200 rounded-xl p-2.5 text-xs text-gray-800 focus:outline-none focus:border-[#9B0F06] focus:ring-1 focus:ring-[#9B0F06]/20 bg-white cursor-pointer transition-all"
+                    >
+                      <option value="ampliacion">Ampliación de Plazo (Prórroga)</option>
+                      <option value="retraso">Ajuste por Fuerza Mayor / Clima</option>
+                      <option value="orden_cambio">Orden de Cambio / Modificativo</option>
+                    </select>
                   </div>
                 )}
 
                 <div>
-                  <label className="text-[10.5px] font-bold text-gray-800 mb-1 block">Nueva Fecha Final Contractual *</label>
-                  <input
-                    type="date"
-                    value={formNuevaFechaFin}
-                    onChange={(e) => setFormNuevaFechaFin(e.target.value)}
-                    className="w-full border border-gray-200 rounded-xl p-2 text-xs text-gray-800 focus:outline-none focus:border-[#9B0F06]"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[10.5px] font-bold text-gray-800 mb-1 block">Motivo de la Modificación</label>
-                  <select
-                    value={formMotivoPlazo}
-                    onChange={(e: any) => setFormMotivoPlazo(e.target.value)}
-                    className="w-full border border-gray-200 rounded-xl p-2 text-xs text-gray-800 focus:outline-none focus:border-[#9B0F06]"
-                  >
-                    <option value="ampliacion">Ampliación de Plazo (Prórroga)</option>
-                    <option value="retraso">Ajuste por Fuerza Mayor / Clima</option>
-                    <option value="orden_cambio">Orden de Cambio / Modificativo</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-[10.5px] font-bold text-gray-800 mb-1 block">Observaciones / Justificación</label>
+                  <label className="text-xs font-bold text-gray-800 mb-1.5 block">Observaciones / Justificación</label>
                   <textarea
-                    rows={2}
+                    rows={3}
                     value={formObservacionesPlazo}
                     onChange={(e) => setFormObservacionesPlazo(e.target.value)}
-                    placeholder="Escriba la justificación legal y técnica..."
-                    className="w-full border border-gray-200 rounded-xl p-2 text-xs text-gray-800 focus:outline-none focus:border-[#9B0F06]"
+                    placeholder="Escriba la justificación legal y técnica detallada..."
+                    className="w-full border border-gray-200 rounded-xl p-2.5 text-xs text-gray-800 focus:outline-none focus:border-[#9B0F06] focus:ring-1 focus:ring-[#9B0F06]/20 transition-all resize-none"
                   />
                 </div>
               </div>

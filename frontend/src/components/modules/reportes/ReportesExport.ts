@@ -435,6 +435,63 @@ export const buildFormalReportHtml = (
         <div style="width: 100%; max-width: 760px; margin: 0 auto;">
           ${caratulaHtml}
           ${pagesHtml}
+          ${(() => {
+            try {
+              if (typeof window !== 'undefined') {
+                const raw = localStorage.getItem('domun_reportes_observaciones_contratante')
+                if (raw) {
+                  const obsList: any[] = JSON.parse(raw)
+                  const relevantes = obsList.filter((o: any) => proyectoId === 'todos' || String(o.proyectoId) === String(proyectoId))
+                  if (relevantes.length > 0) {
+                    return `
+                      <div class="page-container" style="page-break-before: always; padding: 25px 0;">
+                        <table style="width: 100%; border-bottom: 2px solid #9B0F06; margin-bottom: 14px; padding-bottom: 6px;">
+                          <tr>
+                            <td style="font-size: 11pt; font-weight: bold; color: #111827; text-transform: uppercase;">
+                              DICTAMEN Y OBSERVACIONES DE LA ENTIDAD CONTRATANTE
+                            </td>
+                            <td style="text-align: right; font-size: 8.5pt; color: #6b7280; font-weight: bold;">
+                              REGISTRO OFICIAL
+                            </td>
+                          </tr>
+                        </table>
+                        <p style="font-size: 8pt; color: #4b5563; margin-bottom: 12px; line-height: 1.4;">
+                          A continuación se relacionan las observaciones, solicitudes de aclaración y dictámenes emitidos por la Entidad Contratante dentro del sistema DomunNet para el presente período de obra:
+                        </p>
+                        ${relevantes.map((o: any) => `
+                          <div style="border: 1px solid #e5e7eb; border-radius: 6px; padding: 10px; margin-bottom: 10px; background-color: #f9fafb;">
+                            <table style="width: 100%; margin-bottom: 6px;">
+                              <tr>
+                                <td style="font-size: 8.5pt; font-weight: bold; color: #111827;">
+                                  ${escapeHtml(o.autorNombre)} <span style="font-size: 7.5pt; color: #1d4ed8; font-weight: bold;">(${escapeHtml(o.autorRol || 'Entidad Contratante')})</span>
+                                </td>
+                                <td style="text-align: right; font-size: 7.5pt; color: #6b7280;">
+                                  ${escapeHtml(o.fechaTexto || '')}
+                                </td>
+                              </tr>
+                              <tr>
+                                <td colspan="2" style="font-size: 7.5pt; color: #9B0F06; font-weight: bold; text-transform: uppercase;">
+                                  TIPO: ${escapeHtml(o.tipo || 'OBSERVACIÓN')} · ESTADO: ${escapeHtml(o.estado || 'PENDIENTE')}
+                                </td>
+                              </tr>
+                            </table>
+                            <div style="font-size: 8pt; color: #374151; line-height: 1.4; background: #ffffff; padding: 8px; border-radius: 4px; border: 1px solid #f3f4f6;">
+                              ${escapeHtml(o.texto || '')}
+                            </div>
+                            ${Array.isArray(o.respuestas) && o.respuestas.length > 0 ? o.respuestas.map((resp: any) => `
+                              <div style="margin-top: 6px; margin-left: 14px; padding: 6px; background-color: #eff6ff; border-left: 2px solid #3b82f6; border-radius: 3px; font-size: 7.5pt;">
+                                <strong>${escapeHtml(resp.autorNombre)} (${escapeHtml(resp.autorRol)}):</strong> ${escapeHtml(resp.texto)}
+                              </div>
+                            `).join('') : ''}
+                          </div>
+                        `).join('')}
+                      </div>`
+                  }
+                }
+              }
+            } catch (_) {}
+            return ''
+          })()}
         </div>
       </body>
     </html>`

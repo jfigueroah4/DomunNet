@@ -128,18 +128,28 @@ export default function UsuariosPage() {
 
           if (delId && (delId === uId || delId === uCorreo)) return true
           if (respId && (respId === uId || respId === uCorreo)) return true
-          if (delNombre && (delNombre.includes(uPrimerNombre) || delNombre.includes(uPrimerApellido))) return true
-          if (respNombre && (respNombre.includes(uPrimerNombre) || respNombre.includes(uPrimerApellido))) return true
+          if (delNombre && uPrimerNombre && (delNombre.includes(uPrimerNombre) || (uPrimerApellido && delNombre.includes(uPrimerApellido)))) return true
+          if (respNombre && uPrimerNombre && (respNombre.includes(uPrimerNombre) || (uPrimerApellido && respNombre.includes(uPrimerApellido)))) return true
 
           if (Array.isArray(p.equipo)) {
-            return p.equipo.some((m: any) => {
-              const mId = String(m.id || '').toLowerCase()
+            const enEquipo = p.equipo.some((m: any) => {
+              const mId = String(m.id || m.usuarioId || '').toLowerCase()
               const mNom = String(m.nombre || '').toLowerCase()
               return (mId && (mId === uId || mId === uCorreo)) ||
                 (mNom && uPrimerNombre && mNom.includes(uPrimerNombre)) ||
                 (mNom && uPrimerApellido && mNom.includes(uPrimerApellido))
             })
+            if (enEquipo) return true
           }
+
+          if (Array.isArray((user as any).proyectosAsignados)) {
+            const enLista = (user as any).proyectosAsignados.some((pa: any) => {
+              const paStr = typeof pa === 'string' ? pa : (pa.id || pa.codigo || pa.nombre)
+              return paStr && (paStr === p.id || paStr === p.codigo || paStr === p.nombre || paStr === p.nombreOficial)
+            })
+            if (enLista) return true
+          }
+
           return false
         })
 
@@ -147,7 +157,31 @@ export default function UsuariosPage() {
           matchProyectos = proyectosActivos
         }
 
-        const proysAsignados = matchProyectos.map((p: any) => p.nombreOficial || p.nombre || p.codigo || 'Proyecto Activo')
+        const proysAsignados = matchProyectos.map((p: any) => {
+          let rolEnProyecto = user.rol || 'Asignado'
+          const delId = String(p.delegadoResidenteId || p.delegado_residente_id || '').toLowerCase()
+          const respId = String(p.responsable || p.responsable_id || '').toLowerCase()
+          if (delId && (delId === uId || delId === uCorreo)) {
+            rolEnProyecto = 'Delegado Residente'
+          } else if (respId && (respId === uId || respId === uCorreo)) {
+            rolEnProyecto = 'Responsable'
+          } else if (Array.isArray(p.equipo)) {
+            const m = p.equipo.find((mi: any) => {
+              const miId = String(mi.id || mi.usuarioId || '').toLowerCase()
+              return miId && (miId === uId || miId === uCorreo)
+            })
+            if (m && (m.rol || m.rol_proyecto)) {
+              rolEnProyecto = m.rol || m.rol_proyecto
+            }
+          }
+          return {
+            id: p.id,
+            codigo: p.codigo,
+            nombre: p.nombreOficial || p.nombre || p.codigo || 'Proyecto Activo',
+            rol: rolEnProyecto,
+            estado: p.estado || 'Activo',
+          }
+        })
 
         return {
           ...user,
@@ -185,11 +219,11 @@ export default function UsuariosPage() {
 
 
 
-  // Map effective state: Activo = cuenta habilitada, Suspendido = cuenta suspendida
+  // Map effective state: Activo = en línea / sesión activa, Inactivo = desconectado, Suspendido = cuenta deshabilitada
   const usuariosConEstadoEfectivo = useMemo(() => {
     return usuarios.map((u) => {
-      const isCuentaActiva = (u as any).activo !== false && u.estado !== 'Suspendido' && (u as any).estado !== 'Desactivado'
-      if (!isCuentaActiva) {
+      const isCuentaSuspendida = (u as any).activo === false || u.estado === 'Suspendido' || (u as any).estado === 'Desactivado'
+      if (isCuentaSuspendida) {
         return { ...u, estado: 'Suspendido' as EstadoUsuario, enLinea: false, sesionesActivasCount: 0 }
       }
       const isCurrentlyInThisBrowser = profile && (
@@ -198,9 +232,11 @@ export default function UsuariosPage() {
       )
       const count = u.sesionesActivasCount ?? ((u as any).enLinea ? 1 : 0)
       const enLinea = Boolean(count > 0 || isCurrentlyInThisBrowser || (u as any).enLinea)
+      const estadoFinal: EstadoUsuario = enLinea ? 'Activo' : 'Inactivo'
+
       return {
         ...u,
-        estado: 'Activo' as EstadoUsuario,
+        estado: estadoFinal,
         enLinea,
         sesionesActivasCount: count > 0 ? count : (enLinea ? 1 : 0),
       }
@@ -530,6 +566,7 @@ export default function UsuariosPage() {
     window.addEventListener('domun:sesion_cerrada_broadcast', handleCierreSesion);
 
     let chSeguridad: any = null;
+    let chControl: any = null;
     if (supabase) {
       try {
         const chName = `domun_usuarios_seguridad_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
@@ -538,39 +575,54 @@ export default function UsuariosPage() {
             'postgres_changes',
             { event: '*', schema: 'public', table: 'seguridad_log' },
             () => {
-              apiGetDeduplicado('/usuarios', { bypassCache: true }).then((res) => {
-                if (res.data?.data) {
-                  setUsuarios((prev) =>
-                    prev.map((u) => {
-                      const updated = (res.data.data as any[]).find((nu) => nu.id === u.id);
-                      if (updated) {
-                        return {
-                          ...u,
-                          estado: updated.estado,
-                          enLinea: updated.enLinea ?? ((updated.sesionesActivasCount || 0) > 0),
-                          sesionesActivasCount: updated.sesionesActivasCount,
-                          dispositivosActivos: updated.dispositivosActivos,
-                          ultimoAcceso: updated.ultimoAcceso,
-                        };
-                      }
-                      return u;
-                    })
-                  );
-                }
-              }).catch(() => {});
+              cargarUsuarios();
             }
           )
           .subscribe();
+
+        chControl = supabase.channel('domun_sesiones_control')
+          .on('broadcast', { event: 'cierre_sesion' }, (payload: any) => {
+            const uId = payload.payload?.usuarioId;
+            if (uId) {
+              setUsuarios((prev) =>
+                prev.map((u) =>
+                  u.id === uId
+                    ? { ...u, enLinea: false, sesionesActivasCount: 0, estado: 'Inactivo' as EstadoUsuario, dispositivosActivos: [] }
+                    : u
+                )
+              );
+            }
+            cargarUsuarios();
+          })
+          .on('broadcast', { event: 'sesion_iniciada' }, () => {
+            cargarUsuarios();
+          })
+          .subscribe();
       } catch (err) {
-        console.warn('Realtime seguridad_log error:', err);
+        console.warn('Realtime usuarios error:', err);
       }
     }
 
+    const onFocus = () => {
+      cargarUsuarios();
+    };
+    window.addEventListener('focus', onFocus);
+    const intervalPoll = setInterval(() => {
+      cargarUsuarios();
+    }, 20000);
+
     return () => {
       window.removeEventListener('domun:sesion_cerrada_broadcast', handleCierreSesion);
+      window.removeEventListener('focus', onFocus);
+      clearInterval(intervalPoll);
       if (chSeguridad && supabase) {
         try {
           supabase.removeChannel(chSeguridad);
+        } catch (_) {}
+      }
+      if (chControl && supabase) {
+        try {
+          supabase.removeChannel(chControl);
         } catch (_) {}
       }
     };

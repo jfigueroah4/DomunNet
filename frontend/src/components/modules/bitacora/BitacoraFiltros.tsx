@@ -1,6 +1,6 @@
 'use client'
 
-import { Search, Trash2, X, SlidersHorizontal } from 'lucide-react'
+import { Search, Trash2, X, SlidersHorizontal, Calendar } from 'lucide-react'
 import { EstadoBitacora } from '@/types/bitacora'
 import { useEffect, useState, useMemo } from 'react'
 import { apiGetDeduplicado } from '@/lib/api/cliente'
@@ -32,6 +32,7 @@ interface BitacoraFiltrosProps {
   registrosBitacora?: any[]
   modoSeleccion?: boolean
   setModoSeleccion?: (valor: boolean | ((prev: boolean) => boolean)) => void
+  onAbrirCalendario?: () => void
 }
 
 export function BitacoraFiltros({
@@ -52,6 +53,7 @@ export function BitacoraFiltros({
   registrosBitacora = [],
   modoSeleccion = false,
   setModoSeleccion,
+  onAbrirCalendario,
 }: BitacoraFiltrosProps) {
   const [proyectosActivos, setProyectosActivos] = useState<any[]>([])
   const [proyectoSeleccionadoObj, setProyectoSeleccionadoObj] = useState<any>(null)
@@ -364,6 +366,21 @@ export function BitacoraFiltros({
             />
           </div>
 
+          {/* Botón de Calendario Flotante */}
+          <button
+            type="button"
+            disabled={!hayProyecto}
+            onClick={() => onAbrirCalendario?.()}
+            className={`relative flex items-center justify-center h-[32px] w-[34px] shrink-0 rounded-lg border transition-all cursor-pointer shadow-2xs active:scale-95 ${
+              !hayProyecto
+                ? 'bg-gray-100 border-gray-200 text-gray-300 cursor-not-allowed'
+                : 'bg-white border-gray-200 text-gray-700 hover:text-[#9B0F06] hover:bg-gray-50'
+            }`}
+            title="Calendario de días laborados y suspendidos"
+          >
+            <Calendar size={14} className="stroke-[2.2] text-[#9B0F06]" />
+          </button>
+
           {/* Botón de Filtro (Abre Bottom Sheet Modal) */}
           <button
             type="button"
@@ -654,6 +671,22 @@ export function BitacoraFiltros({
               <X size={14} />
             </button>
           )}
+
+          {/* Botón de Calendario Flotante */}
+          <button
+            type="button"
+            disabled={!hayProyecto}
+            onClick={() => onAbrirCalendario?.()}
+            className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg border h-[28px] px-2.5 text-xs font-semibold transition-all cursor-pointer shadow-2xs ${
+              !hayProyecto
+                ? 'border-gray-200 bg-gray-100 text-gray-300 cursor-not-allowed'
+                : 'border-gray-200 bg-white hover:bg-gray-50 text-gray-700 hover:text-[#9B0F06] active:scale-95'
+            }`}
+            title="Ver calendario de días laborados y suspendidos"
+          >
+            <Calendar size={13} className="text-[#9B0F06]" />
+            <span className="hidden md:inline">Calendario de Obra</span>
+          </button>
 
           {/* Botón de Basurero para activar/desactivar selección múltiple para eliminar */}
           <button

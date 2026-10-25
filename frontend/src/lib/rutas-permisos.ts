@@ -18,11 +18,63 @@ export function tienePermiso(
   permisoORuta: string,
   rol?: string
 ): boolean {
-  if (rol && (rol.toLowerCase().includes('admin') || rol.toLowerCase().includes('administrador'))) {
+  const rolNorm = (rol || '').toLowerCase().trim();
+
+  // 1. Administrador y Gerencia tienen acceso completo
+  if (rolNorm.includes('admin') || rolNorm.includes('administrador') || rolNorm.includes('gerenc')) {
     return true;
   }
 
   const permisoRequerido = RUTAS_PERMISOS[permisoORuta] || permisoORuta;
+  const parts = (permisoRequerido || '').split('.');
+  const modulo = parts[0];
+
+  // 2. Personal de campo: Topógrafo, Laboratorista, Auxiliar
+  // Solo pueden acceder a Bitácora, Fotografías e Inicio. NO a proyectos, reportes, usuarios ni ajustes.
+  const esPersonalCampo =
+    rolNorm.includes('topograf') ||
+    rolNorm.includes('laborator') ||
+    rolNorm.includes('auxiliar') ||
+    rolNorm === 'campo' ||
+    rolNorm === 'inspector';
+
+  if (esPersonalCampo) {
+    if (modulo === 'bitacora' || modulo === 'evidencia_fotografica' || permisoORuta === '/dashboard' || permisoORuta === '/') {
+      return true;
+    }
+    return false;
+  }
+
+  // 3. Ejecutora, Supervisora, Contratante, Residente
+  // Pueden ver Proyectos, Bitácora, Fotografías y Reportes. NO usuarios, roles ni configuración.
+  if (
+    rolNorm.includes('ejecutora') ||
+    rolNorm.includes('contratista') ||
+    rolNorm.includes('supervis') ||
+    rolNorm.includes('contratante') ||
+    rolNorm.includes('residente') ||
+    rolNorm.includes('delegado')
+  ) {
+    if (
+      modulo === 'usuarios' ||
+      modulo === 'roles' ||
+      modulo === 'configuracion' ||
+      modulo === 'mantenimiento'
+    ) {
+      return false;
+    }
+    if (
+      modulo === 'proyectos' ||
+      modulo === 'bitacora' ||
+      modulo === 'evidencia_fotografica' ||
+      modulo === 'reportes' ||
+      permisoORuta === '/dashboard' ||
+      permisoORuta === '/'
+    ) {
+      return true;
+    }
+  }
+
   if (!permisoRequerido) return true;
 
   if (!permisosUsuario || permisosUsuario.length === 0) return false;
@@ -37,8 +89,6 @@ export function tienePermiso(
     return true;
   }
 
-  const parts = permisoRequerido.split('.');
-  const modulo = parts[0];
   const accion = parts[1] || '';
 
   const matchHumano = permisosUsuario.some((p) => {

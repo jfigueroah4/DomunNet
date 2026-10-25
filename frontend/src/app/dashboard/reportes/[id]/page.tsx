@@ -8,6 +8,8 @@ import { toast } from 'sonner'
 import { REPORTES_MOCK } from '@/data/reportes.mock'
 import { ReporteVistaPrevia } from '@/components/modules/reportes/ReporteVistaPrevia'
 import { ReporteEstadoBadge } from '@/components/modules/reportes/ReporteEstadoBadge'
+import { ReportesObservacionesContratante } from '@/components/modules/reportes/ReportesObservacionesContratante'
+import { PROYECTOS_MOCK } from '@/data/proyectos.mock'
 
 export default function ReporteDetallePage() {
   const router = useRouter()
@@ -182,6 +184,14 @@ export default function ReporteDetallePage() {
             </p>
           </div>
         </div>
+      </div>
+
+      {/* Espacio de Observaciones y Comentarios del Contratante */}
+      <div className="pt-2">
+        <ReportesObservacionesContratante
+          proyectoIdActual={reporte.proyectoId}
+          proyectosList={PROYECTOS_MOCK}
+        />
       </div>
     </div>
   )
