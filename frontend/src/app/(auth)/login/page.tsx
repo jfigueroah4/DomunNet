@@ -10,6 +10,7 @@ import LoginButton from '@/components/ui/LoginButton';
 import PasswordRecoveryModal from '@/components/modals/PasswordRecoveryModal';
 import SupportModal from '@/components/modals/SupportModal';
 import { api } from '@/lib/api/cliente';
+import { supabase } from '@/lib/supabase/client';
 
 import { useRef } from 'react';
 
@@ -254,6 +255,22 @@ export default function LoginPage() {
         }
       } catch {}
     }
+
+    // Notificar en tiempo real inicio de sesión a otros navegadores conectados
+    try {
+      if (supabase && usuarioLogueado?.id) {
+        const ch = supabase.channel('domun_sesiones_control');
+        await ch.send({
+          type: 'broadcast',
+          event: 'sesion_iniciada',
+          payload: {
+            usuarioId: usuarioLogueado.id,
+            correo: usuarioLogueado.correo,
+            timestamp: Date.now(),
+          },
+        }).catch(() => {});
+      }
+    } catch (_) {}
 
     // Redirección inmediata al dashboard sin esperas
     window.location.replace('/dashboard');

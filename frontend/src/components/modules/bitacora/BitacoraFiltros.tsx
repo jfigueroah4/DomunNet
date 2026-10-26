@@ -10,6 +10,14 @@ import { useAuthStore } from '@/stores/useAuthStore'
 import { useUIStore } from '@/stores/useUIStore'
 import { esProyectoNoBorrador } from '@/lib/proyectos/estado'
 
+function normalizarRol(rol: string): string {
+  if (!rol || typeof rol !== 'string') return ''
+  let clean = rol.trim()
+  clean = clean.replace(/([a-z])([A-Z])/g, '$1 $2')
+  clean = clean.replace(/\bDe\b/g, 'de').replace(/\bDel\b/g, 'del')
+  return clean.trim()
+}
+
 interface BitacoraFiltrosProps {
   busqueda: string
   onBusquedaChange: (busqueda: string) => void
@@ -142,7 +150,7 @@ export function BitacoraFiltros({
       setProyectoSeleccionadoObj(null)
       return
     }
-    apiGetDeduplicado(`/proyectos/${proyectoId}`).then((res) => {
+    apiGetDeduplicado(`/proyectos/${proyectoId}`, { bypassCache: true }).then((res) => {
       if (res.data?.success && res.data.data) {
         setProyectoSeleccionadoObj(res.data.data)
       }
@@ -169,23 +177,19 @@ export function BitacoraFiltros({
     }))
   }, [proyectosActivos])
 
-  // 2. Opciones Roles: Únicamente roles que tengan AL MENOS 1 usuario asignado al proyecto seleccionado
+  // 2. Opciones Roles: Detecta TODOS los roles asignados al proyecto + roles en bitácoras
   const opcionesRoles = useMemo(() => {
     if (!hayProyecto || !proyectoSeleccionadoObj) {
       return [{ value: 'todos', label: 'Todos los Roles' }]
     }
 
-    const equipoList =
-      proyectoSeleccionadoObj.equipo ||
-      proyectoSeleccionadoObj.proyecto_usuario ||
-      proyectoSeleccionadoObj.equipoRows ||
-      []
+    const equipoList = [
+      ...(Array.isArray(proyectoSeleccionadoObj.equipo) ? proyectoSeleccionadoObj.equipo : []),
+      ...(Array.isArray(proyectoSeleccionadoObj.proyecto_usuario) ? proyectoSeleccionadoObj.proyecto_usuario : []),
+      ...(Array.isArray(proyectoSeleccionadoObj.equipoRows) ? proyectoSeleccionadoObj.equipoRows : []),
+    ]
 
-    if (!Array.isArray(equipoList) || equipoList.length === 0) {
-      return [{ value: 'todos', label: 'Todos los Roles' }]
-    }
-
-    const rolesSet = new Set<string>()
+    const rolesMap = new Map<string, string>()
 
     equipoList.forEach((item: any) => {
       const r = (
@@ -198,40 +202,102 @@ export function BitacoraFiltros({
       ).trim()
 
       if (r) {
-        rolesSet.add(r)
+        const norm = normalizarRol(r)
+        const key = norm.toLowerCase().replace(/\s+/g, '')
+        if (key && !rolesMap.has(key)) {
+          rolesMap.set(key, norm)
+        }
       }
     })
 
-    const rolesResult = Array.from(rolesSet).map((r) => ({ value: r, label: r }))
-    return [{ value: 'todos', label: 'Todos los Roles' }, ...rolesResult]
-  }, [hayProyecto, proyectoSeleccionadoObj])
+    // Delegado Residente y Responsable si están definidos
+    if (proyectoSeleccionadoObj.delegadoResidente || proyectoSeleccionadoObj.delegadoResidenteId) {
+      const norm = 'Ingeniero Residente'
+      rolesMap.set(norm.toLowerCase().replace(/\s+/g, ''), norm)
+    }
+    if (proyectoSeleccionadoObj.responsableNombre || proyectoSeleccionadoObj.responsableId) {
+      const norm = 'Gerencia'
+      rolesMap.set(norm.toLowerCase().replace(/\s+/g, ''), norm)
+    }
 
-  // 3. Opciones Usuarios: Usuarios asignados al proyecto + Autores reales con bitácoras en este proyecto
+    // Roles presentes en los registros de bitácora del proyecto
+    const bitacorasDelProyecto = (registrosBitacora || []).filter(
+      (b: any) => String(b.proyecto_id || b.proyectoId) === String(proyectoId)
+    )
+    bitacorasDelProyecto.forEach((b: any) => {
+      const r = (b.rol || b.creadorRol || b.autor_rol || '').trim()
+      if (r) {
+        const norm = normalizarRol(r)
+        const key = norm.toLowerCase().replace(/\s+/g, '')
+        if (key && !rolesMap.has(key)) {
+          rolesMap.set(key, norm)
+        }
+      }
+    })
+
+    const rolesResult = Array.from(rolesMap.values())
+      .sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }))
+      .map((r) => ({ value: r, label: r }))
+
+    return [{ value: 'todos', label: 'Todos los Roles' }, ...rolesResult]
+  }, [hayProyecto, proyectoSeleccionadoObj, registrosBitacora, proyectoId])
+
+  // 3. Opciones Usuarios: Detecta TODOS los usuarios asignados al proyecto + Autores de bitácoras
   const opcionesUsuarios = useMemo(() => {
     if (!hayProyecto || !proyectoSeleccionadoObj) {
       return [{ value: '', label: 'Todos los Usuarios' }]
     }
 
-    let equipoList =
-      proyectoSeleccionadoObj.equipo ||
-      proyectoSeleccionadoObj.proyecto_usuario ||
-      proyectoSeleccionadoObj.equipoRows ||
-      []
-
-    if (!Array.isArray(equipoList)) equipoList = []
+    const equipoList = [
+      ...(Array.isArray(proyectoSeleccionadoObj.equipo) ? proyectoSeleccionadoObj.equipo : []),
+      ...(Array.isArray(proyectoSeleccionadoObj.proyecto_usuario) ? proyectoSeleccionadoObj.proyecto_usuario : []),
+      ...(Array.isArray(proyectoSeleccionadoObj.equipoRows) ? proyectoSeleccionadoObj.equipoRows : []),
+    ]
 
     const usuariosMap = new Map<string, { id: string; nombre: string; rol: string }>()
 
     // 1. Usuarios del equipo del proyecto
     equipoList.forEach((item: any) => {
-      const du = item.usuario?.dato_usuario || (Array.isArray(item.usuario?.dato_usuario) ? item.usuario?.dato_usuario[0] : null) || {}
-      const nombre = item.nombre || (du.primer_nombre ? `${du.primer_nombre} ${du.primer_apellido || ''}`.trim() : '') || item.usuario?.correo || item.correo || 'Usuario'
-      const rol = item.rol_proyecto || item.rol || item.cargo || 'Miembro'
-      const id = item.usuario_id || item.usuario?.id || item.id || nombre
-      usuariosMap.set(String(id), { id: String(id), nombre, rol })
+      const du =
+        item.usuario?.dato_usuario ||
+        (Array.isArray(item.usuario?.dato_usuario) ? item.usuario?.dato_usuario[0] : null) ||
+        {}
+      const nombre =
+        item.nombre ||
+        (du.primer_nombre ? `${du.primer_nombre} ${du.primer_apellido || ''}`.trim() : '') ||
+        item.usuario?.correo ||
+        item.correo ||
+        'Usuario'
+      const rol = normalizarRol(item.rol_proyecto || item.rol || item.cargo || item.usuario?.rol || 'Miembro')
+      const id = String(item.usuario_id || item.usuario?.id || item.id || nombre)
+      if (id && !usuariosMap.has(id)) {
+        usuariosMap.set(id, { id, nombre, rol })
+      }
     })
 
-    // 2. Autores reales de bitácoras del proyecto
+    // 2. Delegado Residente y Responsable si existen
+    if (proyectoSeleccionadoObj.delegadoResidenteId && proyectoSeleccionadoObj.delegadoResidente) {
+      const id = String(proyectoSeleccionadoObj.delegadoResidenteId)
+      if (!usuariosMap.has(id)) {
+        usuariosMap.set(id, {
+          id,
+          nombre: String(proyectoSeleccionadoObj.delegadoResidente),
+          rol: 'Ingeniero Residente',
+        })
+      }
+    }
+    if (proyectoSeleccionadoObj.responsableId && proyectoSeleccionadoObj.responsableNombre) {
+      const id = String(proyectoSeleccionadoObj.responsableId)
+      if (!usuariosMap.has(id)) {
+        usuariosMap.set(id, {
+          id,
+          nombre: String(proyectoSeleccionadoObj.responsableNombre),
+          rol: 'Gerencia',
+        })
+      }
+    }
+
+    // 3. Autores reales de bitácoras del proyecto
     const bitacorasDelProyecto = (registrosBitacora || []).filter(
       (b: any) => String(b.proyecto_id || b.proyectoId) === String(proyectoId)
     )
@@ -239,18 +305,28 @@ export function BitacoraFiltros({
       if (b.autor) {
         const autorNombre = String(b.autor).trim()
         const autorId = String(b.autor_id || b.autorId || b.usuario_id || autorNombre)
-        const autorRol = b.rol || b.creadorRol || 'Autor'
-        if (!usuariosMap.has(autorId) && !Array.from(usuariosMap.values()).some((u) => u.nombre.toLowerCase() === autorNombre.toLowerCase())) {
+        const autorRol = normalizarRol(b.rol || b.creadorRol || 'Autor')
+        if (
+          !usuariosMap.has(autorId) &&
+          !Array.from(usuariosMap.values()).some((u) => u.nombre.toLowerCase() === autorNombre.toLowerCase())
+        ) {
           usuariosMap.set(autorId, { id: autorId, nombre: autorNombre, rol: autorRol })
         }
       }
     })
 
     let userList = Array.from(usuariosMap.values())
+
+    // Si hay un rol seleccionado, filtrar usuarios por rol (con match normalizado flexible)
     if (rolFiltro && rolFiltro !== 'todos') {
-      const targetRol = rolFiltro.toLowerCase()
-      userList = userList.filter((u) => u.rol.toLowerCase().includes(targetRol) || targetRol.includes(u.rol.toLowerCase()))
+      const targetRol = normalizarRol(rolFiltro).toLowerCase().replace(/\s+/g, '')
+      userList = userList.filter((u) => {
+        const uRol = normalizarRol(u.rol).toLowerCase().replace(/\s+/g, '')
+        return uRol.includes(targetRol) || targetRol.includes(uRol)
+      })
     }
+
+    userList.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }))
 
     const res = userList.map((u) => ({
       value: u.id,
@@ -260,7 +336,7 @@ export function BitacoraFiltros({
     return [{ value: '', label: 'Todos los Usuarios' }, ...res]
   }, [hayProyecto, proyectoSeleccionadoObj, rolFiltro, registrosBitacora, proyectoId])
 
-  // 4. Opciones Renglones: Renglones registrados en bitácoras + Renglones del Plan de Trabajo
+  // 4. Opciones Renglones: Renglones registrados en bitácoras + Plan de Trabajo + Hoja Sábana
   const opcionesRenglones = useMemo(() => {
     if (!hayProyecto || !proyectoId) {
       return [{ value: 'todos', label: 'Todos los Renglones' }]
@@ -294,29 +370,56 @@ export function BitacoraFiltros({
     })
 
     // 2. Extraer renglones del catálogo/plan del proyecto
-    const plan =
-      proyectoSeleccionadoObj?.planTrabajo ||
-      proyectoSeleccionadoObj?.renglones ||
-      proyectoSeleccionadoObj?.renglones_sabana ||
-      []
-    if (Array.isArray(plan)) {
-      plan.forEach((item: any) => {
-        const cod = String(item.codigoDGC || item.codigo || item.id || '')
-        const desc = item.descripcion || item.desc || item.nombre || cod
-        if (cod && !renglonesMap.has(cod)) {
-          renglonesMap.set(cod, { cod, desc: cod === desc ? cod : `${cod} - ${desc}` })
-        }
-      })
+    const plan = [
+      ...(Array.isArray(proyectoSeleccionadoObj?.planTrabajo) ? proyectoSeleccionadoObj.planTrabajo : []),
+      ...(Array.isArray(proyectoSeleccionadoObj?.renglones) ? proyectoSeleccionadoObj.renglones : []),
+      ...(Array.isArray(proyectoSeleccionadoObj?.renglones_sabana) ? proyectoSeleccionadoObj.renglones_sabana : []),
+      ...(Array.isArray(proyectoSeleccionadoObj?.renglones_seleccionados) ? proyectoSeleccionadoObj.renglones_seleccionados : []),
+    ]
+    plan.forEach((item: any) => {
+      const cod = String(item.codigoDGC || item.codigo || item.id || '').trim()
+      const desc = (item.descripcion || item.desc || item.nombre || cod).trim()
+      if (cod && !renglonesMap.has(cod)) {
+        renglonesMap.set(cod, { cod, desc: cod === desc ? cod : `${cod} - ${desc}` })
+      }
+    })
+
+    // 3. Extraer renglones de localStorage si existen
+    if (typeof window !== 'undefined') {
+      try {
+        const localKeys = [
+          `domun_proyecto_renglones_${proyectoId}`,
+          `sabana_renglones_${proyectoId}`,
+          `domun_renglones_seleccionados_${proyectoId}`,
+        ]
+        localKeys.forEach((key) => {
+          const raw = localStorage.getItem(key)
+          if (raw) {
+            const parsed = JSON.parse(raw)
+            if (Array.isArray(parsed)) {
+              parsed.forEach((item: any) => {
+                const cod = String(item.codigoDGC || item.codigo || item.id || '').trim()
+                const desc = (item.descripcion || item.desc || item.nombre || cod).trim()
+                if (cod && !renglonesMap.has(cod)) {
+                  renglonesMap.set(cod, { cod, desc: cod === desc ? cod : `${cod} - ${desc}` })
+                }
+              })
+            }
+          }
+        })
+      } catch (_) {}
     }
 
     if (renglonesMap.size === 0) {
       return [{ value: 'todos', label: 'Todos los Renglones' }]
     }
 
-    const res = Array.from(renglonesMap.values()).map((r) => ({
-      value: r.cod,
-      label: r.cod === r.desc ? r.cod : `[${r.cod}] ${r.desc}`,
-    }))
+    const res = Array.from(renglonesMap.values())
+      .sort((a, b) => a.cod.localeCompare(b.cod, undefined, { numeric: true }))
+      .map((r) => ({
+        value: r.cod,
+        label: r.cod === r.desc ? r.cod : `[${r.cod}] ${r.desc}`,
+      }))
 
     return [{ value: 'todos', label: 'Todos los Renglones' }, ...res]
   }, [hayProyecto, proyectoId, registrosBitacora, proyectoSeleccionadoObj])

@@ -59,6 +59,7 @@ export default function BitacoraPage() {
   const [registrosApi, setRegistrosApi] = useState<any[]>([])
   const [proyectosList, setProyectosList] = useState<any[]>([])
   const [modalCalendarioAbierto, setModalCalendarioAbierto] = useState(false)
+  const [userNamesMap, setUserNamesMap] = useState<Record<string, string>>({})
 
   const cargarRegistros = async () => {
     try {
@@ -128,9 +129,15 @@ export default function BitacoraPage() {
       })
 
       const userMap = new Map<string, string>()
+      const uMapObj: Record<string, string> = {}
       usuariosBD.forEach((u: any) => {
-        if (u.id) userMap.set(String(u.id), u.nombre || `${u.primer_nombre || ''} ${u.primer_apellido || ''}`.trim() || u.email)
+        if (u.id) {
+          const nom = u.nombre || `${u.primer_nombre || ''} ${u.primer_apellido || ''}`.trim() || u.email
+          userMap.set(String(u.id), nom)
+          uMapObj[String(u.id)] = nom
+        }
       })
+      setUserNamesMap(uMapObj)
 
       // Mapa de fotos por bitacora_entrada_id
       const fotosMap = new Map<string, any[]>()
@@ -369,18 +376,25 @@ export default function BitacoraPage() {
         fechaHasta === '' || registroFecha <= new Date(fechaHasta)
 
       // Match Usuario flexible
+      const nombreUsuarioFiltro = (userNamesMap[String(usuarioFiltro)] || '').toLowerCase()
       const matchUsuario =
         !usuarioFiltro ||
         String(registro.autor_id) === String(usuarioFiltro) ||
         String(registro.autorId) === String(usuarioFiltro) ||
         String(registro.usuario_id) === String(usuarioFiltro) ||
         (registro.autor && String(registro.autor).toLowerCase().includes(usuarioFiltro.toLowerCase())) ||
-        (usuarioFiltro && String(registro.autor || '').toLowerCase() === String(usuarioFiltro).toLowerCase())
+        (usuarioFiltro && String(registro.autor || '').toLowerCase() === String(usuarioFiltro).toLowerCase()) ||
+        (nombreUsuarioFiltro && registro.autor && String(registro.autor).toLowerCase().includes(nombreUsuarioFiltro))
 
       const matchRol =
         rolFiltro === 'todos' ||
-        (registro.rol && String(registro.rol).toLowerCase().includes(rolFiltro.toLowerCase())) ||
-        (registro.creadorRol && String(registro.creadorRol).toLowerCase().includes(rolFiltro.toLowerCase()))
+        (() => {
+          const target = rolFiltro.toLowerCase().replace(/\s+/g, '')
+          const r1 = String(registro.rol || '').toLowerCase().replace(/\s+/g, '')
+          const r2 = String(registro.creadorRol || '').toLowerCase().replace(/\s+/g, '')
+          const r3 = String(registro.autor_rol || '').toLowerCase().replace(/\s+/g, '')
+          return r1.includes(target) || target.includes(r1) || r2.includes(target) || target.includes(r2) || r3.includes(target) || target.includes(r3)
+        })()
 
       return (
         matchBusqueda &&

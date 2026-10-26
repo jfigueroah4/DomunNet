@@ -11,7 +11,7 @@ const CONFIG_MODULES = [
     name: 'General',
     description: 'Configuración general del sistema',
     icon: Settings,
-    bgColor: 'bg-gradient-to-br from-[#059669] to-[#34D399]',
+    bgColor: 'bg-gradient-to-br from-[#4b5563] to-[#6b7280]',
     href: '/dashboard/configuracion/general',
   },
   {
@@ -19,7 +19,7 @@ const CONFIG_MODULES = [
     name: 'Mantenimiento de Tablas',
     description: 'Catálogos del sistema',
     icon: Database,
-    bgColor: 'bg-gradient-to-br from-[#B45309] to-[#F59E0B]',
+    bgColor: 'bg-gradient-to-br from-[#6b7280] to-[#9ca3af]',
     href: '/dashboard/configuracion/mantenimiento-tablas',
   },
   {
@@ -27,7 +27,7 @@ const CONFIG_MODULES = [
     name: 'Reinicio de Datos',
     description: 'Restablecer datos del sistema o por módulos',
     icon: RefreshCw,
-    bgColor: 'bg-gradient-to-br from-[#9B0F06] to-[#DC2626]',
+    bgColor: 'bg-gradient-to-br from-[#374151] to-[#4b5563]',
     href: '/dashboard/configuracion/reinicio',
   },
   {
@@ -35,7 +35,7 @@ const CONFIG_MODULES = [
     name: 'Backup',
     description: 'Generador de copias de seguridad',
     icon: HardDrive,
-    bgColor: 'bg-gradient-to-br from-[#2563EB] to-[#60A5FA]',
+    bgColor: 'bg-gradient-to-br from-[#B91C1C] to-[#E57373]',
     href: '/dashboard/configuracion/backup',
   },
   {
@@ -43,7 +43,7 @@ const CONFIG_MODULES = [
     name: 'Restauración',
     description: 'Restaura una copia de seguridad',
     icon: RotateCcw,
-    bgColor: 'bg-gradient-to-br from-[#7C3AED] to-[#A78BFA]',
+    bgColor: 'bg-gradient-to-br from-[#E86B2A] to-[#F4A460]',
     href: '/dashboard/configuracion/restauracion',
   },
 ]

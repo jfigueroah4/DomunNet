@@ -70,8 +70,9 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
           bVal = `${b.primer_nombre} ${b.primer_apellido}`.toLowerCase();
           break;
         case 'correo':
-          aVal = a.correo.toLowerCase();
-          bVal = b.correo.toLowerCase();
+        case 'username':
+          aVal = (a.username || a.correo || '').toLowerCase();
+          bVal = (b.username || b.correo || '').toLowerCase();
           break;
         case 'rol':
           aVal = (a.rol || '').toLowerCase();
@@ -144,7 +145,7 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
                   </div>
                   <div className="min-w-0">
                     <p className="text-[11px] font-bold text-gray-900 truncate leading-tight">{nombreCompleto}</p>
-                    <p className="text-[9.5px] text-gray-500 truncate mt-0.5">{usuario.correo}</p>
+                    <p className="text-[9.5px] text-gray-500 truncate mt-0.5">{usuario.username || usuario.correo}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 justify-end">
@@ -292,10 +293,10 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
             <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
                 <th className="px-4 py-3 text-[10px] text-gray-400 uppercase tracking-wide font-semibold cursor-pointer hover:text-gray-600 select-none" onClick={() => handleSort('nombre')}>
-                Usuario{sortIndicator('nombre')}
+                Nombre{sortIndicator('nombre')}
               </th>
-              <th className="px-4 py-3 text-[10px] text-gray-400 uppercase tracking-wide font-semibold cursor-pointer hover:text-gray-600 select-none" onClick={() => handleSort('correo')}>
-                Correo{sortIndicator('correo')}
+              <th className="px-4 py-3 text-[10px] text-gray-400 uppercase tracking-wide font-semibold cursor-pointer hover:text-gray-600 select-none" onClick={() => handleSort('username')}>
+                Usuario{sortIndicator('username')}
               </th>
               <th className="px-4 py-3 text-[10px] text-gray-400 uppercase tracking-wide font-semibold cursor-pointer hover:text-gray-600 select-none" onClick={() => handleSort('rol')}>
                 Rol{sortIndicator('rol')}
@@ -326,7 +327,7 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
               if (nombreCompleto.includes('Natalia')) subtitle = 'Administrador del sistema';
               else if (nombreCompleto.includes('Marco')) subtitle = 'Ingeniero residente';
               else if (usuario.rol === 'Administrador') subtitle = 'Administrador del sistema';
-              else subtitle = usuario.rol || 'Sin rol asignado';
+              else subtitle = (usuario.rol || 'Sin rol asignado').replace(/([a-z])([A-Z])/g, '$1 $2');
 
               const targetRole = roles.find(r => r.nombre === usuario.rol);
               const targetNivel = targetRole?.nivel_permisos ?? (usuario.rol === 'Administrador' ? 100 : 0);
@@ -371,7 +372,7 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-[10px] text-gray-600 font-medium">{usuario.correo}</td>
+                  <td className="px-4 py-3 text-[10px] text-gray-600 font-medium">{usuario.username || usuario.correo}</td>
                   <td className="px-4 py-3 text-[10px]">
                     <UsuarioRolBadge rol={usuario.rol} />
                   </td>

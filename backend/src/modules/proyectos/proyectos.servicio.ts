@@ -702,7 +702,7 @@ export async function obtenerProyectoPorId(proyectoId: string) {
         .eq('id', detalle.delegado_residente_id)
         .maybeSingle()
       if (!del) return ''
-      const dato = (del as any).dato_usuario
+      const dato = Array.isArray((del as any)?.dato_usuario) ? (del as any).dato_usuario[0] : (del as any)?.dato_usuario
       const full = dato ? `${dato.primer_nombre || ''} ${dato.primer_apellido || ''}`.trim() : ''
       return full || del.correo || ''
     })(),
@@ -715,7 +715,7 @@ export async function obtenerProyectoPorId(proyectoId: string) {
         .eq('id', proyecto.responsable_id)
         .maybeSingle()
       if (!respU) return ''
-      const dato = (respU as any).dato_usuario
+      const dato = Array.isArray((respU as any)?.dato_usuario) ? (respU as any).dato_usuario[0] : (respU as any)?.dato_usuario
       const full = dato ? `${dato.primer_nombre || ''} ${dato.primer_apellido || ''}`.trim() : ''
       return full || respU.correo || ''
     })(),
@@ -842,7 +842,7 @@ export async function obtenerProyectoPorId(proyectoId: string) {
 
   const equipo = (equipoRes.data || []).map((row: any) => {
     const u = row.usuario
-    const dato = u?.dato_usuario
+    const dato = Array.isArray(u?.dato_usuario) ? u?.dato_usuario[0] : u?.dato_usuario
     const nombre = dato
       ? `${dato.primer_nombre || ''} ${dato.primer_apellido || ''}`.trim() || u?.correo
       : u?.correo || 'Usuario'
@@ -850,6 +850,7 @@ export async function obtenerProyectoPorId(proyectoId: string) {
       id: row.usuario_id,
       nombre: nombre || 'Usuario',
       rol: row.rol_proyecto || 'Miembro',
+      correo: u?.correo || '',
     }
   })
 
@@ -920,7 +921,7 @@ export async function obtenerProyectoPorId(proyectoId: string) {
   }
   const documentos = (documentosRes.data || []).map((doc: any) => {
     const u = doc.usuario
-    const dato = u?.dato_usuario
+    const dato = Array.isArray(u?.dato_usuario) ? u?.dato_usuario[0] : u?.dato_usuario
     const nombreUsuario = dato
       ? `${dato.primer_nombre || ''} ${dato.primer_apellido || ''}`.trim()
       : (u?.correo || (typeof doc.subido_por === 'string' && !esUuidValido(doc.subido_por) ? doc.subido_por : ''))

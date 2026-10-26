@@ -93,11 +93,14 @@ export default function UsuariosPage() {
 
   const [modoModalEliminar, setModoModalEliminar] = useState<'todos' | 'activar' | 'eliminar' | 'suspender'>('todos')
 
-  const cargarUsuarios = useCallback(async () => {
+  const cargarUsuarios = useCallback(async (bypassCache = false) => {
     try {
       setLoading(true)
+      if (bypassCache) {
+        limpiarCacheMemoria('/usuarios')
+      }
       const [resUsuarios, resProyectos] = await Promise.all([
-        apiGetDeduplicado('/usuarios'),
+        apiGetDeduplicado('/usuarios', { bypassCache }),
         apiGetDeduplicado('/proyectos').catch(() => ({ data: { data: [] } })),
       ])
 
@@ -250,7 +253,8 @@ export default function UsuariosPage() {
       const nombreCompleto = `${usuario.primer_nombre} ${usuario.segundo_nombre || ''} ${usuario.primer_apellido} ${usuario.segundo_apellido || ''}`.replace(/\s+/g, ' ').trim()
       const cumpleBusqueda =
         nombreCompleto.toLowerCase().includes(debouncedBusqueda.toLowerCase()) ||
-        usuario.correo.toLowerCase().includes(debouncedBusqueda.toLowerCase())
+        usuario.correo.toLowerCase().includes(debouncedBusqueda.toLowerCase()) ||
+        (usuario.username || '').toLowerCase().includes(debouncedBusqueda.toLowerCase())
       const cumpleRol = filtroRol === 'Todos' || usuario.rol === filtroRol
       const cumpleEstado = filtroEstado === 'Todos' || usuario.estado === filtroEstado
       return cumpleBusqueda && cumpleRol && cumpleEstado
@@ -275,9 +279,10 @@ export default function UsuariosPage() {
           valorA = `${a.primer_nombre} ${a.primer_apellido}`.toLowerCase()
           valorB = `${b.primer_nombre} ${b.primer_apellido}`.toLowerCase()
           break
+        case 'username':
         case 'correo':
-          valorA = (a.correo || '').toLowerCase()
-          valorB = (b.correo || '').toLowerCase()
+          valorA = (a.username || a.correo || '').toLowerCase()
+          valorB = (b.username || b.correo || '').toLowerCase()
           break
         case 'rol':
           valorA = (a.rol || '').toLowerCase()
@@ -637,8 +642,27 @@ export default function UsuariosPage() {
             }
             cargarUsuarios();
           })
-          .on('broadcast', { event: 'sesion_iniciada' }, () => {
-            cargarUsuarios();
+          .on('broadcast', { event: 'sesion_iniciada' }, (payload: any) => {
+            const data = payload?.payload;
+            if (data?.usuarioId || data?.correo) {
+              setUsuarios((prev) =>
+                prev.map((u) => {
+                  const matchId = data.usuarioId && u.id === data.usuarioId;
+                  const matchCorreo = data.correo && u.correo && u.correo.toLowerCase() === data.correo.toLowerCase();
+                  if (matchId || matchCorreo) {
+                    return {
+                      ...u,
+                      enLinea: true,
+                      estado: 'Activo' as EstadoUsuario,
+                      sesionesActivasCount: Math.max(1, (u.sesionesActivasCount || 0) + 1),
+                    };
+                  }
+                  return u;
+                })
+              );
+            }
+            limpiarCacheMemoria('/usuarios');
+            cargarUsuarios(true);
           })
           .subscribe();
       } catch (err) {

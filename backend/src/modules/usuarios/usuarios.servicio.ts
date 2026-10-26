@@ -261,6 +261,7 @@ export async function listarUsuarios(filtros: FiltrosUsuarios = {}) {
       !busqueda ||
       normalizar(nombreCompleto).includes(busqueda) ||
       normalizar(usuario.correo).includes(busqueda) ||
+      normalizar(dato?.username || '').includes(busqueda) ||
       normalizar(nombreRol).includes(busqueda)
 
     const cumpleRol = !filtros.rol || filtros.rol === 'Todos' || nombreRol === filtros.rol

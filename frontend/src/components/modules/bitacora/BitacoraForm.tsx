@@ -96,6 +96,9 @@ const JUSTIFICACION_SUSPENSION_PRESETS = [
   'Otra...',
 ]
 
+const HORAS_24 = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'))
+const MINUTOS_60 = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'))
+
 const OBSERVACIONES_PRESETS = [
   'Jornada laboral desarrollada con normalidad según programación',
   'Avance conforme a lo planificado sin novedades técnicas',
@@ -352,6 +355,53 @@ export function BitacoraForm({
   const handleCambiarEstFin = (val: string) => {
     setEstFinRenglon(sanitizeEstacion(val))
     setErrors((p) => ({ ...p, estFin: '', estaciones: '', renglones: '' }))
+  }
+
+  const handleCambioHoraSuspension = (nuevaH: string, nuevoM: string) => {
+    const prevH = fd.horaSuspension ? fd.horaSuspension.split(':')[0] : ''
+    const prevM = fd.horaSuspension ? fd.horaSuspension.split(':')[1] : '00'
+    const h = nuevaH !== undefined ? nuevaH : prevH
+    const m = nuevoM !== undefined ? nuevoM : prevM
+    const finalVal = h ? `${h}:${m || '00'}` : ''
+    set('horaSuspension', finalVal)
+    if (finalVal) {
+      setErrors((p) => ({ ...p, horaSuspension: '' }))
+    }
+    if (finalVal && fd.horaReanudacion && fd.horaReanudacion <= finalVal) {
+      setErrors((p) => ({
+        ...p,
+        horaReanudacion: 'La hora de reanudación no puede ser igual o menor a la de inicio',
+      }))
+    } else {
+      setErrors((p) => {
+        if (p.horaReanudacion?.includes('menor') || p.horaReanudacion?.includes('posterior') || p.horaReanudacion?.includes('igual')) {
+          return { ...p, horaReanudacion: '' }
+        }
+        return p
+      })
+    }
+  }
+
+  const handleCambioHoraReanudacion = (nuevaH: string, nuevoM: string) => {
+    const prevH = fd.horaReanudacion ? fd.horaReanudacion.split(':')[0] : ''
+    const prevM = fd.horaReanudacion ? fd.horaReanudacion.split(':')[1] : '00'
+    const h = nuevaH !== undefined ? nuevaH : prevH
+    const m = nuevoM !== undefined ? nuevoM : prevM
+    const finalVal = h ? `${h}:${m || '00'}` : ''
+    set('horaReanudacion', finalVal)
+    if (finalVal && fd.horaSuspension && finalVal <= fd.horaSuspension) {
+      setErrors((p) => ({
+        ...p,
+        horaReanudacion: 'La hora de reanudación no puede ser igual o menor a la de inicio',
+      }))
+    } else {
+      setErrors((p) => {
+        if (p.horaReanudacion?.includes('menor') || p.horaReanudacion?.includes('posterior') || p.horaReanudacion?.includes('igual')) {
+          return { ...p, horaReanudacion: '' }
+        }
+        return p
+      })
+    }
   }
 
   const handleKeyDownEstacion = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -1073,7 +1123,7 @@ export function BitacoraForm({
   }
 
   // Validaciones del formulario: todos los campos son obligatorios
-  const validarFormulario = (): boolean => {
+  const validarFormulario = (): { valido: boolean; errores: Record<string, string> } => {
     const errs: Record<string, string> = {}
     if (!fd.proyectoId) errs.proyectoId = 'Selecciona un proyecto'
     if (!fd.fotografiaPrincipal) errs.foto = 'Adjunta la evidencia fotográfica de la jornada'
@@ -1103,48 +1153,11 @@ export function BitacoraForm({
       errs.estFin = 'Ingresa la estación de fin'
     }
 
-    // Validación detallada de formato y límites de estaciones si ambas están escritas
-    if (estInicioRenglon && estFinRenglon) {
-      const finalEstIni = estInicioRenglon.trim()
-      const finalEstFin = estFinRenglon.trim()
-
-      const mIniStr = (finalEstIni.split('+')[1] || '').trim()
-      const mFinStr = (finalEstFin.split('+')[1] || '').trim()
-
-      const mIni = parseMeters(finalEstIni)
-      const mFin = parseMeters(finalEstFin)
-
-      if (mIniStr && parseInt(mIniStr, 10) > 999) {
-        errs.estInicio = `Los metros después de '+' no pueden exceder 999 (+${mIniStr})`
-      } else if (mFinStr && parseInt(mFinStr, 10) > 999) {
-        errs.estFin = `Los metros después de '+' no pueden exceder 999 (+${mFinStr})`
-      } else if (mIni === null) {
-        errs.estInicio = 'Formato no válido (ej. 15+000)'
-      } else if (mFin === null) {
-        errs.estFin = 'Formato no válido (ej. 35+500)'
-      } else if (mFin < mIni) {
-        errs.estFin = `Est. Fin (${finalEstFin}) debe ser mayor o igual a Est. Inicio (${finalEstIni})`
-      } else {
-        const esFisicoValido =
-          (proyMinMeters === null || mIni >= proyMinMeters) &&
-          (proyMaxMeters === null || mFin <= proyMaxMeters)
-
-        const esRelativoValido =
-          longitudTramoMeters !== null &&
-          proyMinMeters > 0 &&
-          mIni >= 0 &&
-          mFin <= longitudTramoMeters
-
-        if (!esFisicoValido && !esRelativoValido) {
-          if (proyMinMeters > 0 && longitudTramoMeters !== null) {
-            errs.estaciones = `La estación debe estar en el rango físico (${proyMinEstacion} a ${proyMaxEstacion}) o en el tramo de obra (0+000 a ${formatMeters(longitudTramoMeters)})`
-          } else if (proyMinMeters !== null && proyMaxMeters !== null) {
-            errs.estaciones = `La estación debe estar dentro de los límites del proyecto (${proyMinEstacion} a ${proyMaxEstacion})`
-          } else if (proyMinMeters !== null && mIni < proyMinMeters) {
-            errs.estInicio = `Est. Inicio (${finalEstIni}) no puede ser menor a ${proyMinEstacion}`
-          }
-        }
-      }
+    // Validar coherencia numérica de tramo
+    const numIni = parseEstacionVal(estInicioRenglon)
+    const numFin = parseEstacionVal(estFinRenglon)
+    if (numIni !== null && numFin !== null && numIni > numFin) {
+      errs.estaciones = 'La estación de inicio no puede ser mayor que la de fin'
     }
 
     // 6. Descripción u observaciones de la jornada (OBLIGATORIA)
@@ -1164,17 +1177,15 @@ export function BitacoraForm({
       if (!fd.horaSuspension) {
         errs.horaSuspension = 'Ingresa la hora en que se suspendió'
       }
-      if (fd.seReanudo) {
-        if (!fd.horaReanudacion) {
-          errs.horaReanudacion = 'Ingresa la hora de reanudación'
-        } else if (fd.horaReanudacion <= fd.horaSuspension) {
-          errs.horaReanudacion = 'La hora de reanudación debe ser posterior a la de suspensión'
+      if (fd.horaReanudacion) {
+        if (fd.horaSuspension && fd.horaReanudacion <= fd.horaSuspension) {
+          errs.horaReanudacion = 'La hora de reanudación no puede ser igual o menor a la de inicio'
         }
       }
     }
 
     setErrors(errs)
-    return Object.keys(errs).length === 0
+    return { valido: Object.keys(errs).length === 0, errores: errs }
   }
 
   const parseEstacionVal = (val?: string): number | null => {
@@ -1191,8 +1202,18 @@ export function BitacoraForm({
   }
 
   const handleGuardarRegistroFinal = async () => {
-    if (!validarFormulario()) {
-      showErrorToast('Completa los campos requeridos marcados en rojo')
+    const { valido, errores } = validarFormulario()
+    if (!valido) {
+      if (
+        errores.horaReanudacion &&
+        (errores.horaReanudacion.includes('menor') ||
+          errores.horaReanudacion.includes('igual') ||
+          errores.horaReanudacion.includes('posterior'))
+      ) {
+        showErrorToast('La hora de reanudación no puede ser igual o menor a la de inicio')
+      } else {
+        showErrorToast('Completa los campos requeridos marcados en rojo')
+      }
       return
     }
 
@@ -2247,25 +2268,96 @@ export function BitacoraForm({
                         <span className="text-[10px] font-medium text-gray-600 uppercase tracking-wide block mb-1" style={{ fontSize: '10px' }}>
                           Hora inicio
                         </span>
-                        <input
-                          type="time"
-                          value={fd.horaSuspension}
-                          onChange={(e) => set('horaSuspension', e.target.value)}
-                          style={{ fontSize: '10px' }}
-                          className="bitacora-form-control w-full rounded-lg border border-gray-200 px-2 py-1 text-[10px] text-gray-800 font-normal focus:outline-none focus:border-gray-400"
-                        />
+                        <div className="flex items-center gap-1">
+                          <select
+                            value={fd.horaSuspension ? fd.horaSuspension.split(':')[0] : ''}
+                            onChange={(e) => handleCambioHoraSuspension(e.target.value, fd.horaSuspension ? fd.horaSuspension.split(':')[1] : '00')}
+                            style={{ fontSize: '10px' }}
+                            className={`bitacora-form-control flex-1 rounded-lg border px-1.5 py-1 text-[10px] text-gray-800 bg-white font-normal focus:outline-none cursor-pointer ${
+                              errors.horaSuspension
+                                ? 'border-[#9B0F06] ring-1 ring-[#9B0F06] bg-red-50/20'
+                                : 'border-gray-200 focus:border-gray-400'
+                            }`}
+                          >
+                            <option value="" style={{ fontSize: '10px' }}>HH</option>
+                            {HORAS_24.map((h) => (
+                              <option key={h} value={h} style={{ fontSize: '10px' }}>
+                                {h}
+                              </option>
+                            ))}
+                          </select>
+                          <span className="text-[10px] font-bold text-gray-400 select-none">:</span>
+                          <select
+                            value={fd.horaSuspension ? fd.horaSuspension.split(':')[1] : ''}
+                            onChange={(e) => handleCambioHoraSuspension(fd.horaSuspension ? fd.horaSuspension.split(':')[0] : '08', e.target.value)}
+                            style={{ fontSize: '10px' }}
+                            className={`bitacora-form-control flex-1 rounded-lg border px-1.5 py-1 text-[10px] text-gray-800 bg-white font-normal focus:outline-none cursor-pointer ${
+                              errors.horaSuspension
+                                ? 'border-[#9B0F06] ring-1 ring-[#9B0F06] bg-red-50/20'
+                                : 'border-gray-200 focus:border-gray-400'
+                            }`}
+                          >
+                            <option value="" style={{ fontSize: '10px' }}>MM</option>
+                            {MINUTOS_60.map((m) => (
+                              <option key={m} value={m} style={{ fontSize: '10px' }}>
+                                {m}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        {errors.horaSuspension && (
+                          <p className="text-[9.5px] text-[#9B0F06] font-normal mt-0.5 leading-tight" style={{ fontSize: '9.5px' }}>
+                            {errors.horaSuspension}
+                          </p>
+                        )}
                       </div>
+
                       <div>
                         <span className="text-[10px] font-medium text-gray-600 uppercase tracking-wide block mb-1" style={{ fontSize: '10px' }}>
                           Hora reanudación
                         </span>
-                        <input
-                          type="time"
-                          value={fd.horaReanudacion}
-                          onChange={(e) => set('horaReanudacion', e.target.value)}
-                          style={{ fontSize: '10px' }}
-                          className="bitacora-form-control w-full rounded-lg border border-gray-200 px-2 py-1 text-[10px] text-gray-800 font-normal focus:outline-none focus:border-gray-400"
-                        />
+                        <div className="flex items-center gap-1">
+                          <select
+                            value={fd.horaReanudacion ? fd.horaReanudacion.split(':')[0] : ''}
+                            onChange={(e) => handleCambioHoraReanudacion(e.target.value, fd.horaReanudacion ? fd.horaReanudacion.split(':')[1] : '00')}
+                            style={{ fontSize: '10px' }}
+                            className={`bitacora-form-control flex-1 rounded-lg border px-1.5 py-1 text-[10px] text-gray-800 bg-white font-normal focus:outline-none cursor-pointer ${
+                              errors.horaReanudacion
+                                ? 'border-[#9B0F06] ring-1 ring-[#9B0F06] bg-red-50/20'
+                                : 'border-gray-200 focus:border-gray-400'
+                            }`}
+                          >
+                            <option value="" style={{ fontSize: '10px' }}>HH</option>
+                            {HORAS_24.map((h) => (
+                              <option key={h} value={h} style={{ fontSize: '10px' }}>
+                                {h}
+                              </option>
+                            ))}
+                          </select>
+                          <span className="text-[10px] font-bold text-gray-400 select-none">:</span>
+                          <select
+                            value={fd.horaReanudacion ? fd.horaReanudacion.split(':')[1] : ''}
+                            onChange={(e) => handleCambioHoraReanudacion(fd.horaReanudacion ? fd.horaReanudacion.split(':')[0] : '12', e.target.value)}
+                            style={{ fontSize: '10px' }}
+                            className={`bitacora-form-control flex-1 rounded-lg border px-1.5 py-1 text-[10px] text-gray-800 bg-white font-normal focus:outline-none cursor-pointer ${
+                              errors.horaReanudacion
+                                ? 'border-[#9B0F06] ring-1 ring-[#9B0F06] bg-red-50/20'
+                                : 'border-gray-200 focus:border-gray-400'
+                            }`}
+                          >
+                            <option value="" style={{ fontSize: '10px' }}>MM</option>
+                            {MINUTOS_60.map((m) => (
+                              <option key={m} value={m} style={{ fontSize: '10px' }}>
+                                {m}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        {errors.horaReanudacion && (
+                          <p className="text-[9.5px] text-[#9B0F06] font-normal mt-0.5 leading-tight" style={{ fontSize: '9.5px' }}>
+                            {errors.horaReanudacion}
+                          </p>
+                        )}
                       </div>
                     </div>
                   </div>

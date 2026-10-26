@@ -60,7 +60,21 @@ export function SessionTerminationModal() {
           }
         }
       })
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          try {
+            channel.send({
+              type: 'broadcast',
+              event: 'sesion_iniciada',
+              payload: {
+                usuarioId: profile.id,
+                correo: profile.correo,
+                timestamp: Date.now(),
+              },
+            }).catch(() => {});
+          } catch (_) {}
+        }
+      });
 
     const handleCustomEvent = (e: any) => {
       iniciarCierre(e.detail?.mensaje);
@@ -77,7 +91,7 @@ export function SessionTerminationModal() {
       window.removeEventListener('domun:forzar_cierre_sesion', handleCustomEvent);
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [profile?.id]);
+  }, [profile?.id, profile?.correo]);
 
   if (!activo) return null;
 

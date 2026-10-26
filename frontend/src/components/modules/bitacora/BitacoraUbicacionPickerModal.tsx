@@ -84,14 +84,24 @@ export function BitacoraUbicacionPickerModal({
     }
   }
 
-  // Inicializar Leaflet cuando el modal se abre
+  // Inicializar Leaflet cuando el modal se abre y el contenedor esté listo en el DOM
   useEffect(() => {
     if (!abierto) return
 
     let activo = true
 
     const inicializarMapa = async () => {
-      if (mapaRef.current && (mapaRef.current as any)._leaflet_id) {
+      // Esperar a que el elemento mapaRef esté montado en el DOM (creado por el Portal)
+      let intentos = 0
+      while (!mapaRef.current && intentos < 25) {
+        await new Promise((resolve) => setTimeout(resolve, 40))
+        intentos++
+        if (!activo) return
+      }
+
+      if (!mapaRef.current || !activo) return
+
+      if ((mapaRef.current as any)._leaflet_id) {
         delete (mapaRef.current as any)._leaflet_id
       }
       if (instanciaMapaRef.current) {
@@ -99,7 +109,6 @@ export function BitacoraUbicacionPickerModal({
         instanciaMapaRef.current = null
       }
 
-      if (!mapaRef.current) return
       const L = await import('leaflet')
       if (!activo || !mapaRef.current) return
 
@@ -148,9 +157,16 @@ export function BitacoraUbicacionPickerModal({
       instanciaMapaRef.current = mapa
       marcadorRef.current = marker
 
+      // Forzar recalculado de dimensiones de Leaflet varias veces durante y después de la animación del modal
       setTimeout(() => {
-        mapa.invalidateSize()
-      }, 150)
+        if (activo && instanciaMapaRef.current) instanciaMapaRef.current.invalidateSize()
+      }, 100)
+      setTimeout(() => {
+        if (activo && instanciaMapaRef.current) instanciaMapaRef.current.invalidateSize()
+      }, 300)
+      setTimeout(() => {
+        if (activo && instanciaMapaRef.current) instanciaMapaRef.current.invalidateSize()
+      }, 600)
     }
 
     void inicializarMapa()
@@ -320,15 +336,15 @@ export function BitacoraUbicacionPickerModal({
               type="button"
               onClick={handleDetectarGpsReal}
               disabled={detectandoGps}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-gray-200 text-xs font-semibold text-gray-700 hover:bg-gray-50 hover:text-[#9B0F06] transition-colors shadow-2xs cursor-pointer shrink-0"
+              className="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-[#9B0F06] hover:border-gray-300 transition-colors shadow-2xs cursor-pointer shrink-0"
               title="Detectar mi posición GPS actual con alta precisión"
+              aria-label="Detectar mi GPS actual"
             >
               {detectandoGps ? (
-                <Loader2 size={13} className="animate-spin text-[#9B0F06]" />
+                <Loader2 size={14} className="animate-spin text-[#9B0F06]" />
               ) : (
-                <Navigation size={13} className="text-[#9B0F06]" />
+                <Navigation size={14} className="text-[#9B0F06]" />
               )}
-              <span>Mi GPS Actual</span>
             </button>
           </div>
 
