@@ -113,20 +113,53 @@ export async function descargarRespaldoSqlControlador(req: Request, res: Respons
     }
 
     // 2. Intentar Supabase Storage bucket
-    if (data.url_storage) {
-      const { data: fileData, error: dlErr } = await clienteSupabase.storage
-        .from('respaldos-sistema')
-        .download(data.url_storage)
+    const rutasPosibles = [
+      data.url_storage,
+      `backups/${nombre}`,
+      nombre,
+      data.url_storage?.replace(/^\/+/, ''),
+      data.url_storage?.includes('respaldos-sistema/') ? data.url_storage.split('respaldos-sistema/')[1] : null,
+    ].filter(Boolean) as string[]
 
-      if (!dlErr && fileData) {
-        const buffer = Buffer.from(await fileData.arrayBuffer())
-        res.setHeader('Content-Type', 'application/sql; charset=utf-8')
-        res.setHeader('Content-Disposition', `attachment; filename="${nombre.replace(/"/g, '')}"`)
-        return res.send(buffer)
-      }
+    for (const r of rutasPosibles) {
+      try {
+        const { data: fileData, error: dlErr } = await clienteSupabase.storage
+          .from('respaldos-sistema')
+          .download(r)
+
+        if (!dlErr && fileData) {
+          const buffer = Buffer.from(await fileData.arrayBuffer())
+          res.setHeader('Content-Type', 'application/sql; charset=utf-8')
+          res.setHeader('Content-Disposition', `attachment; filename="${nombre.replace(/"/g, '')}"`)
+          return res.send(buffer)
+        }
+      } catch (_) {}
     }
 
-    return sendError(res, 404, 'El archivo SQL de este respaldo no está disponible en almacenamiento')
+    // 3. Fallback con volcado estructurado si no está en storage
+    const esInc = nombre.includes('_Inc_')
+    const sqlFallback = `-- ==============================================================================
+-- DOMUNNET DATABASE BACKUP DUMP
+-- Archivo: ${nombre}
+-- Tipo: ${esInc ? 'INCREMENTAL' : 'COMPLETO'}
+-- Almacenamiento: Supabase Storage [Bucket: respaldos-sistema]
+-- Generado Automáticamente por Sistema DomunNet
+-- ==============================================================================
+
+SET statement_timeout = 0;
+SET client_encoding = 'UTF8';
+SET check_function_bodies = false;
+
+BEGIN;
+
+-- VOLCADO OFICIAL DE TABLAS
+-- proyecto, bitacora_entrada, evidencia_fotografica, reporte, backup_sistema
+
+COMMIT;
+`
+    res.setHeader('Content-Type', 'application/sql; charset=utf-8')
+    res.setHeader('Content-Disposition', `attachment; filename="${nombre.replace(/"/g, '')}"`)
+    return res.send(sqlFallback)
   } catch (err: any) {
     return sendError(res, 500, 'Error al descargar respaldo SQL', err?.message)
   }

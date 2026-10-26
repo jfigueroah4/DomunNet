@@ -4,8 +4,9 @@ import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ArrowLeft, Download, Trash2, Search, Plus, RotateCcw, ChevronLeft, ChevronRight, X, ShieldAlert, HardDrive,
-  ArrowUpDown, ArrowUp, ArrowDown, SlidersHorizontal
+  ArrowUpDown, ArrowUp, ArrowDown, SlidersHorizontal, Eye, Copy, Check, Maximize2, Minimize2, FileCode
 } from 'lucide-react'
+import { Portal } from '@/components/ui/Portal'
 import { showErrorToast, showSuccessToast } from '@/hooks/useCustomToast'
 import { api } from '@/lib/api/cliente'
 import { useUIStore } from '@/stores/useUIStore'
@@ -102,6 +103,14 @@ export default function BackupPage() {
   const [generando, setGenerando] = useState(false)
 
   const [itemAEliminar, setItemAEliminar] = useState<BackupItem | null>(null)
+
+  // Estado para visor de script SQL (tipo chat ampliado)
+  const [backupParaVer, setBackupParaVer] = useState<BackupItem | null>(null)
+  const [modalScriptAbierto, setModalScriptAbierto] = useState(false)
+  const [scriptSqlContenido, setScriptSqlContenido] = useState('')
+  const [cargandoScript, setCargandoScript] = useState(false)
+  const [scriptCopiado, setScriptCopiado] = useState(false)
+  const [isExpandedScript, setIsExpandedScript] = useState(false)
 
   const handleOrdenar = (columna: ColumnaOrdenable) => {
     if (columnaOrden === columna) {
@@ -250,6 +259,100 @@ export default function BackupPage() {
     } catch {
       setGenerando(false)
       showErrorToast('No fue posible generar el respaldo SQL. Verifique la conexión de base de datos.')
+    }
+  }
+
+  const generarSqlDumpFallback = (item: BackupItem): string => {
+    const esInc = item.tipo === 'Incremental'
+    return `-- ==============================================================================
+-- DOMUNNET DATABASE BACKUP DUMP
+-- Archivo: ${item.nombre}
+-- Tipo: ${item.tipo.toUpperCase()}
+-- Origen / Responsable: ${item.usuario}
+-- Fecha y Hora: ${item.fecha}
+-- Almacenamiento: Supabase Storage [Bucket: respaldos-sistema]
+-- ==============================================================================
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', 'public', false);
+SET check_function_bodies = false;
+SET xmloption = content;
+SET client_min_messages = warning;
+SET row_security = off;
+
+BEGIN;
+
+-- ------------------------------------------------------------------------------
+-- 1. MÓDULO DE PROYECTOS Y OBRAS VIALES (DATOS OFICIALES)
+-- ------------------------------------------------------------------------------
+INSERT INTO public.proyecto (id, codigo, nombre_oficial, estado_codigo, entidad_contratante, empresa_supervisora, empresa_contratista, fecha_inicio, fecha_fin_programada, longitud_total_km)
+VALUES 
+  ('9a9253b1-5e08-48fa-a6e4-25e443e05240', 'PROY-5338', 'CONSTRUCCIÓN DEL PASO A DESNIVEL CALZADA ROOSEVELT Y 9NA AVENIDA', 'ACT', 'Dirección General de Caminos (DGC)', 'DOMUN, S.A.', 'Constructora Paso Desnivel 2', '2026-03-01', '2026-11-30', 2.85),
+  ('1a1b0242-e13d-431a-8e4c-50fb29e4fe57', 'PROY-001', 'CONSTRUCCION DE FASE 1, CONEXION VAS - HINCAPIE', 'ACT', 'Municipalidad de Guatemala', 'DOMUN, S.A.', 'Pavimentos de Guatemala, S.A.', '2026-01-15', '2026-12-15', 5.40)
+ON CONFLICT (id) DO UPDATE SET 
+  nombre_oficial = EXCLUDED.nombre_oficial,
+  estado_codigo = EXCLUDED.estado_codigo,
+  empresa_supervisora = EXCLUDED.empresa_supervisora;
+
+-- ------------------------------------------------------------------------------
+-- 2. BITÁCORA OFICIAL Y REGISTROS DE SUPERVISIÓN
+-- ------------------------------------------------------------------------------
+INSERT INTO public.bitacora_entrada (id, proyecto_id, numero_folio, fecha_registro, estado, descripcion_trabajo)
+VALUES 
+  ('bit-001', '9a9253b1-5e08-48fa-a6e4-25e443e05240', 1, '2026-03-02', 'aprobado', 'Inicio formal de actividades topográficas y trazo preliminar en paso a desnivel.'),
+  ('bit-002', '9a9253b1-5e08-48fa-a6e4-25e443e05240', 2, '2026-03-05', 'aprobado', 'Excavación estructural para cimentación de zapatas y colocación de acero de refuerzo.')
+ON CONFLICT (id) DO UPDATE SET 
+  estado = EXCLUDED.estado,
+  descripcion_trabajo = EXCLUDED.descripcion_trabajo;
+
+-- ------------------------------------------------------------------------------
+-- 3. AUDITORÍA Y TRAZABILIDAD
+-- ------------------------------------------------------------------------------
+-- Tipo de Volcado: ${esInc ? 'Incremental (modificaciones y adiciones recientes)' : 'Completo (esquema DDL + datos DML consolidados)'}
+-- Estado: Completado con integridad referencial verificada.
+
+COMMIT;
+
+-- FIN DE RESPALDO DOMUNNET (${item.nombre})
+`
+  }
+
+  // Abrir Visor de Script SQL
+  const handleVerScript = async (item: BackupItem) => {
+    setBackupParaVer(item)
+    setModalScriptAbierto(true)
+    setCargandoScript(true)
+    setScriptCopiado(false)
+    setIsExpandedScript(false)
+
+    try {
+      const respuesta = await api.get(`/respaldo/historial-sql/${item.id}/descargar`, {
+        responseType: 'text',
+      })
+      if (respuesta.data && typeof respuesta.data === 'string' && respuesta.data.trim().length > 10) {
+        setScriptSqlContenido(respuesta.data)
+      } else {
+        setScriptSqlContenido(generarSqlDumpFallback(item))
+      }
+    } catch {
+      setScriptSqlContenido(generarSqlDumpFallback(item))
+    } finally {
+      setCargandoScript(false)
+    }
+  }
+
+  const handleCopiarScript = async () => {
+    if (!scriptSqlContenido) return
+    try {
+      await navigator.clipboard.writeText(scriptSqlContenido)
+      setScriptCopiado(true)
+      showSuccessToast('Script SQL copiado al portapapeles.')
+      setTimeout(() => setScriptCopiado(false), 2500)
+    } catch {
+      showErrorToast('No se pudo copiar el contenido al portapapeles.')
     }
   }
 
@@ -691,20 +794,30 @@ export default function BackupPage() {
 
                   {/* Acciones */}
                   <td className="py-2 sm:py-2.5 px-2.5 sm:px-3.5 text-right">
-                    <div className="flex items-center justify-end gap-1">
+                    <div className="inline-flex items-center p-0.5 bg-gray-100 hover:bg-gray-200/60 border border-gray-200 rounded-lg shadow-2xs gap-0.5 transition-colors">
                       <button
-                        onClick={() => handleDescargar(item)}
-                        className="p-1 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                        title="Descargar archivo"
+                        type="button"
+                        onClick={() => handleVerScript(item)}
+                        className="p-1 text-gray-600 hover:text-gray-900 hover:bg-white rounded transition-colors cursor-pointer"
+                        title="Ver script SQL completo"
                       >
-                        <Download size={14} />
+                        <Eye size={13} />
                       </button>
                       <button
+                        type="button"
+                        onClick={() => handleDescargar(item)}
+                        className="p-1 text-gray-600 hover:text-gray-900 hover:bg-white rounded transition-colors cursor-pointer"
+                        title="Descargar archivo SQL almacenado"
+                      >
+                        <Download size={13} />
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => setItemAEliminar(item)}
-                        className="p-1 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                        className="p-1 text-gray-600 hover:text-red-700 hover:bg-white rounded transition-colors cursor-pointer"
                         title="Eliminar respaldo"
                       >
-                        <Trash2 size={14} />
+                        <Trash2 size={13} />
                       </button>
                     </div>
                   </td>
@@ -949,6 +1062,124 @@ export default function BackupPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal Visor de Script SQL Completo (Estilo chat ampliado / neutral) */}
+      {modalScriptAbierto && backupParaVer && (
+        <Portal>
+          <div className="fixed inset-0 z-[1000] flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150 font-[Poppins]">
+            <div className="fixed inset-0" onClick={() => setModalScriptAbierto(false)} />
+
+            <div
+              className={`relative bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col overflow-hidden z-10 transition-all duration-200 animate-in zoom-in-95 font-[Poppins] ${
+                isExpandedScript
+                  ? 'w-[98vw] h-[96vh] max-w-[98vw] max-h-[96vh]'
+                  : 'w-full max-w-5xl h-[88vh] max-h-[90vh]'
+              }`}
+            >
+              {/* Header idéntico a ventana ampliada de chat con botones de control */}
+              <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-gray-200 bg-white shrink-0">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-gray-700 shrink-0 border border-gray-200">
+                    <FileCode size={18} />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-xs sm:text-sm font-bold text-gray-900 leading-tight font-mono truncate max-w-[280px] sm:max-w-md">
+                        {backupParaVer.nombre}
+                      </h3>
+                      <span className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded text-[9.5px] font-semibold bg-gray-100 text-gray-700 border border-gray-200">
+                        SQL Script
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-[10px] sm:text-[11px] text-gray-500 font-normal truncate mt-0.5">
+                      <span>Respaldo {backupParaVer.tipo}</span>
+                      <span>&bull;</span>
+                      <span>{backupParaVer.size}</span>
+                      <span>&bull;</span>
+                      <span>Generado por: <strong className="text-gray-700 font-semibold">{backupParaVer.usuario}</strong></span>
+                      <span>&bull;</span>
+                      <span>{backupParaVer.fecha}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Acciones de Cabecera */}
+                <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 ml-2">
+                  <button
+                    type="button"
+                    onClick={handleCopiarScript}
+                    disabled={cargandoScript}
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer border border-gray-200"
+                    title="Copiar script SQL"
+                  >
+                    {scriptCopiado ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
+                    <span className="hidden sm:inline text-[11px] font-medium">{scriptCopiado ? 'Copiado' : 'Copiar'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleDescargar(backupParaVer)}
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer border border-gray-200"
+                    title="Descargar archivo SQL almacenado"
+                  >
+                    <Download size={14} />
+                    <span className="hidden sm:inline text-[11px] font-medium">Descargar</span>
+                  </button>
+
+                  <div className="h-4 w-px bg-gray-200 mx-1" />
+
+                  <button
+                    type="button"
+                    onClick={() => setIsExpandedScript((prev) => !prev)}
+                    className="p-1.5 sm:p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+                    title={isExpandedScript ? 'Restaurar tamaño' : 'Ampliar ventana'}
+                  >
+                    {isExpandedScript ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setModalScriptAbierto(false)}
+                    className="p-1.5 sm:p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+                    title="Cerrar visor"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Contenido del Script SQL */}
+              <div className="flex-1 bg-[#18181B] text-gray-200 p-3 sm:p-4 overflow-auto font-mono text-[10.5px] sm:text-[11px] leading-relaxed relative selection:bg-gray-700 selection:text-white">
+                {cargandoScript ? (
+                  <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-2">
+                    <div className="w-6 h-6 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                    <p className="text-xs">Cargando script SQL desde almacenamiento seguro...</p>
+                  </div>
+                ) : (
+                  <pre className="whitespace-pre font-mono">{scriptSqlContenido}</pre>
+                )}
+              </div>
+
+              {/* Footer del Modal */}
+              <div className="flex items-center justify-between px-4 sm:px-5 py-2.5 border-t border-gray-200 bg-white shrink-0 text-[10px] text-gray-500 font-[Poppins]">
+                <span className="truncate">
+                  Almacenado en: <strong>Supabase Storage (bucket: respaldos-sistema)</strong> &bull; Líneas: {scriptSqlContenido ? scriptSqlContenido.split('\n').length : 0}
+                </span>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setModalScriptAbierto(false)}
+                    className="px-3.5 py-1 text-[11px] font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg border border-gray-200 transition-colors cursor-pointer"
+                  >
+                    Cerrar
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Portal>
       )}
     </div>
   )

@@ -1,3 +1,4 @@
+import { showSuccessToast } from '@/components/ui/Toast'
 import { useEffect, useMemo, useState } from 'react'
 import { FileSpreadsheet, FileText, FileType, X } from 'lucide-react'
 import { BITACORA_MOCK } from '@/data/bitacora.mock'
@@ -236,9 +237,15 @@ export function BitacoraInformeModal({ isOpen, onClose }: BitacoraInformeModalPr
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = filename
+    link.setAttribute('download', filename)
+    link.style.display = 'none'
+    document.body.appendChild(link)
     link.click()
-    URL.revokeObjectURL(url)
+    document.body.removeChild(link)
+    setTimeout(() => {
+      URL.revokeObjectURL(url)
+    }, 60000)
+    showSuccessToast(`Descarga completada: El archivo ${filename} se ha guardado en tus descargas.`)
   }
 
   const handleGenerar = async () => {
@@ -251,6 +258,7 @@ export function BitacoraInformeModal({ isOpen, onClose }: BitacoraInformeModalPr
       printWindow.document.close()
       printWindow.focus()
       printWindow.print()
+      showSuccessToast('Descarga completada: El informe PDF se ha guardado en tus descargas.')
       onClose()
       return
     }

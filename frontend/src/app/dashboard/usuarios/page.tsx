@@ -75,6 +75,8 @@ export default function UsuariosPage() {
 
   const [paginaActual, setPaginaActual] = useState(1)
   const [registrosPorPagina, setRegistrosPorPagina] = useState(8)
+  const [sortColumn, setSortColumn] = useState<string>('')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
 
 
 
@@ -261,13 +263,54 @@ export default function UsuariosPage() {
 
   
 
+  const usuariosOrdenados = useMemo(() => {
+    if (!sortColumn) return usuariosFiltrados
+
+    return [...usuariosFiltrados].sort((a, b) => {
+      let valorA: any = ''
+      let valorB: any = ''
+
+      switch (sortColumn) {
+        case 'nombre':
+          valorA = `${a.primer_nombre} ${a.primer_apellido}`.toLowerCase()
+          valorB = `${b.primer_nombre} ${b.primer_apellido}`.toLowerCase()
+          break
+        case 'correo':
+          valorA = (a.correo || '').toLowerCase()
+          valorB = (b.correo || '').toLowerCase()
+          break
+        case 'rol':
+          valorA = (a.rol || '').toLowerCase()
+          valorB = (b.rol || '').toLowerCase()
+          break
+        case 'estado':
+          valorA = (a.estado || '').toLowerCase()
+          valorB = (b.estado || '').toLowerCase()
+          break
+        case 'ultimoAcceso':
+          valorA = (a as any).ultimo_acceso ? new Date((a as any).ultimo_acceso).getTime() : ((a as any).ultimoAcceso ? new Date((a as any).ultimoAcceso).getTime() : 0)
+          valorB = (b as any).ultimo_acceso ? new Date((b as any).ultimo_acceso).getTime() : ((b as any).ultimoAcceso ? new Date((b as any).ultimoAcceso).getTime() : 0)
+          break
+        case 'proyectos':
+          valorA = (a as any).proyectosAsignados?.length || (a as any).proyectos_asignados?.length || 0
+          valorB = (b as any).proyectosAsignados?.length || (b as any).proyectos_asignados?.length || 0
+          break
+        default:
+          return 0
+      }
+
+      if (valorA < valorB) return sortDirection === 'asc' ? -1 : 1
+      if (valorA > valorB) return sortDirection === 'asc' ? 1 : -1
+      return 0
+    })
+  }, [usuariosFiltrados, sortColumn, sortDirection])
+
   const usuariosPaginados = useMemo(() => {
-
     const inicio = (paginaActual - 1) * registrosPorPagina
+    return usuariosOrdenados.slice(inicio, inicio + registrosPorPagina)
+  }, [usuariosOrdenados, paginaActual, registrosPorPagina])
 
-    return usuariosFiltrados.slice(inicio, inicio + registrosPorPagina)
-
-  }, [usuariosFiltrados, paginaActual, registrosPorPagina])
+// handleSort omitido por ordenamiento interno
 
   
 
@@ -937,6 +980,16 @@ export default function UsuariosPage() {
         <div className="space-y-4">
           <UsuarioTabla
             usuarios={usuariosPaginados}
+            sortColumn={sortColumn}
+            sortDirection={sortDirection}
+            onSort={(column) => {
+              if (sortColumn === column) {
+                setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'))
+              } else {
+                setSortColumn(column)
+                setSortDirection('asc')
+              }
+            }}
             onVer={handleVer}
             onEditar={handleEditar}
             onEliminar={handleEliminar}

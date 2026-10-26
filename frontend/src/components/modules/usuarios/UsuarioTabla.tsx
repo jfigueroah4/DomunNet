@@ -15,6 +15,9 @@ interface UsuarioTablaProps {
   onEliminar: (id: string, modoModal?: 'todos' | 'activar' | 'eliminar' | 'suspender') => void
   onCerrarSesion?: (usuario: Usuario) => void
   onGestionarDispositivos?: (usuario: Usuario) => void
+  sortColumn?: string
+  sortDirection?: 'asc' | 'desc'
+  onSort?: (column: string) => void
 }
 
 export const UsuarioTabla = React.memo(function UsuarioTabla({
@@ -24,22 +27,32 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
   onEliminar,
   onCerrarSesion,
   onGestionarDispositivos,
+  sortColumn: sortColumnProp,
+  sortDirection: sortDirectionProp,
+  onSort,
 }: UsuarioTablaProps) {
   const profile = useAuthStore((state) => state.profile);
   const roles = useRolesStore((state) => state.roles);
   const miNivel = profile?.nivel_permisos || 0;
   const esGerenciaOAdmin = String(profile?.rol) === 'Administrador' || String(profile?.rol) === 'Gerencia';
 
-  const [sortColumn, setSortColumn] = useState<string>('');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [internalSortColumn, setInternalSortColumn] = useState<string>('');
+  const [internalSortDirection, setInternalSortDirection] = useState<'asc' | 'desc'>('asc');
   const [usuarioVerProyectos, setUsuarioVerProyectos] = useState<Usuario | null>(null);
 
+  const sortColumn = sortColumnProp !== undefined ? sortColumnProp : internalSortColumn;
+  const sortDirection = sortDirectionProp !== undefined ? sortDirectionProp : internalSortDirection;
+
   const handleSort = (column: string) => {
-    if (sortColumn === column) {
-      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    if (onSort) {
+      onSort(column);
     } else {
-      setSortColumn(column);
-      setSortDirection('asc');
+      if (internalSortColumn === column) {
+        setInternalSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+      } else {
+        setInternalSortColumn(column);
+        setInternalSortDirection('asc');
+      }
     }
   };
 
@@ -134,26 +147,8 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
                     <p className="text-[9.5px] text-gray-500 truncate mt-0.5">{usuario.correo}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                  {usuario.estado === 'Suspendido' ? (
-                    <UsuarioEstadoBadge estado="Suspendido" />
-                  ) : usuario.enLinea ? (
-                    <>
-                      <UsuarioEstadoBadge estado="Activo" />
-                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[8px] font-bold text-emerald-700 border border-emerald-200">
-                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                        En línea
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <UsuarioEstadoBadge estado="Inactivo" />
-                      <span className="inline-flex items-center gap-1 rounded-full bg-gray-50 px-1.5 py-0.5 text-[8px] font-medium text-gray-500 border border-gray-200">
-                        <span className="h-1.5 w-1.5 rounded-full bg-gray-300" />
-                        Desconectado
-                      </span>
-                    </>
-                  )}
+                <div className="flex items-center gap-1.5 justify-end">
+                  <UsuarioEstadoBadge estado={usuario.estado} />
                 </div>
               </div>
 
@@ -381,26 +376,8 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
                     <UsuarioRolBadge rol={usuario.rol} />
                   </td>
                   <td className="px-4 py-3 text-[10px]">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      {usuario.estado === 'Suspendido' ? (
-                        <UsuarioEstadoBadge estado="Suspendido" />
-                      ) : usuario.enLinea ? (
-                        <>
-                          <UsuarioEstadoBadge estado="Activo" />
-                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[8.5px] font-bold text-emerald-700 border border-emerald-200 shadow-2xs">
-                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                            En línea
-                          </span>
-                        </>
-                      ) : (
-                        <>
-                          <UsuarioEstadoBadge estado="Inactivo" />
-                          <span className="inline-flex items-center gap-1 rounded-full bg-gray-50 px-1.5 py-0.5 text-[8.5px] font-medium text-gray-500 border border-gray-200 shadow-2xs">
-                            <span className="h-1.5 w-1.5 rounded-full bg-gray-300" />
-                            Desconectado
-                          </span>
-                        </>
-                      )}
+                    <div className="flex items-center gap-1.5">
+                      <UsuarioEstadoBadge estado={usuario.estado} />
                     </div>
                   </td>
                   <td className="px-4 py-3 text-[10px] text-gray-500 font-medium">{fechaAcceso}</td>
@@ -408,14 +385,14 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
                     <button
                       type="button"
                       onClick={() => setUsuarioVerProyectos(usuario)}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-gray-50 hover:bg-red-50 text-gray-700 hover:text-[#9B0F06] border border-gray-200 hover:border-red-200 transition-colors cursor-pointer group shadow-2xs"
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-50 hover:bg-red-50 text-gray-700 hover:text-[#9B0F06] border border-gray-200 hover:border-red-200 transition-colors cursor-pointer group text-[10px]"
                       title={proyectosCount > 0 ? "Ver proyectos enlazados a este usuario" : "Ver asignación de proyectos"}
                     >
-                      <FolderOpen size={12} className={proyectosCount > 0 ? "text-[#9B0F06]" : "text-gray-400"} />
+                      <FolderOpen size={11} className={proyectosCount > 0 ? "text-[#9B0F06]" : "text-gray-400"} />
                       <span className={proyectosCount > 0 ? "font-bold text-[#9B0F06]" : "font-medium text-gray-400"}>
                         {proyectosCount}
                       </span>
-                      <span className="font-semibold text-gray-700 group-hover:text-[#9B0F06]">
+                      <span className="font-medium text-gray-700 group-hover:text-[#9B0F06]">
                         proyecto{proyectosCount !== 1 ? 's' : ''}
                       </span>
                     </button>

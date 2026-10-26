@@ -2,6 +2,8 @@ import { supabase, isSupabaseConfigured } from './client'
 import { DocumentoProyecto } from '@/types/proyecto'
 
 export const BUCKET_DOCUMENTOS = 'documentos-proyectos'
+export const BUCKET_REPORTES = 'reportes-domun'
+export const BUCKET_RESPALDOS = 'respaldos-sistema'
 
 export function formatearBytes(bytes: number): string {
   if (bytes === 0) return '0 B'
@@ -184,5 +186,98 @@ export async function subirDocumentoProyecto({
     subidoPor,
     categoria,
     url: urlFinal,
+  }
+}
+
+/**
+ * Sube un reporte oficial generado (en formato PDF o HTML) al bucket 'reportes-domun' de Supabase Storage.
+ * Retorna la URL pública y el path dentro del bucket.
+ */
+export async function subirReporteSupabase(
+  archivoBlob: Blob | File,
+  nombreArchivo: string,
+  proyectoId = 'general'
+): Promise<{ url: string; path: string }> {
+  const sanitizedName = `${Date.now()}_${nombreArchivo.replace(/[^a-zA-Z0-9._-]/g, '_')}`
+  const storagePath = `${proyectoId}/${sanitizedName}`
+
+  if (!isSupabaseConfigured() || !supabase) {
+    const urlLocal = URL.createObjectURL(archivoBlob)
+    return { url: urlLocal, path: storagePath }
+  }
+
+  try {
+    const { data, error } = await supabase.storage
+      .from(BUCKET_REPORTES)
+      .upload(storagePath, archivoBlob, {
+        cacheControl: '3600',
+        upsert: true,
+        contentType: archivoBlob.type || 'text/html;charset=utf-8',
+      })
+
+    if (error) {
+      console.warn(`[Supabase Storage] Aviso subiendo a ${BUCKET_REPORTES}:`, error.message)
+      const urlLocal = URL.createObjectURL(archivoBlob)
+      return { url: urlLocal, path: storagePath }
+    }
+
+    const publicUrl = data?.path
+      ? supabase.storage.from(BUCKET_REPORTES).getPublicUrl(data.path).data.publicUrl
+      : ''
+
+    return {
+      url: publicUrl || URL.createObjectURL(archivoBlob),
+      path: data?.path || storagePath,
+    }
+  } catch (storageErr) {
+    console.warn('[Supabase Storage] Excepción al subir reporte:', storageErr)
+    return { url: URL.createObjectURL(archivoBlob), path: storagePath }
+  }
+}
+
+/**
+ * Sube una copia de seguridad SQL directamente al bucket 'respaldos-sistema'
+ */
+export async function subirRespaldoSupabase(
+  contenidoSql: string | Blob,
+  nombreArchivo: string
+): Promise<{ url: string; path: string }> {
+  const blob = typeof contenidoSql === 'string'
+    ? new Blob([contenidoSql], { type: 'application/sql;charset=utf-8' })
+    : contenidoSql
+
+  const storagePath = `backups/${nombreArchivo}`
+
+  if (!isSupabaseConfigured() || !supabase) {
+    const urlLocal = URL.createObjectURL(blob)
+    return { url: urlLocal, path: storagePath }
+  }
+
+  try {
+    const { data, error } = await supabase.storage
+      .from(BUCKET_RESPALDOS)
+      .upload(storagePath, blob, {
+        cacheControl: '3600',
+        upsert: true,
+        contentType: 'application/sql',
+      })
+
+    if (error) {
+      console.warn(`[Supabase Storage] Aviso subiendo a ${BUCKET_RESPALDOS}:`, error.message)
+      const urlLocal = URL.createObjectURL(blob)
+      return { url: urlLocal, path: storagePath }
+    }
+
+    const publicUrl = data?.path
+      ? supabase.storage.from(BUCKET_RESPALDOS).getPublicUrl(data.path).data.publicUrl
+      : ''
+
+    return {
+      url: publicUrl || URL.createObjectURL(blob),
+      path: data?.path || storagePath,
+    }
+  } catch (err) {
+    console.warn('[Supabase Storage] Excepción al subir respaldo:', err)
+    return { url: URL.createObjectURL(blob), path: storagePath }
   }
 }

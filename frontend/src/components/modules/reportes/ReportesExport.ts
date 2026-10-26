@@ -441,7 +441,7 @@ export const buildFormalReportHtml = (
                 const raw = localStorage.getItem('domun_reportes_observaciones_contratante')
                 if (raw) {
                   const obsList: any[] = JSON.parse(raw)
-                  const relevantes = obsList.filter((o: any) => proyectoId === 'todos' || String(o.proyectoId) === String(proyectoId))
+                  const relevantes = obsList.filter((o: any) => (proyectoId === 'todos' || String(o.proyectoId) === String(proyectoId)) && !String(o.id || '').startsWith('obs-init-'))
                   if (relevantes.length > 0) {
                     return `
                       <div class="page-container" style="page-break-before: always; padding: 25px 0;">
@@ -497,20 +497,75 @@ export const buildFormalReportHtml = (
     </html>`
 }
 
-export const downloadBlob = (content: string, filename: string, type: string) => {
-  const blob = new Blob([content], { type })
+export const triggerBrowserDownloadNotification = (filename: string, format = 'PDF') => {
+  if (typeof window === 'undefined') return
+
+  // Notificación nativa del Navegador Web (HTML5 Notification API)
+  if ('Notification' in window) {
+    const notify = () => {
+      try {
+        new Notification('Descarga completada', {
+          body: `El reporte ${format.toUpperCase()} (${filename}) se completó y guardó en tu carpeta de descargas.`,
+          icon: '/logo.png',
+          tag: 'domun-download-' + filename,
+        })
+      } catch (_) {}
+    }
+
+    if (Notification.permission === 'granted') {
+      notify()
+    } else if (Notification.permission !== 'denied') {
+      Notification.requestPermission().then((permission) => {
+        if (permission === 'granted') {
+          notify()
+        }
+      }).catch(() => {})
+    }
+  }
+}
+
+export const downloadBlob = (
+  content: string | Blob,
+  filename: string,
+  type: string,
+  onComplete?: (filename: string) => void
+) => {
+  const blob = content instanceof Blob ? content : new Blob([content], { type })
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
-  link.download = filename
+  link.setAttribute('download', filename)
+  link.style.display = 'none'
+  document.body.appendChild(link)
   link.click()
-  URL.revokeObjectURL(url)
+  document.body.removeChild(link)
+
+  // Retrasar revocación para que el gestor de descargas de Chrome/Edge registre
+  // la descarga y muestre la burbuja / notificación de descarga completada
+  setTimeout(() => {
+    URL.revokeObjectURL(url)
+  }, 60000)
+
+  triggerBrowserDownloadNotification(filename, filename.endsWith('.doc') ? 'Word' : 'Excel')
+  if (onComplete) {
+    onComplete(filename)
+  }
 }
 
 export const exportReport = (
   format: 'pdf' | 'word' | 'excel',
-  html: string
+  html: string,
+  filename?: string,
+  onComplete?: (filename: string) => void
 ) => {
+  const defaultFilename = filename || (
+    format === 'pdf'
+      ? 'reporte-formal-obra.pdf'
+      : format === 'word'
+      ? 'reporte-formal-obra.doc'
+      : 'reporte-formal-obra.xls'
+  )
+
   if (format === 'pdf') {
     // Imprimir directamente en la misma página mediante iframe invisible sin abrir pestaña nueva
     let iframe = document.getElementById('reporte-print-iframe') as HTMLIFrameElement
@@ -532,18 +587,34 @@ export const exportReport = (
       doc.open()
       doc.write(html)
       doc.close()
+
+      let completed = false
+      const notifyDone = () => {
+        if (completed) return
+        completed = true
+        triggerBrowserDownloadNotification(defaultFilename, 'PDF')
+        if (onComplete) {
+          onComplete(defaultFilename)
+        }
+      }
+
+      // Evento de finalización de impresión / guardado del navegador
+      iframe.contentWindow?.addEventListener('afterprint', notifyDone, { once: true })
+
       setTimeout(() => {
         iframe.contentWindow?.focus()
         iframe.contentWindow?.print()
+        // Respaldo de notificación tras iniciar la acción por si el navegador bloquea afterprint
+        setTimeout(notifyDone, 1400)
       }, 400)
     }
     return
   }
 
   if (format === 'word') {
-    downloadBlob(html, 'reporte-formal-obra.doc', 'application/msword;charset=utf-8')
+    downloadBlob(html, defaultFilename, 'application/msword;charset=utf-8', onComplete)
     return
   }
 
-  downloadBlob(html, 'reporte-formal-obra.xls', 'application/vnd.ms-excel;charset=utf-8')
+  downloadBlob(html, defaultFilename, 'application/vnd.ms-excel;charset=utf-8', onComplete)
 }

@@ -13,6 +13,7 @@ export async function POST(req: Request) {
       currentProject,
       currentPath,
       reportsHistory = [],
+      observacionesContratante = [],
     } = await req.json();
 
     const geminiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
@@ -253,6 +254,17 @@ export async function POST(req: Request) {
       reportesContextText = 'Total de reportes oficiales generados en el sistema: 3 reportes (2 en PDF, 1 en Word).\n- "Reporte Formal de Obra - Reposición Tramo KM 45 a KM 60" | Formato: PDF | Creado: 10/10/2026, 10:30 hrs | Folios: 4 | Por: Ingeniero Residente\n- "Expediente Mensual de Bitácora - Vista Hermosa" | Formato: WORD | Creado: 08/10/2026, 16:45 hrs | Folios: 8 | Por: Carlos Mendoza\n- "Reporte de Ensayos y Campo VAS - Hincapié" | Formato: PDF | Creado: 05/10/2026, 11:15 hrs | Folios: 5 | Por: Supervisión Vial';
     }
 
+    let observacionesContextText = '';
+    if (Array.isArray(observacionesContratante) && observacionesContratante.length > 0) {
+      const pendientes = observacionesContratante.filter((o: any) => o.estado === 'pendiente').length;
+      const enRevision = observacionesContratante.filter((o: any) => o.estado === 'en_revision').length;
+      const solventadas = observacionesContratante.filter((o: any) => o.estado === 'solventada').length;
+      observacionesContextText = `Total de observaciones del contratante: ${observacionesContratante.length} (Pendientes: ${pendientes}, En revisión: ${enRevision}, Solventadas: ${solventadas}).\n` +
+        observacionesContratante.slice(0, 10).map((o: any) => `- [${String(o.estado || '').toUpperCase()}] Proyecto: "${o.proyectoNombre || 'General'}" | Tipo: ${o.tipo} | Por: ${o.autorNombre} (${o.autorRol}) | "${o.texto}"`).join('\n');
+    } else {
+      observacionesContextText = 'Sin observaciones pendientes registradas por el Contratante.';
+    }
+
     // Contexto del proyecto actual en pantalla
     let currentProjectContext = '';
     if (currentProject && (currentProject.nombre || currentProject.codigo || currentProject.id)) {
@@ -321,6 +333,12 @@ ${estimacionesCatalogContext}
 8. HISTORIAL Y REGISTROS DE REPORTES CREADOS:
 ${reportesContextText}
 
+9. OBSERVACIONES Y COMENTARIOS DEL CONTRATANTE:
+${observacionesContextText}
+
+9. OBSERVACIONES DE LA ENTIDAD CONTRATANTE:
+${observacionesContextText}
+
 ==================================================
 PERSONALIDAD, TONO Y DIRECTIVAS DE DOMUNBOT:
 ==================================================
@@ -342,23 +360,44 @@ PERSONALIDAD, TONO Y DIRECTIVAS DE DOMUNBOT:
 - Resumen inicial: Cuando te pidan un resumen general de un proyecto, explícalo primero en un párrafo fluido y natural con su avance general, tramo, supervisora y plazos. Sin viñetas excesivas.
 - Desglose detallado: Únicamente si el usuario te pide que especifiques o te dice "en viñetas", desglósaselo con viñetas (-) y datos puntuales.
 
-4. GENERACIÓN DE REPORTES (CON BOTONES DIRECTOS):
+4. GENERACIÓN DE REPORTES (PARÁMETROS Y BOTONES DIRECTOS):
 - Cuando el usuario solicite un reporte (ej. "genérame un reporte de todo el mes", "reporte de esta semana", "reporte del proyecto X"):
   * Determina el proyecto y el rango de fechas (ej. primer y último día del mes en curso).
-  * Explica brevemente qué abarcará el reporte (proyecto, periodo, registros y supervisión).
+  * Identifica el proyecto correspondiente (reconoce nombres o menciones ordinales como "el 2do proyecto", "primer proyecto").
+  * Presenta primero la ficha estructurada de parámetros:
+    - **Proyecto:** [Nombre] ([Código])
+    - **Fecha de Inicio:** [Fecha Inicio]
+    - **Fecha de Fin:** [Fecha Fin]
+    - **Renglones:** Todos los renglones y mediciones
+    - **Supervisión:** [Empresa Supervisora]
   * Añade de inmediato los botones directos para descargar o generar en PDF y Word:
     - [Generar Reporte PDF](/dashboard/reportes?proyectoId=ID_PROYECTO&desde=FECHA_INICIO&hasta=FECHA_FIN&formato=pdf&auto=true)
     - [Generar Reporte Word](/dashboard/reportes?proyectoId=ID_PROYECTO&desde=FECHA_INICIO&hasta=FECHA_FIN&formato=word&auto=true)
 
-5. BOTONES INTERACTIVOS (SOLO CUANDO SEA ÚTIL):
+5. PREDICCIÓN Y ANÁLISIS DE ATRASOS EN PROYECTOS:
+- Tienes capacidad avanzada de predicción de atrasos en obra vial. Evalúa en tiempo real:
+  * Plazo contractual (fecha_inicio vs fecha_fin estipulada vs fecha actual ${hoy}).
+  * Porcentaje de tiempo contractual transcurrido (% tiempo consumido).
+  * Frecuencia y cantidad de registros en bitácora de obra y mediciones.
+  * Si un proyecto lleva tiempo activo (>20% del plazo) pero tiene 0 registros o mediciones, diagnostica "En Riesgo de Atraso" administrativo y documental.
+  * Si fecha_fin < ${hoy}, diagnostica "Atrasado (Plazo Contractual Vencido)".
+  * Si el plazo es reciente y se encuentra dentro de las fechas programadas, diagnostica "En Tiempo".
+- Cuando te pregunten si hay proyectos atrasados ("¿hay algún proyecto que esté atrasado?", "¿pero alguno va atrasado?", "¿cómo vamos con los atrasos?", "predicción de atrasos"):
+  * Responde directamente diagnosticando cada uno de los proyectos registrados.
+  * Señala cuál va en tiempo y cuál está en riesgo de atraso o atrasado, fundamentando el motivo y dando una recomendación preventiva.
+
+6. OBSERVACIONES DEL CONTRATANTE:
+- Dispones de acceso al módulo de "Observaciones y Comentarios del Contratante" donde los supervisores y contratantes registran notas técnicas, salvedades y aclaraciones (pendientes, en revisión y solventadas). Puedes resumirlas o brindar [Ver Observaciones](/dashboard/reportes).
+
+7. BOTONES INTERACTIVOS (SOLO CUANDO SEA ÚTIL):
 - No llenes la pantalla de botones innecesarios.
 - Úsalos únicamente cuando el usuario quiera generar reportes, ir a un módulo específico, o para desambiguar entre proyectos si no especificó cuál.
 - Fuera de eso, responde en texto natural.
 
-6. SEGURIDAD:
+8. SEGURIDAD:
 - Eres un asistente de consulta y auditoría inteligente. Si el usuario te pide modificar o borrar datos directamente en la base de datos, indícale amablemente y dale el botón a la pantalla correspondiente.
 
-7. ESTILO:
+9. ESTILO:
 - Profesional, técnico y cordial.
 - En español, sin emojis, sin numerales (# o ##). Usa negrita (**texto**) y viñetas simples (-) si corresponde.`;
 
@@ -497,8 +536,110 @@ PERSONALIDAD, TONO Y DIRECTIVAS DE DOMUNBOT:
     const lastMessage = (messages?.[messages.length - 1]?.content || '').toLowerCase().trim();
     let fallbackReply = '';
 
+    // Diagnóstico y predicción analítica de atrasos en proyectos
+    const diagnosticoAtraso = (p: any) => {
+      const bs = bitacorasLiveList.filter((b) => String(b.proyecto_id) === String(p.id));
+      const totalBitacoras = bs.length;
+      const fIni = p.fecha_inicio ? new Date(p.fecha_inicio) : null;
+      const fFin = p.fecha_fin ? new Date(p.fecha_fin) : null;
+      const dHoy = new Date(hoy);
+
+      let diasTotales = 0;
+      let diasTranscurridos = 0;
+      let pctTiempo = 0;
+
+      if (fIni && fFin) {
+        diasTotales = Math.max(1, Math.round((fFin.getTime() - fIni.getTime()) / (1000 * 3600 * 24)));
+        diasTranscurridos = Math.round((dHoy.getTime() - fIni.getTime()) / (1000 * 3600 * 24));
+        pctTiempo = Math.min(999, Math.round((diasTranscurridos / diasTotales) * 100));
+      }
+
+      let estado = 'En tiempo';
+      let badge = 'EN TIEMPO';
+      let explicacion = '';
+      let prediccion = '';
+
+      if (p.fecha_fin && p.fecha_fin < hoy) {
+        estado = 'Atrasado (Plazo Vencido)';
+        badge = 'ATRASADO';
+        const diasExceso = Math.round((dHoy.getTime() - (fFin?.getTime() || 0)) / (1000 * 3600 * 24));
+        explicacion = `El plazo contractual estipulado venció el ${p.fecha_fin} (${diasExceso} días de exceso).`;
+        prediccion = `Requiere adenda de tiempo o recepción/liquidación formal para regularizar el desfase.`;
+      } else if (pctTiempo >= 20 && totalBitacoras === 0) {
+        estado = 'En Riesgo Alto de Atraso';
+        badge = 'EN RIESGO';
+        explicacion = `Ha consumido el ${pctTiempo}% de su tiempo contractual (${diasTranscurridos} de ${diasTotales} días) sin registrar entradas de bitácora en obra.`;
+        prediccion = `De mantenerse la falta de documentación física y mediciones diarias, se proyecta un retraso administrativo severo para la estimación mensual y recepción del tramo.`;
+      } else if (pctTiempo >= 80 && totalBitacoras < 5) {
+        estado = 'En Riesgo de Atraso';
+        badge = 'EN RIESGO';
+        explicacion = `Quedan ${diasTotales - diasTranscurridos} días para la culminación contractual (${p.fecha_fin}) con un registro muy bajo de actividades (${totalBitacoras} entradas).`;
+        prediccion = `Ritmo crítico: se proyecta un posible desfase en el cumplimiento de hitos de obra.`;
+      } else {
+        estado = 'En Tiempo Contractual';
+        badge = 'EN TIEMPO';
+        const diasRestantes = diasTotales > 0 ? Math.max(0, diasTotales - diasTranscurridos) : 0;
+        explicacion = `Plazo vigente del ${p.fecha_inicio || 'inicio'} al ${p.fecha_fin || 'fin'}${diasRestantes > 0 ? ` (${diasRestantes} días restantes, ${Math.max(0, pctTiempo)}% de plazo consumido)` : ''}. Cuenta con ${totalBitacoras} registros en bitácora.`;
+        prediccion = `Conforme al cronograma programado, se proyecta culminación dentro de la vigencia contractual.`;
+      }
+
+      return {
+        id: p.id,
+        nombre: p.nombre,
+        codigo: p.codigo || 'S/C',
+        supervisora: p.supervisora,
+        fecha_inicio: p.fecha_inicio,
+        fecha_fin: p.fecha_fin,
+        totalBitacoras,
+        pctTiempo: Math.max(0, pctTiempo),
+        estado,
+        badge,
+        explicacion,
+        prediccion,
+      };
+    };
+
+    // Búsqueda robusta de proyecto (por nombre, código, tokens, ordinales 1ro/2do/etc.)
+    const buscarProyectoEnTexto = (txt: string) => {
+      if (!txt) return null;
+      const lower = txt.toLowerCase();
+      for (const p of proyectosLiveList) {
+        const nom = String(p.nombre || '').toLowerCase();
+        const cod = String(p.codigo || '').toLowerCase();
+        if (cod && lower.includes(cod)) return p;
+        if (nom && (lower.includes(nom) || nom.includes(lower))) return p;
+      }
+      for (const p of proyectosLiveList) {
+        const nom = String(p.nombre || '').toLowerCase();
+        if (lower.includes('paso desnivel 2') || lower.includes('desnivel 2')) {
+          if (nom.includes('2')) return p;
+        }
+        if (lower.includes('c-9') || lower.includes('c9') || lower.includes('paso a desnivel')) {
+          if (nom.includes('c-9') || (!nom.includes('2') && nom.includes('desnivel'))) return p;
+        }
+      }
+      if (proyectosLiveList.length > 0) {
+        if (/(1er|1ro|primer[oa]?|primero|proyecto\s*1)\b/i.test(lower)) {
+          return proyectosLiveList[0];
+        }
+        if (/(2d[oa]|segund[oa]|proyecto\s*2)\b/i.test(lower)) {
+          return proyectosLiveList[1] || proyectosLiveList[0];
+        }
+        if (/(3er|tercer[oa]?|proyecto\s*3)\b/i.test(lower)) {
+          return proyectosLiveList[2] || proyectosLiveList[0];
+        }
+        if (/(4t[oa]|cuart[oa]|proyecto\s*4)\b/i.test(lower)) {
+          return proyectosLiveList[3] || proyectosLiveList[0];
+        }
+        if (/(últim[oa]|ultim[oa])\s*(proyecto)?/i.test(lower)) {
+          return proyectosLiveList[proyectosLiveList.length - 1];
+        }
+      }
+      return null;
+    };
+
     // Detección de proyecto en el turno actual o en turnos previos de la conversación
-    let proyectoActivo = proyectosLiveList.find(
+    let proyectoActivo = buscarProyectoEnTexto(lastMessage) || proyectosLiveList.find(
       (p) =>
         (p.nombre && lastMessage.includes(String(p.nombre).toLowerCase())) ||
         (p.codigo && lastMessage.includes(String(p.codigo).toLowerCase()))
@@ -507,7 +648,7 @@ PERSONALIDAD, TONO Y DIRECTIVAS DE DOMUNBOT:
     if (!proyectoActivo && Array.isArray(messages)) {
       for (let i = messages.length - 1; i >= 0; i--) {
         const prevText = String(messages[i]?.content || '').toLowerCase();
-        const found = proyectosLiveList.find(
+        const found = buscarProyectoEnTexto(prevText) || proyectosLiveList.find(
           (p) =>
             (p.nombre && prevText.includes(String(p.nombre).toLowerCase())) ||
             (p.codigo && prevText.includes(String(p.codigo).toLowerCase()))
@@ -541,6 +682,8 @@ PERSONALIDAD, TONO Y DIRECTIVAS DE DOMUNBOT:
     const esCantidad = /(cu[aá]nt[ao]s?|total|cantidad|n[uú]mero)/i.test(lastMessage);
     const esMes = /(todo\s*el\s*mes|este\s*mes|del\s*mes|mensual)/i.test(lastMessage);
     const esSemana = /(esta\s*semana|de\s*la\s*semana|semanal)/i.test(lastMessage);
+    const esConsultaAtraso = /(atrasad[oa]s?|atras[oa]s?|retrasad[oa]s?|retras[oa]s?|predicci[oó]n.*atras|desfase|en\s*tiempo|vamos\s*a\s*tiempo|va\s*a\s*tiempo|plazos?\s*vencid|cronograma)/i.test(lastMessage);
+    const esObservaciones = /(observaci[oó]n(es)?|comentario(s)?|contratante|salvedad|aclaraci[oó]n)/i.test(lastMessage);
 
     // Fechas para reportes
     const fechaObj = new Date();
@@ -558,6 +701,51 @@ PERSONALIDAD, TONO Y DIRECTIVAS DE DOMUNBOT:
       fallbackReply = `¡Con gusto${userNom}! A la orden para lo que necesites de las obras.`;
     } else if (esEstadoPersonal) {
       fallbackReply = `¡Todo bien por acá! Listo para apoyarte con cualquier consulta de las obras o proyectos.`;
+    } else if (esConsultaAtraso) {
+      const diagnosticos = proyectosLiveList.map(diagnosticoAtraso);
+      const conRiesgo = diagnosticos.filter((d) => d.badge !== 'EN TIEMPO');
+      const enTiempo = diagnosticos.filter((d) => d.badge === 'EN TIEMPO');
+
+      if (proyectoActivo) {
+        const diag = diagnosticoAtraso(proyectoActivo);
+        fallbackReply = `**Predicción y análisis de atraso para "${diag.nombre}" (${diag.codigo}):**\n\n` +
+          `- **Estado de Plazo:** **${diag.estado}**\n` +
+          `- **Vigencia Contractual:** Del ${diag.fecha_inicio || 'N/D'} al ${diag.fecha_fin || 'N/D'}\n` +
+          `- **Tiempo Transcurrido:** ${diag.pctTiempo}% del plazo estipulado\n` +
+          `- **Registros en Bitácora:** ${diag.totalBitacoras} entrada(s)\n` +
+          `- **Diagnóstico Técnico:** ${diag.explicacion}\n` +
+          `- **Predicción Preventiva:** ${diag.prediccion}\n\n` +
+          `[Ver bitácora de obra](/dashboard/bitacora?proyectoId=${diag.id})`;
+      } else {
+        const detalle = diagnosticos.map((d) => {
+          return `- **${d.nombre}** (${d.codigo}): **${d.estado}**\n  ${d.explicacion} ${d.prediccion}`;
+        }).join('\n\n');
+
+        let conclusion = '';
+        if (conRiesgo.length > 0) {
+          conclusion = `En conclusión, se detectan **${conRiesgo.length} proyecto(s) con alerta o riesgo de atraso** (principalmente por falta de asientos de bitácora frente al tiempo contractual transcurrido) y **${enTiempo.length} proyecto(s) en tiempo**.`;
+        } else {
+          conclusion = 'Todos los proyectos se encuentran actualmente dentro de sus plazos programados.';
+        }
+
+        fallbackReply = `Al evaluar los plazos contractuales, fechas de entrega y registros de bitácora en tiempo real:\n\n` +
+          `${detalle}\n\n` +
+          `${conclusion}\n\n` +
+          `¿Deseas que analicemos a fondo el cronograma o los reportes de alguno de ellos?`;
+      }
+    } else if (esObservaciones) {
+      if (observacionesContratante.length > 0) {
+        const pendientes = observacionesContratante.filter((o: any) => o.estado === 'pendiente').length;
+        const enRevision = observacionesContratante.filter((o: any) => o.estado === 'en_revision').length;
+        const solventadas = observacionesContratante.filter((o: any) => o.estado === 'solventada').length;
+        fallbackReply = `Hay **${observacionesContratante.length} observación(es) del contratante** registradas:\n\n` +
+          `- **Pendientes:** ${pendientes}\n` +
+          `- **En Revisión:** ${enRevision}\n` +
+          `- **Solventadas:** ${solventadas}\n\n` +
+          `[Ver Observaciones del Contratante](/dashboard/reportes)`;
+      } else {
+        fallbackReply = `Actualmente no hay observaciones pendientes registradas por parte del Contratante.\n\n[Abrir módulo de Reportes y Observaciones](/dashboard/reportes)`;
+      }
     } else if (esSaludo) {
       fallbackReply = `¡Hola${userNom}! ¿Qué tal? ¿En qué te echo una mano hoy?`;
     } else if (esReporte && (esGenerar || esMes || esSemana || lastMessage.includes('reporte'))) {
@@ -574,7 +762,16 @@ PERSONALIDAD, TONO Y DIRECTIVAS DE DOMUNBOT:
         });
         const cant = bsMes.length > 0 ? bsMes.length : bs.length;
 
-        fallbackReply = `He preparado los parámetros para el reporte oficial del proyecto "${proy.nombre}" (${proy.codigo || 'S/C'}) para ${periodoTexto}.\n\nPara este rango se identifican ${cant} registro(s) de bitácora y mediciones de obra supervisadas por ${proy.supervisora}. Puedes generar y descargar el documento directamente en el formato que requieras:\n\n[Generar Reporte PDF](/dashboard/reportes?proyectoId=${proy.id}&desde=${desde}&hasta=${hasta}&formato=pdf&auto=true)\n[Generar Reporte Word](/dashboard/reportes?proyectoId=${proy.id}&desde=${desde}&hasta=${hasta}&formato=word&auto=true)`;
+        fallbackReply = `He preparado los parámetros para la generación del reporte oficial de obra:\n\n` +
+          `- **Proyecto:** ${proy.nombre} (${proy.codigo || 'S/C'})\n` +
+          `- **Período:** ${periodoTexto} (del ${desde} al ${hasta})\n` +
+          `- **Fecha de Fin:** ${hasta}\n` +
+          `- **Renglones:** Todos los renglones y mediciones registradas\n` +
+          `- **Supervisión:** ${proy.supervisora}\n` +
+          `- **Registros incluidos:** ${cant} registro(s) de bitácora\n\n` +
+          `Puedes generar y descargar el reporte automáticamente en el formato que prefieras:\n\n` +
+          `[Generar Reporte PDF](/dashboard/reportes?proyectoId=${proy.id}&desde=${desde}&hasta=${hasta}&formato=pdf&auto=true)\n` +
+          `[Generar Reporte Word](/dashboard/reportes?proyectoId=${proy.id}&desde=${desde}&hasta=${hasta}&formato=word&auto=true)`;
       } else {
         fallbackReply = 'Para generar el reporte, por favor indícame a qué proyecto corresponde:\n\n' + botonesProyectos;
       }

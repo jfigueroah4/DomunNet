@@ -114,7 +114,7 @@ function FormattedMessage({
                   e.stopPropagation();
                   onAskQuery?.(queryText);
                 }}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 my-1 mr-1.5 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-800 border border-gray-300 font-semibold text-[11px] shadow-2xs transition-all cursor-pointer active:scale-95 group select-none"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 my-1 mr-1.5 rounded-lg bg-white hover:bg-gray-50 text-gray-800 border border-gray-200 font-semibold text-[11px] shadow-xs transition-all cursor-pointer active:scale-95 group select-none"
                 title={`Consultar: ${queryText}`}
               >
                 <span>{queryText}</span>
@@ -138,7 +138,7 @@ function FormattedMessage({
                     e.stopPropagation();
                     onAskQuery?.(queryText || label);
                   }}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 my-1 mr-1.5 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-800 border border-gray-300 font-semibold text-[11px] shadow-2xs transition-all cursor-pointer active:scale-95 group select-none"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 my-1 mr-1.5 rounded-lg bg-white hover:bg-gray-50 text-gray-800 border border-gray-200 font-semibold text-[11px] shadow-xs transition-all cursor-pointer active:scale-95 group select-none"
                   title={`Consultar ${label}`}
                 >
                   <span>{label}</span>
@@ -155,7 +155,7 @@ function FormattedMessage({
                   e.stopPropagation();
                   onNavigate?.(href);
                 }}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 my-1 mr-1.5 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-800 border border-gray-300 font-semibold text-[11px] shadow-2xs transition-all cursor-pointer active:scale-95 group select-none"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 my-1 mr-1.5 rounded-lg bg-white hover:bg-gray-50 text-gray-800 border border-gray-200 font-semibold text-[11px] shadow-xs transition-all cursor-pointer active:scale-95 group select-none"
                 title={`Ir a ${label}`}
               >
                 <span>{label}</span>
@@ -346,6 +346,13 @@ export default function AIAssistant({ isOpen, onClose }: AIAssistantProps) {
           currentProject: currentProjectInfo,
           currentPath: pathname,
           reportsHistory: savedReports.slice(0, 15),
+          observacionesContratante: (() => {
+            try {
+              return JSON.parse(localStorage.getItem('domun_reportes_observaciones_contratante') || '[]').slice(0, 20);
+            } catch (_) {
+              return [];
+            }
+          })(),
           messages: updatedMessages.map((m) => ({
             role: m.role,
             content: m.content,

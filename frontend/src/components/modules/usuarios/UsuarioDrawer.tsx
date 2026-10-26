@@ -16,7 +16,7 @@ import { useEffect, useState, useMemo } from 'react'
 
 
 
-import { Save, X, Eye, PencilLine, UserPlus, Mail, Phone, FolderOpen, Edit2, Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Save, X, Eye, EyeOff, PencilLine, UserPlus, Mail, Phone, FolderOpen, Edit2, Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
 
 
 
@@ -154,6 +154,7 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
 
 
   const [isEditingPassword, setIsEditingPassword] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
   const [fechaErrorMsg, setFechaErrorMsg] = useState<string | null>(null)
 
   // Validaciones en vivo estilo Desktop
@@ -244,6 +245,7 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
 
 
       setIsEditingPassword(false)
+      setShowPassword(false)
 
 
 
@@ -1686,50 +1688,28 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
 
 
 
-              <div className="flex items-center gap-2">
-
-
-
+              <div className="relative flex items-center w-full">
                 <input
-
-
-
-                  type="password"
-
-
-
+                  type={showPassword ? "text" : "password"}
                   placeholder={(mode === 'create' || isEditingPassword) ? "Escriba la nueva contraseña" : "••••••••"}
-
-
-
                   value={formData.contrasena}
-
-
-
                   onChange={(e) => handlePasswordChange(e.target.value)}
-
-
-
                   disabled={isViewMode || (mode === 'edit' && !isEditingPassword)}
-
-
-
-                  className={`w-full h-10 sm:h-8 px-3 text-[15px] sm:text-xs rounded-lg border focus:outline-none disabled:bg-gray-50 transition-colors ${
-
-
-
+                  className={`w-full h-10 sm:h-8 pl-3 pr-10 text-[15px] sm:text-xs rounded-lg border focus:outline-none disabled:bg-gray-50 transition-colors ${
                     errors.contrasena ? 'border-[#FF4D4F] bg-red-50/20' : 'border-gray-200 focus:border-[#9B0F06]'
-
-
-
                   }`}
-
-
-
                 />
-
-
-
+                {(mode === 'create' || isEditingPassword) && !isViewMode && (
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-2.5 p-1 text-gray-400 hover:text-gray-700 transition-colors cursor-pointer"
+                    title={showPassword ? "Ocultar contraseña" : "Ver contraseña"}
+                    tabIndex={-1}
+                  >
+                    {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
+                )}
               </div>
 
 
@@ -1992,7 +1972,7 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
 
 
 
-            className="flex-1 border border-gray-200 bg-white text-gray-700 text-[13px] sm:text-xs font-semibold h-10 sm:h-8 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+            className="flex-1 border border-gray-200 bg-white text-gray-700 text-[13px] sm:text-xs font-semibold h-10 sm:h-8 rounded-lg hover:bg-gray-100 hover:border-gray-300 hover:text-gray-900 active:scale-[0.99] transition-all cursor-pointer shadow-2xs"
 
 
 
@@ -2020,7 +2000,7 @@ export function UsuarioDrawer({ isOpen, onClose, onSave, usuario, mode }: Usuari
 
 
 
-              className="flex-1 bg-[#9B0F06] text-white text-[13px] sm:text-xs font-semibold h-10 sm:h-8 rounded-lg hover:bg-[#5E0006] transition-colors flex items-center justify-center gap-2 cursor-pointer"
+              className="flex-1 bg-[#9B0F06] text-white text-[13px] sm:text-xs font-semibold h-10 sm:h-8 rounded-lg hover:bg-[#7A0C05] active:scale-[0.99] hover:shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs"
 
 
 

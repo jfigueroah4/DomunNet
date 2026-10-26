@@ -2,7 +2,8 @@
 
 export const runtime = 'edge'
 
-import { ChevronLeft, Download, RefreshCw, Share2 } from 'lucide-react'
+import { useState } from 'react'
+import { ChevronLeft, Download, RefreshCw, Share2, MessageSquare } from 'lucide-react'
 import { useRouter, useParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { REPORTES_MOCK } from '@/data/reportes.mock'
@@ -17,6 +18,7 @@ export default function ReporteDetallePage() {
   const reporteId = params.id as string
 
   const reporte = REPORTES_MOCK.find((r) => r.id === reporteId)
+  const [modalObservaciones, setModalObservaciones] = useState(false)
 
   if (!reporte) {
     return (
@@ -58,6 +60,15 @@ export default function ReporteDetallePage() {
         </div>
 
         <div className="flex gap-1.5">
+          <button
+            type="button"
+            onClick={() => setModalObservaciones(true)}
+            className="bg-white border border-gray-200 text-gray-700 text-[10px] px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+            title="Observaciones del Contratante"
+          >
+            <MessageSquare size={12} className="text-[#9B0F06]" />
+            <span>Observaciones</span>
+          </button>
           {reporte.estado === 'completado' && (
             <>
               <button
@@ -186,13 +197,13 @@ export default function ReporteDetallePage() {
         </div>
       </div>
 
-      {/* Espacio de Observaciones y Comentarios del Contratante */}
-      <div className="pt-2">
-        <ReportesObservacionesContratante
-          proyectoIdActual={reporte.proyectoId}
-          proyectosList={PROYECTOS_MOCK}
-        />
-      </div>
+      {/* Modal de Observaciones del Contratante */}
+      <ReportesObservacionesContratante
+        isOpen={modalObservaciones}
+        onClose={() => setModalObservaciones(false)}
+        proyectoIdActual={reporte.proyectoId}
+        proyectosList={PROYECTOS_MOCK}
+      />
     </div>
   )
 }
