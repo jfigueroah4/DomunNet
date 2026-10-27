@@ -339,7 +339,7 @@ export default function LoginPage() {
 
       // Si es un fallo de conexión / backend iniciando (ECONNREFUSED / 502 / 503 / 504 / red caída)
       if (!error.response || status >= 500) {
-        showErrorToast('El servidor backend se está conectando. Por favor espera unos segundos e intenta nuevamente.');
+        showErrorToast('El servidor se está conectando. Por favor espera unos segundos e intenta nuevamente.');
         return;
       }
 
