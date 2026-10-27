@@ -199,26 +199,32 @@ export default function BitacoraPage() {
         }
       })
 
-      // Combinar locales + mapeados BD + BITACORA_MOCK
+            // Obtener lista de IDs eliminados para no volverlos a cargar
+      let idsEliminados = new Set<string>()
+      try {
+        idsEliminados = new Set(JSON.parse(localStorage.getItem('domun_bitacora_eliminados') || '[]').map(String))
+      } catch (_) {}
+
+      // Combinar locales + mapeados BD + BITACORA_MOCK (excluyendo eliminados)
       const idsExistentes = new Set<string>()
       const consolidado: any[] = []
 
       locales.forEach((item: any) => {
-        if (item.id && !idsExistentes.has(String(item.id))) {
+        if (item.id && !idsExistentes.has(String(item.id)) && !idsEliminados.has(String(item.id))) {
           idsExistentes.add(String(item.id))
           consolidado.push(item)
         }
       })
 
       mapeadosBD.forEach((item: any) => {
-        if (item.id && !idsExistentes.has(String(item.id))) {
+        if (item.id && !idsExistentes.has(String(item.id)) && !idsEliminados.has(String(item.id))) {
           idsExistentes.add(String(item.id))
           consolidado.push(item)
         }
       })
 
       BITACORA_MOCK.forEach((item: any) => {
-        if (item.id && !idsExistentes.has(String(item.id))) {
+        if (item.id && !idsExistentes.has(String(item.id)) && !idsEliminados.has(String(item.id))) {
           idsExistentes.add(String(item.id))
           consolidado.push(item)
         }

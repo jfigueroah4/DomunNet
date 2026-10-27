@@ -249,6 +249,12 @@ export default function ReportesView() {
         }
       })
 
+            // Cargar IDs eliminados para no presentarlos en reportes
+      let idsEliminados = new Set<string>()
+      try {
+        idsEliminados = new Set(JSON.parse(localStorage.getItem('domun_bitacora_eliminados') || '[]').map(String))
+      } catch (_) {}
+
       // Consolidar registros
       const idsExistentes = new Set<string>()
       const consolidadoRegistros: any[] = []
@@ -256,7 +262,7 @@ export default function ReportesView() {
 
       // 1. Locales
       locales.forEach((item: any) => {
-        if (item.id && !idsExistentes.has(String(item.id))) {
+        if (item.id && !idsExistentes.has(String(item.id)) && !idsEliminados.has(String(item.id))) {
           idsExistentes.add(String(item.id))
           consolidadoRegistros.push(item)
 
@@ -284,7 +290,7 @@ export default function ReportesView() {
 
       // 2. Base de datos
       mapeadosBD.forEach((item: any) => {
-        if (item.id && !idsExistentes.has(String(item.id))) {
+        if (item.id && !idsExistentes.has(String(item.id)) && !idsEliminados.has(String(item.id))) {
           idsExistentes.add(String(item.id))
           consolidadoRegistros.push(item)
 
@@ -312,14 +318,16 @@ export default function ReportesView() {
 
       // 3. Mocks de respaldo
       BITACORA_MOCK.forEach((item: any) => {
-        if (item.id && !idsExistentes.has(String(item.id))) {
+        if (item.id && !idsExistentes.has(String(item.id)) && !idsEliminados.has(String(item.id))) {
           idsExistentes.add(String(item.id))
           consolidadoRegistros.push(item)
         }
       })
 
       FOTOGRAFIAS_MOCK.forEach((foto: any) => {
-        consolidadoFotos.push(foto)
+        if (!idsEliminados.has(String(foto.bitacoraId)) && !idsEliminados.has(String(foto.id))) {
+          consolidadoFotos.push(foto)
+        }
       })
 
       setBitacoraRegistros(consolidadoRegistros)

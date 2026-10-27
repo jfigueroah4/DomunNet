@@ -24,43 +24,7 @@ export const bitacoraEntradaConfig: TablaConfig = {
     "created_at",
     "updated_at"
 ],
-  dependenciasDelete: [
-    {
-        "tablaDependiente": "bitacora_avance",
-        "columnaFk": "bitacora_entrada_id",
-        "nombreLegible": "bitacora avance"
-    },
-    {
-        "tablaDependiente": "bitacora_pendiente",
-        "columnaFk": "bitacora_entrada_id",
-        "nombreLegible": "bitacora pendiente"
-    },
-    {
-        "tablaDependiente": "condicion_climatica",
-        "columnaFk": "bitacora_entrada_id",
-        "nombreLegible": "condicion climatica"
-    },
-    {
-        "tablaDependiente": "ensayo_laboratorio",
-        "columnaFk": "bitacora_entrada_id",
-        "nombreLegible": "ensayo laboratorio"
-    },
-    {
-        "tablaDependiente": "estacion_kilometrica",
-        "columnaFk": "bitacora_entrada_id",
-        "nombreLegible": "estacion kilometrica"
-    },
-    {
-        "tablaDependiente": "evidencia_fotografica",
-        "columnaFk": "bitacora_entrada_id",
-        "nombreLegible": "evidencia fotografica"
-    },
-    {
-        "tablaDependiente": "incidente_obra",
-        "columnaFk": "bitacora_entrada_id",
-        "nombreLegible": "incidente obra"
-    }
-],
+  dependenciasDelete: [],
   columnasFiltroMenu: [
     {
         "columna": "estado_general_id",

@@ -181,6 +181,25 @@ export async function eliminarRegistro(config: TablaConfig, id: string) {
     }
   }
 
+  if (config.nombreTablaDb === 'bitacora_entrada') {
+    const tablasHijas = [
+      'evidencia_fotografica',
+      'bitacora_avance',
+      'bitacora_pendiente',
+      'condicion_climatica',
+      'ensayo_laboratorio',
+      'estacion_kilometrica',
+      'incidente_obra',
+    ];
+    for (const tabla of tablasHijas) {
+      try {
+        await clienteSupabase.from(tabla).delete().eq('bitacora_entrada_id', id);
+      } catch (e: any) {
+        console.warn(`Limpieza de ${tabla} para bitacora ${id}:`, e?.message);
+      }
+    }
+  }
+
   const { error } = await clienteSupabase.from(config.nombreTablaDb).delete().eq('id', id);
   if (error) throw new Error(error.message);
   invalidarCacheMantenimiento(config.nombreTablaDb);
