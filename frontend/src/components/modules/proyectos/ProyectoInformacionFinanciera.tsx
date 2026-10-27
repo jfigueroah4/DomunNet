@@ -259,6 +259,21 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
 
       const mapa = new Map<string, EstimacionFinancieraItem>()
 
+      // Determinar la perspectiva natural de la Hoja Sábana:
+      // Si DOMUN es Supervisora, la Sábana es de Supervisora; de lo contrario de Ejecutora
+      const perspectivaSabanaPredeterminada: 'ejecutora' | 'supervisora' =
+        (esSupervisoraDomun && !esEjecutoraDomun) || pAny.ambitoPlanTrabajo === 'supervision' ? 'supervisora' : 'ejecutora'
+
+      const resolverPerspectiva = (objPersp?: string): 'ejecutora' | 'supervisora' => {
+        if (objPersp === 'supervisora' || objPersp === 'ejecutora') {
+          if (objPersp === 'ejecutora' && esSupervisoraDomun && !esEjecutoraDomun && pAny.modoObra !== 'sabana') {
+            return 'supervisora'
+          }
+          return objPersp
+        }
+        return perspectivaSabanaPredeterminada
+      }
+
       // 1. Cargar estimaciones de sábana
       if (sabanaStored) {
         try {
@@ -270,12 +285,13 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
               const pctAmort = Number(s.porcentajeAmortizacion ?? 20)
               const amort = Number(s.montoAmortizacion ?? ((bruto * pctAmort) / 100))
               const liq = Number(s.montoLiquido || s.montoLiquidoAPagar || (bruto - amort))
+              const perspFinal = resolverPerspectiva(s.perspectiva)
               mapa.set(num, {
                 id: s.id || `est-sab-${num}`,
                 numero: num,
                 nombreEstimacion: s.nombreEstimacion || `Estimación de Obra - ${num}`,
                 delegadoResidente: s.delegadoResidente || (nombreDelegadoProyecto !== '-' ? nombreDelegadoProyecto : 'Delegado Residente'),
-                perspectiva: (s.perspectiva as any) || 'ejecutora',
+                perspectiva: perspFinal,
                 fechaInicio: s.fechaInicio || '',
                 fechaFin: s.fechaFin || s.fechaCorte || '',
                 mes: s.mes || 'Periodo Obra',
@@ -288,7 +304,7 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
                 montoLiquidoAPagar: liq,
                 saldoContractualRestante: Number(s.saldoContractualRestante || s.saldoRestante || 0),
                 estado: s.estado === 'cerrada' ? 'aprobada' : (s.estado || 'en_revision'),
-                supervisadoPor: s.supervisadoPor || nombreEmpresaSupervisora,
+                supervisadoPor: s.supervisadoPor || (perspFinal === 'supervisora' ? nombreEmpresaSupervisora : nombreEmpresaEjecutora),
                 observaciones: s.notas || s.observaciones || 'Generada desde Hoja Sábana Analítica',
               })
             })
@@ -304,12 +320,13 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
           const pctAmort = Number(e.porcentajeAmortizacion ?? 20)
           const amort = Number(e.montoAmortizacion ?? ((bruto * pctAmort) / 100))
           const liq = Number(e.montoLiquidoAPagar ?? e.montoNetoPagar ?? (bruto - amort))
+          const perspFinal = resolverPerspectiva(e.perspectiva)
           mapa.set(num, {
             id: e.id || `est-${num}`,
             numero: num,
             nombreEstimacion: e.nombreEstimacion || `Estimación - ${num}`,
             delegadoResidente: e.delegadoResidente || (nombreDelegadoProyecto !== '-' ? nombreDelegadoProyecto : 'Delegado Residente'),
-            perspectiva: (e.perspectiva as any) || 'ejecutora',
+            perspectiva: perspFinal,
             fechaInicio: e.fechaInicio || '',
             fechaFin: e.fechaFin || e.fechaCorte || '',
             mes: e.mes || 'Periodo',
@@ -322,7 +339,7 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
             montoLiquidoAPagar: liq,
             saldoContractualRestante: Number(e.saldoContractualRestante || 0),
             estado: e.estado || 'aprobada',
-            supervisadoPor: e.supervisadoPor || nombreEmpresaSupervisora,
+            supervisadoPor: e.supervisadoPor || (perspFinal === 'supervisora' ? nombreEmpresaSupervisora : nombreEmpresaEjecutora),
             observaciones: e.observaciones || '',
           })
         })
@@ -350,12 +367,13 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
           const pctAmort = Number(c.porcentajeAmortizacion ?? 20)
           const amort = Number(c.montoAmortizacion ?? ((bruto * pctAmort) / 100))
           const liq = Number(c.montoLiquido || c.montoLiquidoAPagar || (bruto - amort))
+          const perspFinal = resolverPerspectiva(c.perspectiva)
           mapa.set(num, {
             id: c.id || `est-${num}`,
             numero: num,
             nombreEstimacion: c.nombreEstimacion || `Estimación - ${num}`,
             delegadoResidente: c.delegadoResidente || (nombreDelegadoProyecto !== '-' ? nombreDelegadoProyecto : 'Delegado Residente'),
-            perspectiva: (c.perspectiva as any) || 'ejecutora',
+            perspectiva: perspFinal,
             fechaInicio: c.fechaInicio || '',
             fechaFin: c.fechaFin || c.fechaCorte || '',
             mes: c.mes || 'Periodo',
@@ -368,7 +386,7 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
             montoLiquidoAPagar: liq,
             saldoContractualRestante: Number(c.saldoContractualRestante || c.saldoRestante || 0),
             estado: c.estado || 'borrador',
-            supervisadoPor: c.supervisadoPor || (c.perspectiva === 'supervisora' ? nombreEmpresaSupervisora : nombreEmpresaEjecutora),
+            supervisadoPor: c.supervisadoPor || (perspFinal === 'supervisora' ? nombreEmpresaSupervisora : nombreEmpresaEjecutora),
             observaciones: c.observaciones || '',
           })
         }
@@ -386,12 +404,13 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
               const pctAmort = Number(act.porcentajeAmortizacion ?? 20)
               const amort = Number(act.montoAmortizacion ?? ((bruto * pctAmort) / 100))
               const liq = Number(act.montoLiquido || act.montoLiquidoAPagar || (bruto - amort))
+              const perspFinal = resolverPerspectiva(act.perspectiva)
               mapa.set(act.numero, {
                 id: act.id || `est-activa-${act.numero}`,
                 numero: act.numero,
                 nombreEstimacion: act.nombreEstimacion || `Estimación de Obra - ${act.numero} (En Progreso)`,
                 delegadoResidente: (nombreDelegadoProyecto !== '-' ? nombreDelegadoProyecto : 'Delegado Residente'),
-                perspectiva: (act.perspectiva as any) || 'ejecutora',
+                perspectiva: perspFinal,
                 fechaInicio: act.fechaInicio || '',
                 fechaFin: act.fechaCorte || '',
                 mes: act.mes || 'Periodo Actual',
@@ -404,7 +423,7 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
                 montoLiquidoAPagar: liq,
                 saldoContractualRestante: 0,
                 estado: 'en_revision',
-                supervisadoPor: nombreEmpresaSupervisora,
+                supervisadoPor: perspFinal === 'supervisora' ? nombreEmpresaSupervisora : nombreEmpresaEjecutora,
                 observaciones: act.notas || 'Estimación en progreso en Hoja Sábana',
               })
             }
@@ -1808,7 +1827,9 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
                             <User size={9} className="text-gray-700 shrink-0" />
                             <span className="truncate max-w-[120px]">{est.delegadoResidente}</span>
                           </div>
-                          <p className="text-[8px] text-gray-500 font-normal truncate max-w-[120px]">{est.supervisadoPor}</p>
+                          <p className="text-[8px] text-gray-500 font-normal truncate max-w-[120px]">
+                            {est.perspectiva === 'supervisora' ? nombreEmpresaSupervisora : nombreEmpresaEjecutora}
+                          </p>
                         </td>
 
                         {/* Período */}

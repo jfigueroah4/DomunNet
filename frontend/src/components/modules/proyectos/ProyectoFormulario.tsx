@@ -638,7 +638,18 @@ function SelectorMapaInteractivo({
     const setMun = tipo === 'inicio' ? setMunicipioId : setMunicipioFinId
     if (!setDep || !setMun) return
 
-    const stateNorm = normalizarTexto(address?.state || address?.province || address?.region || '')
+    const rawState = address?.state || address?.province || address?.region || ''
+    const stateNorm = normalizarTexto(rawState)
+      .replace(/^departamento\s+de\s+/i, '')
+      .replace(/^depto\s+de\s+/i, '')
+      .trim()
+
+    const rawCounty = address?.county || ''
+    const countyNorm = normalizarTexto(rawCounty)
+      .replace(/^departamento\s+de\s+/i, '')
+      .replace(/^depto\s+de\s+/i, '')
+      .trim()
+
     const textoExtraNorm = normalizarTexto(textoExtra || '')
 
     const candidatosMun: string[] = [
@@ -652,13 +663,18 @@ function SelectorMapaInteractivo({
       address?.city_district,
     ]
       .filter(Boolean)
-      .map((s: string) => normalizarTexto(s))
+      .map((s: string) => normalizarTexto(s)
+        .replace(/^municipio\s+de\s+/i, '')
+        .replace(/^ciudad\s+de\s+/i, '')
+        .trim()
+      )
 
-    // 1. Detectar departamento por coincidencia directa con el departamento de Nominatim
+    // 1. Detectar departamento por coincidencia directa con state o county de Nominatim
     let depEncontrado = departamentos.find((d: any) => {
       const dName = normalizarTexto(d.nombre)
       if (!dName) return false
-      return dName === stateNorm || stateNorm.includes(dName) || dName.includes(stateNorm)
+      return dName === stateNorm || stateNorm.includes(dName) || dName.includes(stateNorm) ||
+             dName === countyNorm || countyNorm.includes(dName) || dName.includes(countyNorm)
     })
 
     // 2. Si no se detectó por state, buscar si alguno de los municipios coincide y nos da su departamento
@@ -1315,6 +1331,9 @@ function SelectorMapaInteractivo({
 
       if (coordenadas?.lat && coordenadas?.lng) {
         asegurarMarcadorInicio(L, mapa, coordenadas.lat, coordenadas.lng, direccion || 'Punto de Inicio')
+        if (!departamentoId) {
+          void actualizarDireccionDesdeCoordenadas(Number(coordenadas.lat), Number(coordenadas.lng))
+        }
       }
 
       mapa.on('click', (evento: any) => {
@@ -1519,6 +1538,82 @@ let catalogoCacheGlobal: {
   municipios?: any[]
 } = {}
 
+export const DEPARTAMENTOS_GUATEMALA_FALLBACK = [
+  { id: 1, nombre: 'Guatemala', slug: 'guatemala' },
+  { id: 2, nombre: 'El Progreso', slug: 'el-progreso' },
+  { id: 3, nombre: 'Sacatepéquez', slug: 'sacatepequez' },
+  { id: 4, nombre: 'Chimaltenango', slug: 'chimaltenango' },
+  { id: 5, nombre: 'Escuintla', slug: 'escuintla' },
+  { id: 6, nombre: 'Santa Rosa', slug: 'santa-rosa' },
+  { id: 7, nombre: 'Sololá', slug: 'solola' },
+  { id: 8, nombre: 'Totonicapán', slug: 'totonicapan' },
+  { id: 9, nombre: 'Quetzaltenango', slug: 'quetzaltenango' },
+  { id: 10, nombre: 'Suchitepéquez', slug: 'suchitepequez' },
+  { id: 11, nombre: 'Retalhuleu', slug: 'retalhuleu' },
+  { id: 12, nombre: 'San Marcos', slug: 'san-marcos' },
+  { id: 13, nombre: 'Huehuetenango', slug: 'huehuetenango' },
+  { id: 14, nombre: 'Quiché', slug: 'quiche' },
+  { id: 15, nombre: 'Baja Verapaz', slug: 'baja-verapaz' },
+  { id: 16, nombre: 'Alta Verapaz', slug: 'alta-verapaz' },
+  { id: 17, nombre: 'Petén', slug: 'peten' },
+  { id: 18, nombre: 'Izabal', slug: 'izabal' },
+  { id: 19, nombre: 'Zacapa', slug: 'zacapa' },
+  { id: 20, nombre: 'Chiquimula', slug: 'chiquimula' },
+  { id: 21, nombre: 'Jalapa', slug: 'jalapa' },
+  { id: 22, nombre: 'Jutiapa', slug: 'jutiapa' },
+]
+
+export const MUNICIPIOS_GUATEMALA_FALLBACK = [
+  { id: 101, departamento_id: 1, nombre: 'Guatemala (Ciudad)', slug: 'guatemala-ciudad' },
+  { id: 102, departamento_id: 1, nombre: 'Mixco', slug: 'mixco' },
+  { id: 103, departamento_id: 1, nombre: 'Villa Nueva', slug: 'villa-nueva' },
+  { id: 104, departamento_id: 1, nombre: 'Santa Catarina Pinula', slug: 'santa-catarina-pinula' },
+  { id: 105, departamento_id: 1, nombre: 'San Miguel Petapa', slug: 'san-miguel-petapa' },
+  { id: 106, departamento_id: 1, nombre: 'Amatitlán', slug: 'amatitlan' },
+  { id: 107, departamento_id: 1, nombre: 'San José Pinula', slug: 'san-jose-pinula' },
+  { id: 108, departamento_id: 1, nombre: 'Palencia', slug: 'palencia' },
+  { id: 109, departamento_id: 1, nombre: 'Chinautla', slug: 'chinautla' },
+  { id: 201, departamento_id: 2, nombre: 'Guastatoya', slug: 'guastatoya' },
+  { id: 202, departamento_id: 2, nombre: 'Sanarate', slug: 'sanarate' },
+  { id: 301, departamento_id: 3, nombre: 'Antigua Guatemala', slug: 'antigua-guatemala' },
+  { id: 302, departamento_id: 3, nombre: 'San Lucas Sacatepéquez', slug: 'san-lucas-sacatepequez' },
+  { id: 303, departamento_id: 3, nombre: 'Ciudad Vieja', slug: 'ciudad-vieja' },
+  { id: 401, departamento_id: 4, nombre: 'Chimaltenango', slug: 'chimaltenango-mun' },
+  { id: 402, departamento_id: 4, nombre: 'El Tejar', slug: 'el-tejar' },
+  { id: 403, departamento_id: 4, nombre: 'Patzicía', slug: 'patzicia' },
+  { id: 501, departamento_id: 5, nombre: 'Escuintla', slug: 'escuintla-mun' },
+  { id: 502, departamento_id: 5, nombre: 'Santa Lucía Cotzumalguapa', slug: 'santa-lucia-cotzumalguapa' },
+  { id: 503, departamento_id: 5, nombre: 'Puerto San José', slug: 'puerto-san-jose' },
+  { id: 504, departamento_id: 5, nombre: 'Palín', slug: 'palin' },
+  { id: 601, departamento_id: 6, nombre: 'Cuilapa', slug: 'cuilapa' },
+  { id: 602, departamento_id: 6, nombre: 'Barberena', slug: 'barberena' },
+  { id: 701, departamento_id: 7, nombre: 'Sololá', slug: 'solola-mun' },
+  { id: 702, departamento_id: 7, nombre: 'Panajachel', slug: 'panajachel' },
+  { id: 801, departamento_id: 8, nombre: 'Totonicapán', slug: 'totonicapan-mun' },
+  { id: 901, departamento_id: 9, nombre: 'Quetzaltenango', slug: 'xela' },
+  { id: 902, departamento_id: 9, nombre: 'Salcajá', slug: 'salcaja' },
+  { id: 903, departamento_id: 9, nombre: 'Coatepeque', slug: 'coatepeque' },
+  { id: 1001, departamento_id: 10, nombre: 'Mazatenango', slug: 'mazatenango' },
+  { id: 1101, departamento_id: 11, nombre: 'Retalhuleu', slug: 'retalhuleu-mun' },
+  { id: 1201, departamento_id: 12, nombre: 'San Marcos', slug: 'san-marcos-mun' },
+  { id: 1202, departamento_id: 12, nombre: 'San Pedro Sacatepéquez', slug: 'san-pedro-sacatepequez-sm' },
+  { id: 1301, departamento_id: 13, nombre: 'Huehuetenango', slug: 'huehuetenango-mun' },
+  { id: 1302, departamento_id: 13, nombre: 'Chiantla', slug: 'chiantla' },
+  { id: 1401, departamento_id: 14, nombre: 'Santa Cruz del Quiché', slug: 'quiche-mun' },
+  { id: 1501, departamento_id: 15, nombre: 'Salamá', slug: 'salama' },
+  { id: 1601, departamento_id: 16, nombre: 'Cobán', slug: 'coban' },
+  { id: 1602, departamento_id: 16, nombre: 'San Pedro Carchá', slug: 'san-pedro-carcha' },
+  { id: 1701, departamento_id: 17, nombre: 'Flores', slug: 'flores' },
+  { id: 1702, departamento_id: 17, nombre: 'San Benito', slug: 'san-benito' },
+  { id: 1703, departamento_id: 17, nombre: 'Santa Elena', slug: 'santa-elena' },
+  { id: 1801, departamento_id: 18, nombre: 'Puerto Barrios', slug: 'puerto-barrios' },
+  { id: 1802, departamento_id: 18, nombre: 'Morales', slug: 'morales' },
+  { id: 1901, departamento_id: 19, nombre: 'Zacapa', slug: 'zacapa-mun' },
+  { id: 2001, departamento_id: 20, nombre: 'Chiquimula', slug: 'chiquimula-mun' },
+  { id: 2101, departamento_id: 21, nombre: 'Jalapa', slug: 'jalapa-mun' },
+  { id: 2201, departamento_id: 22, nombre: 'Jutiapa', slug: 'jutiapa-mun' },
+]
+
 let ubicacionPromiseGlobal: Promise<any> | null = null
 let empresasPromiseGlobal: Promise<any> | null = null
 
@@ -1533,7 +1628,9 @@ function cargarUbicacionGlobal() {
     ubicacionPromiseGlobal = Promise.all([
       apiGetDeduplicado('/mantenimiento/departamento?limite=500').then((r) => r.data?.data || []).catch(() => []),
       apiGetDeduplicado('/mantenimiento/municipio?limite=500').then((r) => r.data?.data || []).catch(() => []),
-    ]).then(([departamentos, municipios]) => {
+    ]).then(([deps, muns]) => {
+      const departamentos = Array.isArray(deps) && deps.length > 0 ? deps : DEPARTAMENTOS_GUATEMALA_FALLBACK
+      const municipios = Array.isArray(muns) && muns.length > 0 ? muns : MUNICIPIOS_GUATEMALA_FALLBACK
       catalogoCacheGlobal.departamentos = departamentos
       catalogoCacheGlobal.municipios = municipios
       return { departamentos, municipios }
@@ -1653,8 +1750,8 @@ export function ProyectoFormulario({
   const [entidadesContratantes, setEntidadesContratantes] = useState<any[]>(() => catalogoCacheGlobal?.entidades || [])
   const [empresasContratistas, setEmpresasContratistas] = useState<any[]>(() => catalogoCacheGlobal?.contratistas || [])
   const [empresasSupervisoras, setEmpresasSupervisoras] = useState<any[]>(() => catalogoCacheGlobal?.supervisoras || [])
-  const [departamentos, setDepartamentos] = useState<any[]>(() => catalogoCacheGlobal?.departamentos || [])
-  const [municipios, setMunicipios] = useState<any[]>(() => catalogoCacheGlobal?.municipios || [])
+  const [departamentos, setDepartamentos] = useState<any[]>(() => catalogoCacheGlobal?.departamentos || DEPARTAMENTOS_GUATEMALA_FALLBACK)
+  const [municipios, setMunicipios] = useState<any[]>(() => catalogoCacheGlobal?.municipios || MUNICIPIOS_GUATEMALA_FALLBACK)
 
   // Drawers de creación rápida
   const [openCrearUsuarioDrawer, setOpenCrearUsuarioDrawer] = useState(false)
@@ -3260,10 +3357,9 @@ export function ProyectoFormulario({
               <div>
                 <label className={labelClass + " flex items-center justify-between"}>
                   <span>DEPARTAMENTO INICIAL (ORIGEN) <span className="text-[#9B0F06]">*</span></span>
-                  <span className="text-[8px] text-gray-400 font-normal">Autodetectado por mapa</span>
+                  <span className="text-[8px] text-gray-500 font-normal">Autodetectado o seleccionable</span>
                 </label>
                 <Combobox
-                  disabled={true}
                   options={departamentos.map((d: any) => ({ value: d.id, label: d.nombre }))}
                   value={departamentoId}
                   hasError={errors.departamentoId}
@@ -3277,8 +3373,7 @@ export function ProyectoFormulario({
                       }
                     }
                   }}
-                  placeholder="Autodetectado según la dirección en el mapa..."
-                  inputClassName="!bg-gray-100/90 !text-gray-800 !font-semibold !cursor-not-allowed select-none"
+                  placeholder="Seleccione o marque punto en el mapa..."
                   className="mt-0.5"
                 />
               </div>
@@ -3286,21 +3381,23 @@ export function ProyectoFormulario({
               <div>
                 <label className={labelClass + " flex items-center justify-between"}>
                   <span>MUNICIPIO INICIAL (ORIGEN) <span className="text-[#9B0F06]">*</span></span>
-                  <span className="text-[8px] text-gray-400 font-normal">Autodetectado por mapa</span>
+                  <span className="text-[8px] text-gray-500 font-normal">Autodetectado o seleccionable</span>
                 </label>
                 <Combobox
-                  disabled={true}
                   options={municipios
-                    .filter((m: any) => m.departamento_id === departamentoId)
+                    .filter((m: any) => !departamentoId || m.departamento_id === departamentoId)
                     .map((m: any) => ({ value: m.id, label: m.nombre }))}
                   value={municipioId}
                   hasError={errors.municipioId}
                   onChange={(val) => {
                     setMunicipioId(val)
                     setErrors((prev) => ({ ...prev, municipioId: false }))
+                    const munObj = municipios.find((m: any) => m.id === val)
+                    if (munObj && munObj.departamento_id && !departamentoId) {
+                      setDepartamentoId(munObj.departamento_id)
+                    }
                   }}
-                  placeholder="Autodetectado según la dirección en el mapa..."
-                  inputClassName="!bg-gray-100/90 !text-gray-800 !font-semibold !cursor-not-allowed select-none"
+                  placeholder="Seleccione o marque punto en el mapa..."
                   className="mt-0.5"
                 />
               </div>
@@ -3357,32 +3454,34 @@ export function ProyectoFormulario({
                 <div>
                   <label className={labelClass + " flex items-center justify-between"}>
                     <span>Departamento Final (Límite Tramo)</span>
-                    <span className="text-[8px] text-gray-400 font-normal">Autodetectado por mapa</span>
+                    <span className="text-[8px] text-gray-500 font-normal">Autodetectado o seleccionable</span>
                   </label>
                   <Combobox
-                    disabled={true}
                     options={departamentos.map((d: any) => ({ value: d.id, label: d.nombre }))}
                     value={departamentoFinId}
                     onChange={(val) => setDepartamentoFinId(val)}
-                    placeholder="Autodetectado según el destino en el mapa..."
-                    inputClassName="!bg-gray-100/90 !text-gray-800 !font-semibold !cursor-not-allowed select-none"
+                    placeholder="Seleccione o marque punto en el mapa..."
                   />
                 </div>
 
                 <div>
                   <label className={labelClass + " flex items-center justify-between"}>
                     <span>Municipio Final (Límite Tramo)</span>
-                    <span className="text-[8px] text-gray-400 font-normal">Autodetectado por mapa</span>
+                    <span className="text-[8px] text-gray-500 font-normal">Autodetectado o seleccionable</span>
                   </label>
                   <Combobox
-                    disabled={true}
                     options={municipios
-                      .filter((m: any) => m.departamento_id === departamentoFinId)
+                      .filter((m: any) => !departamentoFinId || m.departamento_id === departamentoFinId)
                       .map((m: any) => ({ value: m.id, label: m.nombre }))}
                     value={municipioFinId}
-                    onChange={(val) => setMunicipioFinId(val)}
-                    placeholder="Autodetectado según el destino en el mapa..."
-                    inputClassName="!bg-gray-100/90 !text-gray-800 !font-semibold !cursor-not-allowed select-none"
+                    onChange={(val) => {
+                      setMunicipioFinId(val)
+                      const munObj = municipios.find((m: any) => m.id === val)
+                      if (munObj && munObj.departamento_id && !departamentoFinId) {
+                        setDepartamentoFinId(munObj.departamento_id)
+                      }
+                    }}
+                    placeholder="Seleccione o marque punto en el mapa..."
                   />
                 </div>
               </div>

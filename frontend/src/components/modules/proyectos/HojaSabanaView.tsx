@@ -1233,19 +1233,89 @@ const GENERAR_RENGLONES_VACIOS = (): RenglonDetalladoSabana[] => {
 
 export const GENERAR_MEDICIONES_ANALITICAS_DEFAULT = (proyectoId?: string): MedicionAnaliticaCampo[] => [
   { id: 'med-01', codigoDGC: '201.03 (b)', descripcionRenglon: 'Retiro de Pavimento, Aceras y Otros (OTS-3)', estacionInicio: '14+200', estacionFin: '14+700', longitudL: 500, anchoA: 7.3, alturaH: 0.15, ladoVia: 'Sección Completa', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 547.5, unidad: 'm³', origenTipo: 'Libreta', referenciaOrigen: 'Libreta topográfica N° 01 - Est. 01', numEstimacion: 'Estimación 01', mesPeriodo: 'Mar 2026', observaciones: 'Espesor verificado mediante calas de prueba en carril derecho.', fechaMedicion: '2026-03-25' },
-  { id: 'med-02', codigoDGC: '202.02', descripcionRenglon: 'Limpia chapeo y destronque', estacionInicio: '14+000', estacionFin: '15+500', longitudL: 1500, anchoA: 10, alturaH: 1, ladoVia: 'Sección Completa', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 1.5, unidad: 'Ha', origenTipo: 'Plano', referenciaOrigen: 'Anotación Bitácora N° 03', numEstimacion: 'Estimación 01', mesPeriodo: 'Mar 2026', observaciones: 'Despeje de derecho de vía conforme a planos constructivos.', fechaMedicion: '2026-03-28' },
+  { id: 'med-02', codigoDGC: '202.03', descripcionRenglon: 'Limpia, chapeo y destronque', estacionInicio: '14+000', estacionFin: '15+500', longitudL: 1500, anchoA: 10, alturaH: 0, ladoVia: 'Sección Completa', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 1.5, unidad: 'Ha', origenTipo: 'Plano', referenciaOrigen: 'Anotación Bitácora N° 03', numEstimacion: 'Estimación 01', mesPeriodo: 'Mar 2026', observaciones: 'Despeje de derecho de vía conforme a planos constructivos (1,500 m x 10 m = 15,000 m² = 1.50 Ha).', fechaMedicion: '2026-03-28' },
   { id: 'med-03', codigoDGC: '203.03 (a)', descripcionRenglon: 'Excavación No Clasificada(OC-2)(OC-3)', estacionInicio: '14+300', estacionFin: '15+100', longitudL: 800, anchoA: 8.5, alturaH: 1.4, ladoVia: 'Lado Izquierdo', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 9520, unidad: 'm³', origenTipo: 'Libreta', referenciaOrigen: 'Libreta de nivelación N° 04', numEstimacion: 'Estimación 02', mesPeriodo: 'Abr 2026', observaciones: 'Sección transversal verificada con estación total en talud.', fechaMedicion: '2026-04-20' },
   { id: 'med-04', codigoDGC: '203.03 (b)', descripcionRenglon: 'Excavación No Clasificada de Desperdicio (OTS-1)(OTS-2)(OTS-3)', estacionInicio: '14+800', estacionFin: '15+600', longitudL: 800, anchoA: 7.5, alturaH: 1.2, ladoVia: 'Sección Completa', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 7200, unidad: 'm³', origenTipo: 'Libreta', referenciaOrigen: 'Reporte de volquetes N° 12', numEstimacion: 'Estimación 02', mesPeriodo: 'Abr 2026', observaciones: 'Material transportado a botadero autorizado.', fechaMedicion: '2026-04-24' },
   { id: 'med-05', codigoDGC: '203.03 (c)', descripcionRenglon: 'Excavación No Clasificada para Préstamo', estacionInicio: '15+000', estacionFin: '16+000', longitudL: 1000, anchoA: 9.0, alturaH: 1.5, ladoVia: 'Sección Completa', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 13500, unidad: 'm³', origenTipo: 'Libreta', referenciaOrigen: 'Registro densímetro nuclear N° 08', numEstimacion: 'Estimación 03', mesPeriodo: 'May 2026', observaciones: 'Densidad in-situ mayor al 95% de la prueba Proctor estándar.', fechaMedicion: '2026-05-18' },
   { id: 'med-06', codigoDGC: '203.04 (g)', descripcionRenglon: 'Cortes en Roca (OTS-1)(OTS-2)(OTS3)', estacionInicio: '15+400', estacionFin: '16+100', longitudL: 700, anchoA: 6.5, alturaH: 2.0, ladoVia: 'Lado Derecho', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 9100, unidad: 'm³', origenTipo: 'Libreta', referenciaOrigen: 'Control de voladura N° 06', numEstimacion: 'Estimación 03', mesPeriodo: 'May 2026', observaciones: 'Volumen derivado de perforación y voladura en banco de roca dura.', fechaMedicion: '2026-05-22' },
   { id: 'med-07', codigoDGC: '203.03 (d)', descripcionRenglon: 'Sub-Excavación', estacionInicio: '15+800', estacionFin: '16+600', longitudL: 800, anchoA: 7.3, alturaH: 0.6, ladoVia: 'Sección Completa', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 3504, unidad: 'm³', origenTipo: 'Libreta', referenciaOrigen: 'Anotación Bitácora N° 18', numEstimacion: 'Estimación 04', mesPeriodo: 'Jun 2026', observaciones: 'Reemplazo de estrato fangoso arcilloso bajo subrasante.', fechaMedicion: '2026-06-19' },
-  { id: 'med-08', codigoDGC: '203.04 (h)', descripcionRenglon: 'Contracunetas (OC-1)(OC-3)', estacionInicio: '15+200', estacionFin: '16+400', longitudL: 1200, anchoA: 1.0, alturaH: 0.6, ladoVia: 'Lado Izquierdo', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 720, unidad: 'm', origenTipo: 'Plano', referenciaOrigen: 'Plano hidráulico D-04', numEstimacion: 'Estimación 04', mesPeriodo: 'Jun 2026', observaciones: 'Contracuneta revestida de concreto para protección de taludes.', fechaMedicion: '2026-06-25' },
+  { id: 'med-08', codigoDGC: '203.04 (h)', descripcionRenglon: 'Contracunetas (OC-1)(OC-3)', estacionInicio: '15+200', estacionFin: '15+920', longitudL: 720, anchoA: 0, alturaH: 0, ladoVia: 'Lado Izquierdo', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 720, unidad: 'm', origenTipo: 'Plano', referenciaOrigen: 'Plano hidráulico D-04', numEstimacion: 'Estimación 04', mesPeriodo: 'Jun 2026', observaciones: 'Contracuneta revestida de concreto para protección de taludes.', fechaMedicion: '2026-06-25' },
   { id: 'med-09', codigoDGC: '204.02', descripcionRenglon: 'Excavación de canales (oc-1)(oc-3)', estacionInicio: '14+200', estacionFin: '16+200', longitudL: 2000, anchoA: 1.8, alturaH: 0.8, ladoVia: 'Sección Completa', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 2880, unidad: 'm³', origenTipo: 'Libreta', referenciaOrigen: 'Bitácora N° 25 - Est. 05', numEstimacion: 'Estimación 05', mesPeriodo: 'Jul 2026', observaciones: 'Canal de desagüe principal con sección trapecial completada.', fechaMedicion: '2026-07-21' },
   { id: 'med-10', codigoDGC: '155.07', descripcionRenglon: 'Mantenimiento de la carretera durante la ejecución del trabajo', estacionInicio: '0+000', estacionFin: '10+000', longitudL: 10000, anchoA: 1, alturaH: 1, ladoVia: 'Sección Completa', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 1, unidad: 'u', origenTipo: 'Plano', referenciaOrigen: 'Certificación de paso vehicular expedida por supervisión', numEstimacion: 'Estimación 05', mesPeriodo: 'Jul 2026', observaciones: 'Paso continuo garantizado durante el mes de julio sin interrupciones.', fechaMedicion: '2026-07-28' },
 ]
 
-// Trabajos Pendientes (cargados dinámicamente desde el backend)
-export const TRABAJOS_PENDIENTES_MOCK: TrabajoPendienteBolsa[] = []
+// Trabajos Pendientes realistas para pruebas y conciliación
+export const TRABAJOS_PENDIENTES_MOCK: TrabajoPendienteBolsa[] = [
+  {
+    id: 'pend-01',
+    codigoDGC: '203.03 (a)',
+    descripcion: 'Excavación No Clasificada(OC-2)(OC-3)',
+    unidad: 'm³',
+    proyectoId: 'p-1',
+    renglonId: '203.03 (a)',
+    bitacoraEntradaId: 'bit-2026-089',
+    origenTrazabilidad: 'Anotación Bitácora Electrónica #44 - Tramo Km 16+100 a 16+500',
+    estacionInicio: '16+100',
+    estacionFin: '16+500',
+    estacionInicialNum: 16100,
+    estacionFinalNum: 16500,
+    longitudL: 400,
+    anchoA: 9.0,
+    alturaH: 1.0,
+    volumenAreaBruto: 3600,
+    cantidadBruta: 3600,
+    costoUnitario: 45.50,
+    precioUnitario: 45.50,
+    descuentoMonto: 360,
+    descuentoNombre: '10% Descuento por talud pendiente de peinado y estabilización',
+    descuentoAplicadoId: 'desc-talud-01',
+    factorDescuento: 0.10,
+    cantidadNetaCobrar: 3240,
+    ubicacionEspecifica: 'Km 16+100 al 16+500 Carril Derecho',
+    ladoVia: 'Lado Derecho',
+    estado: 'Pendiente',
+    mesesAntiguedad: 1,
+    estimacionOrigen: null,
+    fechaMedicion: '2026-10-15',
+    bitacoraTitulo: 'Excavación de corte en talud inestable con sobreancho preventivo',
+    bitacoraDescripcion: 'Se realizó excavación masiva de corte en roca blanda y suelo cohesivo. Se aplica descuento temporal del 10% hasta verificar peinado final del talud.',
+    bitacoraObservaciones: 'Requiere levantamiento conjunto con supervisión para conciliación definitiva de cotas finales.',
+  },
+  {
+    id: 'pend-02',
+    codigoDGC: '204.01',
+    descripcion: 'Excavación Estructural',
+    unidad: 'm³',
+    proyectoId: 'p-1',
+    renglonId: '204.01',
+    bitacoraEntradaId: 'bit-2026-092',
+    origenTrazabilidad: 'Anotación Bitácora Electrónica #48 - Cimentación de Muro M-02',
+    estacionInicio: '15+850',
+    estacionFin: '15+960',
+    estacionInicialNum: 15850,
+    estacionFinalNum: 15960,
+    longitudL: 110,
+    anchoA: 3.5,
+    alturaH: 3.0,
+    volumenAreaBruto: 1155,
+    cantidadBruta: 1155,
+    costoUnitario: 68.00,
+    precioUnitario: 68.00,
+    descuentoMonto: 0,
+    descuentoNombre: 'Sin penalización técnica',
+    factorDescuento: 0,
+    cantidadNetaCobrar: 1155,
+    ubicacionEspecifica: 'Km 15+850 al 15+960 Margen Izquierdo',
+    ladoVia: 'Lado Izquierdo',
+    estado: 'Pendiente',
+    mesesAntiguedad: 0,
+    estimacionOrigen: null,
+    fechaMedicion: '2026-10-22',
+    bitacoraTitulo: 'Excavación estructural para zapatas corridas de muro de contención',
+    bitacoraDescripcion: 'Excavación bajo cota de subrasante para desplante de zapatas estructurales del muro de contención M-02.',
+    bitacoraObservaciones: 'Pendiente entrega de reporte de capacidad portante del suelo por parte del laboratorio de mecánica de suelos.',
+  },
+]
 
 type ColumnaOrdenable = keyof RenglonDetalladoSabana | 'totalAFecha' | 'avancePct' | 'costoTotalAFecha' | 'saldoPorEjecutar' | string
 
@@ -1520,18 +1590,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
     setModalAperturaEstimacionOpen(true)
   }
 
-  // Auto-abrir modal de Apertura de Estimación si el proyecto está ACTIVO y no hay ninguna estimación registrada aún
-  useEffect(() => {
-    if (!proyecto || hasAutoOpenedModal) return
-    const est = typeof proyecto.estado === 'string' ? proyecto.estado.toLowerCase() : (proyecto.estado as any)?.codigo?.toLowerCase() || ''
-    const isBorradorLocal = est === 'borrador'
-    const isActivo = est === 'activo' || !isBorradorLocal
-    const tieneEstimacionesPrevias = (Array.isArray(listaEstimaciones) && listaEstimaciones.length > 0) || (Array.isArray(proyecto.estimaciones) && proyecto.estimaciones.length > 0)
-    if (isActivo && !estimacionEnProgreso && !modalAperturaEstimacionOpen && !tieneEstimacionesPrevias) {
-      handleAbrirAperturaEstimacion()
-      setHasAutoOpenedModal(true)
-    }
-  }, [proyecto, estimacionEnProgreso, hasAutoOpenedModal, modalAperturaEstimacionOpen, listaEstimaciones])
+// Auto-abertura removida para permitir ver el plan de trabajo libremente
 
   // EDICIÓN DE MEDICIONES VINCULADAS DESDE BITÁCORA EN TAB ANALÍTICO
   const [medicionEnEdicion, setMedicionEnEdicion] = useState<MedicionAnaliticaCampo | null>(null)
@@ -1781,9 +1840,13 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
 
         if (resPend.status === 'fulfilled') {
           const lista = resPend.value?.data?.data || resPend.value?.data
-          if (Array.isArray(lista)) {
+          if (Array.isArray(lista) && lista.length > 0) {
             setTrabajosPendientes(lista)
+          } else {
+            setTrabajosPendientes(TRABAJOS_PENDIENTES_MOCK)
           }
+        } else {
+          setTrabajosPendientes(TRABAJOS_PENDIENTES_MOCK)
         }
 
         if (resMed.status === 'fulfilled') {
@@ -1892,7 +1955,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
   }, [renglones, proyectoIdSeleccionado, id, proyecto?.nombre, estimacionEnProgreso, diasRestantesEstimacion])
 
   const [medicionesAnaliticas, setMedicionesAnaliticas] = useState<MedicionAnaliticaCampo[]>(() => GENERAR_MEDICIONES_ANALITICAS_DEFAULT())
-  const [trabajosPendientes, setTrabajosPendientes] = useState<TrabajoPendienteBolsa[]>([])
+  const [trabajosPendientes, setTrabajosPendientes] = useState<TrabajoPendienteBolsa[]>(() => TRABAJOS_PENDIENTES_MOCK)
 
   const [capitulosLista, setCapitulosLista] = useState(CAPITULOS_LIBRO_AZUL)
   const [unidadesLista, setUnidadesLista] = useState([
@@ -2528,15 +2591,6 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
 
   const handleCancelarAperturaEstimacion = () => {
     setModalAperturaEstimacionOpen(false)
-    if (listaEstimaciones.length === 0 && (!proyecto?.estimaciones || proyecto.estimaciones.length === 0)) {
-      setEsSaliendoPlanTrabajo(true)
-      showInfoToast('Saliendo del plan de trabajo')
-      if (proyecto?.id) {
-        router.push(`/dashboard/proyectos/${proyecto.id}`)
-      } else {
-        router.push('/dashboard/proyectos')
-      }
-    }
   }
 
   const handleFechaInicioChange = (val: string) => {
@@ -3232,16 +3286,6 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                     <span>Modo Planificación</span>
                   </span>
                 )}
-                <span
-                  className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[9px] font-bold border ml-1 font-[Poppins] ${
-                    ambitoSabanaActual === 'supervision'
-                      ? 'bg-orange-50 text-orange-800 border-orange-200'
-                      : 'bg-red-50 text-[#9B0F06] border-red-200'
-                  }`}
-                >
-                  <Briefcase size={10} />
-                  <span>Ámbito: {ambitoSabanaActual === 'supervision' ? 'Supervisión' : 'Obra (Ejecución)'}</span>
-                </span>
               </h1>
             </div>
           </div>
@@ -3266,81 +3310,58 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
               <button
                 type="button"
                 onClick={() => setModoVistaLineaBase('inicial')}
-                className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 font-medium transition-all cursor-pointer ${
+                className={`inline-flex items-center gap-1 rounded-md px-2 sm:px-2.5 py-1 text-[10px] font-medium transition-all cursor-pointer ${
                   modoVistaLineaBase === 'inicial'
                     ? 'bg-white text-[#7A0C0D] font-semibold shadow-xs border border-gray-200/60'
                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                 }`}
               >
                 <Calendar size={12} />
-                <span>Plan de Trabajo</span>
+                <span className="hidden sm:inline">Plan de Trabajo</span>
+                <span className="sm:hidden text-[10px]">P.Trabajo</span>
               </button>
               {(tieneModificadaConfirmada || (proyecto as any)?.en_replanificacion) && (
                 <button
                   type="button"
                   onClick={() => setModoVistaLineaBase('modificada')}
-                  className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 font-medium transition-all cursor-pointer ${
+                  className={`inline-flex items-center gap-1 rounded-md px-2 sm:px-2.5 py-1 text-[10px] font-medium transition-all cursor-pointer ${
                     modoVistaLineaBase === 'modificada'
                       ? 'bg-white text-[#7A0C0D] font-semibold shadow-xs border border-gray-200/60'
                       : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                   }`}
                 >
                   <Calendar size={12} />
-                  <span>Modificada {(proyecto as any)?.en_replanificacion ? '(Borrador)' : ''}</span>
+                  <span className="hidden sm:inline">Modificada {(proyecto as any)?.en_replanificacion ? '(Borrador)' : ''}</span>
+                  <span className="sm:hidden text-[10px]">Modificada</span>
                 </button>
               )}
               {!esBorrador && !(proyecto as any)?.en_replanificacion && (
                 <button
                   type="button"
                   onClick={() => setModoVistaLineaBase('actual')}
-                  className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 font-medium transition-all cursor-pointer ${
+                  className={`inline-flex items-center gap-1 rounded-md px-2 sm:px-2.5 py-1 text-[10px] font-medium transition-all cursor-pointer ${
                     modoVistaLineaBase === 'actual'
                       ? 'bg-white text-[#7A0C0D] font-semibold shadow-xs border border-gray-200/60'
                       : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                   }`}
                 >
                   <Clock size={12} />
-                  <span>Actual</span>
+                  <span className="text-[10px]">Actual</span>
                 </button>
               )}
             </div>
-
-            {/* Botón [Activar Proyecto] (Sólo Administrador mientras en_replanificacion = true) */}
-            {(proyecto as any)?.en_replanificacion && esAdminUser && (
-              <button
-                type="button"
-                onClick={async () => {
-                  try {
-                    await api.post(`/proyectos/${proyecto.id}/activar-replanificacion`, {
-                      esReanudacionPausa: proyecto?.estado === 'pausado',
-                      fechaReanudacion: formFechaReanudacion,
-                      nuevaFechaFin: formNuevaFechaFin,
-                    })
-                    showSuccessToast('Proyecto activado exitosamente tras replanificación.')
-                    setTieneModificadaConfirmada(true)
-                    setModoVistaLineaBase('actual')
-                    if (typeof window !== 'undefined') window.location.reload()
-                  } catch (e: any) {
-                    showErrorToast(e?.response?.data?.mensaje || e?.message || 'Error al activar el proyecto')
-                  }
-                }}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white px-3 py-1.5 text-[10.5px] font-bold transition-all shadow-xs cursor-pointer"
-              >
-                <CheckCircle2 size={13} />
-                <span>Activar Proyecto</span>
-              </button>
-            )}
 
             {/* + Aperturar Estimación (Oculto mientras haya una estimación en progreso) */}
             {!esBorrador && !estimacionEnProgreso && (
               <button
                 type="button"
                 onClick={handleAbrirAperturaEstimacion}
-                className="inline-flex items-center gap-1 rounded-lg bg-[#7A0C0D] hover:bg-[#5E0006] text-white px-3 py-1.5 text-[10.5px] font-semibold transition-colors shadow-2xs cursor-pointer"
+                className="inline-flex items-center gap-1 rounded-lg bg-[#7A0C0D] hover:bg-[#5E0006] text-white px-2.5 sm:px-3 py-1 sm:py-1.5 text-[10px] font-semibold transition-colors shadow-2xs cursor-pointer"
                 title="Aperturar nuevo periodo de estimación para este proyecto"
               >
-                <Plus size={13} />
-                <span>Aperturar Estimación</span>
+                <Plus size={12} />
+                <span className="hidden sm:inline">Aperturar Estimación</span>
+                <span className="sm:hidden text-[10px]">A.Estimacion</span>
               </button>
             )}
 
@@ -3542,10 +3563,10 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
           </div>
         )}
 
-        {/* 3. BLOQUE DE INFORMACIÓN DEL PROYECTO (Fila horizontal ultracompacta con fuente 9px en móvil) */}
-        <div className="grid grid-cols-1 sm:grid-cols-5 gap-0 bg-white border border-gray-200 rounded-lg p-1.5 text-xs divide-y sm:divide-y-0 sm:divide-x divide-gray-200/80">
-          <div className="px-2 py-0.5 min-w-0">
-            <span className="text-[9px] sm:text-[8.5px] font-semibold uppercase tracking-wider text-gray-400 block truncate">
+        {/* 3. BLOQUE DE INFORMACIÓN DEL PROYECTO (10px en móvil) */}
+        <div className="grid grid-cols-1 sm:grid-cols-5 gap-0 bg-white border border-gray-200 rounded-lg p-1.5 text-[10px] divide-y sm:divide-y-0 sm:divide-x divide-gray-200/80 font-[Poppins]">
+          <div className="px-2 py-1 sm:py-0.5 min-w-0">
+            <span className="text-[10px] sm:text-[8.5px] font-semibold uppercase tracking-wider text-gray-400 block truncate">
               Proyecto / Contrato
             </span>
             <select
@@ -3555,7 +3576,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                 setProyectoIdSeleccionado(newId)
                 router.push(`/dashboard/proyectos/${newId}/hoja-sabana`)
               }}
-              className="h-5 w-full rounded border border-gray-300 bg-white px-1 text-[9px] sm:text-[10px] font-medium text-gray-900 focus:border-[#7A0C0D] focus:outline-none cursor-pointer truncate"
+              className="h-6 sm:h-5 w-full rounded border border-gray-300 bg-white px-1 text-[10px] font-medium text-gray-900 focus:border-[#7A0C0D] focus:outline-none cursor-pointer truncate font-[Poppins]"
             >
               {(proyectosLista.length > 0 ? proyectosLista : [proyecto]).map((p: any) => (
                 <option key={p.id} value={p.id}>
@@ -3565,39 +3586,39 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
             </select>
           </div>
 
-          <div className="px-2 py-0.5">
-            <span className="text-[9px] sm:text-[8.5px] font-semibold uppercase tracking-wider text-gray-400 block truncate">
+          <div className="px-2 py-1 sm:py-0.5">
+            <span className="text-[10px] sm:text-[8.5px] font-semibold uppercase tracking-wider text-gray-400 block truncate">
               {esBorrador ? 'Plazo Planificado' : 'Plazo de Ejecución Real'}
             </span>
-            <span className="font-medium text-gray-800 flex items-center gap-1 mt-0.5">
-              <Clock size={10} className="text-[#7A0C0D] shrink-0" />
-              <span className="text-[9px] sm:text-[10px]">{metricasHeaderContextuales.plazo}</span>
+            <span className="font-medium text-gray-800 flex items-center gap-1 mt-0.5 text-[10px] font-[Poppins]">
+              <Clock size={11} className="text-[#7A0C0D] shrink-0" />
+              <span>{metricasHeaderContextuales.plazo}</span>
             </span>
           </div>
 
-          <div className="px-2 py-0.5">
-            <span className="text-[9px] sm:text-[8.5px] font-semibold uppercase tracking-wider text-gray-400 block truncate">
+          <div className="px-2 py-1 sm:py-0.5">
+            <span className="text-[10px] sm:text-[8.5px] font-semibold uppercase tracking-wider text-gray-400 block truncate">
               Costo Directo Contratado Total (D × F)
             </span>
-            <span className="font-semibold font-mono text-gray-900 text-[9px] sm:text-[10px] block mt-0.5">
+            <span className="font-semibold font-mono text-gray-900 text-[10px] block mt-0.5">
               Q {metricasHeaderContextuales.costoDirecto.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
             </span>
           </div>
 
-          <div className="px-2 py-0.5">
-            <span className="text-[9px] sm:text-[8.5px] font-semibold uppercase tracking-wider text-gray-400 block truncate">
+          <div className="px-2 py-1 sm:py-0.5">
+            <span className="text-[10px] sm:text-[8.5px] font-semibold uppercase tracking-wider text-gray-400 block truncate">
               Monto Contractual Original (con Indirectos e IVA)
             </span>
-            <span className="font-semibold font-mono text-gray-900 text-[9px] sm:text-[10px] block mt-0.5">
+            <span className="font-semibold font-mono text-gray-900 text-[10px] block mt-0.5">
               Q {metricasHeaderContextuales.montoContractualOriginal.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
             </span>
           </div>
 
-          <div className="px-2 py-0.5">
-            <span className="text-[9px] sm:text-[8.5px] font-semibold uppercase tracking-wider text-gray-400 block truncate">
+          <div className="px-2 py-1 sm:py-0.5">
+            <span className="text-[10px] sm:text-[8.5px] font-semibold uppercase tracking-wider text-gray-400 block truncate">
               Líquido Neto Este Período
             </span>
-            <span className="font-semibold font-mono text-gray-900 text-[9px] sm:text-[10px] block mt-0.5">
+            <span className="font-semibold font-mono text-gray-900 text-[10px] block mt-0.5">
               Q {metricasHeaderContextuales.liquidoNetoPeriodo.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
             </span>
           </div>
@@ -3608,11 +3629,11 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
       <div className="border-b border-gray-200 bg-white px-1 rounded-t-md font-[Poppins]">
         <div className="flex flex-wrap items-center gap-1">
           {[
-            { id: 'sabana', label: 'Sábana', icon: Layers },
-            ...(!esBorrador && modoVistaSabana === 'actual' ? [{ id: 'analitico', label: 'Analítico', icon: Calculator }] : []),
-            { id: 'resumen', label: 'Resumen Financiero', icon: Banknote },
-            ...(proyecto.id === 'nuevo' || id === 'nuevo' || esBorrador || modoVistaSabana === 'planificacion' ? [] : [{ id: 'pendientes', label: 'Pendientes', icon: FileCheck2 }]),
-            ...(!esBorrador && modoVistaSabana === 'actual' ? [{ id: 'planificadoReal', label: 'Planificado vs Real', icon: TrendingUp }] : []),
+            { id: 'sabana', label: 'Sábana', mobileLabel: 'Sabana', icon: Layers },
+            ...(!esBorrador && modoVistaSabana === 'actual' ? [{ id: 'analitico', label: 'Analítico', mobileLabel: 'Analitico', icon: Calculator }] : []),
+            { id: 'resumen', label: 'Resumen Financiero', mobileLabel: 'Resumen', icon: Banknote },
+            ...(proyecto.id === 'nuevo' || id === 'nuevo' || esBorrador || modoVistaSabana === 'planificacion' ? [] : [{ id: 'pendientes', label: 'Pendientes', mobileLabel: 'Pendiente', icon: FileCheck2 }]),
+            ...(!esBorrador && modoVistaSabana === 'actual' ? [{ id: 'planificadoReal', label: 'Planificado vs Real', mobileLabel: 'Comparativa', icon: TrendingUp }] : []),
           ].map((item) => {
             const Icon = item.icon
             const active = tabSeccion === item.id
@@ -3629,7 +3650,8 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                 }`}
               >
                 <Icon size={11} />
-                <span>{item.label}</span>
+                <span className="hidden sm:inline">{item.label}</span>
+                <span className="sm:hidden text-[10px]">{item.mobileLabel}</span>
               </button>
             )
           })}
@@ -3655,7 +3677,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                     setBusqueda(e.target.value)
                     setPaginaActual(1)
                   }}
-                  className="w-full h-[32px] border border-gray-200 bg-gray-50 focus:bg-white rounded-lg pl-7 pr-2 text-[11px] font-normal placeholder:text-gray-400 focus:outline-none focus:border-[#9B0F06] transition-colors"
+                  className="w-full h-[30px] border border-gray-200 bg-gray-50 focus:bg-white rounded-lg pl-7 pr-2 text-[10px] font-[Poppins] font-normal placeholder:text-gray-400 placeholder:text-[10px] focus:outline-none focus:border-[#9B0F06] transition-colors"
                 />
               </div>
 
@@ -3909,42 +3931,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
             </div>
           ) : (
             <>
-              {/* Barra de estado distintiva del modo Planificación / Inicial vs Modo Actual */}
-              <div className={`flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 text-[9.5px] border-b font-[Poppins] ${
-                modoVistaSabana === 'planificacion'
-                  ? 'bg-amber-50/90 border-amber-200 text-amber-900'
-                  : 'bg-emerald-50/90 border-emerald-200 text-emerald-900'
-              }`}>
-                <div className="flex items-center gap-2">
-                  {modoVistaSabana === 'planificacion' ? (
-                    <>
-                      <Calendar size={13} className="text-amber-700 shrink-0" />
-                      <span>
-                        <strong>Modo Planificación / Línea Base ({modoVistaLineaBase === 'inicial' ? 'Plan de Trabajo' : 'Modificada'}):</strong> Visualizando programación contractual. Las columnas de ejecución real inician en 0.
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <Clock size={13} className="text-emerald-700 shrink-0" />
-                      <span>
-                        <strong>Modo Actual:</strong> Seguimiento de mediciones y avance físico real en obra.
-                        {numEstimacionFiltro !== 'todos' && (
-                          <span className="ml-1 font-bold underline">Valores adaptados a {numEstimacionFiltro}.</span>
-                        )}
-                      </span>
-                    </>
-                  )}
-                </div>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <span className={`px-2 py-0.5 rounded text-[8.5px] font-bold font-mono uppercase tracking-wider border ${
-                    modoVistaSabana === 'planificacion'
-                      ? 'bg-amber-100 text-amber-900 border-amber-300'
-                      : 'bg-emerald-100 text-emerald-900 border-emerald-300'
-                  }`}>
-                    {modoVistaSabana === 'planificacion' ? 'Línea Base / Plan' : (numEstimacionFiltro !== 'todos' ? numEstimacionFiltro : 'Ejecución Actual')}
-                  </span>
-                </div>
-              </div>
+              
 
               <div ref={tableScrollRef} className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-270px)] scroll-smooth">
               <table className="w-full text-[9.5px] leading-tight">
@@ -7095,7 +7082,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
               if (p.id === resultado.id) {
                 return {
                   ...p,
-                  estado: resultado.estado || p.estado,
+                  estado: resultado.estado || (resultado.accion === 'confirmar' ? 'Trasladado' : p.estado),
                   cantidadNetaCobrar: resultado.cantidadNetaCobrar !== undefined ? resultado.cantidadNetaCobrar : p.cantidadNetaCobrar,
                   estimacionOrigen: resultado.estimacionOrigen !== undefined ? resultado.estimacionOrigen : p.estimacionOrigen,
                   esAnulado: resultado.accion === 'anular' ? true : p.esAnulado,
@@ -7106,6 +7093,54 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
               return p
             })
           )
+
+          // Si la partida fue confirmada, se incorpora de inmediato al cálculo analítico y a la estimación activa
+          if (resultado.accion === 'confirmar') {
+            const cantCobrar = Number(resultado.cantidadNetaCobrar ?? pendienteSeleccionado?.cantidadNetaCobrar ?? pendienteSeleccionado?.cantidadBruta ?? 0)
+            const numEstActual = numEstimacionFiltro || `Estimación ${String(estimacionEnProgreso).padStart(2, '0')}`
+            const codDgc = resultado.codigoDGC || pendienteSeleccionado?.codigoDGC || ''
+            const desc = resultado.descripcion || pendienteSeleccionado?.descripcion || ''
+
+            const nuevaMedicion: MedicionAnaliticaCampo = {
+              id: `med-conf-${Date.now()}`,
+              codigoDGC: codDgc,
+              descripcionRenglon: desc,
+              estacionInicio: resultado.estacionInicio || pendienteSeleccionado?.estacionInicio || '0+000',
+              estacionFin: resultado.estacionFin || pendienteSeleccionado?.estacionFin || '0+100',
+              longitudL: Number(resultado.longitudL ?? pendienteSeleccionado?.longitudL ?? 0),
+              anchoA: Number(resultado.anchoA ?? pendienteSeleccionado?.anchoA ?? 0),
+              alturaH: Number(resultado.alturaH ?? pendienteSeleccionado?.alturaH ?? 0),
+              ladoVia: pendienteSeleccionado?.ladoVia || 'Sección Completa',
+              multiplicador: 1,
+              descuento: Number(pendienteSeleccionado?.descuentoMonto ?? 0),
+              tipoDescuento: 'monto',
+              cantidadCalculada: cantCobrar,
+              unidad: resultado.unidad || pendienteSeleccionado?.unidad || 'm³',
+              origenTipo: 'Bitácora',
+              referenciaOrigen: `Confirmado de Pendientes: ${resultado.id}`,
+              numEstimacion: numEstActual,
+              mesPeriodo: periodoActivoEtiqueta || 'Período Actual',
+              observaciones: `Aprobado y liquidado en ${numEstActual}. ${resultado.observaciones || ''}`.trim(),
+              fechaMedicion: new Date().toISOString().split('T')[0],
+              bitacoraEntradaId: pendienteSeleccionado?.bitacoraEntradaId,
+            }
+
+            setMedicionesAnaliticas((prev) => [nuevaMedicion, ...prev])
+
+            // Sincronizar renglones de la sábana reflejando de inmediato la cantidad y costo en Columna I y M
+            setRenglones((prev) =>
+              prev.map((r) => {
+                if (r.codigoDGC === codDgc || r.id === pendienteSeleccionado?.renglonId) {
+                  const actual = Number(r.cantidadEstePeriodo || 0)
+                  return {
+                    ...r,
+                    cantidadEstePeriodo: actual + cantCobrar,
+                  }
+                }
+                return r
+              })
+            )
+          }
         }}
       />
     </div>
