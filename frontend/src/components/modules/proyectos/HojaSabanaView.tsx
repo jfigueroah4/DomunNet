@@ -1427,6 +1427,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
     montoLiquido?: number
   }>>([])
   const [formEstNumero, setFormEstNumero] = useState('Estimación 01')
+  const [formEstDescripcionOpcional, setFormEstDescripcionOpcional] = useState('')
   const [formEstFechaInicio, setFormEstFechaInicio] = useState(new Date().toISOString().slice(0, 10))
   const [formEstFechaCorte, setFormEstFechaCorte] = useState(() => {
     const d = new Date()
@@ -1439,36 +1440,98 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
     const targetProjId = proyecto?.id || proyectoIdSeleccionado || id
     if (!targetProjId || targetProjId === 'nuevo' || targetProjId === 'crear') return
     try {
-      const stored = localStorage.getItem(`domun_estimacion_activa_${targetProjId}`)
-      if (stored) {
-        const parsed = JSON.parse(stored)
-        setEstimacionEnProgreso(parsed)
-      }
+      let currentLista: any[] = []
       const storedLista = localStorage.getItem(`domun_estimaciones_sabana_${targetProjId}`)
       if (storedLista) {
         const parsedLista = JSON.parse(storedLista)
         if (Array.isArray(parsedLista) && parsedLista.length > 0) {
           setListaEstimaciones(parsedLista)
-          return
+          currentLista = parsedLista
         }
       }
-      if (Array.isArray(proyecto?.estimaciones) && proyecto.estimaciones.length > 0) {
+      if (currentLista.length === 0 && Array.isArray(proyecto?.estimaciones) && proyecto.estimaciones.length > 0) {
         setListaEstimaciones(proyecto.estimaciones)
+        currentLista = proyecto.estimaciones
+      }
+
+      // Calcular número progresivo basado en las estimaciones existentes
+      let maxNum = 0
+      currentLista.forEach((e: any) => {
+        const match = (e.numero || e.nombreEstimacion || '').match(/\d+/)
+        if (match) {
+          const n = parseInt(match[0], 10)
+          if (!isNaN(n) && n > maxNum) maxNum = n
+        }
+      })
+      const proxNum = maxNum + 1
+      const proxStr = proxNum < 10 ? `Estimación 0${proxNum}` : `Estimación ${proxNum}`
+      setFormEstNumero(proxStr)
+
+      const stored = localStorage.getItem(`domun_estimacion_activa_${targetProjId}`)
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        // Verificar si la estimación almacenada ya fue cerrada o fue superada por estimaciones existentes
+        const estaCerrada = currentLista.some((e: any) => {
+          const nE = (e.numero || '').toLowerCase().replace(/\s+/g, '')
+          const nP = (parsed.numero || '').toLowerCase().replace(/\s+/g, '')
+          return nE === nP && (e.estado === 'cerrada' || e.estado === 'aprobada' || e.estado === 'pagada')
+        })
+        const matchParsedNum = (parsed.numero || '').match(/\d+/)
+        const parsedNumInt = matchParsedNum ? parseInt(matchParsedNum[0], 10) : 0
+        const esSuperada = maxNum > parsedNumInt
+
+        if (estaCerrada || esSuperada) {
+          localStorage.removeItem(`domun_estimacion_activa_${targetProjId}`)
+          const abiertaReal = currentLista.find((e: any) => e.estado === 'actual' || e.estado === 'en_proceso' || e.estado === 'borrador')
+          if (abiertaReal) {
+            setEstimacionEnProgreso(abiertaReal)
+            localStorage.setItem(`domun_estimacion_activa_${targetProjId}`, JSON.stringify(abiertaReal))
+          } else {
+            setEstimacionEnProgreso(null)
+          }
+        } else {
+          setEstimacionEnProgreso(parsed)
+        }
+      } else {
+        const abiertaReal = currentLista.find((e: any) => e.estado === 'actual' || e.estado === 'en_proceso' || e.estado === 'borrador')
+        if (abiertaReal) {
+          setEstimacionEnProgreso(abiertaReal)
+        } else {
+          setEstimacionEnProgreso(null)
+        }
       }
     } catch {}
   }, [proyecto?.id, proyectoIdSeleccionado, id])
 
-  // Auto-abrir modal de Apertura de Estimación si el proyecto está ACTIVO y no hay estimación en progreso
+  const handleAbrirAperturaEstimacion = () => {
+    let maxNum = 0
+    const lista = Array.isArray(listaEstimaciones) && listaEstimaciones.length > 0 ? listaEstimaciones : (Array.isArray(proyecto?.estimaciones) ? proyecto.estimaciones : [])
+    lista.forEach((e: any) => {
+      const match = (e.numero || e.nombreEstimacion || '').match(/\d+/)
+      if (match) {
+        const n = parseInt(match[0], 10)
+        if (!isNaN(n) && n > maxNum) maxNum = n
+      }
+    })
+    const proxNum = maxNum + 1
+    const proxStr = proxNum < 10 ? `Estimación 0${proxNum}` : `Estimación ${proxNum}`
+    setFormEstNumero(proxStr)
+    setFormEstDescripcionOpcional('')
+    setModalAperturaEstimacionOpen(true)
+  }
+
+  // Auto-abrir modal de Apertura de Estimación si el proyecto está ACTIVO y no hay ninguna estimación registrada aún
   useEffect(() => {
     if (!proyecto || hasAutoOpenedModal) return
     const est = typeof proyecto.estado === 'string' ? proyecto.estado.toLowerCase() : (proyecto.estado as any)?.codigo?.toLowerCase() || ''
     const isBorradorLocal = est === 'borrador'
     const isActivo = est === 'activo' || !isBorradorLocal
-    if (isActivo && !estimacionEnProgreso && !modalAperturaEstimacionOpen) {
-      setModalAperturaEstimacionOpen(true)
+    const tieneEstimacionesPrevias = (Array.isArray(listaEstimaciones) && listaEstimaciones.length > 0) || (Array.isArray(proyecto.estimaciones) && proyecto.estimaciones.length > 0)
+    if (isActivo && !estimacionEnProgreso && !modalAperturaEstimacionOpen && !tieneEstimacionesPrevias) {
+      handleAbrirAperturaEstimacion()
       setHasAutoOpenedModal(true)
     }
-  }, [proyecto, estimacionEnProgreso, hasAutoOpenedModal, modalAperturaEstimacionOpen])
+  }, [proyecto, estimacionEnProgreso, hasAutoOpenedModal, modalAperturaEstimacionOpen, listaEstimaciones])
 
   // EDICIÓN DE MEDICIONES VINCULADAS DESDE BITÁCORA EN TAB ANALÍTICO
   const [medicionEnEdicion, setMedicionEnEdicion] = useState<MedicionAnaliticaCampo | null>(null)
@@ -2464,13 +2527,15 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
   }
 
   const handleCancelarAperturaEstimacion = () => {
-    setEsSaliendoPlanTrabajo(true)
-    showInfoToast('Saliendo del plan de trabajo')
     setModalAperturaEstimacionOpen(false)
-    if (proyecto?.id) {
-      router.push(`/dashboard/proyectos/${proyecto.id}`)
-    } else {
-      router.push('/dashboard/proyectos')
+    if (listaEstimaciones.length === 0 && (!proyecto?.estimaciones || proyecto.estimaciones.length === 0)) {
+      setEsSaliendoPlanTrabajo(true)
+      showInfoToast('Saliendo del plan de trabajo')
+      if (proyecto?.id) {
+        router.push(`/dashboard/proyectos/${proyecto.id}`)
+      } else {
+        router.push('/dashboard/proyectos')
+      }
     }
   }
 
@@ -2554,13 +2619,20 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
 
     const targetProjId = proyecto?.id || proyectoIdSeleccionado || id
 
+    const nombreCompleto = formEstDescripcionOpcional.trim()
+      ? `${formEstNumero.trim()} - ${formEstDescripcionOpcional.trim()}`
+      : formEstNumero.trim() || 'Estimación'
+
+    const notasCompletas = [formEstDescripcionOpcional.trim(), formEstNotas.trim()].filter(Boolean).join(' - ')
+
     const nuevaEst = {
       id: `est-${Date.now()}`,
       numero: formEstNumero.trim() || 'Estimación 01',
+      nombreEstimacion: nombreCompleto,
       mes: `Periodo ${formEstFechaInicio} al ${formEstFechaCorte}`,
       fechaInicio: formEstFechaInicio,
       fechaCorte: formEstFechaCorte,
-      notas: formEstNotas.trim(),
+      notas: notasCompletas,
       creadoEn: new Date().toLocaleDateString('es-GT'),
       creadoPor: responsableNombre,
       estado: 'actual' as const,
@@ -3189,7 +3261,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                 <span>Confirmar Cambios</span>
               </button>
             )}
-            {/* Toggle de Línea Base: Inicial / Modificada / Actual */}
+            {/* Toggle de Línea Base: Plan de Trabajo / Modificada / Actual */}
             <div className="inline-flex items-center rounded-lg border border-gray-200 bg-gray-50 p-0.5 text-[10px]">
               <button
                 type="button"
@@ -3201,7 +3273,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                 }`}
               >
                 <Calendar size={12} />
-                <span>Inicial</span>
+                <span>Plan de Trabajo</span>
               </button>
               {(tieneModificadaConfirmada || (proyecto as any)?.en_replanificacion) && (
                 <button
@@ -3263,7 +3335,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
             {!esBorrador && !estimacionEnProgreso && (
               <button
                 type="button"
-                onClick={() => setModalAperturaEstimacionOpen(true)}
+                onClick={handleAbrirAperturaEstimacion}
                 className="inline-flex items-center gap-1 rounded-lg bg-[#7A0C0D] hover:bg-[#5E0006] text-white px-3 py-1.5 text-[10.5px] font-semibold transition-colors shadow-2xs cursor-pointer"
                 title="Aperturar nuevo periodo de estimación para este proyecto"
               >
@@ -3848,7 +3920,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                     <>
                       <Calendar size={13} className="text-amber-700 shrink-0" />
                       <span>
-                        <strong>Modo Planificación / Línea Base ({modoVistaLineaBase === 'inicial' ? 'Inicial' : 'Modificada'}):</strong> Visualizando programación contractual. Las columnas de ejecución real inician en 0.
+                        <strong>Modo Planificación / Línea Base ({modoVistaLineaBase === 'inicial' ? 'Plan de Trabajo' : 'Modificada'}):</strong> Visualizando programación contractual. Las columnas de ejecución real inician en 0.
                       </span>
                     </>
                   ) : (
@@ -6360,15 +6432,29 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
               </p>
 
               <div className="space-y-2.5">
-                <div>
-                  <label className="text-[10px] font-bold text-gray-700 mb-0.5 block">Identificador de Estimación *</label>
-                  <input
-                    type="text"
-                    value={formEstNumero}
-                    onChange={(e) => setFormEstNumero(e.target.value)}
-                    placeholder="Ej: Estimación 01, Estimación 02"
-                    className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-800 focus:outline-none focus:border-[#9B0F06]"
-                  />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-700 mb-0.5 block">No. de Estimación *</label>
+                    <input
+                      type="text"
+                      value={formEstNumero}
+                      onChange={(e) => setFormEstNumero(e.target.value)}
+                      placeholder="Ej: Estimación 06"
+                      className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-gray-800 focus:outline-none focus:border-[#9B0F06]"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-700 mb-0.5 block">
+                      Descripción Adicional <span className="text-gray-400 font-normal">(Opcional)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formEstDescripcionOpcional}
+                      onChange={(e) => setFormEstDescripcionOpcional(e.target.value)}
+                      placeholder="Ej: Tramo Inicial, Puentes..."
+                      className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-800 focus:outline-none focus:border-[#9B0F06]"
+                    />
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">

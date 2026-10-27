@@ -184,14 +184,20 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
   const montoBaseCurva = perspectivaCurva === 'ejecutora' ? montoAjustadoVigente : montoSupervisionOriginal
   const anticipoOtorgado = montoContractualOriginal * pctAnticipoEjec
 
-  // Soporte de Modalidad Manual de Presupuesto y Estimaciones
-  const modoManual =
-    pAny.modoGestionFinanciera === 'manual' ||
-    pAny.modo_gestion_financiera === 'manual' ||
-    pAny.tipoObra === 'manual' ||
-    pAny.tipo_obra === 'manual' ||
-    pAny.usarModoSabana === false
-  const esModoSabana = (pAny.modoGestionFinanciera === 'sabana' || pAny.usarModoSabana === true) && !modoManual
+  // Soporte de Modalidad Manual de Presupuesto y Estimaciones por Empresa/Perspectiva
+  const esEjecutoraDomun = nombreEmpresaEjecutora.toLowerCase().includes('domun')
+  const esSupervisoraDomun = nombreEmpresaSupervisora.toLowerCase().includes('domun')
+
+  // Determinar si cada empresa tiene su propia Hoja Sábana o Modo Manual
+  const modoObraActual = pAny.modoObra || pAny.modo_obra || (esEjecutoraDomun && pAny.usarModoSabana !== false ? 'sabana' : 'manual')
+  const modoSupervisionActual = pAny.modoSupervision || pAny.modo_supervision || (esSupervisoraDomun && pAny.usarModoSabana !== false ? 'sabana' : 'manual')
+
+  const tieneSabanaEjecutora = Boolean(modoObraActual === 'sabana')
+  const tieneSabanaSupervisora = Boolean(modoSupervisionActual === 'sabana')
+
+  const esModoSabanaActual = perspectivaEstimacion === 'ejecutora' ? tieneSabanaEjecutora : tieneSabanaSupervisora
+
+  const modoManual = !esModoSabanaActual
 
   // Capítulos Libro Azul DGC + Capítulos personalizados creados en este proyecto
   const [capitulosProyecto, setCapitulosProyecto] = useState<Array<{ id: number; nombre: string }>>(() => {
@@ -373,31 +379,35 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
         try {
           const act = JSON.parse(activaStored)
           if (act && act.numero) {
-            const bruto = Number(act.valorBruto || act.valorBrutoTrabajado || act.montoEstimacion || 0)
-            const pctAmort = Number(act.porcentajeAmortizacion ?? 20)
-            const amort = Number(act.montoAmortizacion ?? ((bruto * pctAmort) / 100))
-            const liq = Number(act.montoLiquido || act.montoLiquidoAPagar || (bruto - amort))
-            mapa.set(act.numero, {
-              id: act.id || `est-activa-${act.numero}`,
-              numero: act.numero,
-              nombreEstimacion: `Estimación de Obra - ${act.numero} (En Progreso)`,
-              delegadoResidente: (nombreDelegadoProyecto !== '-' ? nombreDelegadoProyecto : 'Delegado Residente'),
-              perspectiva: 'ejecutora',
-              fechaInicio: act.fechaInicio || '',
-              fechaFin: act.fechaCorte || '',
-              mes: act.mes || 'Periodo Actual',
-              diasRetraso: 0,
-              porcentajeRendimiento: 100,
-              calificacionDesempeno: 'bueno',
-              valorBrutoTrabajado: bruto,
-              porcentajeAmortizacion: pctAmort,
-              montoAmortizacion: amort,
-              montoLiquidoAPagar: liq,
-              saldoContractualRestante: 0,
-              estado: 'en_revision',
-              supervisadoPor: nombreEmpresaSupervisora,
-              observaciones: act.notas || 'Estimación en progreso en Hoja Sábana',
-            })
+            const existing = mapa.get(act.numero)
+            const estaCerrada = existing && (existing.estado === 'aprobada' || existing.estado === 'pagada')
+            if (!estaCerrada) {
+              const bruto = Number(act.valorBruto || act.valorBrutoTrabajado || act.montoEstimacion || 0)
+              const pctAmort = Number(act.porcentajeAmortizacion ?? 20)
+              const amort = Number(act.montoAmortizacion ?? ((bruto * pctAmort) / 100))
+              const liq = Number(act.montoLiquido || act.montoLiquidoAPagar || (bruto - amort))
+              mapa.set(act.numero, {
+                id: act.id || `est-activa-${act.numero}`,
+                numero: act.numero,
+                nombreEstimacion: act.nombreEstimacion || `Estimación de Obra - ${act.numero} (En Progreso)`,
+                delegadoResidente: (nombreDelegadoProyecto !== '-' ? nombreDelegadoProyecto : 'Delegado Residente'),
+                perspectiva: (act.perspectiva as any) || 'ejecutora',
+                fechaInicio: act.fechaInicio || '',
+                fechaFin: act.fechaCorte || '',
+                mes: act.mes || 'Periodo Actual',
+                diasRetraso: 0,
+                porcentajeRendimiento: 100,
+                calificacionDesempeno: 'bueno',
+                valorBrutoTrabajado: bruto,
+                porcentajeAmortizacion: pctAmort,
+                montoAmortizacion: amort,
+                montoLiquidoAPagar: liq,
+                saldoContractualRestante: 0,
+                estado: 'en_revision',
+                supervisadoPor: nombreEmpresaSupervisora,
+                observaciones: act.notas || 'Estimación en progreso en Hoja Sábana',
+              })
+            }
           }
         } catch {}
       }
@@ -748,10 +758,20 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
   }, [proyecto, pAny.plazoMeses])
 
   const calcularSiguienteNumeroEstimacion = (perspectiva: 'ejecutora' | 'supervisora') => {
-    const filtradas = estimacionesGeneradas.filter((e) => e.perspectiva === perspectiva)
+    const todas: any[] = [...estimacionesGeneradas]
+    if (proyecto?.id) {
+      try {
+        const sabanaStored = localStorage.getItem(`domun_estimaciones_sabana_${proyecto.id}`)
+        if (sabanaStored) {
+          const parsed = JSON.parse(sabanaStored)
+          if (Array.isArray(parsed)) todas.push(...parsed)
+        }
+      } catch {}
+    }
+    const filtradas = todas.filter((e) => (e.perspectiva || 'ejecutora') === perspectiva)
     let maxNum = 0
     filtradas.forEach((e) => {
-      const match = e.numero.match(/\d+/)
+      const match = (e.numero || '').match(/\d+/)
       if (match) {
         const n = parseInt(match[0], 10)
         if (!isNaN(n) && n > maxNum) maxNum = n
@@ -876,12 +896,8 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
 
   const estimacionesFiltradas = useMemo(() => {
     return estimacionesGeneradas.filter((e) => {
-      const tieneEstimacionesExclusivasSupervisora = estimacionesGeneradas.some((item) => item.perspectiva === 'supervisora')
-      if (perspectivaEstimacion === 'supervisora') {
-        if (e.perspectiva !== 'supervisora' && tieneEstimacionesExclusivasSupervisora) return false
-      } else {
-        if (e.perspectiva === 'supervisora') return false
-      }
+      const p = e.perspectiva || 'ejecutora'
+      if (p !== perspectivaEstimacion) return false
       if (fechaDesdeEstimacion && e.fechaInicio && e.fechaInicio < fechaDesdeEstimacion) return false
       if (fechaHastaEstimacion && e.fechaFin && e.fechaFin > fechaHastaEstimacion) return false
       return true
@@ -1681,7 +1697,7 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
 
             {/* Botón para crear o agregar estimación */}
             <div className="flex items-center gap-2">
-              {esModoSabana ? (
+              {esModoSabanaActual ? (
                 <a
                   href={`/dashboard/proyectos/${proyecto?.id || ''}/hoja-sabana`}
                   className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-[#9B0F06] px-2.5 py-1.5 text-[10px] font-bold text-white hover:bg-[#7a0c05] transition-colors cursor-pointer shadow-2xs whitespace-nowrap"
@@ -1738,11 +1754,11 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
                             No hay estimaciones registradas
                           </p>
                           <p className="text-[10px] text-gray-500 leading-normal">
-                            {esModoSabana
-                              ? 'Las estimaciones de este proyecto se generan y controlan directamente a través de la Hoja Sábana Analítica.'
+                            {esModoSabanaActual
+                              ? 'Las estimaciones de esta perspectiva se generan y controlan directamente a través de la Hoja Sábana Analítica.'
                               : 'Este proyecto no cuenta con estimaciones registradas en la perspectiva actual. Haz clic en el botón para crear la primera estimación progresiva.'}
                           </p>
-                          {esModoSabana ? (
+                          {esModoSabanaActual ? (
                             <a
                               href={`/dashboard/proyectos/${proyecto?.id || ''}/hoja-sabana`}
                               className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-[#9B0F06] px-3.5 py-1.5 text-[10px] font-bold text-white hover:bg-[#7a0c05] transition-colors cursor-pointer shadow-xs"
@@ -1766,10 +1782,20 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
                   ) : (
                     estimacionesPaginadas.map((est) => (
                       <tr key={est.id} className="hover:bg-gray-50/70 transition-colors">
-                        {/* No. Estimación & Nombre (Sin badge de estado, todo en negro) */}
+                        {/* No. Estimación & Nombre (con indicación de Hoja Sábana si aplica) */}
                         <td className="px-2.5 py-1.5 font-sans">
-                          <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="font-bold text-gray-900">{est.numero}</span>
+                            {(esModoSabanaActual || (est as any).origenSabana) && (
+                              <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[8px] font-bold bg-[#9B0F06]/10 text-[#9B0F06] border border-[#9B0F06]/20">
+                                <FileSpreadsheet size={9} /> Hoja Sábana
+                              </span>
+                            )}
+                            {est.estado === 'en_revision' && (
+                              <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[8px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                En Progreso
+                              </span>
+                            )}
                           </div>
                           <p className="text-[9px] text-gray-600 font-medium truncate max-w-[180px]" title={est.nombreEstimacion}>
                             {est.nombreEstimacion}
@@ -2803,30 +2829,40 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
             <form onSubmit={handleGuardarEstimacionManual} className="flex-1 overflow-y-auto px-6 py-5 space-y-5 text-xs">
               {/* Sección 1: Identificación y Perspectiva */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* No. de Estimación (Bloqueado / Progresivo) */}
+                {/* No. de Estimación (Progresivo por defecto) */}
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className="block text-xs font-bold text-gray-700">
                       No. de Estimación <span className="text-[#9B0F06]">*</span>
                     </label>
                     <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
-                      <Lock size={9} /> Correlativo bloqueado
+                      Progresivo
                     </span>
                   </div>
                   <div className="relative">
                     <input
                       type="text"
-                      readOnly
-                      disabled
                       value={formEstNumero}
-                      placeholder="Ej: Est. 01"
-                      className="w-full rounded-xl border border-gray-200 bg-gray-100/90 pl-3 pr-8 py-2 font-mono text-xs font-bold text-gray-800 cursor-not-allowed select-none focus:outline-none"
-                      title="El número de estimación es correlativo progresivo y no puede modificarse manualmente."
+                      onChange={(e) => setFormEstNumero(e.target.value)}
+                      placeholder="Ej: Est. 06"
+                      className="w-full rounded-xl border border-gray-200 bg-gray-50/80 px-3 py-2 font-mono text-xs font-bold text-gray-800 focus:outline-none focus:border-[#9B0F06]"
+                      title="Número correlativo de la estimación."
                     />
-                    <div className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
-                      <Lock size={13} />
-                    </div>
                   </div>
+                </div>
+
+                {/* Concepto / Descripción Opcional */}
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    Descripción / Concepto <span className="text-gray-400 font-normal">(Opcional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formEstNombre}
+                    onChange={(e) => setFormEstNombre(e.target.value)}
+                    placeholder="Ej: Obras Preliminares, Tramo 2..."
+                    className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs text-gray-800 focus:border-[#9B0F06] focus:outline-none"
+                  />
                 </div>
 
                 {/* Perspectiva Contractual */}
@@ -2852,20 +2888,6 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
                     <option value="ejecutora">Empresa Ejecutora (Contratista)</option>
                     <option value="supervisora">Empresa Supervisora (DGC)</option>
                   </select>
-                </div>
-
-                {/* Concepto / Título de la Estimación */}
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
-                    Concepto / Título de la Estimación
-                  </label>
-                  <input
-                    type="text"
-                    value={formEstNombre}
-                    onChange={(e) => setFormEstNombre(e.target.value)}
-                    placeholder="Ej: Estimación No. 01 - Obras Preliminares"
-                    className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs text-gray-800 focus:border-[#9B0F06] focus:outline-none"
-                  />
                 </div>
               </div>
 

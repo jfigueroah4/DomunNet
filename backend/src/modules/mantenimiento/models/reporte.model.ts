@@ -41,7 +41,7 @@ export const reporteConfig: TablaConfig = {
     }
 ],
   
-  bloquearCreacion: true,
+  bloquearCreacion: false,
   bloquearModificacion: true,
   
   mensajeBloqueo: "Los reportes son generados mediante el generador de reportes del sistema.",

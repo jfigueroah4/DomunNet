@@ -17,7 +17,6 @@ import {
   Map as LucideMap,
   History,
   MessageSquare,
-  Check,
 } from 'lucide-react'
 import { ReportesObservacionesContratante } from './ReportesObservacionesContratante'
 import { BITACORA_MOCK } from '@/data/bitacora.mock'
@@ -69,9 +68,6 @@ export default function ReportesView() {
   // Modal de Observaciones del Contratante
   const [modalObservacionesAbierto, setModalObservacionesAbierto] = useState(false)
 
-  // Notificación visual de descarga completada estilo navegador
-  const [descargaNotificacion, setDescargaNotificacion] = useState<{ nombre: string; formato: string } | null>(null)
-  const timerNotificacionRef = useRef<NodeJS.Timeout | null>(null)
 
   // Drawer de Detalle y Lightbox de Fotografía
   const [drawerRegistro, setDrawerRegistro] = useState<any | null>(null)
@@ -690,15 +686,8 @@ export default function ReportesView() {
     const nombreArchivo = `Reporte_${proyNomLimpio}_${fechaLimpia}.${extension}`
 
     exportReport(format, html, nombreArchivo, (nombreFinal) => {
-      // 1. Mostrar toast oficial del sistema indicando descarga completada
+      // Mostrar únicamente el toast oficial del sistema indicando descarga completada
       showSuccessToast(`Descarga completada: El reporte ${format.toUpperCase()} (${nombreFinal}) se ha guardado en tus descargas.`)
-
-      // 2. Mostrar banner visual de descarga en la esquina superior del navegador
-      setDescargaNotificacion({ nombre: nombreFinal, formato: format.toUpperCase() })
-      if (timerNotificacionRef.current) clearTimeout(timerNotificacionRef.current)
-      timerNotificacionRef.current = setTimeout(() => {
-        setDescargaNotificacion(null)
-      }, 7000)
     })
 
     const nombreResp =
@@ -743,26 +732,33 @@ export default function ReportesView() {
     // Asentar en la tabla reporte de la Base de Datos si la conexión está disponible
     try {
       const { api } = await import('@/lib/api/cliente')
-      await api.post('/mantenimiento/reporte', {
-        proyecto_id: proyectoId !== 'todos' ? proyectoId : (proyectosValidos[0]?.id || null),
-        generado_por: nombreResp,
-        titulo: nuevoReporte.titulo,
-        tipo: 'bitacora_evidencias',
-        formato: format,
-        estado: 'generado',
-        campos_incluidos: {
-          cantidad_registros: nuevoReporte.cantidadRegistros,
-          cantidad_fotos: nuevoReporte.cantidadFotos,
-        },
-        filtros_aplicados: {
-          fecha_desde: fechaDesde,
-          fecha_hasta: fechaHasta,
-          renglon: renglonFiltro,
-          periodo: nuevoReporte.periodo,
-        },
-        fecha_generacion: nuevoReporte.fechaIso,
-        url_storage: urlReporteGenerado,
-      }).catch(() => null)
+      const isUuid = (val: any) => typeof val === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val)
+      const validProyId = isUuid(proyectoId) ? proyectoId : (proyectosValidos.find((p: any) => isUuid(p.id))?.id || null)
+      const validUserId = isUuid(userProfile?.id) ? userProfile?.id : null
+
+      if (validProyId) {
+        await api.post('/mantenimiento/reporte', {
+          proyecto_id: validProyId,
+          generado_por: validUserId,
+          titulo: nuevoReporte.titulo,
+          tipo: 'bitacora_evidencias',
+          formato: format,
+          estado: 'generado',
+          nombre_archivo: nombreArchivo,
+          campos_incluidos: {
+            cantidad_registros: nuevoReporte.cantidadRegistros,
+            cantidad_fotos: nuevoReporte.cantidadFotos,
+          },
+          filtros_aplicados: {
+            fecha_desde: fechaDesde,
+            fecha_hasta: fechaHasta,
+            renglon: renglonFiltro,
+            periodo: nuevoReporte.periodo,
+          },
+          fecha_generacion: nuevoReporte.fechaIso,
+          url_storage: urlReporteGenerado,
+        }).catch(() => null)
+      }
     } catch (_) {}
   }
 
@@ -947,38 +943,6 @@ export default function ReportesView() {
 
       {/* MODAL DE OBSERVACIONES Y COMENTARIOS DEL CONTRATANTE */}
       
-      {/* BANNER FLOTANTE DE NOTIFICACIÓN DE DESCARGA COMPLETADA (ESTILO NAVEGADOR) */}
-      {descargaNotificacion && (
-        <Portal>
-          <div className="fixed top-5 right-5 z-[9999999] flex items-center gap-3 bg-white border border-gray-200/90 shadow-2xl rounded-xl px-4 py-3 font-[Poppins] max-w-sm transition-all animate-in fade-in slide-in-from-top-3">
-            <div className="w-9 h-9 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100 shadow-2xs">
-              <Check size={18} strokeWidth={2.8} />
-            </div>
-            <div className="flex flex-col min-w-0 pr-1">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-semibold text-gray-900">Descarga completada</span>
-                <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200/60 uppercase">
-                  {descargaNotificacion.formato}
-                </span>
-              </div>
-              <span className="text-[11px] text-gray-600 truncate font-mono" title={descargaNotificacion.nombre}>
-                {descargaNotificacion.nombre}
-              </span>
-              <span className="text-[10px] text-gray-400">
-                Guardado en tu carpeta de descargas
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setDescargaNotificacion(null)}
-              className="text-gray-400 hover:text-gray-600 p-1 rounded-md transition-colors shrink-0 ml-1 cursor-pointer"
-              aria-label="Cerrar notificación"
-            >
-              <X size={14} />
-            </button>
-          </div>
-        </Portal>
-      )}
 
       <ReportesObservacionesContratante
         isOpen={modalObservacionesAbierto}
@@ -1001,6 +965,8 @@ export default function ReportesView() {
           showSuccessToast(`Parámetros de "${rep.titulo}" cargados para edición.`)
         }}
         userRole={userProfile?.rol || ''}
+        proyectoIdActual={String(proyectoId)}
+        proyectos={proyectosValidos}
       />
 
       {/* DRAWER LATERAL DESLIZANTE DE DETALLE DE REGISTRO */}

@@ -8,6 +8,7 @@ export interface DocumentoReporteVisor {
   id?: string
   titulo: string
   urlPdf: string
+  htmlContent?: string
   subidoPor?: string
   fecha?: string
   pesoFormateado?: string
@@ -34,21 +35,36 @@ export function PdfViewerModal({ documento, isOpen, onClose }: PdfViewerModalPro
         iframe.contentWindow.print()
         return
       } catch {
-        window.open(documento.urlPdf, '_blank')
+        if (documento.urlPdf) window.open(documento.urlPdf, '_blank')
       }
-    } else {
+    } else if (documento.urlPdf) {
       window.open(documento.urlPdf, '_blank')
     }
   }
 
   const handleDownload = () => {
-    const link = document.createElement('a')
-    link.href = documento.urlPdf
-    const ext = documento.urlPdf.includes('.pdf') ? '.pdf' : '.html'
-    link.download = `${documento.titulo.replace(/[^a-zA-Z0-9_-]/g, '_')}${ext}`
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
+    if (documento.htmlContent) {
+      const blob = new Blob([documento.htmlContent], { type: 'text/html;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `${documento.titulo.replace(/[^a-zA-Z0-9_-]/g, '_')}.html`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      setTimeout(() => URL.revokeObjectURL(url), 60000)
+      return
+    }
+
+    if (documento.urlPdf) {
+      const link = document.createElement('a')
+      link.href = documento.urlPdf
+      const ext = documento.urlPdf.includes('.pdf') ? '.pdf' : '.html'
+      link.download = `${documento.titulo.replace(/[^a-zA-Z0-9_-]/g, '_')}${ext}`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    }
   }
 
   // Modo pantalla completa maximizada
@@ -92,7 +108,8 @@ export function PdfViewerModal({ documento, isOpen, onClose }: PdfViewerModalPro
           </div>
           <iframe
             id="pdf-frame-fs"
-            src={documento.urlPdf}
+            srcDoc={documento.htmlContent || undefined}
+            src={!documento.htmlContent ? documento.urlPdf : undefined}
             title={documento.titulo}
             className="w-full h-full border-none bg-white"
           />
@@ -177,7 +194,8 @@ export function PdfViewerModal({ documento, isOpen, onClose }: PdfViewerModalPro
           <div className="flex-1 bg-gray-100 relative overflow-hidden">
             <iframe
               id="pdf-frame"
-              src={documento.urlPdf}
+              srcDoc={documento.htmlContent || undefined}
+              src={!documento.htmlContent ? documento.urlPdf : undefined}
               title={documento.titulo}
               className="w-full h-full border-none bg-white"
             />

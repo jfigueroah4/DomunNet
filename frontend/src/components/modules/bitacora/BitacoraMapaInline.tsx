@@ -95,7 +95,11 @@ export function BitacoraMapaInline({ registro, onClose, vistaInicial = 'leaflet'
       instanciaMapaRef.current = mapa
 
       setTimeout(() => {
-        mapa.invalidateSize()
+        if (activo && instanciaMapaRef.current) {
+          try {
+            mapa.invalidateSize()
+          } catch (_) {}
+        }
       }, 150)
     }
 
@@ -104,7 +108,11 @@ export function BitacoraMapaInline({ registro, onClose, vistaInicial = 'leaflet'
     return () => {
       activo = false
       if (instanciaMapaRef.current) {
-        instanciaMapaRef.current.remove()
+        try {
+          instanciaMapaRef.current.stop()
+          instanciaMapaRef.current.off()
+          instanciaMapaRef.current.remove()
+        } catch (_) {}
         instanciaMapaRef.current = null
       }
     }

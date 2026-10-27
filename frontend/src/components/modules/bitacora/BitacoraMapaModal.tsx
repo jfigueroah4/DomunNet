@@ -77,7 +77,11 @@ export function BitacoraMapaModal({ abierto, onClose, registro }: BitacoraMapaMo
       instanciaMapaRef.current = mapa
 
       setTimeout(() => {
-        mapa.invalidateSize()
+        if (activo && instanciaMapaRef.current) {
+          try {
+            mapa.invalidateSize()
+          } catch (_) {}
+        }
       }, 100)
     }
 
@@ -86,7 +90,11 @@ export function BitacoraMapaModal({ abierto, onClose, registro }: BitacoraMapaMo
     return () => {
       activo = false
       if (instanciaMapaRef.current) {
-        instanciaMapaRef.current.remove()
+        try {
+          instanciaMapaRef.current.stop()
+          instanciaMapaRef.current.off()
+          instanciaMapaRef.current.remove()
+        } catch (_) {}
         instanciaMapaRef.current = null
       }
     }

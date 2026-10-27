@@ -428,23 +428,24 @@ const ensayoLaboratorioSchema = z.object({
 // ============================================================================
 // 9. REPORTES Y AUDITORÃA
 // ============================================================================
-const reporteSchema = z.object({
-  proyecto_id: z.string().uuid(),
-  generado_por: z.string().uuid().optional().nullable().or(z.literal('')),
-  titulo: z.string().max(200),
-  tipo: z.string().max(100),
-  filtros_aplicados: z.any().optional(),
-  formato: z.string().max(20),
-  estado: z.string().max(50),
-  nombre_archivo: z.string().max(255),
-  logo_incluido: z.boolean().optional().default(true),
-  marca_agua_incluida: z.boolean().optional().default(true),
-  logo_url: z.string().url().max(500).optional().nullable().or(z.literal('')),
-  marca_agua_url: z.string().url().max(500).optional().nullable().or(z.literal('')),
-  estructura: z.any().optional(),
-  campos_incluidos: z.any().optional(),
-  url_storage: z.string().url().max(500).optional().nullable().or(z.literal(''))
-}).strict()
+const reporteSchema = z.object({
+  proyecto_id: z.string().uuid().optional().nullable().or(z.literal('')),
+  generado_por: z.string().uuid().optional().nullable().or(z.literal('')),
+  titulo: z.string().max(200),
+  tipo: z.string().max(100),
+  filtros_aplicados: z.any().optional(),
+  formato: z.string().max(20),
+  estado: z.string().max(50),
+  nombre_archivo: z.string().max(255).optional().nullable().or(z.literal('')),
+  logo_incluido: z.boolean().optional().default(true),
+  marca_agua_incluida: z.boolean().optional().default(true),
+  logo_url: z.string().max(500).optional().nullable().or(z.literal('')),
+  marca_agua_url: z.string().max(500).optional().nullable().or(z.literal('')),
+  estructura: z.any().optional(),
+  campos_incluidos: z.any().optional(),
+  url_storage: z.string().max(500).optional().nullable().or(z.literal('')),
+  fecha_generacion: z.string().optional().nullable(),
+}).passthrough()
 
 const auditoriaOperativaSchema = z.object({
   usuario_id: z.string().uuid().optional().nullable().or(z.literal('')),
