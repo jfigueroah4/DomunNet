@@ -76,6 +76,11 @@ const fasesBase: any[] = [
 ]
 
 const equipoAmpliadoMock = [
+  { id: '31976eb7-b773-43b8-8609-3c4e87876c6e', nombre: 'Josue Figueroa', rol: 'Administrador', correo: 'josuedanielf2002@gmail.com', username: 'dani' },
+  { id: '22e3578a-b952-47dd-bc47-c7c23d8f5e26', nombre: 'Jorge Figueroa', rol: 'Administrador', correo: 'jorge.figueroa@domun.gt', username: 'jfigueroa' },
+  { id: '775f9d2b-4d83-42ae-bfb4-c4e64ee2a5e0', nombre: 'Rita Caballero', rol: 'Ingeniero Residente', correo: 'rcaballeros@domun.gt', username: 'rcaballeros' },
+  { id: 'c2c4580e-4d12-4d2d-980a-d7349892e4be', nombre: 'Lilia Beltrán', rol: 'Contratante', correo: 'lbeltran@domun.gt', username: 'lbeltran' },
+  { id: 'ce4188c9-43f6-43d8-96e9-49b9f5566987', nombre: 'Ericka Herrera', rol: 'Auxiliar de Campo', correo: 'eherrera@domun.gt', username: 'eherrera' },
   { id: '1', nombre: 'Carlos Mendoza', rol: 'Supervisor Vial Principal' },
   { id: '2', nombre: 'Laura Fernández', rol: 'Ingeniera Estructural' },
   { id: '3', nombre: 'Roberto López', rol: 'Residente de Obra Vial' },

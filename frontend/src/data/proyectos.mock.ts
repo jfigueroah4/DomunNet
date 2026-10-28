@@ -53,6 +53,11 @@ export const PROYECTOS_MOCK: Proyecto[] = [
     ubicacion: 'Boulevard Vista Hermosa, Ciudad de Guatemala',
     responsable: 'Ing. Carlos Mendoza',
     equipo: [
+      { id: '31976eb7-b773-43b8-8609-3c4e87876c6e', nombre: 'Josue Figueroa', rol: 'Administrador' },
+      { id: '22e3578a-b952-47dd-bc47-c7c23d8f5e26', nombre: 'Jorge Figueroa', rol: 'Administrador' },
+      { id: '775f9d2b-4d83-42ae-bfb4-c4e64ee2a5e0', nombre: 'Rita Caballero', rol: 'Ingeniero Residente' },
+      { id: 'c2c4580e-4d12-4d2d-980a-d7349892e4be', nombre: 'Lilia Beltrán', rol: 'Contratante' },
+      { id: 'ce4188c9-43f6-43d8-96e9-49b9f5566987', nombre: 'Ericka Herrera', rol: 'Auxiliar de Campo' },
       { id: '1-1', nombre: 'Carlos Mendoza', rol: 'Supervisor vial' },
       { id: '1-2', nombre: 'Laura Fernandez', rol: 'Ingeniera estructural' },
       { id: '1-3', nombre: 'Roberto Lopez', rol: 'Residente de obra vial' },
