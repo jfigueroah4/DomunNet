@@ -994,10 +994,10 @@ function obtenerValoresCompletosProyecto(p?: ProyectoType | any): Record<string,
     fechaFinSupervisora: cSup.fechaFin || pAny.fechaFinSupervisora || '',
 
     // Ubicación
-    departamentoId: p.departamentoId || pAny.departamentoId || pAny.departamento_id || '',
-    departamentoNombre: p.departamentoNombre || pAny.departamentoNombre || pAny.departamento_nombre || pAny.departamento?.nombre || '',
-    municipioId: p.municipioId || pAny.municipioId || pAny.municipio_id || '',
-    municipioNombre: p.municipioNombre || pAny.municipioNombre || pAny.municipio_nombre || pAny.municipio?.nombre || '',
+    departamentoId: p.departamentoId || pAny.departamentoId || pAny.departamento_id || p.departamentoFinId || pAny.departamento_fin_id || '',
+    departamentoNombre: p.departamentoNombre || pAny.departamentoNombre || pAny.departamento_nombre || pAny.departamento?.nombre || p.departamentoFinNombre || pAny.departamento_fin_nombre || (String(p.direccion || p.ubicacionFisica || '').toLowerCase().includes('guatemala') ? 'Guatemala' : ''),
+    municipioId: p.municipioId || pAny.municipioId || pAny.municipio_id || p.municipioFinId || pAny.municipio_fin_id || '',
+    municipioNombre: p.municipioNombre || pAny.municipioNombre || pAny.municipio_nombre || pAny.municipio?.nombre || p.municipioFinNombre || pAny.municipio_fin_nombre || (String(p.direccion || p.ubicacionFisica || '').toLowerCase().includes('villa nueva') ? 'Villa Nueva' : String(p.direccion || p.ubicacionFisica || '').toLowerCase().includes('mixco') ? 'Mixco' : ''),
     departamentoFinId: p.departamentoFinId || pAny.departamentoFinId || pAny.departamento_fin_id || '',
     departamentoFinNombre: p.departamentoFinNombre || pAny.departamentoFinNombre || pAny.departamento_fin_nombre || pAny.departamentoFin?.nombre || '',
     municipioFinId: p.municipioFinId || pAny.municipioFinId || pAny.municipio_fin_id || '',
@@ -1114,6 +1114,17 @@ export function ProyectoDetalleView({ proyecto: initialProyecto, slugId }: { pro
   }, [user, proyecto])
   const canManageTeam = String(user?.rol).toLowerCase() === 'administrador' || String(user?.rol).toLowerCase() === 'gerencia'
 
+  const esContratante = useMemo(() => {
+    return String(user?.rol || '').toLowerCase().trim().includes('contratante')
+  }, [user?.rol])
+
+  // Contratante no puede acceder a informacion financiera
+  useEffect(() => {
+    if (esContratante && tabMaestra === 'financiera') {
+      setTabMaestra('general')
+    }
+  }, [esContratante, tabMaestra])
+
   useEffect(() => {
     if (initialProyecto) {
       setProyecto(initialProyecto)
@@ -1176,7 +1187,11 @@ export function ProyectoDetalleView({ proyecto: initialProyecto, slugId }: { pro
   const [verificandoBitacora, setVerificandoBitacora] = useState(false)
 
   // Modo Manual y Drawer de Renglones de Obra
-  const esModoManual = Boolean(
+  const tieneDomunEnProyecto = Boolean(
+    String((proyecto as any)?.empresaSupervisora || (proyecto as any)?.empresa_supervisora || '').toLowerCase().includes('domun') ||
+    String((proyecto as any)?.empresaContratista || (proyecto as any)?.empresa_contratista || '').toLowerCase().includes('domun')
+  )
+  const esModoManual = !tieneDomunEnProyecto && Boolean(
     (proyecto as any)?.modoGestionFinanciera === 'manual' ||
     (proyecto as any)?.modo_gestion_financiera === 'manual' ||
     (proyecto as any)?.usarModoSabana === false ||
@@ -2411,21 +2426,23 @@ export function ProyectoDetalleView({ proyecto: initialProyecto, slugId }: { pro
               <Info size={12} className={tabMaestra === 'general' ? 'text-[#9B0F06]' : 'text-gray-500'} />
               <span className="truncate"><span className="sm:hidden">General</span><span className="hidden sm:inline">Información General</span></span>
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                setTabMaestra('financiera')
-                setEditingSection(null)
-              }}
-              className={`inline-flex min-w-0 items-center gap-1 rounded-md px-2 sm:px-3 py-1.5 text-[10.5px] font-bold transition-all cursor-pointer ${
-                tabMaestra === 'financiera'
-                  ? 'bg-white text-[#9B0F06] border border-gray-200/80 shadow-xs'
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/50'
-              }`}
-            >
-              <CalendarDays size={12} className={tabMaestra === 'financiera' ? 'text-[#9B0F06]' : 'text-gray-500'} />
-              <span className="truncate"><span className="sm:hidden">Financiera</span><span className="hidden sm:inline">Información Financiera</span></span>
-            </button>
+            {!esContratante && (
+              <button
+                type="button"
+                onClick={() => {
+                  setTabMaestra('financiera')
+                  setEditingSection(null)
+                }}
+                className={`inline-flex min-w-0 items-center gap-1 rounded-md px-2 sm:px-3 py-1.5 text-[10.5px] font-bold transition-all cursor-pointer ${
+                  tabMaestra === 'financiera'
+                    ? 'bg-white text-[#9B0F06] border border-gray-200/80 shadow-xs'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/50'
+                }`}
+              >
+                <CalendarDays size={12} className={tabMaestra === 'financiera' ? 'text-[#9B0F06]' : 'text-gray-500'} />
+                <span className="truncate"><span className="sm:hidden">Financiera</span><span className="hidden sm:inline">Información Financiera</span></span>
+              </button>
+            )}
           </div>
 
           <div className="flex shrink-0 items-center gap-1.5">
@@ -2454,15 +2471,17 @@ export function ProyectoDetalleView({ proyecto: initialProyecto, slugId }: { pro
 
               {menuOpcionesAbierto && (
                 <div className="absolute right-0 top-full mt-1.5 w-60 rounded-xl border border-gray-200 bg-white p-1.5 shadow-xl z-50 animate-in fade-in zoom-in-95 duration-100 font-[Poppins]">
-                  <button
-                    type="button"
-                    onClick={() => handleNavegarOpcion('bitacora')}
-                    disabled={verificandoBitacora}
-                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-semibold text-gray-700 hover:bg-red-50 hover:text-[#9B0F06] transition-colors cursor-pointer disabled:opacity-50"
-                  >
-                    <ClipboardList size={15} className="text-gray-400 group-hover:text-[#9B0F06]" />
-                    <span>Registros de bitácora</span>
-                  </button>
+                  {!esContratante && (
+                    <button
+                      type="button"
+                      onClick={() => handleNavegarOpcion('bitacora')}
+                      disabled={verificandoBitacora}
+                      className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-semibold text-gray-700 hover:bg-red-50 hover:text-[#9B0F06] transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      <ClipboardList size={15} className="text-gray-400 group-hover:text-[#9B0F06]" />
+                      <span>Registros de bitácora</span>
+                    </button>
+                  )}
 
                   <button
                     type="button"
@@ -3904,11 +3923,11 @@ export function ProyectoDetalleView({ proyecto: initialProyecto, slugId }: { pro
                   </div>
                   <EditableInfoField
                     label="Departamento Inicial (Origen)"
-                    value={pAny.departamentoNombre || ''}
+                    value={pAny.departamentoNombre || pAny.departamento_nombre || pAny.departamentoFinNombre || pAny.departamento_fin_nombre || (String(proyecto.direccion || proyecto.ubicacionFisica || '').toLowerCase().includes('guatemala') ? 'Guatemala' : '')}
                   />
                   <EditableInfoField
                     label="Municipio Inicial (Origen)"
-                    value={pAny.municipioNombre || ''}
+                    value={pAny.municipioNombre || pAny.municipio_nombre || pAny.municipioFinNombre || pAny.municipio_fin_nombre || (String(proyecto.direccion || proyecto.ubicacionFisica || '').toLowerCase().includes('villa nueva') ? 'Villa Nueva' : String(proyecto.direccion || proyecto.ubicacionFisica || '').toLowerCase().includes('mixco') ? 'Mixco' : '')}
                   />
                   <EditableInfoField
                     label="Dirección Inicial (Texto Corto)"
@@ -4009,7 +4028,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto, slugId }: { pro
       )}
 
       {/* CONTENIDO DE PESTAÑA: INFORMACIÓN FINANCIERA */}
-      {tabMaestra === 'financiera' && (
+      {tabMaestra === 'financiera' && !esContratante && (
         <ProyectoInformacionFinanciera proyecto={proyecto} />
       )}
 

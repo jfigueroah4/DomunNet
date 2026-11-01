@@ -69,9 +69,9 @@ export default function DashboardPage() {
     return rawModules.filter(mod => {
       const permisoRequerido = RUTAS_PERMISOS[mod.href]
       if (!permisoRequerido) return true
-      return tienePermiso(permisos, permisoRequerido)
+      return tienePermiso(permisos, permisoRequerido, profile?.rol)
     })
-  }, [profile?.permisos])
+  }, [profile?.permisos, profile?.rol])
 
   return (
     <div className="space-y-4 p-2 md:p-3">

@@ -17,6 +17,8 @@ import {
   Map as LucideMap,
   History,
   MessageSquare,
+  UploadCloud,
+  Loader2,
 } from 'lucide-react'
 import { ReportesObservacionesContratante } from './ReportesObservacionesContratante'
 import { BITACORA_MOCK } from '@/data/bitacora.mock'
@@ -30,7 +32,7 @@ import { exportReport, buildFormalReportHtml } from './ReportesExport'
 import { BitacoraEstadoBadge } from '@/components/modules/bitacora/BitacoraEstadoBadge'
 import { BitacoraMapaInline } from '@/components/modules/bitacora/BitacoraMapaInline'
 import { Portal } from '@/components/ui/Portal'
-import { showSuccessToast } from '@/hooks/useCustomToast'
+import { showSuccessToast, showErrorToast } from '@/hooks/useCustomToast'
 import { useUIStore } from '@/stores/useUIStore'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { esProyectoNoBorrador } from '@/lib/proyectos/estado'
@@ -64,6 +66,8 @@ export default function ReportesView() {
   // Modal de Historial de Reportes
   const [modalHistorialAbierto, setModalHistorialAbierto] = useState(false)
   const [historialReportes, setHistorialReportes] = useState<ReporteGeneradoRegistro[]>([])
+  const [almacenandoEnSupabase, setAlmacenandoEnSupabase] = useState(false)
+  const esContratante = useMemo(() => String(userProfile?.rol || '').toLowerCase().trim().includes('contratante'), [userProfile?.rol])
 
   // Modal de Observaciones del Contratante
   const [modalObservacionesAbierto, setModalObservacionesAbierto] = useState(false)
@@ -644,6 +648,7 @@ export default function ReportesView() {
     }
   }, [proyectosValidos])
 
+  // Solo descarga local en el navegador del usuario (NO se almacena en Supabase)
   const handleExport = async (format: 'pdf' | 'word' | 'excel') => {
     let portada = ''
     if (portadaSeleccion === 'subida') {
@@ -653,7 +658,6 @@ export default function ReportesView() {
       portada = f?.url || f?.urlMiniatura || ''
     }
 
-    // Solicitar permiso de notificación del navegador web si no se ha pedido aún
     if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
       try {
         Notification.requestPermission().catch(() => {})
@@ -671,7 +675,6 @@ export default function ReportesView() {
       portada || undefined
     )
 
-    // Registrar en el historial de reportes creados
     const proyObj = proyectosValidos.find((p) => String(p.id) === String(proyectoId))
     const proyNom = proyectoId === 'todos' ? 'Todos los Proyectos' : (proyObj?.nombreOficial || proyObj?.nombre || 'Proyecto Vial')
     const ahora = new Date()
@@ -679,87 +682,137 @@ export default function ReportesView() {
     const proyNomLimpio = proyNom
       .toLowerCase()
       .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[̀-ͯ]/g, '')
       .replace(/[^a-z0-9]/g, '_')
       .slice(0, 25)
     const extension = format === 'word' ? 'doc' : format === 'excel' ? 'xls' : 'pdf'
     const nombreArchivo = `Reporte_${proyNomLimpio}_${fechaLimpia}.${extension}`
 
     exportReport(format, html, nombreArchivo, (nombreFinal) => {
-      // Mostrar únicamente el toast oficial del sistema indicando descarga completada
       showSuccessToast(`Descarga completada: El reporte ${format.toUpperCase()} (${nombreFinal}) se ha guardado en tus descargas.`)
     })
+  }
 
-    const nombreResp =
-      userProfile?.nombre ||
-      `${userProfile?.primerNombre || ''} ${userProfile?.primerApellido || ''}`.trim() ||
-      userProfile?.correo ||
-      'Josues Da'
-
-    // Subir reporte al bucket 'reportes-domun' en Supabase Storage
-    let urlReporteGenerado = ''
-    try {
-      const blobReporte = new Blob([html], { type: 'text/html;charset=utf-8' })
-      const resSubida = await subirReporteSupabase(blobReporte, nombreArchivo, String(proyectoId))
-      urlReporteGenerado = resSubida.url || ''
-    } catch (e) {
-      console.warn('Subida a storage reportes-domun omitida:', e)
+  // Almacenar explícitamente en la nube de Supabase (Storage + BD)
+  const handleAlmacenarEnSupabase = async (format: 'pdf' | 'word' = 'pdf') => {
+    if (almacenandoEnSupabase) return
+    if (bitacoraParaReporte.length === 0 && fotosParaReporte.length === 0) {
+      showErrorToast('No hay registros ni evidencias para almacenar.')
+      return
     }
 
-    const nuevoReporte: ReporteGeneradoRegistro = {
-      id: `rep-${Date.now()}`,
-      titulo: `Reporte Formal de Obra - ${proyNom}`,
-      formato: format,
-      proyectoId: String(proyectoId),
-      proyectoNombre: proyNom,
-      fechaCreacion: ahora.toLocaleDateString('es-GT', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ', ' + ahora.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' hrs',
-      fechaIso: ahora.toISOString(),
-      cantidadRegistros: bitacoraParaReporte.length,
-      cantidadFotos: fotosParaReporte.length,
-      generadoPor: nombreResp,
-      periodo: fechaDesde && fechaHasta ? `Del ${fechaDesde} al ${fechaHasta}` : 'Periodo Completo',
-      htmlContent: html,
-      urlPdf: urlReporteGenerado,
-      urlStorage: urlReporteGenerado,
-    }
-
-    const actualizados = [nuevoReporte, ...historialReportes]
-    setHistorialReportes(actualizados)
+    setAlmacenandoEnSupabase(true)
     try {
-      localStorage.setItem('domun_reportes_historial', JSON.stringify(actualizados))
-    } catch (_) {}
-
-    // Asentar en la tabla reporte de la Base de Datos si la conexión está disponible
-    try {
-      const { api } = await import('@/lib/api/cliente')
-      const isUuid = (val: any) => typeof val === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val)
-      const validProyId = isUuid(proyectoId) ? proyectoId : (proyectosValidos.find((p: any) => isUuid(p.id))?.id || null)
-      const validUserId = isUuid(userProfile?.id) ? userProfile?.id : null
-
-      if (validProyId) {
-        await api.post('/mantenimiento/reporte', {
-          proyecto_id: validProyId,
-          generado_por: validUserId,
-          titulo: nuevoReporte.titulo,
-          tipo: 'bitacora_evidencias',
-          formato: format,
-          estado: 'generado',
-          nombre_archivo: nombreArchivo,
-          campos_incluidos: {
-            cantidad_registros: nuevoReporte.cantidadRegistros,
-            cantidad_fotos: nuevoReporte.cantidadFotos,
-          },
-          filtros_aplicados: {
-            fecha_desde: fechaDesde,
-            fecha_hasta: fechaHasta,
-            renglon: renglonFiltro,
-            periodo: nuevoReporte.periodo,
-          },
-          fecha_generacion: nuevoReporte.fechaIso,
-          url_storage: urlReporteGenerado,
-        }).catch(() => null)
+      let portada = ''
+      if (portadaSeleccion === 'subida') {
+        portada = portadaSubida
+      } else if (portadaSeleccion !== 'auto') {
+        const f = fotosParaReporte.find((x) => String(x.id) === portadaSeleccion)
+        portada = f?.url || f?.urlMiniatura || ''
       }
-    } catch (_) {}
+
+      const html = buildFormalReportHtml(
+        proyectoId,
+        fechaDesde,
+        fechaHasta,
+        renglonFiltro,
+        bitacoraParaReporte,
+        fotosParaReporte,
+        proyectosValidos,
+        portada || undefined
+      )
+
+      const proyObj = proyectosValidos.find((p) => String(p.id) === String(proyectoId))
+      const proyNom = proyectoId === 'todos' ? 'Todos los Proyectos' : (proyObj?.nombreOficial || proyObj?.nombre || 'Proyecto Vial')
+      const ahora = new Date()
+      const fechaLimpia = ahora.toISOString().slice(0, 10).replace(/-/g, '')
+      const proyNomLimpio = proyNom
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[̀-ͯ]/g, '')
+        .replace(/[^a-z0-9]/g, '_')
+        .slice(0, 25)
+      const extension = format === 'word' ? 'doc' : 'pdf'
+      const nombreArchivo = `Reporte_${proyNomLimpio}_${fechaLimpia}.${extension}`
+
+      const nombreResp =
+        userProfile?.nombre ||
+        `${userProfile?.primerNombre || ''} ${userProfile?.primerApellido || ''}`.trim() ||
+        userProfile?.correo ||
+        'Usuario Domun'
+
+      // Subir al bucket en Supabase Storage
+      let urlReporteGenerado = ''
+      try {
+        const blobReporte = new Blob([html], { type: 'text/html;charset=utf-8' })
+        const resSubida = await subirReporteSupabase(blobReporte, nombreArchivo, String(proyectoId))
+        urlReporteGenerado = resSubida.url || ''
+      } catch (e) {
+        console.warn('Subida a storage reportes-domun omitida:', e)
+      }
+
+      const nuevoReporte: ReporteGeneradoRegistro = {
+        id: `rep-${Date.now()}`,
+        titulo: `Reporte Formal de Obra - ${proyNom}`,
+        formato: format,
+        proyectoId: String(proyectoId),
+        proyectoNombre: proyNom,
+        fechaCreacion: ahora.toLocaleDateString('es-GT', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ', ' + ahora.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' hrs',
+        fechaIso: ahora.toISOString(),
+        cantidadRegistros: bitacoraParaReporte.length,
+        cantidadFotos: fotosParaReporte.length,
+        generadoPor: nombreResp,
+        periodo: fechaDesde && fechaHasta ? `Del ${fechaDesde} al ${fechaHasta}` : 'Periodo Completo',
+        htmlContent: html,
+        urlPdf: urlReporteGenerado,
+        urlStorage: urlReporteGenerado,
+      }
+
+      const actualizados = [nuevoReporte, ...historialReportes]
+      setHistorialReportes(actualizados)
+      try {
+        localStorage.setItem('domun_reportes_historial', JSON.stringify(actualizados))
+      } catch (_) {}
+
+      // Asentar en la tabla reporte de la Base de Datos
+      try {
+        const { api } = await import('@/lib/api/cliente')
+        const isUuid = (val: any) => typeof val === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val)
+        const validProyId = isUuid(proyectoId) ? proyectoId : (proyectosValidos.find((p: any) => isUuid(p.id))?.id || null)
+        const validUserId = isUuid(userProfile?.id) ? userProfile?.id : null
+
+        if (validProyId) {
+          await api.post('/mantenimiento/reporte', {
+            proyecto_id: validProyId,
+            generado_por: validUserId,
+            titulo: nuevoReporte.titulo,
+            tipo: 'bitacora_evidencias',
+            formato: format,
+            estado: 'generado',
+            nombre_archivo: nombreArchivo,
+            campos_incluidos: {
+              cantidad_registros: nuevoReporte.cantidadRegistros,
+              cantidad_fotos: nuevoReporte.cantidadFotos,
+            },
+            filtros_aplicados: {
+              fecha_desde: fechaDesde,
+              fecha_hasta: fechaHasta,
+              renglon: renglonFiltro,
+              periodo: nuevoReporte.periodo,
+            },
+            fecha_generacion: nuevoReporte.fechaIso,
+            url_storage: urlReporteGenerado,
+          }).catch(() => null)
+        }
+      } catch (_) {}
+
+      showSuccessToast('Reporte almacenado exitosamente en Supabase.')
+    } catch (err: any) {
+      console.error('Error al almacenar reporte en Supabase:', err)
+      showErrorToast('No se pudo almacenar el reporte en Supabase.')
+    } finally {
+      setAlmacenandoEnSupabase(false)
+    }
   }
 
   // Disparo automático de generación si proviene de DomunBot AI u otro enlace con parámetro auto=true
@@ -915,7 +968,7 @@ export default function ReportesView() {
           })()}
         </div>
 
-        {/* Barra de Exportación con Word y PDF */}
+        {/* Barra de Exportación con Descargar (Word / PDF) y Almacenar en Supabase */}
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2.5 border-t border-gray-100 pt-3">
           <p className="text-[11px] sm:text-[10px] text-gray-500 font-medium">
             Se exportarán {bitacoraParaReporte.length} registros y {fotosParaReporte.length} imágenes.
@@ -925,6 +978,7 @@ export default function ReportesView() {
               disabled={bitacoraParaReporte.length === 0 && fotosParaReporte.length === 0}
               onClick={() => handleExport('word')}
               className="flex-1 sm:flex-initial inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3.5 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50 hover:border-gray-300 disabled:cursor-not-allowed disabled:opacity-40 shadow-2xs cursor-pointer active:scale-95"
+              title="Descargar documento Word en tus descargas"
             >
               <FileText size={14} className="text-gray-500" />
               <span>Word</span>
@@ -932,11 +986,32 @@ export default function ReportesView() {
             <button
               disabled={bitacoraParaReporte.length === 0 && fotosParaReporte.length === 0}
               onClick={() => handleExport('pdf')}
-              className="flex-1 sm:flex-initial inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-[#9B0F06] px-3.5 text-xs font-semibold text-white transition-colors hover:bg-[#5E0006] disabled:cursor-not-allowed disabled:opacity-40 shadow-2xs cursor-pointer active:scale-95"
+              className="flex-1 sm:flex-initial inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3.5 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50 hover:border-gray-300 disabled:cursor-not-allowed disabled:opacity-40 shadow-2xs cursor-pointer active:scale-95"
+              title="Descargar documento PDF en tus descargas"
             >
-              <FileType size={14} className="text-white" />
+              <FileType size={14} className="text-gray-500" />
               <span>PDF</span>
             </button>
+            {!esContratante && (
+              <button
+                disabled={almacenandoEnSupabase || (bitacoraParaReporte.length === 0 && fotosParaReporte.length === 0)}
+                onClick={() => handleAlmacenarEnSupabase('pdf')}
+                className="flex-1 sm:flex-initial inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-[#9B0F06] px-3.5 text-xs font-semibold text-white transition-colors hover:bg-[#5E0006] disabled:cursor-not-allowed disabled:opacity-40 shadow-2xs cursor-pointer active:scale-95"
+                title="Almacenar reporte en Supabase (Nube)"
+              >
+                {almacenandoEnSupabase ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin text-white" />
+                    <span>Almacenando...</span>
+                  </>
+                ) : (
+                  <>
+                    <UploadCloud size={14} className="text-white" />
+                    <span>Almacenar</span>
+                  </>
+                )}
+              </button>
+            )}
           </div>
         </div>
       </section>

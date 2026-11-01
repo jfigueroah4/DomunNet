@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { api, apiGetDeduplicado } from '@/lib/api/cliente'
 import { EmpresaRelacionada } from '@/stores/useEmpresasRelacionadasStore'
+import { Portal } from '@/components/ui/Portal'
 
 export interface ProyectoVinculadoItem {
   id: string
@@ -438,7 +439,8 @@ export function ProyectosVinculadosModal({
   if (!isOpen || !empresa) return null
 
   return (
-    <div
+    <Portal>
+      <div
       className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/50 backdrop-blur-xs font-[Poppins] animate-in fade-in duration-200"
       onClick={onClose}
     >
@@ -615,6 +617,7 @@ export function ProyectosVinculadosModal({
           </button>
         </div>
       </div>
-    </div>
+      </div>
+    </Portal>
   )
 }

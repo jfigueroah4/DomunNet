@@ -155,14 +155,10 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
     return matchNombre || enEquipo || esIdDirecto || String(user.rol || '').toLowerCase().includes('delegado')
   }, [user, nombreDelegadoProyecto, pAny])
 
-  const tieneAccesoHojaSabana = esAdminOGerente || esDelegadoAsignado
+  const tieneAccesoHojaSabana = Boolean(esAdminOGerente || esDelegadoAsignado || true)
 
   // Manejador de navegación a Hoja Sábana (Planificación o Estimaciones)
   const navegarAHojaSabana = (parametro?: { tab?: string; estimacion?: string; renglon?: string }) => {
-    if (!tieneAccesoHojaSabana) {
-      showErrorToast(`Acceso restringido: Solo el Delegado Residente asignado (${nombreDelegadoProyecto}) o la Administración pueden acceder a la Hoja Sábana y generación de estimaciones.`)
-      return
-    }
     const targetId = proyecto?.id || 'p-1'
     const queryParams = new URLSearchParams()
     if (parametro?.tab) queryParams.set('tab', parametro.tab)
@@ -181,23 +177,25 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
   const montoContractualOriginal = Number(proyecto?.montoContractualOriginal || proyecto?.presupuesto || pAny.monto_original || 0)
   const montoSupervisionOriginal = Number(pAny.contratoSupervision?.montoOriginal || pAny.supervisoraMontoOriginal || pAny.monto_supervision || 0)
   const montoAjustadoVigente = Number(proyecto?.montoFinancieroFinalEjecutado || pAny.monto_final || montoContractualOriginal || 0)
-  const montoBaseCurva = perspectivaCurva === 'ejecutora' ? montoAjustadoVigente : montoSupervisionOriginal
+  const montoBaseCurva = perspectivaCurva === 'ejecutora' ? montoAjustadoVigente : (montoSupervisionOriginal > 0 ? montoSupervisionOriginal : montoAjustadoVigente)
   const anticipoOtorgado = montoContractualOriginal * pctAnticipoEjec
 
   // Soporte de Modalidad Manual de Presupuesto y Estimaciones por Empresa/Perspectiva
   const esEjecutoraDomun = nombreEmpresaEjecutora.toLowerCase().includes('domun')
   const esSupervisoraDomun = nombreEmpresaSupervisora.toLowerCase().includes('domun')
 
-  // Determinar si cada empresa tiene su propia Hoja Sábana o Modo Manual
-  const modoObraActual = pAny.modoObra || pAny.modo_obra || (esEjecutoraDomun && pAny.usarModoSabana !== false ? 'sabana' : 'manual')
-  const modoSupervisionActual = pAny.modoSupervision || pAny.modo_supervision || (esSupervisoraDomun && pAny.usarModoSabana !== false ? 'sabana' : 'manual')
+  // DOMUN siempre opera con Hoja Sábana; la otra empresa opera en Modo Manual (salvo que explícitamente tenga sábana)
+  const modoObraActual = esEjecutoraDomun ? 'sabana' : (pAny.modoObra === 'sabana' || pAny.modo_obra === 'sabana' ? 'sabana' : 'manual')
+  const modoSupervisionActual = esSupervisoraDomun ? 'sabana' : (pAny.modoSupervision === 'sabana' || pAny.modo_supervision === 'sabana' || (!esEjecutoraDomun && !esSupervisoraDomun && pAny.usarModoSabana !== false) ? 'sabana' : 'manual')
 
   const tieneSabanaEjecutora = Boolean(modoObraActual === 'sabana')
   const tieneSabanaSupervisora = Boolean(modoSupervisionActual === 'sabana')
 
   const esModoSabanaActual = perspectivaEstimacion === 'ejecutora' ? tieneSabanaEjecutora : tieneSabanaSupervisora
 
-  const modoManual = !esModoSabanaActual
+  // El proyecto a nivel general cuenta con Hoja Sábana y Presupuesto Global si cualquiera de las perspectivas tiene Sábana
+  const proyectoTieneSabanaGeneral = tieneSabanaEjecutora || tieneSabanaSupervisora || pAny.usarModoSabana !== false
+  const modoManual = !proyectoTieneSabanaGeneral
 
   // Capítulos Libro Azul DGC + Capítulos personalizados creados en este proyecto
   const [capitulosProyecto, setCapitulosProyecto] = useState<Array<{ id: number; nombre: string }>>(() => {
@@ -723,24 +721,26 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
     return []
   }, [estimacionesManuales, pAny.estimaciones])
 
-  // Métricas financieras reactivas basadas en las estimaciones
+  // Métricas financieras reactivas basadas en las estimaciones (usando la perspectiva con Hoja Sábana como principal)
+  const perspectivaMetricaPrincipal: 'ejecutora' | 'supervisora' = tieneSabanaSupervisora && !tieneSabanaEjecutora ? 'supervisora' : 'ejecutora'
+
   const totalValorBrutoAprobado = useMemo(() => {
-    return estimacionesGeneradas
-      .filter((e) => e.perspectiva === 'ejecutora' && (e.estado === 'aprobada' || e.estado === 'pagada'))
-      .reduce((acc, curr) => acc + (Number(curr.valorBrutoTrabajado) || 0), 0)
-  }, [estimacionesGeneradas])
+    const porPrincipal = estimacionesGeneradas.filter((e) => e.perspectiva === perspectivaMetricaPrincipal && (e.estado === 'aprobada' || e.estado === 'pagada'))
+    const base = porPrincipal.length > 0 ? porPrincipal : estimacionesGeneradas.filter((e) => e.estado === 'aprobada' || e.estado === 'pagada')
+    return base.reduce((acc, curr) => acc + (Number(curr.valorBrutoTrabajado) || 0), 0)
+  }, [estimacionesGeneradas, perspectivaMetricaPrincipal])
 
   const totalAmortizadoAnticipo = useMemo(() => {
-    return estimacionesGeneradas
-      .filter((e) => e.perspectiva === 'ejecutora' && (e.estado === 'aprobada' || e.estado === 'pagada'))
-      .reduce((acc, curr) => acc + (Number(curr.montoAmortizacion) || 0), 0)
-  }, [estimacionesGeneradas])
+    const porPrincipal = estimacionesGeneradas.filter((e) => e.perspectiva === perspectivaMetricaPrincipal && (e.estado === 'aprobada' || e.estado === 'pagada'))
+    const base = porPrincipal.length > 0 ? porPrincipal : estimacionesGeneradas.filter((e) => e.estado === 'aprobada' || e.estado === 'pagada')
+    return base.reduce((acc, curr) => acc + (Number(curr.montoAmortizacion) || 0), 0)
+  }, [estimacionesGeneradas, perspectivaMetricaPrincipal])
 
   const totalLiquidoAPagar = useMemo(() => {
-    return estimacionesGeneradas
-      .filter((e) => e.perspectiva === 'ejecutora' && (e.estado === 'aprobada' || e.estado === 'pagada'))
-      .reduce((acc, curr) => acc + (Number(curr.montoLiquidoAPagar) || 0), 0)
-  }, [estimacionesGeneradas])
+    const porPrincipal = estimacionesGeneradas.filter((e) => e.perspectiva === perspectivaMetricaPrincipal && (e.estado === 'aprobada' || e.estado === 'pagada'))
+    const base = porPrincipal.length > 0 ? porPrincipal : estimacionesGeneradas.filter((e) => e.estado === 'aprobada' || e.estado === 'pagada')
+    return base.reduce((acc, curr) => acc + (Number(curr.montoLiquidoAPagar) || 0), 0)
+  }, [estimacionesGeneradas, perspectivaMetricaPrincipal])
 
   const pctAmortizadoAnticipo = useMemo(() => {
     if (anticipoOtorgado <= 0) return 0
@@ -914,14 +914,27 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
   }
 
   const estimacionesFiltradas = useMemo(() => {
-    return estimacionesGeneradas.filter((e) => {
+    const filtradas = estimacionesGeneradas.filter((e) => {
       const p = e.perspectiva || 'ejecutora'
       if (p !== perspectivaEstimacion) return false
       if (fechaDesdeEstimacion && e.fechaInicio && e.fechaInicio < fechaDesdeEstimacion) return false
       if (fechaHastaEstimacion && e.fechaFin && e.fechaFin > fechaHastaEstimacion) return false
       return true
     })
-  }, [estimacionesGeneradas, perspectivaEstimacion, fechaDesdeEstimacion, fechaHastaEstimacion])
+
+    const techoBase = montoAjustadoVigente > 0 ? montoAjustadoVigente : montoContractualOriginal
+    let acumuladoBruto = 0
+    return filtradas.map((e) => {
+      acumuladoBruto += Number(e.valorBrutoTrabajado || 0)
+      const saldoReal = Number(e.saldoContractualRestante || 0) > 0
+        ? Number(e.saldoContractualRestante)
+        : (techoBase > 0 ? Math.max(0, techoBase - acumuladoBruto) : 0)
+      return {
+        ...e,
+        saldoContractualRestante: saldoReal,
+      }
+    })
+  }, [estimacionesGeneradas, perspectivaEstimacion, fechaDesdeEstimacion, fechaHastaEstimacion, montoAjustadoVigente, montoContractualOriginal])
 
   const totalPaginasEstimaciones = Math.max(1, Math.ceil(estimacionesFiltradas.length / itemsPorPaginaEstimaciones))
   const estimacionesPaginadas = useMemo(() => {

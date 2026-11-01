@@ -538,6 +538,10 @@ function SelectorMapaInteractivo({
   const [avisoBusqueda, setAvisoBusqueda] = useState<string | null>(null)
   const [mapaListo, setMapaListo] = useState(false)
   const ultimaDireccionFinalBuscadaRef = useRef('')
+  const departamentosRef = useRef<any[]>(departamentos || [])
+  const municipiosRef = useRef<any[]>(municipios || [])
+  departamentosRef.current = departamentos || []
+  municipiosRef.current = municipios || []
 
   const sonDireccionesIdenticas = useMemo(() => {
     return Boolean(
@@ -637,6 +641,8 @@ function SelectorMapaInteractivo({
     const setDep = tipo === 'inicio' ? setDepartamentoId : setDepartamentoFinId
     const setMun = tipo === 'inicio' ? setMunicipioId : setMunicipioFinId
     if (!setDep || !setMun) return
+    const departamentos = departamentosRef.current?.length ? departamentosRef.current : []
+    const municipios = municipiosRef.current?.length ? municipiosRef.current : []
 
     const rawState = address?.state || address?.province || address?.region || ''
     const stateNorm = normalizarTexto(rawState)
@@ -1618,7 +1624,15 @@ let ubicacionPromiseGlobal: Promise<any> | null = null
 let empresasPromiseGlobal: Promise<any> | null = null
 
 function cargarUbicacionGlobal() {
-  if (catalogoCacheGlobal.departamentos && catalogoCacheGlobal.municipios) {
+  const tieneUuidsEnCache =
+    Array.isArray(catalogoCacheGlobal.departamentos) &&
+    catalogoCacheGlobal.departamentos.length > 0 &&
+    String(catalogoCacheGlobal.departamentos[0]?.id || '').length > 10 &&
+    Array.isArray(catalogoCacheGlobal.municipios) &&
+    catalogoCacheGlobal.municipios.length > 0 &&
+    String(catalogoCacheGlobal.municipios[0]?.id || '').length > 10
+
+  if (tieneUuidsEnCache) {
     return Promise.resolve({
       departamentos: catalogoCacheGlobal.departamentos,
       municipios: catalogoCacheGlobal.municipios,
@@ -1629,10 +1643,14 @@ function cargarUbicacionGlobal() {
       apiGetDeduplicado('/mantenimiento/departamento?limite=500').then((r) => r.data?.data || []).catch(() => []),
       apiGetDeduplicado('/mantenimiento/municipio?limite=500').then((r) => r.data?.data || []).catch(() => []),
     ]).then(([deps, muns]) => {
-      const departamentos = Array.isArray(deps) && deps.length > 0 ? deps : DEPARTAMENTOS_GUATEMALA_FALLBACK
-      const municipios = Array.isArray(muns) && muns.length > 0 ? muns : MUNICIPIOS_GUATEMALA_FALLBACK
-      catalogoCacheGlobal.departamentos = departamentos
-      catalogoCacheGlobal.municipios = municipios
+      const tieneDepsReales = Array.isArray(deps) && deps.length > 0
+      const tieneMunsReales = Array.isArray(muns) && muns.length > 0
+      const departamentos = tieneDepsReales ? deps : DEPARTAMENTOS_GUATEMALA_FALLBACK
+      const municipios = tieneMunsReales ? muns : MUNICIPIOS_GUATEMALA_FALLBACK
+      if (tieneDepsReales && tieneMunsReales) {
+        catalogoCacheGlobal.departamentos = departamentos
+        catalogoCacheGlobal.municipios = municipios
+      }
       return { departamentos, municipios }
     }).finally(() => {
       ubicacionPromiseGlobal = null
@@ -2286,6 +2304,114 @@ export function ProyectoFormulario({
       return () => clearTimeout(timer)
     }
   }, [pasoActual, esEditar, cargarUsuarios, usuariosDisponibles])
+
+  // Sincronizar IDs de departamento/municipio cuando el catálogo real con UUIDs carga o cuando hay texto de dirección
+  useEffect(() => {
+    if (!Array.isArray(departamentos) || departamentos.length === 0 || !Array.isArray(municipios) || municipios.length === 0) return
+
+    const resolverParGeo = (
+      currDepId: any,
+      currMunId: any,
+      nomDepHint: string,
+      nomMunHint: string,
+      textoDir: string,
+      fallbackDepId?: any,
+      fallbackMunId?: any
+    ) => {
+      let depRes = currDepId ? String(currDepId) : ''
+      let munRes = currMunId ? String(currMunId) : ''
+
+      const existeDep = depRes && departamentos.some((d: any) => String(d.id) === depRes)
+      if (!existeDep) {
+        const fbDep = DEPARTAMENTOS_GUATEMALA_FALLBACK.find((d) => String(d.id) === depRes)
+        const busqNom = normalizarTexto(fbDep?.nombre || nomDepHint || depRes)
+        if (busqNom) {
+          const match = departamentos.find((d: any) => normalizarTexto(d.nombre) === busqNom || normalizarTexto(d.nombre).includes(busqNom))
+          if (match) depRes = String(match.id)
+        }
+      }
+
+      const existeMun = munRes && municipios.some((m: any) => String(m.id) === munRes)
+      if (!existeMun) {
+        const fbMun = MUNICIPIOS_GUATEMALA_FALLBACK.find((m) => String(m.id) === munRes)
+        const busqNom = normalizarTexto((fbMun?.nombre || nomMunHint || munRes).replace(/\s*\(ciudad\)\s*/gi, ''))
+        if (busqNom) {
+          const match = municipios.find(
+            (m: any) =>
+              (!depRes || String(m.departamento_id) === depRes) &&
+              (normalizarTexto(m.nombre) === busqNom || normalizarTexto(m.nombre).includes(busqNom))
+          ) || municipios.find((m: any) => normalizarTexto(m.nombre) === busqNom || normalizarTexto(m.nombre).includes(busqNom))
+          if (match) {
+            munRes = String(match.id)
+            if (!depRes && match.departamento_id) depRes = String(match.departamento_id)
+          }
+        }
+      }
+
+      const textoNorm = normalizarTexto(textoDir || '')
+      if ((!existeDep && !depRes) || (!existeMun && !munRes)) {
+        if (!munRes && textoNorm) {
+          const munsSorted = [...municipios].sort((a: any, b: any) => String(b.nombre || '').length - String(a.nombre || '').length)
+          const munMatch =
+            munsSorted.find((m: any) => {
+              const mn = normalizarTexto(String(m.nombre || '').replace(/\s*\(ciudad\)\s*/gi, ''))
+              return mn.length > 3 && mn !== 'guatemala' && textoNorm.includes(mn)
+            }) ||
+            munsSorted.find((m: any) => {
+              const mn = normalizarTexto(String(m.nombre || '').replace(/\s*\(ciudad\)\s*/gi, ''))
+              return mn.length > 3 && textoNorm.includes(mn)
+            })
+          if (munMatch) {
+            munRes = String(munMatch.id)
+            if (!depRes && munMatch.departamento_id) depRes = String(munMatch.departamento_id)
+          }
+        }
+        if (!depRes && textoNorm) {
+          const depMatch = departamentos.find((d: any) => {
+            const dn = normalizarTexto(d.nombre)
+            return dn.length > 3 && textoNorm.includes(dn)
+          })
+          if (depMatch) depRes = String(depMatch.id)
+        }
+      }
+
+      if (!depRes && fallbackDepId && departamentos.some((d: any) => String(d.id) === String(fallbackDepId))) {
+        depRes = String(fallbackDepId)
+      }
+      if (!munRes && fallbackMunId && municipios.some((m: any) => String(m.id) === String(fallbackMunId))) {
+        munRes = String(fallbackMunId)
+      }
+      if (munRes && !depRes) {
+        const munObj = municipios.find((m: any) => String(m.id) === munRes)
+        if (munObj?.departamento_id) depRes = String(munObj.departamento_id)
+      }
+
+      return { depRes, munRes }
+    }
+
+    const pAny = (proyectoInicial as any) || {}
+    const ini = resolverParGeo(
+      departamentoId,
+      municipioId,
+      pAny.departamentoNombre || pAny.departamento_nombre || '',
+      pAny.municipioNombre || pAny.municipio_nombre || '',
+      `${direccion || ''} ${ubicacionFisica || ''}`,
+      departamentoFinId || pAny.departamentoFinId || pAny.departamento_fin_id,
+      municipioFinId || pAny.municipioFinId || pAny.municipio_fin_id
+    )
+    if (ini.depRes && ini.depRes !== String(departamentoId || '')) setDepartamentoId(ini.depRes)
+    if (ini.munRes && ini.munRes !== String(municipioId || '')) setMunicipioId(ini.munRes)
+
+    const fin = resolverParGeo(
+      departamentoFinId,
+      municipioFinId,
+      pAny.departamentoFinNombre || pAny.departamento_fin_nombre || '',
+      pAny.municipioFinNombre || pAny.municipio_fin_nombre || '',
+      direccionFin || ''
+    )
+    if (fin.depRes && fin.depRes !== String(departamentoFinId || '')) setDepartamentoFinId(fin.depRes)
+    if (fin.munRes && fin.munRes !== String(municipioFinId || '')) setMunicipioFinId(fin.munRes)
+  }, [departamentos, municipios, direccion, ubicacionFisica, direccionFin])
 
   // Auto-llenar datos de Contratista al seleccionar del combobox
   const handleSelectContratista = (val: string) => {

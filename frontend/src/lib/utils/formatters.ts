@@ -65,6 +65,20 @@ export function formatearRangoFechas(inicio?: string | null, fin?: string | null
 export function tieneModoSabanaActivo(proyecto: any): boolean {
   if (!proyecto) return false
   const pAny = proyecto as any
+  const supDomun = String(pAny.empresaSupervisora || pAny.empresa_supervisora || '').toLowerCase().includes('domun')
+  const ejecDomun = String(pAny.empresaContratista || pAny.empresa_contratista || '').toLowerCase().includes('domun')
+  if (supDomun || ejecDomun) return true
+
+  const tieneRenglonesOMonto = Boolean(
+    (Array.isArray(pAny.renglon_trabajo) && pAny.renglon_trabajo.length > 0) ||
+    (Array.isArray(pAny.renglones) && pAny.renglones.length > 0) ||
+    (Array.isArray(pAny.planTrabajo) && pAny.planTrabajo.length > 0) ||
+    (Array.isArray(pAny.renglones_sabana) && pAny.renglones_sabana.length > 0) ||
+    Number(pAny.totalRenglones) > 0 ||
+    Number(pAny.presupuesto || pAny.montoContractualOriginal || pAny.monto_original) > 0
+  )
+  if (tieneRenglonesOMonto) return true
+
   if (pAny.modoGestionFinanciera === 'manual' || pAny.modo_gestion_financiera === 'manual' || pAny.usarModoSabana === false) {
     return false
   }
@@ -72,24 +86,19 @@ export function tieneModoSabanaActivo(proyecto: any): boolean {
     pAny.tieneSabana ||
     pAny.usarModoSabana === true ||
     pAny.modoGestionFinanciera === 'sabana' ||
-    pAny.modo_gestion_financiera === 'sabana' ||
-    (Array.isArray(pAny.renglon_trabajo) && pAny.renglon_trabajo.length > 0) ||
-    (Array.isArray(pAny.renglones) && pAny.renglones.length > 0) ||
-    (Array.isArray(pAny.planTrabajo) && pAny.planTrabajo.length > 0) ||
-    (Array.isArray(pAny.renglones_sabana) && pAny.renglones_sabana.length > 0) ||
-    (Number(pAny.totalRenglones) > 0)
+    pAny.modo_gestion_financiera === 'sabana'
   )
 }
 
 /**
  * Regla de negocio: En la información general de los proyectos, Monto y Avance
- * solo se muestran si el proyecto NO está en estado borrador y tiene modo sábana activado.
+ * se muestran siempre que el proyecto NO esté en estado borrador.
  */
 export function debeMostrarMontoYAvance(proyecto: any): boolean {
   if (!proyecto) return false
   const estado = String(proyecto.estado || '').toLowerCase().trim()
   if (estado === 'borrador') return false
-  return tieneModoSabanaActivo(proyecto)
+  return true
 }
 
 /**

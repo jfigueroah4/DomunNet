@@ -90,6 +90,171 @@ export function esUuidValido(val: any): string | null {
   return uuidRegex.test(val.trim()) ? val.trim() : null
 }
 
+const FALLBACK_DEPTO_ID_TO_NOMBRE: Record<string, string> = {
+  '1': 'Guatemala', '2': 'El Progreso', '3': 'Sacatepéquez', '4': 'Chimaltenango',
+  '5': 'Escuintla', '6': 'Santa Rosa', '7': 'Sololá', '8': 'Totonicapán',
+  '9': 'Quetzaltenango', '10': 'Suchitepéquez', '11': 'Retalhuleu', '12': 'San Marcos',
+  '13': 'Huehuetenango', '14': 'Quiché', '15': 'Baja Verapaz', '16': 'Alta Verapaz',
+  '17': 'Petén', '18': 'Izabal', '19': 'Zacapa', '20': 'Chiquimula',
+  '21': 'Jalapa', '22': 'Jutiapa',
+}
+
+const FALLBACK_MUNI_ID_TO_NOMBRE: Record<string, string> = {
+  '101': 'Guatemala', '102': 'Mixco', '103': 'Villa Nueva', '104': 'Santa Catarina Pinula',
+  '105': 'San Miguel Petapa', '106': 'Amatitlán', '107': 'San José Pinula', '108': 'Palencia',
+  '109': 'Chinautla', '201': 'Guastatoya', '202': 'Sanarate', '301': 'Antigua Guatemala',
+  '302': 'San Lucas Sacatepéquez', '303': 'Ciudad Vieja', '401': 'Chimaltenango', '402': 'El Tejar',
+  '403': 'Patzicía', '501': 'Escuintla', '502': 'Santa Lucía Cotzumalguapa', '503': 'Puerto San José',
+  '504': 'Palín', '601': 'Cuilapa', '602': 'Barberena', '701': 'Sololá', '702': 'Panajachel',
+  '801': 'Totonicapán', '901': 'Quetzaltenango', '902': 'Salcajá', '903': 'Coatepeque',
+  '1001': 'Mazatenango', '1101': 'Retalhuleu', '1201': 'San Marcos', '1202': 'San Pedro Sacatepéquez',
+  '1301': 'Huehuetenango', '1302': 'Chiantla', '1401': 'Santa Cruz del Quiché', '1501': 'Salamá',
+  '1601': 'Cobán', '1602': 'San Pedro Carchá', '1701': 'Flores', '1702': 'San Benito',
+  '1703': 'Santa Elena', '1801': 'Puerto Barrios', '1802': 'Morales', '1901': 'Zacapa',
+  '2001': 'Chiquimula', '2101': 'Jalapa', '2201': 'Jutiapa',
+}
+
+let cacheCatalogoGeo: {
+  departamentos: Array<{ id: string; nombre: string }>;
+  municipios: Array<{ id: string; nombre: string; departamento_id: string }>;
+  timestamp: number;
+} | null = null
+
+function normGeo(s: any): string {
+  return String(s || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+}
+
+async function obtenerCatalogoGeografico() {
+  if (cacheCatalogoGeo && Date.now() - cacheCatalogoGeo.timestamp < 10 * 60 * 1000) {
+    return cacheCatalogoGeo
+  }
+  const [depRes, munRes] = await Promise.all([
+    clienteSupabase.from('departamento').select('id, nombre'),
+    clienteSupabase.from('municipio').select('id, nombre, departamento_id'),
+  ])
+  cacheCatalogoGeo = {
+    departamentos: depRes.data || [],
+    municipios: munRes.data || [],
+    timestamp: Date.now(),
+  }
+  return cacheCatalogoGeo
+}
+
+async function resolverUbicacionCompleta(params: {
+  departamentoId?: any;
+  municipioId?: any;
+  departamentoNombre?: any;
+  municipioNombre?: any;
+  direccionTexto?: any;
+  fallbackDeptoId?: any;
+  fallbackMuniId?: any;
+}): Promise<{
+  departamentoId: string | null;
+  departamentoNombre: string;
+  municipioId: string | null;
+  municipioNombre: string;
+}> {
+  const geo = await obtenerCatalogoGeografico()
+  const { departamentos, municipios } = geo
+
+  let depUuid = esUuidValido(params.departamentoId)
+  let munUuid = esUuidValido(params.municipioId)
+
+  // 1. Si enviaron ID numérico del fallback frontend (ej. 1 o "1", 103 o "103") o nombre
+  if (!depUuid && params.departamentoId != null && String(params.departamentoId).trim() !== '') {
+    const rawStr = String(params.departamentoId).trim()
+    const nomBuscado = normGeo(FALLBACK_DEPTO_ID_TO_NOMBRE[rawStr] || rawStr)
+    const found = departamentos.find((d) => normGeo(d.nombre) === nomBuscado || normGeo(d.nombre).includes(nomBuscado))
+    if (found) depUuid = found.id
+  }
+
+  if (!depUuid && params.departamentoNombre) {
+    const nomBuscado = normGeo(params.departamentoNombre)
+    const found = departamentos.find((d) => normGeo(d.nombre) === nomBuscado || normGeo(d.nombre).includes(nomBuscado))
+    if (found) depUuid = found.id
+  }
+
+  if (!munUuid && params.municipioId != null && String(params.municipioId).trim() !== '') {
+    const rawStr = String(params.municipioId).trim()
+    const nomBuscado = normGeo(FALLBACK_MUNI_ID_TO_NOMBRE[rawStr] || rawStr)
+    const found = municipios.find((m) =>
+      (!depUuid || m.departamento_id === depUuid) &&
+      (normGeo(m.nombre) === nomBuscado || normGeo(m.nombre).includes(nomBuscado) || nomBuscado.includes(normGeo(m.nombre)))
+    ) || municipios.find((m) => normGeo(m.nombre) === nomBuscado || normGeo(m.nombre).includes(nomBuscado))
+    if (found) {
+      munUuid = found.id
+      if (!depUuid && found.departamento_id) depUuid = found.departamento_id
+    }
+  }
+
+  if (!munUuid && params.municipioNombre) {
+    const nomBuscado = normGeo(params.municipioNombre)
+    const found = municipios.find((m) =>
+      (!depUuid || m.departamento_id === depUuid) &&
+      (normGeo(m.nombre) === nomBuscado || normGeo(m.nombre).includes(nomBuscado))
+    ) || municipios.find((m) => normGeo(m.nombre) === nomBuscado)
+    if (found) {
+      munUuid = found.id
+      if (!depUuid && found.departamento_id) depUuid = found.departamento_id
+    }
+  }
+
+  // 2. Inferir desde texto de dirección/tramo si aún falta municipio o departamento
+  const textoNorm = normGeo(params.direccionTexto)
+  if ((!depUuid || !munUuid) && textoNorm) {
+    if (!munUuid) {
+      // Buscar municipio mencionado en la dirección (ordenando por longitud de nombre descendente para evitar falsos positivos con "Guatemala")
+      const munisOrdenados = [...municipios].sort((a, b) => b.nombre.length - a.nombre.length)
+      const munEnTexto = munisOrdenados.find((m) => {
+        const mNom = normGeo(m.nombre).replace(/\s*\(ciudad\)\s*/g, '').trim()
+        return mNom.length > 3 && mNom !== 'guatemala' && textoNorm.includes(mNom)
+      }) || munisOrdenados.find((m) => {
+        const mNom = normGeo(m.nombre).replace(/\s*\(ciudad\)\s*/g, '').trim()
+        return mNom.length > 3 && textoNorm.includes(mNom)
+      })
+      if (munEnTexto) {
+        munUuid = munEnTexto.id
+        if (!depUuid && munEnTexto.departamento_id) depUuid = munEnTexto.departamento_id
+      }
+    }
+    if (!depUuid) {
+      const depEnTexto = departamentos.find((d) => {
+        const dNom = normGeo(d.nombre)
+        return dNom.length > 3 && textoNorm.includes(dNom)
+      })
+      if (depEnTexto) depUuid = depEnTexto.id
+    }
+  }
+
+  // 3. Fallback a departamento_fin_id / municipio_fin_id si sigue vacío
+  if (!depUuid && esUuidValido(params.fallbackDeptoId)) {
+    depUuid = esUuidValido(params.fallbackDeptoId)
+  }
+  if (!munUuid && esUuidValido(params.fallbackMuniId)) {
+    munUuid = esUuidValido(params.fallbackMuniId)
+  }
+
+  // Si tenemos municipio pero no departamento, derivar el departamento del municipio
+  if (munUuid && !depUuid) {
+    const munObj = municipios.find((m) => m.id === munUuid)
+    if (munObj?.departamento_id) depUuid = munObj.departamento_id
+  }
+
+  const depObj = depUuid ? departamentos.find((d) => d.id === depUuid) : null
+  const munObj = munUuid ? municipios.find((m) => m.id === munUuid) : null
+
+  return {
+    departamentoId: depUuid || null,
+    departamentoNombre: depObj?.nombre || '',
+    municipioId: munUuid || null,
+    municipioNombre: munObj?.nombre || '',
+  }
+}
+
 async function resolverUsuarioIdPorNombre(nombre: unknown): Promise<string | null> {
   if (typeof nombre !== 'string' || !nombre.trim()) return null
   const buscado = nombre.trim().toLowerCase()
@@ -594,20 +759,43 @@ export async function obtenerProyectoPorId(proyectoId: string) {
   if (proyectoRes.error || !proyectoRes.data) throw new Error('Proyecto no encontrado')
   const proyecto = proyectoRes.data
   const detalle: any = detalleRes.data || {}
-  const [departamentoInicioRes, municipioInicioRes, departamentoFinRes, municipioFinRes] = await Promise.all([
-    detalle.departamento_id
-      ? clienteSupabase.from('departamento').select('nombre').eq('id', detalle.departamento_id).maybeSingle()
-      : Promise.resolve({ data: null }),
-    detalle.municipio_id
-      ? clienteSupabase.from('municipio').select('nombre').eq('id', detalle.municipio_id).maybeSingle()
-      : Promise.resolve({ data: null }),
-    detalle.departamento_fin_id
-      ? clienteSupabase.from('departamento').select('nombre').eq('id', detalle.departamento_fin_id).maybeSingle()
-      : Promise.resolve({ data: null }),
-    detalle.municipio_fin_id
-      ? clienteSupabase.from('municipio').select('nombre').eq('id', detalle.municipio_fin_id).maybeSingle()
-      : Promise.resolve({ data: null }),
+  const [ubicacionInicioResuelta, ubicacionFinResuelta] = await Promise.all([
+    resolverUbicacionCompleta({
+      departamentoId: detalle.departamento_id,
+      municipioId: detalle.municipio_id,
+      direccionTexto: detalle.direccion || detalle.tramo || proyecto.ubicacion,
+      fallbackDeptoId: detalle.departamento_fin_id,
+      fallbackMuniId: detalle.municipio_fin_id,
+    }),
+    resolverUbicacionCompleta({
+      departamentoId: detalle.departamento_fin_id,
+      municipioId: detalle.municipio_fin_id,
+      direccionTexto: detalle.direccion_fin,
+      fallbackDeptoId: detalle.departamento_id,
+      fallbackMuniId: detalle.municipio_id,
+    }),
   ])
+
+  // Auto-reparar en BD si departamento_id o municipio_id estaban nulos pero pudieron inferirse
+  if (
+    (!detalle.departamento_id && ubicacionInicioResuelta.departamentoId) ||
+    (!detalle.municipio_id && ubicacionInicioResuelta.municipioId)
+  ) {
+    const healPayload: Record<string, any> = {}
+    if (!detalle.departamento_id && ubicacionInicioResuelta.departamentoId) {
+      healPayload.departamento_id = ubicacionInicioResuelta.departamentoId
+      detalle.departamento_id = ubicacionInicioResuelta.departamentoId
+    }
+    if (!detalle.municipio_id && ubicacionInicioResuelta.municipioId) {
+      healPayload.municipio_id = ubicacionInicioResuelta.municipioId
+      detalle.municipio_id = ubicacionInicioResuelta.municipioId
+    }
+    clienteSupabase
+      .from('proyecto_detalle')
+      .update(healPayload)
+      .eq('proyecto_id', proyectoId)
+      .then(() => {})
+  }
 
   function extraerCodigoRenglon(desc?: string, codExplicit?: string | null): string | null {
     if (codExplicit) return codExplicit
@@ -1014,14 +1202,14 @@ export async function obtenerProyectoPorId(proyectoId: string) {
     coordenadasMapa: detalle.latitud != null && detalle.longitud != null
       ? { lat: Number(detalle.latitud), lng: Number(detalle.longitud), puntoTexto: detalle.direccion ?? 'Punto de obra' }
       : undefined,
-    municipioId: detalle.municipio_id,
-    municipioNombre: municipioInicioRes.data?.nombre || '',
-    departamentoId: detalle.departamento_id,
-    departamentoNombre: departamentoInicioRes.data?.nombre || '',
-    municipioFinId: detalle.municipio_fin_id,
-    municipioFinNombre: municipioFinRes.data?.nombre || '',
-    departamentoFinId: detalle.departamento_fin_id,
-    departamentoFinNombre: departamentoFinRes.data?.nombre || '',
+    municipioId: ubicacionInicioResuelta.municipioId || detalle.municipio_id,
+    municipioNombre: ubicacionInicioResuelta.municipioNombre || '',
+    departamentoId: ubicacionInicioResuelta.departamentoId || detalle.departamento_id,
+    departamentoNombre: ubicacionInicioResuelta.departamentoNombre || '',
+    municipioFinId: ubicacionFinResuelta.municipioId || detalle.municipio_fin_id,
+    municipioFinNombre: ubicacionFinResuelta.municipioNombre || '',
+    departamentoFinId: ubicacionFinResuelta.departamentoId || detalle.departamento_fin_id,
+    departamentoFinNombre: ubicacionFinResuelta.departamentoNombre || '',
     direccionFin: detalle.direccion_fin ?? '',
     kilometroInicio: detalle.kilometro_inicio,
     kilometroFin: detalle.kilometro_fin,
@@ -1075,11 +1263,11 @@ export async function obtenerProyectoPorId(proyectoId: string) {
           return cC > 0 || cA > 0 || cE > 0
         })
       : mappedRenglones,
-    tipoObra: detalle.tipo_obra ? String(detalle.tipo_obra).toLowerCase().trim() : (mappedRenglones.length > 0 ? 'sabana' : 'manual'),
-    tipo_obra: detalle.tipo_obra ? String(detalle.tipo_obra).toLowerCase().trim() : (mappedRenglones.length > 0 ? 'sabana' : 'manual'),
-    tieneSabana: (detalle.tipo_obra ? String(detalle.tipo_obra).toLowerCase().trim() === 'sabana' : true) && mappedRenglones.length > 0,
-    usarModoSabana: detalle.tipo_obra ? String(detalle.tipo_obra).toLowerCase().trim() === 'sabana' : mappedRenglones.length > 0,
-    modoGestionFinanciera: detalle.tipo_obra ? String(detalle.tipo_obra).toLowerCase().trim() : (mappedRenglones.length > 0 ? 'sabana' : 'manual'),
+    tipoObra: (mappedRenglones.length > 0 || String(detalle.empresa_supervisora || '').toLowerCase().includes('domun')) ? 'sabana' : (detalle.tipo_obra ? String(detalle.tipo_obra).toLowerCase().trim() : 'manual'),
+    tipo_obra: (mappedRenglones.length > 0 || String(detalle.empresa_supervisora || '').toLowerCase().includes('domun')) ? 'sabana' : (detalle.tipo_obra ? String(detalle.tipo_obra).toLowerCase().trim() : 'manual'),
+    tieneSabana: mappedRenglones.length > 0 || String(detalle.empresa_supervisora || '').toLowerCase().includes('domun') || String(detalle.tipo_obra || '').toLowerCase().trim() === 'sabana',
+    usarModoSabana: mappedRenglones.length > 0 || String(detalle.empresa_supervisora || '').toLowerCase().includes('domun') || String(detalle.tipo_obra || '').toLowerCase().trim() === 'sabana',
+    modoGestionFinanciera: (mappedRenglones.length > 0 || String(detalle.empresa_supervisora || '').toLowerCase().includes('domun')) ? 'sabana' : (detalle.tipo_obra ? String(detalle.tipo_obra).toLowerCase().trim() : 'manual'),
     totalRenglones: mappedRenglones.length,
     avance: avanceFisicoCalculado,
     avanceFisico: avanceFisicoCalculado,
@@ -1198,6 +1386,9 @@ export async function obtenerProyectos() {
           longitud,
           municipio_id,
           departamento_id,
+          municipio_fin_id,
+          departamento_fin_id,
+          direccion_fin,
           departamento:departamento_id(id, nombre),
           municipio:municipio_id(id, nombre),
           kilometro_inicio,
@@ -1276,8 +1467,36 @@ export async function obtenerProyectos() {
     return true
   })
 
-  const resultado = filasUnicas.map((p: any) => {
+  const resultado = await Promise.all(filasUnicas.map(async (p: any) => {
     const d = Array.isArray(p.proyecto_detalle) ? p.proyecto_detalle[0] : p.proyecto_detalle || {}
+    let depIdRes = d.departamento_id || null
+    let munIdRes = d.municipio_id || null
+    let depNombreRes = d.departamento?.nombre || ''
+    let munNombreRes = d.municipio?.nombre || ''
+
+    if (!depIdRes || !munIdRes || !depNombreRes || !munNombreRes) {
+      const resuelto = await resolverUbicacionCompleta({
+        departamentoId: depIdRes,
+        municipioId: munIdRes,
+        departamentoNombre: depNombreRes,
+        municipioNombre: munNombreRes,
+        direccionTexto: `${d.direccion || ''} ${d.tramo || ''} ${p.ubicacion || ''} ${p.nombre || ''}`,
+        fallbackDeptoId: d.departamento_fin_id,
+        fallbackMuniId: d.municipio_fin_id,
+      })
+      depIdRes = resuelto.departamentoId || depIdRes
+      munIdRes = resuelto.municipioId || munIdRes
+      depNombreRes = resuelto.departamentoNombre || depNombreRes
+      munNombreRes = resuelto.municipioNombre || munNombreRes
+
+      if ((depIdRes && !d.departamento_id) || (munIdRes && !d.municipio_id)) {
+        const healUpdates: Record<string, any> = {}
+        if (depIdRes && !d.departamento_id) healUpdates.departamento_id = depIdRes
+        if (munIdRes && !d.municipio_id) healUpdates.municipio_id = munIdRes
+        void clienteSupabase.from('proyecto_detalle').update(healUpdates).eq('proyecto_id', p.id)
+      }
+    }
+
     const fInicio = d.fecha_inicio_contractual || p.fecha_inicio || d.fecha_adjudicacion || ''
     const plazoNum = d.plazo_ejecucion_original || d.plazo_ejecucion_ampliado || null
     let fFin = d.fecha_finalizacion_real || p.fecha_fin_estimada || ''
@@ -1291,11 +1510,12 @@ export async function obtenerProyectos() {
     const plazoStr = plazoNum ? `${plazoNum} días` : (fInicio && fFin ? `${Math.round((new Date(fFin).getTime() - new Date(fInicio).getTime()) / 86400000)} días` : '')
     const estadoCod = p.estado_id ? (estadoMapa.get(p.estado_id) || 'borrador') : 'borrador'
     const delegadoNombre = d.delegado_residente_id ? (delegadoMapa.get(d.delegado_residente_id) || '') : ''
-    const ubicacionCalc = d.tramo || d.direccion || (d.departamento?.nombre ? (d.municipio?.nombre ? `${d.departamento.nombre}, ${d.municipio.nombre}` : d.departamento.nombre) : '') || p.ubicacion || ''
+    const ubicacionCalc = d.tramo || d.direccion || (depNombreRes ? (munNombreRes ? `${depNombreRes}, ${munNombreRes}` : depNombreRes) : '') || p.ubicacion || ''
     const totalRenglones = Array.isArray(p.renglon_trabajo) ? p.renglon_trabajo.length : 0
+    const esSupDomun = String(d.empresa_supervisora || '').toLowerCase().includes('domun')
     const tipoObraD = d.tipo_obra ? String(d.tipo_obra).toLowerCase().trim() : null
-    const modoGestionFinanciera = tipoObraD ? tipoObraD : (totalRenglones > 0 ? 'sabana' : 'manual')
-    const tieneSabana = modoGestionFinanciera === 'sabana' && totalRenglones > 0
+    const modoGestionFinanciera = (totalRenglones > 0 || esSupDomun) ? 'sabana' : (tipoObraD || 'manual')
+    const tieneSabana = modoGestionFinanciera === 'sabana' || totalRenglones > 0 || esSupDomun
 
     let totalMontoPlanificado = 0
     let totalMontoEjecutadoPonderado = 0
@@ -1348,14 +1568,14 @@ export async function obtenerProyectos() {
       plazoContractual: plazoStr,
       plazo_ejecucion_original: plazoNum,
       plazoEjecucionOriginal: plazoNum,
-      departamento_id: d.departamento_id,
-      municipio_id: d.municipio_id,
-      departamentoId: d.departamento_id,
-      municipioId: d.municipio_id,
-      departamentoNombre: d.departamento?.nombre || '',
-      municipioNombre: d.municipio?.nombre || '',
-      departamento_nombre: d.departamento?.nombre || '',
-      municipio_nombre: d.municipio?.nombre || '',
+      departamento_id: depIdRes,
+      municipio_id: munIdRes,
+      departamentoId: depIdRes,
+      municipioId: munIdRes,
+      departamentoNombre: depNombreRes,
+      municipioNombre: munNombreRes,
+      departamento_nombre: depNombreRes,
+      municipio_nombre: munNombreRes,
       estado: estadoCod,
       responsable_id: p.responsable_id || null,
       responsableId: p.responsable_id || null,
@@ -1391,7 +1611,7 @@ export async function obtenerProyectos() {
         rol: pu.rol_proyecto,
       })) : [],
     }
-  })
+  }))
 
   cacheProyectosList = { data: resultado, timestamp: Date.now() }
   return resultado
@@ -1514,10 +1734,29 @@ export async function crearProyecto(datosFormulario: any) {
     throw new Error('No se pudo crear el registro base del proyecto')
   }
 
-  const muniId = esUuidValido(datosFormulario.municipioId)
-  const depaId = esUuidValido(datosFormulario.departamentoId)
-  const muniFinId = esUuidValido(datosFormulario.municipioFinId)
-  const depaFinId = esUuidValido(datosFormulario.departamentoFinId)
+  const [ubicacionInicioRes, ubicacionFinRes] = await Promise.all([
+    resolverUbicacionCompleta({
+      departamentoId: datosFormulario.departamentoId ?? datosFormulario.departamento_id,
+      municipioId: datosFormulario.municipioId ?? datosFormulario.municipio_id,
+      departamentoNombre: datosFormulario.departamentoNombre ?? datosFormulario.departamento,
+      municipioNombre: datosFormulario.municipioNombre ?? datosFormulario.municipio,
+      direccionTexto: `${datosFormulario.direccion || ''} ${datosFormulario.ubicacionFisica || ''} ${nombreFinal}`,
+      fallbackDeptoId: datosFormulario.departamentoFinId ?? datosFormulario.departamento_fin_id,
+      fallbackMuniId: datosFormulario.municipioFinId ?? datosFormulario.municipio_fin_id,
+    }),
+    resolverUbicacionCompleta({
+      departamentoId: datosFormulario.departamentoFinId ?? datosFormulario.departamento_fin_id,
+      municipioId: datosFormulario.municipioFinId ?? datosFormulario.municipio_fin_id,
+      departamentoNombre: datosFormulario.departamentoFinNombre ?? datosFormulario.departamentoFin,
+      municipioNombre: datosFormulario.municipioFinNombre ?? datosFormulario.municipioFin,
+      direccionTexto: `${datosFormulario.direccionFin || ''} ${datosFormulario.direccion || ''}`,
+    }),
+  ])
+
+  const muniId = ubicacionInicioRes.municipioId || ubicacionFinRes.municipioId
+  const depaId = ubicacionInicioRes.departamentoId || ubicacionFinRes.departamentoId
+  const muniFinId = ubicacionFinRes.municipioId || ubicacionInicioRes.municipioId
+  const depaFinId = ubicacionFinRes.departamentoId || ubicacionInicioRes.departamentoId
   const delegadoResId = esUuidValido(datosFormulario.delegadoResidenteId)
 
   const usuariosAInsertar: any[] = []
@@ -1639,10 +1878,43 @@ export async function actualizarProyecto(proyectoId: string, datosFormulario: Re
     proyectoUpdates.ubicacion = datosFormulario.ubicacionFisica
     detalleUpdates.tramo = datosFormulario.ubicacionFisica
   }
-  if ('municipioId' in datosFormulario) detalleUpdates.municipio_id = esUuidValido(datosFormulario.municipioId)
-  if ('departamentoId' in datosFormulario) detalleUpdates.departamento_id = esUuidValido(datosFormulario.departamentoId)
-  if ('municipioFinId' in datosFormulario) detalleUpdates.municipio_fin_id = esUuidValido(datosFormulario.municipioFinId)
-  if ('departamentoFinId' in datosFormulario) detalleUpdates.departamento_fin_id = esUuidValido(datosFormulario.departamentoFinId)
+  if (
+    'municipioId' in datosFormulario ||
+    'departamentoId' in datosFormulario ||
+    'municipio_id' in datosFormulario ||
+    'departamento_id' in datosFormulario ||
+    'direccion' in datosFormulario ||
+    'ubicacionFisica' in datosFormulario
+  ) {
+    const resIni = await resolverUbicacionCompleta({
+      departamentoId: datosFormulario.departamentoId ?? datosFormulario.departamento_id,
+      municipioId: datosFormulario.municipioId ?? datosFormulario.municipio_id,
+      departamentoNombre: datosFormulario.departamentoNombre ?? datosFormulario.departamento,
+      municipioNombre: datosFormulario.municipioNombre ?? datosFormulario.municipio,
+      direccionTexto: `${datosFormulario.direccion || ''} ${datosFormulario.ubicacionFisica || ''}`,
+      fallbackDeptoId: datosFormulario.departamentoFinId ?? datosFormulario.departamento_fin_id,
+      fallbackMuniId: datosFormulario.municipioFinId ?? datosFormulario.municipio_fin_id,
+    })
+    if (resIni.municipioId) detalleUpdates.municipio_id = resIni.municipioId
+    if (resIni.departamentoId) detalleUpdates.departamento_id = resIni.departamentoId
+  }
+  if (
+    'municipioFinId' in datosFormulario ||
+    'departamentoFinId' in datosFormulario ||
+    'municipio_fin_id' in datosFormulario ||
+    'departamento_fin_id' in datosFormulario ||
+    'direccionFin' in datosFormulario
+  ) {
+    const resFin = await resolverUbicacionCompleta({
+      departamentoId: datosFormulario.departamentoFinId ?? datosFormulario.departamento_fin_id,
+      municipioId: datosFormulario.municipioFinId ?? datosFormulario.municipio_fin_id,
+      departamentoNombre: datosFormulario.departamentoFinNombre ?? datosFormulario.departamentoFin,
+      municipioNombre: datosFormulario.municipioFinNombre ?? datosFormulario.municipioFin,
+      direccionTexto: `${datosFormulario.direccionFin || ''}`,
+    })
+    if (resFin.municipioId) detalleUpdates.municipio_fin_id = resFin.municipioId
+    if (resFin.departamentoId) detalleUpdates.departamento_fin_id = resFin.departamentoId
+  }
   if ('direccionFin' in datosFormulario) detalleUpdates.direccion_fin = datosFormulario.direccionFin || null
   if ('latitud' in datosFormulario || 'longitud' in datosFormulario || 'coordenadasMapa' in datosFormulario || 'coordenadas' in datosFormulario) {
     const lat = datosFormulario.latitud ?? (datosFormulario.coordenadasMapa as any)?.lat ?? (datosFormulario.coordenadas as any)?.lat

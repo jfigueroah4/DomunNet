@@ -19,6 +19,7 @@ import {
 import { api } from '@/lib/api/cliente'
 import { showErrorToast, showSuccessToast } from '@/hooks/useCustomToast'
 import { ContactoRelacionado, EmpresaRelacionada } from '@/stores/useEmpresasRelacionadasStore'
+import { Portal } from '@/components/ui/Portal'
 
 export interface ContactoFormDrawerProps {
   isOpen: boolean
@@ -171,7 +172,8 @@ export function ContactoFormDrawer({
   }
 
   return (
-    <div
+    <Portal>
+      <div
       className="fixed inset-0 z-[65] flex justify-end bg-black/60 backdrop-blur-xs font-[Poppins] animate-in fade-in duration-200"
       onClick={onClose}
     >
@@ -475,6 +477,7 @@ export function ContactoFormDrawer({
           )}
         </div>
       </div>
-    </div>
+      </div>
+    </Portal>
   )
 }

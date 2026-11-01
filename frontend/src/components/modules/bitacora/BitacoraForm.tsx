@@ -157,8 +157,8 @@ export type EvidenciaFoto = {
 
 const comprimirImagen = async (
   file: File,
-  maxDim = 1600,
-  quality = 0.78
+  maxDim = 1080,
+  quality = 0.56
 ): Promise<{ base64: string; sizeFormatted: string }> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
@@ -198,7 +198,20 @@ const comprimirImagen = async (
         ctx.imageSmoothingQuality = 'high'
         ctx.drawImage(img, 0, 0, width, height)
 
-        const compressedBase64 = canvas.toDataURL('image/jpeg', quality)
+        let compressedBase64 = canvas.toDataURL('image/jpeg', quality)
+        if (Math.round((compressedBase64.length * 3) / 4) > 68 * 1024) {
+          const scale2 = Math.min(1, 900 / Math.max(width, height))
+          const c2 = document.createElement('canvas')
+          c2.width = Math.max(1, Math.round(width * scale2))
+          c2.height = Math.max(1, Math.round(height * scale2))
+          const ctx2 = c2.getContext('2d')
+          if (ctx2) {
+            ctx2.imageSmoothingEnabled = true
+            ctx2.imageSmoothingQuality = 'high'
+            ctx2.drawImage(img, 0, 0, c2.width, c2.height)
+            compressedBase64 = c2.toDataURL('image/jpeg', 0.46)
+          }
+        }
         const approxBytes = Math.round((compressedBase64.length * 3) / 4)
         const approxKB = Math.round(approxBytes / 1024)
         const formatted = approxKB > 1024 ? `${(approxKB / 1024).toFixed(1)} MB` : `${approxKB} KB`
@@ -301,6 +314,7 @@ export function BitacoraForm({
   const [personalizarFecha, setPersonalizarFecha] = useState<boolean>(false)
 
   const fileInputFotoRef = useRef<HTMLInputElement>(null)
+  const fileInputCamaraRef = useRef<HTMLInputElement>(null)
 
   const [fd, setFd] = useState<FormDataBitacora>({
     tipoIngreso: 'Campo',
@@ -1073,7 +1087,7 @@ export function BitacoraForm({
   const handleProcesarFoto = async (file: File) => {
     try {
       const ext = file.name.split('.').pop()?.toUpperCase() || 'JPG'
-      const { base64, sizeFormatted } = await comprimirImagen(file, 1600, 0.78)
+      const { base64, sizeFormatted } = await comprimirImagen(file, 1080, 0.56)
       const nuevaFoto: EvidenciaFoto = {
         id: uid(),
         url: base64,
@@ -1405,12 +1419,13 @@ export function BitacoraForm({
 
   return (
     <div className="bitacora-form-mobile font-[Poppins] w-full max-w-full overflow-x-hidden sm:overflow-visible min-h-[calc(100vh-65px)] bg-white flex flex-col touch-pan-y">
-      {/* Input de archivo oculto */}
+      {/* Inputs de archivo ocultos: Cámara directa y Galería */}
+      <input ref={fileInputCamaraRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={(e) => { if (e.target.files && e.target.files.length > 0) handleProcesarFoto(e.target.files[0]); e.target.value = '' }} />
       <input
         ref={fileInputFotoRef}
         type="file"
         accept="image/jpeg,image/png,image/heic,image/webp,image/*"
-        capture="environment"
+
         style={{ display: 'none' }}
         onChange={(e) => {
           if (e.target.files && e.target.files.length > 0) {
@@ -1546,8 +1561,16 @@ export function BitacoraForm({
             onClick={() => fileInputFotoRef.current?.click()}
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-white border border-gray-300 px-6 sm:px-7 py-3 text-sm sm:text-xs font-bold text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-all shadow-2xs active:scale-95 cursor-pointer"
           >
-            <Camera size={18} className="text-gray-500" />
-            <span>Seleccionar del dispositivo / Tomar foto</span>
+            <ImagePlus size={18} className="text-[#9B0F06]" />
+            <span>Seleccionar de galería / dispositivo</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => fileInputCamaraRef.current?.click()}
+            className="mt-2.5 inline-flex items-center justify-center gap-2 rounded-xl bg-[#9B0F06] px-6 sm:px-7 py-3 text-sm sm:text-xs font-bold text-white hover:bg-[#5E0006] transition-all shadow-2xs active:scale-95 cursor-pointer"
+          >
+            <Camera size={18} className="text-white" />
+            <span>Tomar foto con cámara</span>
           </button>
 
           <span className="text-xs sm:text-[11px] text-gray-400 mt-5">
@@ -1628,7 +1651,18 @@ export function BitacoraForm({
                   title="Cambiar fotografía"
                 >
                   <ArrowLeftRight size={12} className="text-gray-400" />
-                  <span>Cambiar foto</span>
+                  <span>Galería / Cambiar</span>
+                </button>
+              )}
+              {fd.fotografiaPrincipal && (
+                <button
+                  type="button"
+                  onClick={() => fileInputCamaraRef.current?.click()}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#9B0F06] hover:bg-[#5E0006] text-white px-2 py-0.5 sm:px-2.5 sm:py-1 text-[11.5px] sm:text-[11px] font-medium transition-all cursor-pointer shadow-2xs"
+                  title="Tomar nueva foto con la cámara"
+                >
+                  <Camera size={12} />
+                  <span>Cámara</span>
                 </button>
               )}
             </div>

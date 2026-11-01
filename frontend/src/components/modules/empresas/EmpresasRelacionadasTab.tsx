@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Edit, Eye, Search, Trash2, ArrowUpDown, ArrowUp, ArrowDown, FolderGit2, Users } from 'lucide-react'
 import { api } from '@/lib/api/cliente'
 import { showErrorToast, showSuccessToast } from '@/hooks/useCustomToast'
@@ -15,12 +15,14 @@ export function EmpresasRelacionadasTab({
   empresas,
   recargar,
   crearSolicitud,
+  onResetCrear,
   onFilteredCountChange,
 }: {
   tipo: 'entidad' | 'contratista' | 'ejecutora' | 'supervisora'
   empresas: EmpresaRelacionada[]
   recargar: () => Promise<void>
   crearSolicitud: number
+  onResetCrear?: () => void
   onFilteredCountChange?: (count: number) => void
 }) {
   const [query, setQuery] = useState('')
@@ -38,6 +40,8 @@ export function EmpresasRelacionadasTab({
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [empresaEliminar, setEmpresaEliminar] = useState<EmpresaRelacionada>()
 
+  const lastCrearSolicitud = useRef(crearSolicitud)
+
   useEffect(() => {
     void recargar()
   }, [tipo, recargar])
@@ -52,11 +56,16 @@ export function EmpresasRelacionadasTab({
   }, [empresas])
 
   useEffect(() => {
-    if (crearSolicitud === 0) return
-    setSelected(undefined)
-    setDrawerMode('create')
-    setOpen(true)
-  }, [crearSolicitud])
+    if (crearSolicitud > 0 && crearSolicitud !== lastCrearSolicitud.current) {
+      lastCrearSolicitud.current = crearSolicitud
+      setSelected(undefined)
+      setDrawerMode('create')
+      setOpen(true)
+      onResetCrear?.()
+    } else if (crearSolicitud === 0) {
+      lastCrearSolicitud.current = 0
+    }
+  }, [crearSolicitud, onResetCrear])
 
   const handleSort = (column: typeof sortColumn) => {
     if (sortColumn === column) {
@@ -399,7 +408,10 @@ export function EmpresasRelacionadasTab({
 
       <EmpresaRelacionadaDrawer
         isOpen={open}
-        onClose={() => setOpen(false)}
+        onClose={() => {
+          setOpen(false)
+          onResetCrear?.()
+        }}
         onSave={guardar}
         empresa={selected}
         tipo={tipo}

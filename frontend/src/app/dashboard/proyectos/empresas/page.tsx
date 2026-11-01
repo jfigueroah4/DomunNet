@@ -22,6 +22,15 @@ export default function EmpresasPage() {
 
   const listaEjecutoras = ejecutoras && ejecutoras.length > 0 ? ejecutoras : contratistas
 
+  const handleTabChange = (key: 'entidades' | 'ejecutoras' | 'supervisoras') => {
+    setActiveTab(key)
+    setCrearSolicitud(0)
+  }
+
+  const handleResetCrear = useCallback(() => {
+    setCrearSolicitud(0)
+  }, [])
+
   const botonTexto =
     activeTab === 'entidades'
       ? 'Nueva Entidad'
@@ -59,7 +68,7 @@ export default function EmpresasPage() {
               <button
                 key={key}
                 type="button"
-                onClick={() => setActiveTab(key)}
+                onClick={() => handleTabChange(key)}
                 className={`flex h-8 items-center gap-1.5 px-3 text-[10px] rounded-md transition-colors cursor-pointer ${
                   activeTab === key
                     ? 'bg-white text-gray-800 shadow-2xs font-semibold'
@@ -85,30 +94,14 @@ export default function EmpresasPage() {
         </div>
       </div>
 
-      {activeTab === 'entidades' && (
-        <EmpresasRelacionadasTab
-          tipo="entidad"
-          empresas={entidades}
-          recargar={recargarEntidades}
-          crearSolicitud={crearSolicitud}
-        />
-      )}
-      {activeTab === 'ejecutoras' && (
-        <EmpresasRelacionadasTab
-          tipo="ejecutora"
-          empresas={listaEjecutoras}
-          recargar={recargarEjecutoras}
-          crearSolicitud={crearSolicitud}
-        />
-      )}
-      {activeTab === 'supervisoras' && (
-        <EmpresasRelacionadasTab
-          tipo="supervisora"
-          empresas={supervisoras}
-          recargar={recargarSupervisoras}
-          crearSolicitud={crearSolicitud}
-        />
-      )}
+      <EmpresasRelacionadasTab
+        key={activeTab}
+        tipo={activeTab === 'entidades' ? 'entidad' : activeTab === 'ejecutoras' ? 'ejecutora' : 'supervisora'}
+        empresas={activeTab === 'entidades' ? entidades : activeTab === 'ejecutoras' ? listaEjecutoras : supervisoras}
+        recargar={activeTab === 'entidades' ? recargarEntidades : activeTab === 'ejecutoras' ? recargarEjecutoras : recargarSupervisoras}
+        crearSolicitud={crearSolicitud}
+        onResetCrear={handleResetCrear}
+      />
     </div>
   )
 }

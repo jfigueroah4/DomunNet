@@ -17,6 +17,10 @@ function getSectionTitle(pathname: string) {
   if (pathname === '/dashboard') return 'INICIO'
   if (pathname.startsWith('/dashboard/proyectos/') && pathname.includes('/editar')) return 'EDITAR PROYECTO'
   if (pathname.startsWith('/dashboard/proyectos/nuevo')) return 'NUEVO PROYECTO'
+  if (pathname.startsWith('/dashboard/proyectos/empresas')) return 'EMPRESAS'
+  if (pathname.startsWith('/dashboard/proyectos/renglones')) return 'RENGLONES'
+  if (pathname.startsWith('/dashboard/proyectos/supervision')) return 'SUPERVISIÓN'
+  if (pathname.startsWith('/dashboard/proyectos/recursos')) return 'RECURSOS'
   if (pathname.startsWith('/dashboard/proyectos/')) return 'DETALLE PROYECTO'
   if (pathname.startsWith('/dashboard/proyectos')) return 'PROYECTOS'
   if (pathname.startsWith('/dashboard/bitacora')) return 'BITÁCORA'
@@ -134,8 +138,23 @@ export default function DashboardLayout({
   
   const autorizado = useMemo(() => {
     if (!profile) return false
+
+    // Regla estricta para rol Contratante:
+    // No tiene acceso a bitácora, hoja sábana, nuevo proyecto ni editar proyecto
+    const rolNorm = (profile.rol || '').toLowerCase().trim()
+    if (rolNorm.includes('contratante')) {
+      if (
+        pathname.includes('/bitacora') ||
+        pathname.includes('/hoja-sabana') ||
+        pathname.includes('/proyectos/nuevo') ||
+        pathname.includes('/editar')
+      ) {
+        return false
+      }
+    }
+
     // Match the exact path or its base path
-        // Find the longest matching prefix in RUTAS_PERMISOS
+    // Find the longest matching prefix in RUTAS_PERMISOS
     const matches = Object.keys(RUTAS_PERMISOS).filter(p => pathname === p || pathname.startsWith(`${p}/`))
     if (matches.length === 0) return true // Unprotected or implicit
     

@@ -45,13 +45,61 @@ export function tienePermiso(
     return false;
   }
 
-  // 3. Ejecutora, Supervisora, Contratante, Residente
+  // 3. Contratante (Entidad Contratante)
+  // Únicamente visualiza información: Proyectos (solo lectura, sin info financiera ni hoja sábana), Fotografías y Reportes.
+  // NO tiene acceso al módulo de Bitácora, NO puede ver info financiera ni Hoja Sábana, NO usuarios, roles ni configuración.
+  if (rolNorm.includes('contratante')) {
+    if (
+      modulo === 'bitacora' ||
+      permisoORuta.includes('/bitacora') ||
+      permisoORuta.includes('bitacora')
+    ) {
+      return false;
+    }
+    if (
+      modulo === 'finanzas' ||
+      permisoORuta.includes('financiera') ||
+      permisoORuta.includes('finanzas') ||
+      permisoORuta.includes('hoja-sabana') ||
+      permisoORuta === 'hoja_sabana'
+    ) {
+      return false;
+    }
+    if (
+      permisoRequerido === 'proyectos.create' ||
+      permisoRequerido === 'proyectos.update' ||
+      permisoRequerido === 'proyectos.delete' ||
+      permisoORuta.includes('/proyectos/nuevo') ||
+      permisoORuta.includes('/editar')
+    ) {
+      return false;
+    }
+    if (
+      modulo === 'usuarios' ||
+      modulo === 'roles' ||
+      modulo === 'configuracion' ||
+      modulo === 'mantenimiento'
+    ) {
+      return false;
+    }
+    if (
+      modulo === 'proyectos' ||
+      modulo === 'evidencia_fotografica' ||
+      modulo === 'reportes' ||
+      permisoORuta === '/dashboard' ||
+      permisoORuta === '/'
+    ) {
+      return true;
+    }
+    return false;
+  }
+
+  // 4. Ejecutora, Supervisora, Residente
   // Pueden ver Proyectos, Bitácora, Fotografías y Reportes. NO usuarios, roles ni configuración.
   if (
     rolNorm.includes('ejecutora') ||
     rolNorm.includes('contratista') ||
     rolNorm.includes('supervis') ||
-    rolNorm.includes('contratante') ||
     rolNorm.includes('residente') ||
     rolNorm.includes('delegado')
   ) {

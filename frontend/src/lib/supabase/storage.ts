@@ -36,8 +36,8 @@ export function detectarTipoDocumento(
  */
 export async function comprimirImagenClientSide(
   file: File,
-  maxDimension = 1920,
-  calidad = 0.82
+  maxDimension = 1080,
+  calidad = 0.56
 ): Promise<{ blob: Blob; tamanioFormateado: string; urlData: string }> {
   return new Promise((resolve) => {
     // Si no es imagen soportada para canvas, retornar el archivo original

@@ -408,6 +408,7 @@ export function ProyectoTimeline({
   const { id: proyectoIdParam } = useParams<{ id: string }>()
   const { profile: user } = useAuthStore()
   const esAdmin = user?.rol === 'administrador' || user?.rol === 'supervisor'
+  const esContratante = String(user?.rol || '').toLowerCase().trim().includes('contratante')
 
   const [modoEstimacion] = useState<'edicion' | 'creacion'>('edicion')
 
@@ -783,7 +784,7 @@ export function ProyectoTimeline({
             </p>
           </div>
 
-          {!modoCapturaInicial && (
+          {!modoCapturaInicial && !esContratante && (
             <button
               type="button"
               onClick={() => {
