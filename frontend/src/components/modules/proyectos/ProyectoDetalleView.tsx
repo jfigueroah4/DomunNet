@@ -1077,6 +1077,10 @@ export function ProyectoDetalleView({ proyecto: initialProyecto, slugId }: { pro
   const canEdit = useMemo(() => {
     if (!user) return false
     const rolNorm = (user.rol || '').toLowerCase().trim()
+    // Rol Presentador: solo lectura completa, nunca puede editar
+    if (rolNorm.includes('presentad')) {
+      return false
+    }
     // Administrador y Gerencia siempre pueden editar
     if (rolNorm.includes('admin') || rolNorm.includes('gerenc') || (user as any).nivel_permisos >= 100) {
       return true
@@ -1187,11 +1191,9 @@ export function ProyectoDetalleView({ proyecto: initialProyecto, slugId }: { pro
   const [verificandoBitacora, setVerificandoBitacora] = useState(false)
 
   // Modo Manual y Drawer de Renglones de Obra
-  const tieneDomunEnProyecto = Boolean(
-    String((proyecto as any)?.empresaSupervisora || (proyecto as any)?.empresa_supervisora || '').toLowerCase().includes('domun') ||
-    String((proyecto as any)?.empresaContratista || (proyecto as any)?.empresa_contratista || '').toLowerCase().includes('domun')
-  )
-  const esModoManual = !tieneDomunEnProyecto && Boolean(
+  const esModoManual = Boolean(
+    ((proyecto as any)?.modoObra === 'manual' && (proyecto as any)?.modoSupervision === 'manual') ||
+    (proyecto as any)?.tieneSabana === false ||
     (proyecto as any)?.modoGestionFinanciera === 'manual' ||
     (proyecto as any)?.modo_gestion_financiera === 'manual' ||
     (proyecto as any)?.usarModoSabana === false ||

@@ -45,6 +45,8 @@ export function DispositivosConectadosModal({
   const [cerrandoId, setCerrandoId] = useState<string | null>(null);
   const [cerrandoTodas, setCerrandoTodas] = useState(false);
 
+  const esPresentador = (usuario?.correo || '').toLowerCase().includes('presentad') || String((usuario as any)?.rol || '').toLowerCase().includes('presentad');
+  const maxEquipos = esPresentador ? 20 : 2;
   const isSelf = profile?.id === usuario.id || (profile?.correo && usuario.correo && profile.correo.toLowerCase() === usuario.correo.toLowerCase());
   const currentDeviceId = typeof window !== 'undefined' ? localStorage.getItem('domun_device_id') : null;
 
@@ -206,7 +208,7 @@ export function DispositivosConectadosModal({
                 Dispositivos Conectados
               </h2>
               <p className="text-xs text-[#6B7280] mt-0.5 font-medium">
-                <span className="font-semibold text-gray-800">{nombreMostrar}</span> • Máximo <strong className="text-gray-800 font-bold">2 dispositivos simultáneos</strong> permitidos
+                <span className="font-semibold text-gray-800">{nombreMostrar}</span> • Máximo <strong className="text-gray-800 font-bold">{maxEquipos} dispositivos simultáneos</strong> permitidos
               </p>
             </div>
             <button
@@ -224,7 +226,7 @@ export function DispositivosConectadosModal({
           {/* Subheader: Sesiones Activas & Botón Cerrar Todas */}
           <div className="flex items-center justify-between gap-2">
             <span className="text-[11px] font-bold text-[#4B5563] uppercase tracking-wider">
-              SESIONES ACTIVAS ({sesiones.length} DE 2):
+              SESIONES ACTIVAS ({sesiones.length} DE {maxEquipos}):
             </span>
             {sesiones.length > 0 && (!isSelf || sesiones.some((s) => !s.esDispositivoActual)) && (
               <button

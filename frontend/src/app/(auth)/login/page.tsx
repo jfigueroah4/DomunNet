@@ -62,6 +62,7 @@ export default function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loginStatusText, setLoginStatusText] = useState('Ingresando...');
   const [modalLimiteDispositivosOpen, setModalLimiteDispositivosOpen] = useState(false);
+  const [limiteMaximoDispositivos, setLimiteMaximoDispositivos] = useState(2);
   const [dispositivosActivos, setDispositivosActivos] = useState<Array<{
     id: string;
     dispositivo: string;
@@ -345,6 +346,8 @@ export default function LoginPage() {
 
       if (status === 409 || error?.response?.data?.codigo === 'LIMITE_DISPOSITIVOS_ALCANZADO') {
         const activos = error?.response?.data?.data?.dispositivosActivos || [];
+        const limite = error?.response?.data?.data?.limite || 2;
+        setLimiteMaximoDispositivos(limite);
         setDispositivosActivos(activos);
         setModalLimiteDispositivosOpen(true);
         return;
@@ -638,7 +641,7 @@ export default function LoginPage() {
                   Límite de Dispositivos Alcanzado
                 </h3>
                 <p className="text-[11px] text-gray-500 mt-0.5">
-                  Máximo <strong>2 dispositivos simultáneos</strong> permitidos por cuenta.
+                  Máximo <strong>{limiteMaximoDispositivos} dispositivos simultáneos</strong> permitidos por cuenta.
                 </p>
               </div>
               <button
@@ -651,13 +654,13 @@ export default function LoginPage() {
             </div>
 
             <p className="text-xs text-gray-600 leading-relaxed">
-              Tu cuenta ya tiene <strong>2 sesiones activas</strong> en otros dispositivos. Por políticas de seguridad, no es posible iniciar sesión en un tercer equipo sin cerrar una sesión previa:
+              Tu cuenta ya tiene <strong>{limiteMaximoDispositivos} sesiones activas</strong> en otros dispositivos. Por políticas de seguridad, no es posible iniciar sesión en un nuevo equipo sin cerrar una sesión previa:
             </p>
 
             {/* Listado de Dispositivos Activos */}
             <div className="rounded-xl border border-gray-200 bg-gray-50/70 p-3 space-y-2">
               <p className="text-[9.5px] font-bold uppercase tracking-wider text-gray-500">
-                Sesiones actualmente abiertas ({dispositivosActivos.length || 2} de 2):
+                Sesiones actualmente abiertas ({dispositivosActivos.length || limiteMaximoDispositivos} de {limiteMaximoDispositivos}):
               </p>
               {dispositivosActivos.length > 0 ? (
                 dispositivosActivos.map((d, idx) => (
@@ -682,7 +685,7 @@ export default function LoginPage() {
               ) : (
                 <div className="flex items-center gap-2 bg-white p-2.5 rounded-lg border border-gray-200/80 text-xs text-gray-600">
                   <Laptop size={14} className="text-[#9B0F06]" />
-                  <span>2 dispositivos remotos conectados</span>
+                  <span>{limiteMaximoDispositivos} dispositivos remotos conectados</span>
                 </div>
               )}
             </div>

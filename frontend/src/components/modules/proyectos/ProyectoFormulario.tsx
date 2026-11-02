@@ -1999,9 +1999,12 @@ export function ProyectoFormulario({
   const [modoObra, setModoObra] = useState<'sabana' | 'manual'>(() => {
     if ((proyectoInicial as any)?.modoObra) return (proyectoInicial as any).modoObra
     if ((proyectoInicial as any)?.modo_obra) return (proyectoInicial as any).modo_obra
+    const tObra = String((proyectoInicial as any)?.tipo_obra || (proyectoInicial as any)?.tipoObra || '').toLowerCase().trim()
+    if (tObra === 'sabana_ambos' || tObra === 'sabana_obra') return 'sabana'
+    if (tObra === 'sabana_supervision' || tObra === 'manual') return 'manual'
     const mgf = (proyectoInicial as any)?.modoGestionFinanciera || (proyectoInicial as any)?.modo_gestion_financiera
     const amb = (proyectoInicial as any)?.ambitoPlanTrabajo || (proyectoInicial as any)?.ambito_plan_trabajo
-    if (mgf === 'manual') return 'manual'
+    if (mgf === 'manual' || (proyectoInicial as any)?.tieneSabana === false || (proyectoInicial as any)?.usarModoSabana === false) return 'manual'
     if (mgf === 'sabana' && amb === 'supervision') return 'manual'
     return 'sabana'
   })
@@ -2009,8 +2012,12 @@ export function ProyectoFormulario({
   const [modoSupervision, setModoSupervision] = useState<'sabana' | 'manual'>(() => {
     if ((proyectoInicial as any)?.modoSupervision) return (proyectoInicial as any).modoSupervision
     if ((proyectoInicial as any)?.modo_supervision) return (proyectoInicial as any).modo_supervision
+    const tObra = String((proyectoInicial as any)?.tipo_obra || (proyectoInicial as any)?.tipoObra || '').toLowerCase().trim()
+    if (tObra === 'sabana_ambos' || tObra === 'sabana_supervision') return 'sabana'
+    if (tObra === 'sabana_obra' || tObra === 'manual') return 'manual'
     const mgf = (proyectoInicial as any)?.modoGestionFinanciera || (proyectoInicial as any)?.modo_gestion_financiera
     const amb = (proyectoInicial as any)?.ambitoPlanTrabajo || (proyectoInicial as any)?.ambito_plan_trabajo
+    if (mgf === 'manual' || (proyectoInicial as any)?.tieneSabana === false || (proyectoInicial as any)?.usarModoSabana === false) return 'manual'
     if (mgf === 'sabana' && amb === 'supervision') return 'sabana'
     return 'manual'
   })

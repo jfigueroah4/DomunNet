@@ -46,7 +46,8 @@ export default function BitacoraPage() {
   const searchParams = useSearchParams()
   const usuario = useAuthStore((s) => s.profile)
   const rolUsuario = (usuario?.rol || '').toLowerCase().trim()
-  const esAdmin = rolUsuario.includes('admin') || rolUsuario.includes('director') || rolUsuario.includes('gerenc')
+  const esPresentador = rolUsuario.includes('presentad')
+  const esAdmin = rolUsuario.includes('admin') || rolUsuario.includes('director') || rolUsuario.includes('gerenc') || esPresentador
   const esPersonalCampo =
     rolUsuario.includes('topograf') ||
     rolUsuario.includes('laborator') ||
@@ -296,7 +297,7 @@ export default function BitacoraPage() {
   }, [drawerRegistro, fotoExpandida, modalMapaGTAbierto, modalEliminarAbierto, setOcultarBottomNav])
 
   useEffect(() => {
-    if (searchParams?.get('nuevo') === 'true' || searchParams?.get('formulario') === 'true') {
+    if (!esPresentador && (searchParams?.get('nuevo') === 'true' || searchParams?.get('formulario') === 'true')) {
       setVista('crear')
     } else {
       setVista('lista')
@@ -305,7 +306,7 @@ export default function BitacoraPage() {
     if (pId) {
       setProyectoId(pId)
     }
-  }, [searchParams])
+  }, [searchParams, esPresentador])
 
   // Paginación (15 registros por página por defecto para visualizar sin scrollear)
   const [paginaActual, setPaginaActual] = useState(1)
@@ -602,18 +603,20 @@ export default function BitacoraPage() {
           <p className="text-[11px] sm:text-[9.5px] text-gray-500">Registro diario de actividades de campo y ensayos de laboratorio</p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => {
-            setVista('crear')
-            router.push('/dashboard/bitacora?nuevo=true')
-          }}
-          className="flex items-center justify-center gap-1.5 bg-[#9B0F06] text-white text-xs font-bold p-2 sm:px-4 sm:py-2 rounded-xl hover:bg-[#7D0C05] transition-all shadow-sm hover:shadow active:scale-95 cursor-pointer shrink-0"
-          title="Nuevo Registro"
-        >
-          <Plus size={16} className="stroke-[2.5]" />
-          <span className="hidden sm:inline">Nuevo Registro</span>
-        </button>
+        {!esPresentador && (
+          <button
+            type="button"
+            onClick={() => {
+              setVista('crear')
+              router.push('/dashboard/bitacora?nuevo=true')
+            }}
+            className="flex items-center justify-center gap-1.5 bg-[#9B0F06] text-white text-xs font-bold p-2 sm:px-4 sm:py-2 rounded-xl hover:bg-[#7D0C05] transition-all shadow-sm hover:shadow active:scale-95 cursor-pointer shrink-0"
+            title="Nuevo Registro"
+          >
+            <Plus size={16} className="stroke-[2.5]" />
+            <span className="hidden sm:inline">Nuevo Registro</span>
+          </button>
+        )}
       </div>
 
       {/* Main Layout - Ancho completo */}
@@ -652,7 +655,7 @@ export default function BitacoraPage() {
           onAbrirCalendario={() => setModalCalendarioAbierto(true)}
         />
 
-        {modoSeleccion && (
+        {modoSeleccion && !esPresentador && (
           <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50/90 p-1.5 px-3 shadow-2xs font-[Poppins] text-[11px] font-medium text-gray-700 animate-in fade-in duration-150">
             <div className="flex items-center gap-2">
               <input
@@ -1043,14 +1046,16 @@ export default function BitacoraPage() {
 
                 {/* Drawer Footer */}
                 <div className="p-3 border-t border-gray-200 bg-gray-50 flex items-center justify-between gap-3 font-[Poppins]">
-                  <button
-                    type="button"
-                    onClick={() => abrirModalEliminarIndividual(String(drawerRegistro.id))}
-                    className="p-1.5 text-gray-400 hover:text-[#9B0F06] hover:scale-110 transition-all cursor-pointer focus:outline-none"
-                    title="Eliminar Registro"
-                  >
-                    <Trash2 size={16} />
-                  </button>
+                  {!esPresentador && (
+                    <button
+                      type="button"
+                      onClick={() => abrirModalEliminarIndividual(String(drawerRegistro.id))}
+                      className="p-1.5 text-gray-400 hover:text-[#9B0F06] hover:scale-110 transition-all cursor-pointer focus:outline-none"
+                      title="Eliminar Registro"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  )}
                   <div className="flex items-center gap-2">
                     <span className="text-[9px] text-gray-400 font-medium hidden sm:inline">ID: {drawerRegistro.id}</span>
                     <button

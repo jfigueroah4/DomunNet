@@ -330,12 +330,17 @@ export function ProyectosView() {
   }
 
   const usuario = useAuthStore((s: any) => s.profile)
-  const esAdminOGerencia = useMemo(() => {
+  const esPresentador = useMemo(() => {
     const rolStr = (usuario?.rol || '').toLowerCase().trim()
-    return rolStr.includes('admin') || rolStr.includes('gerenc') || (usuario as any)?.nivel_permisos >= 100
+    return rolStr.includes('presentad')
   }, [usuario])
 
-  const puedeCrearProyecto = esAdminOGerencia
+  const esAdminOGerencia = useMemo(() => {
+    const rolStr = (usuario?.rol || '').toLowerCase().trim()
+    return rolStr.includes('admin') || rolStr.includes('gerenc') || (usuario as any)?.nivel_permisos >= 100 || esPresentador
+  }, [usuario, esPresentador])
+
+  const puedeCrearProyecto = esAdminOGerencia && !esPresentador
 
   const proyectosFiltrados = useMemo(() => {
     return proyectosReales.filter((proyecto) => {
@@ -576,12 +581,12 @@ export function ProyectosView() {
           filtroFechaFin={filtroFechaFin}
           setFiltroFechaFin={(valor) => { setFiltroFechaFin(valor); setPagina(1); }}
           onLimpiar={handleLimpiarFiltros}
-          modoSeleccion={modoSeleccion}
-          setModoSeleccion={setModoSeleccion}
+          modoSeleccion={esPresentador ? false : modoSeleccion}
+          setModoSeleccion={esPresentador ? (() => {}) : setModoSeleccion}
         />
       </div>
 
-      {modoSeleccion && (
+      {modoSeleccion && !esPresentador && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 rounded-xl border border-gray-200 bg-gray-50/90 p-2.5 px-4 shadow-2xs font-[Poppins] text-xs font-semibold text-gray-800">
           <div className="flex items-center gap-2">
             <input

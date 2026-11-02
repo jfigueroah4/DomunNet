@@ -120,7 +120,9 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
           const targetIsOwner = usuario.correo?.toLowerCase().trim() === 'daniel.figueroa@domunnet.test' || (usuario as any).username?.toLowerCase().trim() === 'dani';
 
           let canDelete = true;
-          if (isSelf) {
+          if (miRolNorm.includes('presentad')) {
+            canDelete = false;
+          } else if (isSelf) {
             canDelete = false;
           } else if (targetIsOwner) {
             canDelete = false;
@@ -132,8 +134,8 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
             canDelete = targetNivel <= miNivel && targetRolNorm !== 'administrador' && targetRolNorm !== 'admin';
           }
 
-          const canEdit = isOwner || miRolNorm === 'administrador' || miRolNorm === 'admin' || canDelete;
-          const canCloseSession = !isSelf && (isOwner || miRolNorm === 'administrador' || miRolNorm === 'gerencia') && usuario.estado === 'Activo';
+          const canEdit = !miRolNorm.includes('presentad') && (isOwner || miRolNorm === 'administrador' || miRolNorm === 'admin' || canDelete);
+          const canCloseSession = !miRolNorm.includes('presentad') && !isSelf && (isOwner || miRolNorm === 'administrador' || miRolNorm === 'gerencia') && usuario.estado === 'Activo';
           const esSuspendido = usuario.estado === 'Suspendido' || (usuario as any).activo === false;
 
           return (
@@ -339,7 +341,9 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
               const targetIsOwner = usuario.correo?.toLowerCase().trim() === 'daniel.figueroa@domunnet.test' || (usuario as any).username?.toLowerCase().trim() === 'dani';
 
               let canDelete = true;
-              if (isSelf) {
+              if (miRolNorm.includes('presentad')) {
+                canDelete = false;
+              } else if (isSelf) {
                 canDelete = false;
               } else if (targetIsOwner) {
                 canDelete = false;
@@ -351,8 +355,8 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
                 canDelete = miNivel >= 100 ? true : (targetRolNorm !== 'administrador' && targetRolNorm !== 'admin' && targetNivel <= miNivel);
               }
 
-              const canEdit = isOwner || miRolNorm === 'administrador' || miRolNorm === 'admin' || canDelete;
-              const canCloseSession = !isSelf && (isOwner || esGerenciaOAdmin) && usuario.estado === 'Activo';
+              const canEdit = !miRolNorm.includes('presentad') && (isOwner || miRolNorm === 'administrador' || miRolNorm === 'admin' || canDelete);
+              const canCloseSession = !miRolNorm.includes('presentad') && !isSelf && (isOwner || esGerenciaOAdmin) && usuario.estado === 'Activo';
 
               return (
                 <tr

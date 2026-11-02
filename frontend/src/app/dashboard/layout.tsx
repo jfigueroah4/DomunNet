@@ -153,6 +153,19 @@ export default function DashboardLayout({
       }
     }
 
+    // Regla estricta para rol Presentador:
+    // Solo visualización completa; no puede acceder a rutas de creación ni edición
+    if (rolNorm.includes('presentad')) {
+      if (
+        pathname.includes('/nuevo') ||
+        pathname.includes('/nueva') ||
+        pathname.includes('/editar') ||
+        pathname.includes('/crear')
+      ) {
+        return false
+      }
+    }
+
     // Match the exact path or its base path
     // Find the longest matching prefix in RUTAS_PERMISOS
     const matches = Object.keys(RUTAS_PERMISOS).filter(p => pathname === p || pathname.startsWith(`${p}/`))

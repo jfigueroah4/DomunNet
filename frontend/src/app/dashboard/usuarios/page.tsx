@@ -35,6 +35,7 @@ import { supabase } from '@/lib/supabase/client'
 export default function UsuariosPage() {
   const { roles, fetchRoles } = useRolesStore()
   const profile = useAuthStore((state) => state.profile)
+  const esPresentador = (profile?.rol || '').toLowerCase().includes('presentad')
   const setOcultarBottomNav = useUIStore((state) => state.setOcultarBottomNav)
 
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
@@ -784,13 +785,15 @@ export default function UsuariosPage() {
               <span>Gestión de Roles</span>
             </Link>
 
-            <button
-              onClick={handleNuevo}
-              className="flex items-center gap-1.5 px-3.5 sm:px-3 py-2 sm:py-1.5 bg-[#9B0F06] hover:bg-[#5E0006] text-white text-xs sm:text-[11px] font-bold rounded-lg transition-colors shadow-sm cursor-pointer active:scale-95"
-            >
-              <Plus size={14} className="sm:w-3 sm:h-3" />
-              <span>Nuevo Usuario</span>
-            </button>
+            {!esPresentador && (
+              <button
+                onClick={handleNuevo}
+                className="flex items-center gap-1.5 px-3.5 sm:px-3 py-2 sm:py-1.5 bg-[#9B0F06] hover:bg-[#5E0006] text-white text-xs sm:text-[11px] font-bold rounded-lg transition-colors shadow-sm cursor-pointer active:scale-95"
+              >
+                <Plus size={14} className="sm:w-3 sm:h-3" />
+                <span>Nuevo Usuario</span>
+              </button>
+            )}
           </div>
         </div>
 

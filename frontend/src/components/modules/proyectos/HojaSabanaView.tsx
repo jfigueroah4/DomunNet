@@ -1354,6 +1354,14 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
   const [menuTopOpen, setMenuTopOpen] = useState(false)
   const [menuEstOpen, setMenuEstOpen] = useState(false)
 
+  const [perspectivaActiva, setPerspectivaActiva] = useState<'ejecutora' | 'supervisora'>(() => {
+    if (typeof window !== 'undefined') {
+      const p = new URLSearchParams(window.location.search).get('perspectiva')
+      if (p === 'ejecutora' || p === 'supervisora') return p
+    }
+    return 'supervisora'
+  })
+
   const esPlantillaVacia = proyectoIdSeleccionado === 'nuevo' || proyectoIdSeleccionado === 'crear'
 
   const proyecto = useMemo(() => {
@@ -1414,6 +1422,53 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
 
   
   
+
+  const nombreEmpresaSupervisora = useMemo(() => {
+    const p = proyecto as any
+    return p?.empresaSupervisora?.nombre || p?.empresa_supervisora_nombre || p?.empresaSupervisora || 'Domun, S.A.'
+  }, [proyecto])
+
+  const nombreEmpresaEjecutora = useMemo(() => {
+    const p = proyecto as any
+    return p?.empresaEjecutora?.nombre || p?.empresa_ejecutora_nombre || p?.empresaEjecutora || p?.empresa?.nombre || p?.empresa || 'Constructora Nacional Vial, S.A.'
+  }, [proyecto])
+
+  const nombreEmpresaActual = perspectivaActiva === 'supervisora' ? nombreEmpresaSupervisora : nombreEmpresaEjecutora
+
+  const tieneAmbasSabana = useMemo(() => {
+    const p = proyecto as any
+    const mObra = p?.modoObra || p?.modo_obra
+    const mSup = p?.modoSupervision || p?.modo_supervision
+    const tipo = p?.tipo_obra || p?.tipoObra
+    return tipo === 'sabana_ambos' || (mObra === 'sabana' && mSup === 'sabana')
+  }, [proyecto])
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const p = new URLSearchParams(window.location.search).get('perspectiva')
+      if (p === 'ejecutora' || p === 'supervisora') {
+        setPerspectivaActiva(p)
+        return
+      }
+    }
+    const mObra = (proyecto as any)?.modoObra || (proyecto as any)?.modo_obra
+    const mSup = (proyecto as any)?.modoSupervision || (proyecto as any)?.modo_supervision
+    if (mObra === 'sabana' && mSup !== 'sabana') {
+      setPerspectivaActiva('ejecutora')
+    } else if (mSup === 'sabana' && mObra !== 'sabana') {
+      setPerspectivaActiva('supervisora')
+    }
+  }, [(proyecto as any)?.modoObra, (proyecto as any)?.modo_obra, (proyecto as any)?.modoSupervision, (proyecto as any)?.modo_supervision])
+
+  const handleCambiarPerspectiva = (nuevaPersp: 'ejecutora' | 'supervisora') => {
+    setPerspectivaActiva(nuevaPersp)
+    setHasAutoOpenedModal(false)
+    if (typeof window !== 'undefined') {
+      const u = new URL(window.location.href)
+      u.searchParams.set('perspectiva', nuevaPersp)
+      window.history.replaceState({}, '', u.toString())
+    }
+  }
 
   const userProfile = useAuthStore((s) => s.profile)
   const esAdminUser = (userProfile?.rol || '').toLowerCase().trim() === 'administrador' || (userProfile?.rol || '').toLowerCase().trim() === 'admin'
@@ -1511,7 +1566,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
     if (!targetProjId || targetProjId === 'nuevo' || targetProjId === 'crear') return
     try {
       let currentLista: any[] = []
-      const storedLista = localStorage.getItem(`domun_estimaciones_sabana_${targetProjId}`)
+      const storedLista = localStorage.getItem(`domun_estimaciones_sabana_${targetProjId}_${perspectivaActiva}`) || (perspectivaActiva === 'supervisora' ? localStorage.getItem(`domun_estimaciones_sabana_${targetProjId}`) : null)
       if (storedLista) {
         const parsedLista = JSON.parse(storedLista)
         if (Array.isArray(parsedLista) && parsedLista.length > 0) {
@@ -1519,7 +1574,12 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
           currentLista = parsedLista
         }
       }
-      if (currentLista.length === 0 && Array.isArray(proyecto?.estimaciones) && proyecto.estimaciones.length > 0) {
+      const estList = perspectivaActiva === 'ejecutora' ? ((proyecto as any)?.estimacionesSecundarias || (proyecto as any)?.estimacionesEjecutora || []) : (proyecto?.estimaciones || [])
+      if (currentLista.length === 0 && Array.isArray(estList) && estList.length > 0) {
+        setListaEstimaciones(estList)
+        currentLista = estList
+      }
+      if (false) {
         setListaEstimaciones(proyecto.estimaciones)
         currentLista = proyecto.estimaciones
       }
@@ -1537,7 +1597,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
       const proxStr = proxNum < 10 ? `Estimación 0${proxNum}` : `Estimación ${proxNum}`
       setFormEstNumero(proxStr)
 
-      const stored = localStorage.getItem(`domun_estimacion_activa_${targetProjId}`)
+      const stored = localStorage.getItem(`domun_estimacion_activa_${targetProjId}_${perspectivaActiva}`) || (perspectivaActiva === 'supervisora' ? localStorage.getItem(`domun_estimacion_activa_${targetProjId}`) : null)
       if (stored) {
         const parsed = JSON.parse(stored)
         // Verificar si la estimación almacenada ya fue cerrada o fue superada por estimaciones existentes
@@ -1551,10 +1611,13 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
         const esSuperada = maxNum > parsedNumInt
 
         if (estaCerrada || esSuperada) {
-          localStorage.removeItem(`domun_estimacion_activa_${targetProjId}`)
+          localStorage.removeItem(`domun_estimacion_activa_${targetProjId}_${perspectivaActiva}`)
+          localStorage.removeItem(`domun_estimacion_activa_${targetProjId}_${perspectivaActiva}`)
+      localStorage.removeItem(`domun_estimacion_activa_${targetProjId}`)
           const abiertaReal = currentLista.find((e: any) => e.estado === 'actual' || e.estado === 'en_proceso' || e.estado === 'borrador')
           if (abiertaReal) {
             setEstimacionEnProgreso(abiertaReal)
+            localStorage.setItem(`domun_estimacion_activa_${targetProjId}_${perspectivaActiva}`, JSON.stringify(abiertaReal))
             localStorage.setItem(`domun_estimacion_activa_${targetProjId}`, JSON.stringify(abiertaReal))
           } else {
             setEstimacionEnProgreso(null)
@@ -1571,7 +1634,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
         }
       }
     } catch {}
-  }, [proyecto?.id, proyectoIdSeleccionado, id])
+  }, [proyecto?.id, proyectoIdSeleccionado, id, perspectivaActiva, (proyecto as any)?.estimacionesSecundarias, (proyecto as any)?.estimaciones])
 
   const handleAbrirAperturaEstimacion = () => {
     let maxNum = 0
@@ -1590,7 +1653,16 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
     setModalAperturaEstimacionOpen(true)
   }
 
-// Auto-abertura removida para permitir ver el plan de trabajo libremente
+  // Auto-apertura requerida: si al ingresar a la sábana no hay estimación en progreso, abrir modal para iniciar una
+  useEffect(() => {
+    if (modoVistaSabana === 'actual' && tabSeccion === 'sabana' && !estimacionEnProgreso && !hasAutoOpenedModal && proyecto && proyecto.id && proyecto.id !== 'nuevo') {
+      const timer = setTimeout(() => {
+        handleAbrirAperturaEstimacion()
+        setHasAutoOpenedModal(true)
+      }, 400)
+      return () => clearTimeout(timer)
+    }
+  }, [modoVistaSabana, tabSeccion, estimacionEnProgreso, hasAutoOpenedModal, proyecto?.id, perspectivaActiva])
 
   // EDICIÓN DE MEDICIONES VINCULADAS DESDE BITÁCORA EN TAB ANALÍTICO
   const [medicionEnEdicion, setMedicionEnEdicion] = useState<MedicionAnaliticaCampo | null>(null)
@@ -1639,7 +1711,9 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
           const cached = localStorage.getItem(`sabana_renglones_${targetId}`)
           if (cached) {
             const parsed = JSON.parse(cached)
-            if (Array.isArray(parsed) && parsed.length > 0) return parsed
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              return parsed.filter((r: any) => !String(r.codigoDGC || '').includes('(b) 2') && !String(r.descripcion || '').includes('(b) 2'))
+            }
           }
         }
       } catch {}
@@ -1923,7 +1997,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
         }
 
         // 2. Alertas de exceso de renglones (> 100%)
-        renglones.forEach((r: any) => {
+        renglones.filter((r: any) => !String(r.codigoDGC || '').includes('(b) 2') && !String(r.descripcion || '').includes('(b) 2')).forEach((r: any) => {
           const cantTotalFechaK = (r.cantidadEstePeriodo || 0) + (r.cantidadAcumuladaAnterior || 0)
           const pctAvance = r.cantidadAjustada > 0 ? (cantTotalFechaK / r.cantidadAjustada) * 100 : 0
           if (pctAvance > 100) {
@@ -2702,10 +2776,16 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
     setModalAperturaEstimacionOpen(false)
 
     if (targetProjId) {
+      localStorage.setItem(`domun_estimacion_activa_${targetProjId}_${perspectivaActiva}`, JSON.stringify(nuevaEst))
       localStorage.setItem(`domun_estimacion_activa_${targetProjId}`, JSON.stringify(nuevaEst))
+      localStorage.setItem(`domun_estimaciones_sabana_${targetProjId}_${perspectivaActiva}`, JSON.stringify(listaActualizada))
       localStorage.setItem(`domun_estimaciones_sabana_${targetProjId}`, JSON.stringify(listaActualizada))
       localStorage.setItem(`domun_estimaciones_manuales_${targetProjId}`, JSON.stringify(listaActualizada))
-      api.put(`/proyectos/${targetProjId}`, { estimaciones: listaActualizada }).catch(() => {})
+      if (perspectivaActiva === 'ejecutora') {
+        api.put(`/proyectos/${targetProjId}`, { estimacionesSecundarias: listaActualizada }).catch(() => {})
+      } else {
+        api.put(`/proyectos/${targetProjId}`, { estimaciones: listaActualizada }).catch(() => {})
+      }
     }
 
     showSuccessToast(`Se aperturó con éxito el periodo ${nuevaEst.numero} (${nuevaEst.fechaInicio} al ${nuevaEst.fechaCorte})`)
@@ -2747,7 +2827,9 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
     setEstimacionEnProgreso(null)
     const targetProjId = proyecto?.id || proyectoIdSeleccionado || id
     if (targetProjId) {
+      localStorage.removeItem(`domun_estimacion_activa_${targetProjId}_${perspectivaActiva}`)
       localStorage.removeItem(`domun_estimacion_activa_${targetProjId}`)
+      localStorage.setItem(`domun_estimaciones_sabana_${targetProjId}_${perspectivaActiva}`, JSON.stringify(nuevasEstimaciones))
       localStorage.setItem(`domun_estimaciones_sabana_${targetProjId}`, JSON.stringify(nuevasEstimaciones))
       localStorage.setItem(`domun_estimaciones_manuales_${targetProjId}`, JSON.stringify(nuevasEstimaciones))
 
@@ -3285,6 +3367,40 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                   >
                     <span>Modo Planificación</span>
                   </span>
+                )}
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[10.5px] font-semibold bg-red-50 text-[#7A0C0D] border border-red-200 ml-1">
+                  <Briefcase size={12} className="text-[#7A0C0D] shrink-0" />
+                  <span className="text-gray-500 font-normal">Revisando:</span>
+                  <span className="font-bold underline decoration-dotted">{nombreEmpresaActual}</span>
+                  <span className="text-[9px] text-[#9B0F06] font-bold bg-white px-1.5 py-0.2 rounded border border-red-100 uppercase">
+                    {perspectivaActiva === 'supervisora' ? 'Supervisora' : 'Ejecutora'}
+                  </span>
+                </div>
+                {tieneAmbasSabana && (
+                  <div className="inline-flex items-center rounded-lg border border-gray-200 bg-gray-100/80 p-0.5 text-[9.5px] ml-1">
+                    <button
+                      type="button"
+                      onClick={() => handleCambiarPerspectiva('ejecutora')}
+                      className={`px-2 py-0.5 rounded text-[9.5px] font-semibold transition-all cursor-pointer ${
+                        perspectivaActiva === 'ejecutora'
+                          ? 'bg-[#7A0C0D] text-white shadow-2xs'
+                          : 'text-gray-600 hover:text-gray-900 hover:bg-white'
+                      }`}
+                    >
+                      Ejecutora ({nombreEmpresaEjecutora})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleCambiarPerspectiva('supervisora')}
+                      className={`px-2 py-0.5 rounded text-[9.5px] font-semibold transition-all cursor-pointer ${
+                        perspectivaActiva === 'supervisora'
+                          ? 'bg-[#7A0C0D] text-white shadow-2xs'
+                          : 'text-gray-600 hover:text-gray-900 hover:bg-white'
+                      }`}
+                    >
+                      Supervisora ({nombreEmpresaSupervisora})
+                    </button>
+                  </div>
                 )}
               </h1>
             </div>

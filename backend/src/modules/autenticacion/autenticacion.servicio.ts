@@ -42,10 +42,13 @@ export class LimiteDispositivosError extends Error {
     fechaHora: string
   }>
 
-  constructor(dispositivos: Array<{ id: string; dispositivo: string; ip: string; fechaHora: string }>) {
+  limiteMaximo: number
+
+  constructor(dispositivos: Array<{ id: string; dispositivo: string; ip: string; fechaHora: string }>, limiteMaximo: number = 2) {
     super('LIMITE_DISPOSITIVOS_ALCANZADO')
     this.name = 'LimiteDispositivosError'
     this.dispositivosActivos = dispositivos
+    this.limiteMaximo = limiteMaximo
   }
 }
 
@@ -311,10 +314,15 @@ export async function iniciarSesion(
     .filter(([devId]) => devId !== deviceIdActual)
     .map(([_, info]) => info)
 
-  // Si ya existen 2 o más otros dispositivos con sesión abierta y este es un nuevo dispositivo:
-  if (!esMismoDispositivo && otrosDispositivosActivos.length >= 2) {
+  const rolNombreNorm = (rol.nombre || '').toLowerCase().trim()
+  const correoNorm = (usuarioFila.correo || '').toLowerCase().trim()
+  const esPresentador = rolNombreNorm.includes('presentad') || correoNorm.includes('presentad')
+  const limiteDispositivos = esPresentador ? 20 : 2
+
+  // Si ya existen N o más otros dispositivos con sesión abierta y este es un nuevo dispositivo:
+  if (!esMismoDispositivo && otrosDispositivosActivos.length >= limiteDispositivos) {
     if (!opcionesDispositivo?.cerrarOtrasSesiones) {
-      throw new LimiteDispositivosError(otrosDispositivosActivos)
+      throw new LimiteDispositivosError(otrosDispositivosActivos, limiteDispositivos)
     }
 
     // Si el usuario autorizó cerrar las otras sesiones para ingresar en este equipo
@@ -374,7 +382,7 @@ export async function iniciarSesion(
       dispositivo: nombreDispositivo,
       session_id: sessionId,
       estado: 'activa',
-      limite_sesiones: 'max_2_equipos',
+      limite_sesiones: esPresentador ? 'max_20_equipos' : 'max_2_equipos',
     },
   })
 

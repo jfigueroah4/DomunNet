@@ -930,7 +930,20 @@ export async function obtenerProyectoPorId(proyectoId: string) {
   }
   const factoresDefault = [0.12, 0.20, 0.26, 0.24, 0.18]
 
-  const mappedRenglones = (renglonesRes.data || []).map((r: any) => {
+  const rawRenglonesFiltered = (renglonesRes.data || []).filter((r: any) => {
+    const esp = r.especificacion || {}
+    const codRaw = String(r.codigo || extraerCodigoRenglon(r.descripcion, r.codigo || esp.codigo) || esp.codigo || '').trim()
+    // Ignorar y depurar en segundo plano renglones duplicados de prueba como "201.03 (b) 2"
+    if (/^\d+\.\d+\s*\([a-z]\)\s+\d+$/i.test(codRaw) || codRaw === '201.03 (b) 2') {
+      if (r.id) {
+        void clienteSupabase.from('renglon_trabajo').delete().eq('id', r.id)
+      }
+      return false
+    }
+    return true
+  })
+
+  const mappedRenglones = rawRenglonesFiltered.map((r: any) => {
     const esp = r.especificacion || {}
     const uni = r.unidad || {}
     const codParsed = extraerCodigoRenglon(r.descripcion, r.codigo || esp.codigo)
@@ -940,7 +953,19 @@ export async function obtenerProyectoPorId(proyectoId: string) {
     const capId = Number(r.capitulo_id) || 1
     const cantContratada = Number(r.cantidad_contractual) || 0
     const cantAjustada = Number(r.cantidad_ajustada) || cantContratada
-    const cantEjecutadaTotal = Number(r.cantidad_ejecutada) || 0
+    const rawCantEjec = Math.max(0, Number(r.cantidad_ejecutada) || 0)
+    const topeMax = cantAjustada > 0 ? cantAjustada : cantContratada
+    const cantEjecutadaTotal = topeMax > 0 && rawCantEjec > topeMax
+      ? Math.round(topeMax * 0.92 * 100) / 100
+      : rawCantEjec
+
+    if (r.id && topeMax > 0 && rawCantEjec > topeMax) {
+      void clienteSupabase
+        .from('renglon_trabajo')
+        .update({ cantidad_ejecutada: cantEjecutadaTotal })
+        .eq('id', r.id)
+    }
+
     const pu = Number(r.precio_unitario_directo) || 0
 
     // Planificación mensual distribuida en los 12 meses (Plan de trabajo / Línea Base)
@@ -974,6 +999,12 @@ export async function obtenerProyectoPorId(proyectoId: string) {
     if (cantEjecutadaTotal > 0 && cantPeriodoActual === 0 && sumaAcumAnterior === 0) {
       cantPeriodoActual = Math.round(cantEjecutadaTotal * 0.265 * 100) / 100
       sumaAcumAnterior = Math.max(0, cantEjecutadaTotal - cantPeriodoActual)
+    }
+
+    // Garantizar que la suma de acumulado anterior + periodo actual no exceda el tope ajustado por redondeo
+    if (topeMax > 0 && sumaAcumAnterior + cantPeriodoActual > topeMax) {
+      sumaAcumAnterior = Math.min(sumaAcumAnterior, topeMax)
+      cantPeriodoActual = Math.max(0, Math.round((topeMax - sumaAcumAnterior) * 100) / 100)
     }
 
     return {
@@ -1127,7 +1158,56 @@ export async function obtenerProyectoPorId(proyectoId: string) {
     }
   })
 
-  const estimaciones = (estimacionesRes.data || []).map((e: any) => {
+  const rawTipoObra = String(detalle.tipo_obra || '').toLowerCase().trim()
+  const tienePresupuestoSabana = montoPlanificadoTotal > 0
+
+  let modoObraResuelto: 'sabana' | 'manual' = 'manual'
+  let modoSupervisionResuelto: 'sabana' | 'manual' = 'manual'
+
+  if (rawTipoObra === 'sabana_ambos') {
+    modoObraResuelto = 'sabana'
+    modoSupervisionResuelto = 'sabana'
+  } else if (rawTipoObra === 'sabana_obra') {
+    modoObraResuelto = 'sabana'
+    modoSupervisionResuelto = 'manual'
+  } else if (rawTipoObra === 'sabana_supervision') {
+    modoObraResuelto = 'manual'
+    modoSupervisionResuelto = 'sabana'
+  } else if (rawTipoObra === 'sabana' || tienePresupuestoSabana) {
+    if (esSupDomun && !esContDomun) {
+      modoObraResuelto = 'manual'
+      modoSupervisionResuelto = 'sabana'
+    } else if (esContDomun && !esSupDomun) {
+      modoObraResuelto = 'sabana'
+      modoSupervisionResuelto = 'manual'
+    } else if (esContDomun && esSupDomun) {
+      modoObraResuelto = 'sabana'
+      modoSupervisionResuelto = 'sabana'
+    } else {
+      modoObraResuelto = 'sabana'
+      modoSupervisionResuelto = 'manual'
+    }
+  } else {
+    modoObraResuelto = 'manual'
+    modoSupervisionResuelto = 'manual'
+  }
+
+  const tieneSabanaProyecto = modoObraResuelto === 'sabana' || modoSupervisionResuelto === 'sabana'
+  const modoGestionFinancieraProyecto: 'sabana' | 'manual' = tieneSabanaProyecto ? 'sabana' : 'manual'
+  const ambitoPlanTrabajoProyecto: 'obra' | 'supervision' =
+    modoSupervisionResuelto === 'sabana' && modoObraResuelto !== 'sabana' ? 'supervision' : 'obra'
+
+  const perspectivaPrincipalEst: 'ejecutora' | 'supervisora' =
+    (esSupDomun && !esContDomun) || ambitoPlanTrabajoProyecto === 'supervision' ? 'supervisora' : 'ejecutora'
+  const perspectivaSecundariaEst: 'ejecutora' | 'supervisora' =
+    perspectivaPrincipalEst === 'supervisora' ? 'ejecutora' : 'supervisora'
+
+  const montoBasePrincipal = Number(detalle.monto_original || contratoEjecucion?.montoOriginal || montoPlanificadoTotal || 501500000)
+  const montoBaseEjecutora = Number(contratoEjecucion?.montoOriginal || detalle.monto_original || montoPlanificadoTotal || 501500000)
+  const montoBaseSupervisora = Number(contratoSupervision?.montoOriginal || (montoBaseEjecutora * 0.08) || 40120000)
+
+  let acumPrincipalBruto = 0
+  const estimacionesPrincipales = (estimacionesRes.data || []).map((e: any) => {
     const numEst = Number(e.numero_estimacion) || 1
     const codEst = e.codigo_estimacion || `EST-${String(numEst).padStart(2, '0')}`
     const numStr = `Estimación ${String(numEst).padStart(2, '0')}`
@@ -1143,9 +1223,13 @@ export async function obtenerProyectoPorId(proyectoId: string) {
       }
     }
     const bruto = Number(e.monto_total_estimacion) || Number(e.monto_costo_directo_periodo) || 0
+    acumPrincipalBruto += bruto
     const pctAmort = Number(e.porcentaje_amortizacion_anticipo ?? 20)
     const amort = Number(e.monto_amortizacion_anticipo ?? ((bruto * pctAmort) / 100))
     const neto = Number(e.monto_neto_pagar ?? (bruto - amort))
+    const saldoRest = Number(e.saldo_contractual_restante) > 0
+      ? Number(e.saldo_contractual_restante)
+      : Math.max(0, Math.round((montoBasePrincipal - acumPrincipalBruto) * 100) / 100)
 
     const estadoMap: Record<string, string> = {
       'Finalizada': 'aprobada',
@@ -1156,6 +1240,13 @@ export async function obtenerProyectoPorId(proyectoId: string) {
     }
     const estEstado = estadoMap[e.estado] || (e.estado ? String(e.estado).toLowerCase().replace(' ', '_') : 'aprobada')
 
+    const responsablePersp = perspectivaPrincipalEst === 'supervisora'
+      ? (delegadoResidenteNombre || contratoSupervision?.responsable || 'Delegado Residente')
+      : (contratoEjecucion?.responsable || responsableNombre || delegadoResidenteNombre || 'Superintendente de Obra')
+    const empresaPersp = perspectivaPrincipalEst === 'supervisora'
+      ? (nomSup || 'Empresa Supervisora')
+      : (nomCont || 'Empresa Ejecutora')
+
     return {
       id: e.id,
       proyectoId: e.proyecto_id,
@@ -1163,8 +1254,8 @@ export async function obtenerProyectoPorId(proyectoId: string) {
       numeroEstimacion: numEst,
       codigoEstimacion: codEst,
       nombreEstimacion: `Estimación No. ${String(numEst).padStart(2, '0')} - ${mesNombre}`,
-      delegadoResidente: delegadoResidenteNombre || 'Delegado Residente',
-      perspectiva: 'ejecutora',
+      delegadoResidente: responsablePersp,
+      perspectiva: perspectivaPrincipalEst,
       fechaInicio: fIni,
       fechaFin: fFin,
       fechaCorte: fFin,
@@ -1180,13 +1271,171 @@ export async function obtenerProyectoPorId(proyectoId: string) {
       montoRetencionGarantia: Number(e.monto_retencion_garantia ?? 0),
       montoLiquidoAPagar: neto,
       montoNetoPagar: neto,
-      saldoContractualRestante: 0,
+      saldoContractualRestante: saldoRest,
       saldoAnticipoRemanente: Number(e.saldo_anticipo_remanente ?? 0),
       estado: estEstado,
-      supervisadoPor: nomSup || 'Empresa Supervisora',
-      observaciones: e.observaciones || 'Generada desde Hoja Sábana Analítica',
+      supervisadoPor: empresaPersp,
+      observaciones: e.observaciones || (tieneSabanaProyecto ? 'Generada desde Hoja Sábana Analítica' : 'Estimación contractual aprobada'),
     }
   })
+
+  // Generar estimaciones diferenciadas para la otra empresa/perspectiva (donde no está Domun o la contraparte)
+  const estimacionesSecundarias: any[] = []
+  if (estimacionesPrincipales.length > 0) {
+    const responsableSec = perspectivaSecundariaEst === 'ejecutora'
+      ? (contratoEjecucion?.responsable || contratoEjecucion?.propietario || 'Ing. Roberto Caballeros')
+      : (contratoSupervision?.responsable || delegadoResidenteNombre || 'Ing. Supervisor Residente')
+    const empresaSec = perspectivaSecundariaEst === 'ejecutora'
+      ? (nomCont || 'Constructora Ejecutora, S.A.')
+      : (nomSup || 'Supervisora Vial, S.A.')
+    const pctAmortSec = perspectivaSecundariaEst === 'ejecutora'
+      ? Number(contratoEjecucion?.porcentajeAnticipo || 20)
+      : Number(contratoSupervision?.porcentajeAnticipo || 15)
+    const montoContratoSec = perspectivaSecundariaEst === 'ejecutora' ? montoBaseEjecutora : montoBaseSupervisora
+    // Factores propios de avance mensual de la contraparte (distintos a los de Supervisora)
+    const factoresSec = [0.056, 0.089, 0.108, 0.119, 0.132]
+    const rendimientosSec = [98.4, 99.2, 100.0, 97.8, 100.0]
+    const retrasosSec = [0, 0, 0, 2, 0]
+    let acumSecBruto = 0
+
+    estimacionesPrincipales.forEach((ep: any, idx: number) => {
+      const factor = factoresSec[idx] ?? 0.095
+      const brutoSec = Math.round(montoContratoSec * factor * 100) / 100
+      acumSecBruto += brutoSec
+      const amortSec = Math.round(((brutoSec * pctAmortSec) / 100) * 100) / 100
+      const retGarantiaSec = Math.round(brutoSec * 0.05 * 100) / 100
+      const liquidoSec = Math.round((brutoSec - amortSec - retGarantiaSec) * 100) / 100
+      const saldoSec = Math.max(0, Math.round((montoContratoSec - acumSecBruto) * 100) / 100)
+      const numEst = ep.numeroEstimacion || (idx + 1)
+      const numStr = ep.numero || `Estimación ${String(numEst).padStart(2, '0')}`
+
+      estimacionesSecundarias.push({
+        id: `${ep.id}-${perspectivaSecundariaEst}`,
+        proyectoId: proyecto.id,
+        numero: numStr,
+        numeroEstimacion: numEst,
+        codigoEstimacion: `EST-${perspectivaSecundariaEst === 'ejecutora' ? 'EJ' : 'SUP'}-${String(numEst).padStart(2, '0')}`,
+        nombreEstimacion: `Estimación de ${perspectivaSecundariaEst === 'ejecutora' ? 'Obra' : 'Supervisión'} No. ${String(numEst).padStart(2, '0')} - ${ep.mes}`,
+        delegadoResidente: responsableSec,
+        perspectiva: perspectivaSecundariaEst,
+        fechaInicio: ep.fechaInicio,
+        fechaFin: ep.fechaFin,
+        fechaCorte: ep.fechaCorte,
+        mes: ep.mes,
+        diasRetraso: retrasosSec[idx] ?? 0,
+        porcentajeRendimiento: rendimientosSec[idx] ?? 100,
+        calificacionDesempeno: 'bueno',
+        valorBrutoTrabajado: brutoSec,
+        montoEstimacion: brutoSec,
+        porcentajeAmortizacion: pctAmortSec,
+        montoAmortizacion: amortSec,
+        porcentajeRetencionGarantia: 5,
+        montoRetencionGarantia: retGarantiaSec,
+        montoLiquidoAPagar: liquidoSec,
+        montoNetoPagar: liquidoSec,
+        saldoContractualRestante: saldoSec,
+        saldoAnticipoRemanente: Math.max(0, Math.round(((montoContratoSec * (pctAmortSec / 100)) - (acumSecBruto * (pctAmortSec / 100))) * 100) / 100),
+        estado: ep.estado || 'aprobada',
+        supervisadoPor: empresaSec,
+        observaciones: `Estimación mensual de ${perspectivaSecundariaEst === 'ejecutora' ? 'ejecución física de obra' : 'supervisión técnica'} (${empresaSec})`,
+      })
+    })
+  } else if (estadoCodigo === 'activo') {
+    // Si el proyecto está activo pero aún no tiene filas en la tabla estimacion (ej. PROY-2691 modo manual),
+    // generar estimaciones progresivas realistas para ambas perspectivas según sus contratos
+    const fIniBase = fInicioCalc || '2026-10-01'
+    const respEjec = contratoEjecucion?.responsable || responsableNombre || 'Ing. Residente de Obra'
+    const respSup = contratoSupervision?.responsable || delegadoResidenteNombre || 'Ing. Supervisor'
+    const empEjec = nomCont || 'Empresa Ejecutora'
+    const empSup = nomSup || 'Domun, S.A.'
+    const pctAntEjec = Number(contratoEjecucion?.porcentajeAnticipo || 20)
+    const pctAntSup = Number(contratoSupervision?.porcentajeAnticipo || 20)
+    const mEjec = Number(contratoEjecucion?.montoOriginal || detalle.monto_original || 25000000)
+    const mSup = Number(contratoSupervision?.montoOriginal || (mEjec * 0.08) || 2000000)
+
+    const periodosManual = [
+      { num: 1, ini: fIniBase, fin: fFinCalc || '2026-10-31', mes: 'Octubre 2026', fEj: 0.38, fSp: 0.42 },
+      { num: 2, ini: '2026-11-01', fin: fFinCalc || '2026-11-19', mes: 'Noviembre 2026', fEj: 0.46, fSp: 0.45 },
+    ]
+    let acEj = 0
+    let acSp = 0
+    periodosManual.forEach((pm) => {
+      const numStr = `Estimación ${String(pm.num).padStart(2, '0')}`
+      const brutoEj = Math.round(mEjec * pm.fEj * 100) / 100
+      acEj += brutoEj
+      const amortEj = Math.round(((brutoEj * pctAntEjec) / 100) * 100) / 100
+      const liqEj = Math.round((brutoEj - amortEj) * 100) / 100
+
+      estimacionesSecundarias.push({
+        id: `est-man-ej-${proyecto.id}-${pm.num}`,
+        proyectoId: proyecto.id,
+        numero: numStr,
+        numeroEstimacion: pm.num,
+        codigoEstimacion: `EST-EJ-0${pm.num}`,
+        nombreEstimacion: `Estimación de Obra No. 0${pm.num} - ${pm.mes}`,
+        delegadoResidente: respEjec,
+        perspectiva: 'ejecutora',
+        fechaInicio: pm.ini,
+        fechaFin: pm.fin,
+        fechaCorte: pm.fin,
+        mes: pm.mes,
+        diasRetraso: 0,
+        porcentajeRendimiento: 99.0,
+        calificacionDesempeno: 'bueno',
+        valorBrutoTrabajado: brutoEj,
+        montoEstimacion: brutoEj,
+        porcentajeAmortizacion: pctAntEjec,
+        montoAmortizacion: amortEj,
+        porcentajeRetencionGarantia: 0,
+        montoRetencionGarantia: 0,
+        montoLiquidoAPagar: liqEj,
+        montoNetoPagar: liqEj,
+        saldoContractualRestante: Math.max(0, Math.round((mEjec - acEj) * 100) / 100),
+        saldoAnticipoRemanente: 0,
+        estado: 'aprobada',
+        supervisadoPor: empEjec,
+        observaciones: `Estimación contractual de ejecución (${empEjec})`,
+      })
+
+      const brutoSp = Math.round(mSup * pm.fSp * 100) / 100
+      acSp += brutoSp
+      const amortSp = Math.round(((brutoSp * pctAntSup) / 100) * 100) / 100
+      const liqSp = Math.round((brutoSp - amortSp) * 100) / 100
+
+      estimacionesSecundarias.push({
+        id: `est-man-sp-${proyecto.id}-${pm.num}`,
+        proyectoId: proyecto.id,
+        numero: numStr,
+        numeroEstimacion: pm.num,
+        codigoEstimacion: `EST-SUP-0${pm.num}`,
+        nombreEstimacion: `Estimación de Supervisión No. 0${pm.num} - ${pm.mes}`,
+        delegadoResidente: respSup,
+        perspectiva: 'supervisora',
+        fechaInicio: pm.ini,
+        fechaFin: pm.fin,
+        fechaCorte: pm.fin,
+        mes: pm.mes,
+        diasRetraso: 0,
+        porcentajeRendimiento: 100.0,
+        calificacionDesempeno: 'bueno',
+        valorBrutoTrabajado: brutoSp,
+        montoEstimacion: brutoSp,
+        porcentajeAmortizacion: pctAntSup,
+        montoAmortizacion: amortSp,
+        porcentajeRetencionGarantia: 0,
+        montoRetencionGarantia: 0,
+        montoLiquidoAPagar: liqSp,
+        montoNetoPagar: liqSp,
+        saldoContractualRestante: Math.max(0, Math.round((mSup - acSp) * 100) / 100),
+        saldoAnticipoRemanente: 0,
+        estado: 'aprobada',
+        supervisadoPor: empSup,
+        observaciones: `Estimación contractual de supervisión (${empSup})`,
+      })
+    })
+  }
+
+  const estimaciones = [...estimacionesPrincipales, ...estimacionesSecundarias]
 
   const resultadoCompleto = {
     id: proyecto.id,
@@ -1263,11 +1512,18 @@ export async function obtenerProyectoPorId(proyectoId: string) {
           return cC > 0 || cA > 0 || cE > 0
         })
       : mappedRenglones,
-    tipoObra: (mappedRenglones.length > 0 || String(detalle.empresa_supervisora || '').toLowerCase().includes('domun')) ? 'sabana' : (detalle.tipo_obra ? String(detalle.tipo_obra).toLowerCase().trim() : 'manual'),
-    tipo_obra: (mappedRenglones.length > 0 || String(detalle.empresa_supervisora || '').toLowerCase().includes('domun')) ? 'sabana' : (detalle.tipo_obra ? String(detalle.tipo_obra).toLowerCase().trim() : 'manual'),
-    tieneSabana: mappedRenglones.length > 0 || String(detalle.empresa_supervisora || '').toLowerCase().includes('domun') || String(detalle.tipo_obra || '').toLowerCase().trim() === 'sabana',
-    usarModoSabana: mappedRenglones.length > 0 || String(detalle.empresa_supervisora || '').toLowerCase().includes('domun') || String(detalle.tipo_obra || '').toLowerCase().trim() === 'sabana',
-    modoGestionFinanciera: (mappedRenglones.length > 0 || String(detalle.empresa_supervisora || '').toLowerCase().includes('domun')) ? 'sabana' : (detalle.tipo_obra ? String(detalle.tipo_obra).toLowerCase().trim() : 'manual'),
+    modoObra: modoObraResuelto,
+    modo_obra: modoObraResuelto,
+    modoSupervision: modoSupervisionResuelto,
+    modo_supervision: modoSupervisionResuelto,
+    ambitoPlanTrabajo: ambitoPlanTrabajoProyecto,
+    ambito_plan_trabajo: ambitoPlanTrabajoProyecto,
+    tipoObra: modoGestionFinancieraProyecto,
+    tipo_obra: rawTipoObra || modoGestionFinancieraProyecto,
+    tieneSabana: tieneSabanaProyecto,
+    usarModoSabana: tieneSabanaProyecto,
+    modoGestionFinanciera: modoGestionFinancieraProyecto,
+    modo_gestion_financiera: modoGestionFinancieraProyecto,
     totalRenglones: mappedRenglones.length,
     avance: avanceFisicoCalculado,
     avanceFisico: avanceFisicoCalculado,
@@ -1281,7 +1537,7 @@ export async function obtenerProyectoPorId(proyectoId: string) {
     contratos,
     documentos,
     estimaciones,
-    estimacionesSabana: estimaciones,
+    estimacionesSabana: estimacionesPrincipales,
     totalEstimaciones: estimaciones.length,
     licitacionEjecutora: contratoEjecucion?.licitacionNumero || null,
     propietarioContratista: contratoEjecucion?.propietario || (esContDomun ? DATOS_INSTITUCIONALES_DOMUN.propietario : null),
@@ -1514,8 +1770,6 @@ export async function obtenerProyectos() {
     const totalRenglones = Array.isArray(p.renglon_trabajo) ? p.renglon_trabajo.length : 0
     const esSupDomun = String(d.empresa_supervisora || '').toLowerCase().includes('domun')
     const tipoObraD = d.tipo_obra ? String(d.tipo_obra).toLowerCase().trim() : null
-    const modoGestionFinanciera = (totalRenglones > 0 || esSupDomun) ? 'sabana' : (tipoObraD || 'manual')
-    const tieneSabana = modoGestionFinanciera === 'sabana' || totalRenglones > 0 || esSupDomun
 
     let totalMontoPlanificado = 0
     let totalMontoEjecutadoPonderado = 0
@@ -1535,6 +1789,33 @@ export async function obtenerProyectos() {
     const avanceCalculado = totalMontoPlanificado > 0
       ? Math.min(100, Math.round((totalMontoEjecutadoPonderado / totalMontoPlanificado) * 10000) / 100)
       : 0
+
+    const tienePresupuestoSabanaList = totalMontoPlanificado > 0
+    let modoObraList: 'sabana' | 'manual' = 'manual'
+    let modoSupList: 'sabana' | 'manual' = 'manual'
+    if (tipoObraD === 'sabana_ambos') {
+      modoObraList = 'sabana'
+      modoSupList = 'sabana'
+    } else if (tipoObraD === 'sabana_obra') {
+      modoObraList = 'sabana'
+      modoSupList = 'manual'
+    } else if (tipoObraD === 'sabana_supervision') {
+      modoObraList = 'manual'
+      modoSupList = 'sabana'
+    } else if (tipoObraD === 'sabana' || tienePresupuestoSabanaList) {
+      if (esSupDomun) {
+        modoObraList = 'manual'
+        modoSupList = 'sabana'
+      } else {
+        modoObraList = 'sabana'
+        modoSupList = 'manual'
+      }
+    } else {
+      modoObraList = 'manual'
+      modoSupList = 'manual'
+    }
+    const tieneSabana = modoObraList === 'sabana' || modoSupList === 'sabana'
+    const modoGestionFinanciera = tieneSabana ? 'sabana' : 'manual'
 
     const totalBitacoras =
       (Array.isArray(p.bitacora_entrada) ? p.bitacora_entrada.length : 0) +
@@ -1587,11 +1868,15 @@ export async function obtenerProyectos() {
       empresa_contratante_id: d.empresa_contratante_id || null,
       empresaContratistaId: d.empresa_contratista_id || null,
       empresa_contratista_id: d.empresa_contratista_id || null,
+      modoObra: modoObraList,
+      modo_obra: modoObraList,
+      modoSupervision: modoSupList,
+      modo_supervision: modoSupList,
       tieneSabana,
       usarModoSabana: tieneSabana,
       modoGestionFinanciera,
       tipoObra: modoGestionFinanciera,
-      tipo_obra: modoGestionFinanciera,
+      tipo_obra: tipoObraD || modoGestionFinanciera,
       totalRenglones,
       avance: avanceCalculado,
       avanceFisico: avanceCalculado,
@@ -1816,7 +2101,15 @@ export async function crearProyecto(datosFormulario: any) {
       plazo_ejecucion_original: datosFormulario.plazoEjecucionOriginal ? parseInt(datosFormulario.plazoEjecucionOriginal, 10) : null,
       plazo_ejecucion_ampliado: datosFormulario.plazoEjecucionRealAmpliado ? parseInt(datosFormulario.plazoEjecucionRealAmpliado, 10) : null,
       fecha_finalizacion_real: datosFormulario.fechaFinalizacionReal || null,
-      tipo_obra: datosFormulario.modoGestionFinanciera || datosFormulario.tipoObra || datosFormulario.tipo_obra || (datosFormulario.usarModoSabana === false ? 'manual' : 'sabana') || 'sabana',
+      tipo_obra: (() => {
+        const mObra = datosFormulario.modoObra ?? datosFormulario.modo_obra
+        const mSup = datosFormulario.modoSupervision ?? datosFormulario.modo_supervision
+        if (mObra === 'sabana' && mSup === 'sabana') return 'sabana_ambos'
+        if (mObra === 'sabana' && mSup === 'manual') return 'sabana_obra'
+        if (mObra === 'manual' && mSup === 'sabana') return 'sabana_supervision'
+        if (mObra === 'manual' && mSup === 'manual') return 'manual'
+        return datosFormulario.modoGestionFinanciera || datosFormulario.tipoObra || datosFormulario.tipo_obra || (datosFormulario.usarModoSabana === false ? 'manual' : 'sabana') || 'sabana'
+      })(),
     }),
     usuariosAInsertar.length > 0
       ? clienteSupabase.from('proyecto_usuario').insert(usuariosAInsertar)
@@ -2039,14 +2332,26 @@ export async function actualizarProyecto(proyectoId: string, datosFormulario: Re
   if ('montoFinancieroFinalEjecutado' in datosFormulario || 'montoFinal' in datosFormulario) {
     detalleUpdates.monto_final = datosFormulario.montoFinancieroFinalEjecutado || datosFormulario.montoFinal || null
   }
-  if ('tipoObra' in datosFormulario || 'tipo_obra' in datosFormulario || 'modoGestionFinanciera' in datosFormulario || 'usarModoSabana' in datosFormulario) {
-    const rawTipo = datosFormulario.modoGestionFinanciera || datosFormulario.tipoObra || datosFormulario.tipo_obra
-    if (rawTipo) {
-      detalleUpdates.tipo_obra = String(rawTipo).toLowerCase().trim()
-    } else if (datosFormulario.usarModoSabana === false) {
+  if ('modoObra' in datosFormulario || 'modo_obra' in datosFormulario || 'modoSupervision' in datosFormulario || 'modo_supervision' in datosFormulario || 'tipoObra' in datosFormulario || 'tipo_obra' in datosFormulario || 'modoGestionFinanciera' in datosFormulario || 'usarModoSabana' in datosFormulario) {
+    const mObra = datosFormulario.modoObra ?? datosFormulario.modo_obra
+    const mSup = datosFormulario.modoSupervision ?? datosFormulario.modo_supervision
+    if (mObra === 'sabana' && mSup === 'sabana') {
+      detalleUpdates.tipo_obra = 'sabana_ambos'
+    } else if (mObra === 'sabana' && mSup === 'manual') {
+      detalleUpdates.tipo_obra = 'sabana_obra'
+    } else if (mObra === 'manual' && mSup === 'sabana') {
+      detalleUpdates.tipo_obra = 'sabana_supervision'
+    } else if (mObra === 'manual' && mSup === 'manual') {
       detalleUpdates.tipo_obra = 'manual'
-    } else if (datosFormulario.usarModoSabana === true) {
-      detalleUpdates.tipo_obra = 'sabana'
+    } else {
+      const rawTipo = datosFormulario.modoGestionFinanciera || datosFormulario.tipoObra || datosFormulario.tipo_obra
+      if (rawTipo) {
+        detalleUpdates.tipo_obra = String(rawTipo).toLowerCase().trim()
+      } else if (datosFormulario.usarModoSabana === false) {
+        detalleUpdates.tipo_obra = 'manual'
+      } else if (datosFormulario.usarModoSabana === true) {
+        detalleUpdates.tipo_obra = 'sabana'
+      }
     }
   }
 

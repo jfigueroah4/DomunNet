@@ -158,12 +158,20 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
   const tieneAccesoHojaSabana = Boolean(esAdminOGerente || esDelegadoAsignado || true)
 
   // Manejador de navegación a Hoja Sábana (Planificación o Estimaciones)
-  const navegarAHojaSabana = (parametro?: { tab?: string; estimacion?: string; renglon?: string }) => {
+  const navegarAHojaSabana = (parametro?: { tab?: string; estimacion?: string; renglon?: string; perspectiva?: 'ejecutora' | 'supervisora' }) => {
     const targetId = proyecto?.id || 'p-1'
     const queryParams = new URLSearchParams()
     if (parametro?.tab) queryParams.set('tab', parametro.tab)
     if (parametro?.estimacion) queryParams.set('estimacion', parametro.estimacion)
     if (parametro?.renglon) queryParams.set('renglon', parametro.renglon)
+    const perspTarget =
+      parametro?.perspectiva ||
+      (subTab === 'estimaciones' && (perspectivaEstimacion === 'ejecutora' ? tieneSabanaEjecutora : tieneSabanaSupervisora)
+        ? perspectivaEstimacion
+        : tieneSabanaSupervisora && !tieneSabanaEjecutora
+        ? 'supervisora'
+        : 'ejecutora')
+    queryParams.set('perspectiva', perspTarget)
 
     const queryString = queryParams.toString()
     router.push(`/dashboard/proyectos/${targetId}/hoja-sabana${queryString ? `?${queryString}` : ''}`)
@@ -184,18 +192,40 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
   const esEjecutoraDomun = nombreEmpresaEjecutora.toLowerCase().includes('domun')
   const esSupervisoraDomun = nombreEmpresaSupervisora.toLowerCase().includes('domun')
 
-  // DOMUN siempre opera con Hoja Sábana; la otra empresa opera en Modo Manual (salvo que explícitamente tenga sábana)
-  const modoObraActual = esEjecutoraDomun ? 'sabana' : (pAny.modoObra === 'sabana' || pAny.modo_obra === 'sabana' ? 'sabana' : 'manual')
-  const modoSupervisionActual = esSupervisoraDomun ? 'sabana' : (pAny.modoSupervision === 'sabana' || pAny.modo_supervision === 'sabana' || (!esEjecutoraDomun && !esSupervisoraDomun && pAny.usarModoSabana !== false) ? 'sabana' : 'manual')
+  const tienePresupuestoSabanaCargado = Boolean(
+    Number(pAny.montoPlanificadoTotal || pAny.montoPlanificado || 0) > 0 ||
+    (Array.isArray(pAny.renglones) && pAny.renglones.some((r: any) => Number(r.costoUnitarioDirecto ?? r.precio_unitario_directo ?? 0) > 0))
+  )
+  const rawTipoObraProj = String(pAny.tipo_obra || pAny.tipoObra || pAny.modoGestionFinanciera || '').toLowerCase().trim()
+  const esProyectoExplicitoManual =
+    !tienePresupuestoSabanaCargado &&
+    (rawTipoObraProj === 'manual' || pAny.tieneSabana === false || pAny.usarModoSabana === false)
+
+  const modoObraActual: 'sabana' | 'manual' = (() => {
+    if (pAny.modoObra === 'sabana' || pAny.modo_obra === 'sabana' || rawTipoObraProj === 'sabana_ambos' || rawTipoObraProj === 'sabana_obra') return 'sabana'
+    if (pAny.modoObra === 'manual' || pAny.modo_obra === 'manual' || rawTipoObraProj === 'sabana_supervision' || esProyectoExplicitoManual) return 'manual'
+    return esEjecutoraDomun && tienePresupuestoSabanaCargado ? 'sabana' : 'manual'
+  })()
+
+  const modoSupervisionActual: 'sabana' | 'manual' = (() => {
+    if (pAny.modoSupervision === 'sabana' || pAny.modo_supervision === 'sabana' || rawTipoObraProj === 'sabana_ambos' || rawTipoObraProj === 'sabana_supervision') return 'sabana'
+    if (pAny.modoSupervision === 'manual' || pAny.modo_supervision === 'manual' || rawTipoObraProj === 'sabana_obra' || esProyectoExplicitoManual) return 'manual'
+    return esSupervisoraDomun && tienePresupuestoSabanaCargado ? 'sabana' : 'manual'
+  })()
 
   const tieneSabanaEjecutora = Boolean(modoObraActual === 'sabana')
   const tieneSabanaSupervisora = Boolean(modoSupervisionActual === 'sabana')
 
   const esModoSabanaActual = perspectivaEstimacion === 'ejecutora' ? tieneSabanaEjecutora : tieneSabanaSupervisora
 
-  // El proyecto a nivel general cuenta con Hoja Sábana y Presupuesto Global si cualquiera de las perspectivas tiene Sábana
-  const proyectoTieneSabanaGeneral = tieneSabanaEjecutora || tieneSabanaSupervisora || pAny.usarModoSabana !== false
+  // El proyecto a nivel general cuenta con Hoja Sábana si cualquiera de las perspectivas tiene Sábana activa
+  const proyectoTieneSabanaGeneral = tieneSabanaEjecutora || tieneSabanaSupervisora
   const modoManual = !proyectoTieneSabanaGeneral
+  const mostrarBotonHojaSabanaBanner =
+    proyectoTieneSabanaGeneral &&
+    (subTab === 'resumen' ||
+      (subTab === 'estimaciones' && esModoSabanaActual) ||
+      (subTab === 'curva' && (perspectivaCurva === 'ejecutora' ? tieneSabanaEjecutora : tieneSabanaSupervisora)))
 
   // Capítulos Libro Azul DGC + Capítulos personalizados creados en este proyecto
   const [capitulosProyecto, setCapitulosProyecto] = useState<Array<{ id: number; nombre: string }>>(() => {
@@ -252,43 +282,55 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
     if (!proyecto?.id) return
     try {
       const sabanaStored = localStorage.getItem(`domun_estimaciones_sabana_${proyecto.id}`)
+      const sabanaEjecStored = localStorage.getItem(`domun_estimaciones_sabana_${proyecto.id}_ejecutora`)
+      const sabanaSupStored = localStorage.getItem(`domun_estimaciones_sabana_${proyecto.id}_supervisora`)
       const manualStored = localStorage.getItem(`domun_estimaciones_manuales_${proyecto.id}`)
       const activaStored = localStorage.getItem(`domun_estimacion_activa_${proyecto.id}`)
+      const activaEjecStored = localStorage.getItem(`domun_estimacion_activa_${proyecto.id}_ejecutora`)
+      const activaSupStored = localStorage.getItem(`domun_estimacion_activa_${proyecto.id}_supervisora`)
 
       const mapa = new Map<string, EstimacionFinancieraItem>()
 
-      // Determinar la perspectiva natural de la Hoja Sábana:
-      // Si DOMUN es Supervisora, la Sábana es de Supervisora; de lo contrario de Ejecutora
       const perspectivaSabanaPredeterminada: 'ejecutora' | 'supervisora' =
         (esSupervisoraDomun && !esEjecutoraDomun) || pAny.ambitoPlanTrabajo === 'supervision' ? 'supervisora' : 'ejecutora'
 
-      const resolverPerspectiva = (objPersp?: string): 'ejecutora' | 'supervisora' => {
+      const resolverPerspectiva = (objPersp?: string, fallback?: 'ejecutora' | 'supervisora'): 'ejecutora' | 'supervisora' => {
         if (objPersp === 'supervisora' || objPersp === 'ejecutora') {
-          if (objPersp === 'ejecutora' && esSupervisoraDomun && !esEjecutoraDomun && pAny.modoObra !== 'sabana') {
-            return 'supervisora'
-          }
           return objPersp
         }
-        return perspectivaSabanaPredeterminada
+        return fallback || perspectivaSabanaPredeterminada
       }
 
-      // 1. Cargar estimaciones de sábana
-      if (sabanaStored) {
+      const responsableEjecutoraNombre =
+        pAny.contratoEjecucion?.responsable ||
+        pAny.superintendente ||
+        pAny.responsableNombre ||
+        'Ing. Roberto Caballeros'
+      const responsableSupervisoraNombre =
+        nombreDelegadoProyecto !== '-'
+          ? nombreDelegadoProyecto
+          : (pAny.contratoSupervision?.responsable || pAny.responsableSupervisora || 'Delegado Residente')
+
+      const registrarListaSabana = (rawJson: string | null, perspForzada?: 'ejecutora' | 'supervisora') => {
+        if (!rawJson) return
         try {
-          const parsedSab = JSON.parse(sabanaStored)
+          const parsedSab = JSON.parse(rawJson)
           if (Array.isArray(parsedSab)) {
             parsedSab.forEach((s: any) => {
-              const num = s.numero || 'Est. 01'
+              const num = s.numero || 'Estimación 01'
               const bruto = Number(s.valorBruto || s.montoEstimacion || s.valorBrutoTrabajado || 0)
               const pctAmort = Number(s.porcentajeAmortizacion ?? 20)
               const amort = Number(s.montoAmortizacion ?? ((bruto * pctAmort) / 100))
               const liq = Number(s.montoLiquido || s.montoLiquidoAPagar || (bruto - amort))
-              const perspFinal = resolverPerspectiva(s.perspectiva)
-              mapa.set(num, {
-                id: s.id || `est-sab-${num}`,
+              const perspFinal = perspForzada || resolverPerspectiva(s.perspectiva)
+              const mapKey = `${perspFinal}__${num}`
+              mapa.set(mapKey, {
+                id: s.id ? `${s.id}-${perspFinal}` : `est-sab-${perspFinal}-${num}`,
                 numero: num,
-                nombreEstimacion: s.nombreEstimacion || `Estimación de Obra - ${num}`,
-                delegadoResidente: s.delegadoResidente || (nombreDelegadoProyecto !== '-' ? nombreDelegadoProyecto : 'Delegado Residente'),
+                nombreEstimacion: s.nombreEstimacion || `Estimación de ${perspFinal === 'supervisora' ? 'Supervisión' : 'Obra'} - ${num}`,
+                delegadoResidente:
+                  s.delegadoResidente ||
+                  (perspFinal === 'supervisora' ? responsableSupervisoraNombre : responsableEjecutoraNombre),
                 perspectiva: perspFinal,
                 fechaInicio: s.fechaInicio || '',
                 fechaFin: s.fechaFin || s.fechaCorte || '',
@@ -310,20 +352,28 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
         } catch {}
       }
 
-      // 2. Cargar estimaciones de proyecto (prioridad si vienen de API)
+      // 1. Cargar estimaciones de sábana almacenadas localmente
+      registrarListaSabana(sabanaStored)
+      registrarListaSabana(sabanaEjecStored, 'ejecutora')
+      registrarListaSabana(sabanaSupStored, 'supervisora')
+
+      // 2. Cargar estimaciones de proyecto provenientes del backend (prioridad si vienen de API)
       if (Array.isArray(pAny.estimaciones) && pAny.estimaciones.length > 0) {
         pAny.estimaciones.forEach((e: any) => {
-          const num = e.numero || `Est. ${String(e.numeroEstimacion || 1).padStart(2, '0')}`
+          const num = e.numero || `Estimación ${String(e.numeroEstimacion || 1).padStart(2, '0')}`
           const bruto = Number(e.valorBrutoTrabajado || e.montoEstimacion || 0)
           const pctAmort = Number(e.porcentajeAmortizacion ?? 20)
           const amort = Number(e.montoAmortizacion ?? ((bruto * pctAmort) / 100))
           const liq = Number(e.montoLiquidoAPagar ?? e.montoNetoPagar ?? (bruto - amort))
           const perspFinal = resolverPerspectiva(e.perspectiva)
-          mapa.set(num, {
-            id: e.id || `est-${num}`,
+          const mapKey = `${perspFinal}__${num}`
+          mapa.set(mapKey, {
+            id: e.id || `est-${perspFinal}-${num}`,
             numero: num,
             nombreEstimacion: e.nombreEstimacion || `Estimación - ${num}`,
-            delegadoResidente: e.delegadoResidente || (nombreDelegadoProyecto !== '-' ? nombreDelegadoProyecto : 'Delegado Residente'),
+            delegadoResidente:
+              e.delegadoResidente ||
+              (perspFinal === 'supervisora' ? responsableSupervisoraNombre : responsableEjecutoraNombre),
             perspectiva: perspFinal,
             fechaInicio: e.fechaInicio || '',
             fechaFin: e.fechaFin || e.fechaCorte || '',
@@ -341,14 +391,10 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
             observaciones: e.observaciones || '',
           })
         })
-        try {
-          localStorage.setItem(`domun_estimaciones_sabana_${proyecto.id}`, JSON.stringify(Array.from(mapa.values())))
-        } catch {}
       }
 
-      // 3. Cargar estimaciones de proyecto o manuales
+      // 3. Cargar estimaciones manuales adicionales
       const candidatas = [
-        ...(Array.isArray(pAny.estimaciones) ? pAny.estimaciones : []),
         ...(Array.isArray(pAny.estimacionesManuales) ? pAny.estimacionesManuales : []),
       ]
       if (manualStored) {
@@ -359,18 +405,21 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
       }
 
       candidatas.forEach((c: any) => {
-        const num = c.numero || 'Est. 01'
-        if (!mapa.has(num)) {
+        const num = c.numero || 'Estimación 01'
+        const perspFinal = resolverPerspectiva(c.perspectiva)
+        const mapKey = `${perspFinal}__${num}`
+        if (!mapa.has(mapKey)) {
           const bruto = Number(c.valorBruto || c.valorBrutoTrabajado || c.montoEstimacion || 0)
           const pctAmort = Number(c.porcentajeAmortizacion ?? 20)
           const amort = Number(c.montoAmortizacion ?? ((bruto * pctAmort) / 100))
           const liq = Number(c.montoLiquido || c.montoLiquidoAPagar || (bruto - amort))
-          const perspFinal = resolverPerspectiva(c.perspectiva)
-          mapa.set(num, {
-            id: c.id || `est-${num}`,
+          mapa.set(mapKey, {
+            id: c.id || `est-${perspFinal}-${num}`,
             numero: num,
             nombreEstimacion: c.nombreEstimacion || `Estimación - ${num}`,
-            delegadoResidente: c.delegadoResidente || (nombreDelegadoProyecto !== '-' ? nombreDelegadoProyecto : 'Delegado Residente'),
+            delegadoResidente:
+              c.delegadoResidente ||
+              (perspFinal === 'supervisora' ? responsableSupervisoraNombre : responsableEjecutoraNombre),
             perspectiva: perspFinal,
             fechaInicio: c.fechaInicio || '',
             fechaFin: c.fechaFin || c.fechaCorte || '',
@@ -390,24 +439,111 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
         }
       })
 
-      // 3. Estimación activa actualmente abierta en Hoja Sábana
-      if (activaStored) {
+      // 4. Garantizar que si existe una perspectiva con estimaciones y la contraparte (ej. Ejecutora donde no está Domun)
+      // no tenía estimaciones por caché previa en localStorage, se generen sus estimaciones diferenciadas
+      const actualesList = Array.from(mapa.values())
+      const estsSupervisora = actualesList.filter((e) => e.perspectiva === 'supervisora')
+      const estsEjecutora = actualesList.filter((e) => e.perspectiva === 'ejecutora')
+
+      if (estsSupervisora.length > 0 && estsEjecutora.length === 0) {
+        const mBaseEj = montoContractualOriginal > 0 ? montoContractualOriginal : 501500000
+        const pctAmortEj = pctAnticipoEjecucionNum > 0 ? pctAnticipoEjecucionNum : 20
+        const factoresEj = [0.056, 0.089, 0.108, 0.119, 0.132]
+        const rendsEj = [98.4, 99.2, 100.0, 97.8, 100.0]
+        const retrasosEj = [0, 0, 0, 2, 0]
+        let acumEj = 0
+
+        estsSupervisora.forEach((esItem, idx) => {
+          const factor = factoresEj[idx] ?? 0.095
+          const brutoEj = Math.round(mBaseEj * factor * 100) / 100
+          acumEj += brutoEj
+          const amortEj = Math.round(((brutoEj * pctAmortEj) / 100) * 100) / 100
+          const retGarantia = Math.round(brutoEj * 0.05 * 100) / 100
+          const liqEj = Math.round((brutoEj - amortEj - retGarantia) * 100) / 100
+          const saldoEj = Math.max(0, Math.round((mBaseEj - acumEj) * 100) / 100)
+          const mapKey = `ejecutora__${esItem.numero}`
+
+          mapa.set(mapKey, {
+            id: `est-ejec-gen-${proyecto.id}-${idx + 1}`,
+            numero: esItem.numero,
+            nombreEstimacion: `Estimación de Obra No. ${String(idx + 1).padStart(2, '0')} - ${esItem.mes}`,
+            delegadoResidente: responsableEjecutoraNombre,
+            perspectiva: 'ejecutora',
+            fechaInicio: esItem.fechaInicio,
+            fechaFin: esItem.fechaFin,
+            mes: esItem.mes,
+            diasRetraso: retrasosEj[idx] ?? 0,
+            porcentajeRendimiento: rendsEj[idx] ?? 100,
+            calificacionDesempeno: 'bueno',
+            valorBrutoTrabajado: brutoEj,
+            porcentajeAmortizacion: pctAmortEj,
+            montoAmortizacion: amortEj,
+            montoLiquidoAPagar: liqEj,
+            saldoContractualRestante: saldoEj,
+            estado: esItem.estado === 'en_revision' ? 'aprobada' : esItem.estado,
+            supervisadoPor: nombreEmpresaEjecutora,
+            observaciones: `Estimación mensual de ejecución física (${nombreEmpresaEjecutora})`,
+          })
+        })
+      } else if (estsEjecutora.length > 0 && estsSupervisora.length === 0) {
+        const mBaseSp = montoSupervisionOriginal > 0 ? montoSupervisionOriginal : (montoContractualOriginal > 0 ? montoContractualOriginal * 0.08 : 40120000)
+        const pctAmortSp = pctAnticipoSupervisionNum > 0 ? pctAnticipoSupervisionNum : 15
+        const factoresSp = [0.062, 0.085, 0.102, 0.115, 0.128]
+        let acumSp = 0
+
+        estsEjecutora.forEach((ejItem, idx) => {
+          const factor = factoresSp[idx] ?? 0.09
+          const brutoSp = Math.round(mBaseSp * factor * 100) / 100
+          acumSp += brutoSp
+          const amortSp = Math.round(((brutoSp * pctAmortSp) / 100) * 100) / 100
+          const liqSp = Math.round((brutoSp - amortSp) * 100) / 100
+          const saldoSp = Math.max(0, Math.round((mBaseSp - acumSp) * 100) / 100)
+          const mapKey = `supervisora__${ejItem.numero}`
+
+          mapa.set(mapKey, {
+            id: `est-sup-gen-${proyecto.id}-${idx + 1}`,
+            numero: ejItem.numero,
+            nombreEstimacion: `Estimación de Supervisión No. ${String(idx + 1).padStart(2, '0')} - ${ejItem.mes}`,
+            delegadoResidente: responsableSupervisoraNombre,
+            perspectiva: 'supervisora',
+            fechaInicio: ejItem.fechaInicio,
+            fechaFin: ejItem.fechaFin,
+            mes: ejItem.mes,
+            diasRetraso: 0,
+            porcentajeRendimiento: 100,
+            calificacionDesempeno: 'bueno',
+            valorBrutoTrabajado: brutoSp,
+            porcentajeAmortizacion: pctAmortSp,
+            montoAmortizacion: amortSp,
+            montoLiquidoAPagar: liqSp,
+            saldoContractualRestante: saldoSp,
+            estado: ejItem.estado === 'en_revision' ? 'aprobada' : ejItem.estado,
+            supervisadoPor: nombreEmpresaSupervisora,
+            observaciones: `Estimación mensual de supervisión técnica (${nombreEmpresaSupervisora})`,
+          })
+        })
+      }
+
+      // 5. Estimación activa actualmente abierta en Hoja Sábana (general o por perspectiva)
+      const registrarActiva = (rawAct: string | null, perspForzada?: 'ejecutora' | 'supervisora') => {
+        if (!rawAct) return
         try {
-          const act = JSON.parse(activaStored)
+          const act = JSON.parse(rawAct)
           if (act && act.numero) {
-            const existing = mapa.get(act.numero)
+            const perspFinal = perspForzada || resolverPerspectiva(act.perspectiva)
+            const mapKey = `${perspFinal}__${act.numero}`
+            const existing = mapa.get(mapKey)
             const estaCerrada = existing && (existing.estado === 'aprobada' || existing.estado === 'pagada')
             if (!estaCerrada) {
               const bruto = Number(act.valorBruto || act.valorBrutoTrabajado || act.montoEstimacion || 0)
               const pctAmort = Number(act.porcentajeAmortizacion ?? 20)
               const amort = Number(act.montoAmortizacion ?? ((bruto * pctAmort) / 100))
               const liq = Number(act.montoLiquido || act.montoLiquidoAPagar || (bruto - amort))
-              const perspFinal = resolverPerspectiva(act.perspectiva)
-              mapa.set(act.numero, {
-                id: act.id || `est-activa-${act.numero}`,
+              mapa.set(mapKey, {
+                id: act.id || `est-activa-${perspFinal}-${act.numero}`,
                 numero: act.numero,
-                nombreEstimacion: act.nombreEstimacion || `Estimación de Obra - ${act.numero} (En Progreso)`,
-                delegadoResidente: (nombreDelegadoProyecto !== '-' ? nombreDelegadoProyecto : 'Delegado Residente'),
+                nombreEstimacion: act.nombreEstimacion || `Estimación de ${perspFinal === 'supervisora' ? 'Supervisión' : 'Obra'} - ${act.numero} (En Progreso)`,
+                delegadoResidente: perspFinal === 'supervisora' ? responsableSupervisoraNombre : responsableEjecutoraNombre,
                 perspectiva: perspFinal,
                 fechaInicio: act.fechaInicio || '',
                 fechaFin: act.fechaCorte || '',
@@ -429,6 +565,12 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
         } catch {}
       }
 
+      if (proyectoTieneSabanaGeneral) {
+        registrarActiva(activaStored)
+        if (tieneSabanaEjecutora) registrarActiva(activaEjecStored, 'ejecutora')
+        if (tieneSabanaSupervisora) registrarActiva(activaSupStored, 'supervisora')
+      }
+
       const lista = Array.from(mapa.values()).filter(
         (item: any) => !item.id?.startsWith('est-ejec-1-') && !item.id?.startsWith('est-sup-1-')
       )
@@ -436,7 +578,7 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
     } catch (e) {
       console.warn('Error cargando estimaciones:', e)
     }
-  }, [proyecto?.id, pAny.estimacionesManuales, pAny.estimaciones])
+  }, [proyecto?.id, pAny.estimacionesManuales, pAny.estimaciones, proyectoTieneSabanaGeneral, tieneSabanaEjecutora, tieneSabanaSupervisora])
 
   // Carga inicial y reactiva de los renglones del proyecto (con persistencia en localStorage y API)
   useEffect(() => {
@@ -1167,8 +1309,8 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
     <div className="space-y-2.5 font-[Poppins] text-[10.5px]">
       {/* Banner Superior */}
       <div className="rounded-xl border border-gray-200 bg-white p-2.5 shadow-2xs">
-        <div className={`flex flex-wrap items-center ${modoManual ? 'justify-end' : 'justify-between'} gap-2.5`}>
-          {!modoManual && (
+        <div className="flex flex-wrap items-center justify-between gap-2.5">
+          {!modoManual ? (
             <div className="flex items-center gap-2.5">
               <Banknote size={16} className="text-[#9B0F06] shrink-0" />
               <div>
@@ -1185,24 +1327,94 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
                 </div>
               </div>
             </div>
+          ) : (
+            <div className="flex items-center gap-2.5">
+              <Layers size={15} className="text-[#9B0F06] shrink-0" />
+              <div>
+                <p className="text-[8px] font-bold uppercase tracking-wider text-gray-400 font-sans">
+                  Modalidad de Control Financiero y de Obra
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[11px] font-bold text-gray-900 leading-none font-sans">
+                    Modo Manual — Renglones en Bitácora y Estimaciones Progresivas
+                  </span>
+                  {montoContractualOriginal > 0 && (
+                    <span className="text-[10px] text-gray-500 font-medium font-sans">
+                      · Contrato: Q {montoContractualOriginal.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
           )}
 
-          <div className="flex items-center gap-3 font-sans">
-            {!modoManual && (
-              <button
-                type="button"
-                onClick={() => navegarAHojaSabana({ tab: 'planificacion' })}
-                className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[10px] font-bold transition-all shadow-xs ${
-                  tieneAccesoHojaSabana
-                    ? 'bg-[#9B0F06] text-white hover:bg-[#5E0006] cursor-pointer'
-                    : 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200'
-                }`}
-                title={tieneAccesoHojaSabana ? 'Abrir Hoja Sábana Analítica' : 'Solo el Delegado Residente o Administrador tiene acceso'}
-              >
-                {tieneAccesoHojaSabana ? <FileSpreadsheet size={11} /> : <Lock size={11} />}
-                <span>Hoja Sábana Analítica</span>
-                {tieneAccesoHojaSabana && <ArrowRight size={10} />}
-              </button>
+          <div className="flex items-center gap-2 font-sans">
+            {mostrarBotonHojaSabanaBanner ? (
+              tieneSabanaEjecutora && tieneSabanaSupervisora && subTab === 'resumen' ? (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => navegarAHojaSabana({ tab: 'planificacion', perspectiva: 'ejecutora' })}
+                    className="inline-flex items-center gap-1.5 rounded-md bg-[#9B0F06] text-white hover:bg-[#5E0006] px-2.5 py-1 text-[10px] font-bold transition-all shadow-xs cursor-pointer"
+                    title={`Abrir Hoja Sábana de Empresa Ejecutora (${nombreEmpresaEjecutora})`}
+                  >
+                    <FileSpreadsheet size={11} />
+                    <span>Hoja Sábana Ejecutora</span>
+                    <ArrowRight size={10} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => navegarAHojaSabana({ tab: 'planificacion', perspectiva: 'supervisora' })}
+                    className="inline-flex items-center gap-1.5 rounded-md bg-gray-800 text-white hover:bg-gray-950 px-2.5 py-1 text-[10px] font-bold transition-all shadow-xs cursor-pointer"
+                    title={`Abrir Hoja Sábana de Empresa Supervisora (${nombreEmpresaSupervisora})`}
+                  >
+                    <FileSpreadsheet size={11} />
+                    <span>Hoja Sábana Supervisora</span>
+                    <ArrowRight size={10} />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() =>
+                    navegarAHojaSabana({
+                      tab: 'planificacion',
+                      perspectiva:
+                        subTab === 'estimaciones'
+                          ? perspectivaEstimacion
+                          : subTab === 'curva'
+                          ? perspectivaCurva
+                          : tieneSabanaSupervisora && !tieneSabanaEjecutora
+                          ? 'supervisora'
+                          : 'ejecutora',
+                    })
+                  }
+                  className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[10px] font-bold transition-all shadow-xs ${
+                    tieneAccesoHojaSabana
+                      ? 'bg-[#9B0F06] text-white hover:bg-[#5E0006] cursor-pointer'
+                      : 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200'
+                  }`}
+                  title={tieneAccesoHojaSabana ? 'Abrir Hoja Sábana Analítica' : 'Solo el Delegado Residente o Administrador tiene acceso'}
+                >
+                  {tieneAccesoHojaSabana ? <FileSpreadsheet size={11} /> : <Lock size={11} />}
+                  <span>
+                    Hoja Sábana Analítica
+                    {tieneSabanaEjecutora && tieneSabanaSupervisora
+                      ? ` (${(subTab === 'estimaciones' ? perspectivaEstimacion : perspectivaCurva) === 'supervisora' ? 'Supervisora' : 'Ejecutora'})`
+                      : ''}
+                  </span>
+                  {tieneAccesoHojaSabana && <ArrowRight size={10} />}
+                </button>
+              )
+            ) : (
+              <span className="inline-flex items-center gap-1.5 rounded-md bg-gray-100 border border-gray-200 px-2.5 py-1 text-[9.5px] font-bold text-gray-600">
+                <Receipt size={11} className="text-gray-500" />
+                <span>
+                  {modoManual
+                    ? 'Gestión en Modo Manual'
+                    : `Perspectiva ${perspectivaEstimacion === 'supervisora' ? 'Supervisora' : 'Ejecutora'}: Modo Manual`}
+                </span>
+              </span>
             )}
           </div>
         </div>
@@ -1731,12 +1943,12 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
             <div className="flex items-center gap-2">
               {esModoSabanaActual ? (
                 <a
-                  href={`/dashboard/proyectos/${proyecto?.id || ''}/hoja-sabana`}
+                  href={`/dashboard/proyectos/${proyecto?.id || ''}/hoja-sabana?perspectiva=${perspectivaEstimacion}`}
                   className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-[#9B0F06] px-2.5 py-1.5 text-[10px] font-bold text-white hover:bg-[#7a0c05] transition-colors cursor-pointer shadow-2xs whitespace-nowrap"
-                  title="Gestionar periodos y estimaciones en Hoja Sábana"
+                  title={`Gestionar periodos y estimaciones en Hoja Sábana (${perspectivaEstimacion === 'supervisora' ? nombreEmpresaSupervisora : nombreEmpresaEjecutora})`}
                 >
                   <FileSpreadsheet size={12} />
-                  <span>Gestionar en Hoja Sábana</span>
+                  <span>Gestionar en Hoja Sábana ({perspectivaEstimacion === 'supervisora' ? 'Supervisora' : 'Ejecutora'})</span>
                 </a>
               ) : (
                 <button

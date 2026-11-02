@@ -8,6 +8,15 @@ export function tienePermiso(permisosUsuario: string[], permisoRequerido: string
     if (rolNorm === 'administrador' || rolNorm === 'admin') {
       return true
     }
+    if (rolNorm.includes('presentad')) {
+      const parts = (permisoRequerido || '').toLowerCase().split('.')
+      const accion = parts[1] || parts[0] || ''
+      const esAccionEscritura = ['write', 'crear', 'actualizar', 'eliminar', 'aprobar', 'procesar', 'edit', 'delete'].some((a) => accion.includes(a))
+      if (esAccionEscritura) {
+        return false
+      }
+      return true
+    }
   }
 
   if (!permisosUsuario || !Array.isArray(permisosUsuario)) {

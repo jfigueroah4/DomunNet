@@ -75,12 +75,13 @@ export async function iniciarSesionControlador(req: Request, res: Response) {
       return sendError(res, 403, 'Su cuenta se encuentra desactivada. Contacte al administrador.')
     }
     if (error instanceof LimiteDispositivosError) {
+      const limite = error.limiteMaximo || 2
       return res.status(409).json({
         success: false,
         codigo: 'LIMITE_DISPOSITIVOS_ALCANZADO',
-        mensaje: 'Límite de dispositivos alcanzado (máximo 2). Tu cuenta ya tiene 2 sesiones activas en otros equipos.',
+        mensaje: `Límite de dispositivos alcanzado (máximo ${limite}). Tu cuenta ya tiene ${limite} sesiones activas en otros equipos.`,
         data: {
-          limite: 2,
+          limite,
           dispositivosActivos: error.dispositivosActivos,
         },
       })
@@ -171,10 +172,12 @@ export async function obtenerPerfilControlador(req: SolicitudAutenticada, res: R
         .maybeSingle()
 
       if (sessionLog && ((sessionLog.detalles as any)?.estado === 'revocada' || (sessionLog.detalles as any)?.estado === 'cerrada' || !sessionLog.exitoso)) {
+        const esPresentador = (req.usuario.rol || '').toLowerCase().includes('presentad')
+        const maxEquipos = esPresentador ? 20 : 2
         return sendError(
           res,
           401,
-          'Tu sesión ha expirado porque se inició sesión en otro dispositivo superando el límite de 2 equipos.',
+          `Tu sesión ha expirado porque se inició sesión en otro dispositivo superando el límite de ${maxEquipos} equipos.`,
           'SESION_REVOCADA_LIMITE'
         )
       }

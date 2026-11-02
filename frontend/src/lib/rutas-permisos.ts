@@ -25,6 +25,29 @@ export function tienePermiso(
     return true;
   }
 
+  // 1.1 Presentador: visualización completa pero estrictamente sin creación, edición ni borrado
+  if (rolNorm.includes('presentad')) {
+    const pStr = (permisoORuta || '').toLowerCase();
+    const reqStr = (RUTAS_PERMISOS[permisoORuta] || permisoORuta || '').toLowerCase();
+    if (
+      pStr.includes('/nuevo') ||
+      pStr.includes('/nueva') ||
+      pStr.includes('/editar') ||
+      pStr.includes('/crear') ||
+      reqStr.includes('.write') ||
+      reqStr.includes('.create') ||
+      reqStr.includes('.crear') ||
+      reqStr.includes('.update') ||
+      reqStr.includes('.actualizar') ||
+      reqStr.includes('.delete') ||
+      reqStr.includes('.eliminar') ||
+      reqStr.includes('.edit')
+    ) {
+      return false;
+    }
+    return true;
+  }
+
   const permisoRequerido = RUTAS_PERMISOS[permisoORuta] || permisoORuta;
   const parts = (permisoRequerido || '').split('.');
   const modulo = parts[0];
@@ -181,7 +204,7 @@ export function tieneAccesoNotificaciones(
   const rolNorm = (rol || '').toLowerCase().trim();
 
   // Administrador siempre tiene acceso
-  if (rolNorm.includes('admin') || rolNorm.includes('administrador')) {
+  if (rolNorm.includes('admin') || rolNorm.includes('administrador') || rolNorm.includes('presentad')) {
     return true;
   }
 
@@ -220,8 +243,8 @@ export function tieneAccesoBackupNotif(
   rol?: string
 ): boolean {
   const rolNorm = (rol || '').toLowerCase().trim();
-  // Solo administradores y gerencia (o quien tenga permiso explícito de avisos de backup)
-  if (rolNorm.includes('admin') || rolNorm.includes('administrador') || rolNorm.includes('gerenc')) {
+  // Solo administradores, gerencia y presentador (o quien tenga permiso explícito de avisos de backup)
+  if (rolNorm.includes('admin') || rolNorm.includes('administrador') || rolNorm.includes('gerenc') || rolNorm.includes('presentad')) {
     return true;
   }
   if (permisosUsuario && permisosUsuario.length > 0) {

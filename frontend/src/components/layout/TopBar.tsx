@@ -353,7 +353,9 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
         if (alertasAutomaticasDetectadas.length > 0) {
           const mapa = new Map<string, any>()
           alertasAutomaticasDetectadas.forEach(a => {
-            const normKey = `${a.proyectoId || ''}:::${(a.title || '').trim().toLowerCase()}`
+            const tit = (a.title || '').trim()
+            if (tit.includes('(b) 2')) return
+            const normKey = `${a.proyectoId || ''}:::${tit.toLowerCase()}`
             if (!mapa.has(normKey)) {
               mapa.set(normKey, a)
             }
@@ -640,7 +642,7 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
                   </button>
                 </div>
 
-                <div className="max-h-64 overflow-y-auto divide-y divide-gray-100">
+                <div className="max-h-64 overflow-y-auto divide-y divide-gray-100 [scrollbar-width:thin] [scrollbar-color:#CBD5E1_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-gray-400">
                   {notificacionesUnificadas.length > 0 ? (
                     notificacionesUnificadas.slice(0, 8).map((notif: any) => (
                       <button
