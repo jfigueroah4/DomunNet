@@ -964,7 +964,7 @@ function obtenerValoresCompletosProyecto(p?: ProyectoType | any): Record<string,
     actaInicioFechaSupervisora: pAny.actaInicioFechaSupervisora || parsedActaSup.fecha,
 
     // Ficha Técnica Obra
-    responsableNombre: cEjec.responsable || pAny.responsableNombre || '',
+    responsableNombre: pAny.responsableNombre || (p as any)?.responsableNombre || '',
     programaObra: cEjec.programa || pAny.programaObra || '',
     subprogramaObra: cEjec.subprograma || pAny.subprogramaObra || '',
     fuenteFinanciamientoObra: cEjec.fuenteFinanciamiento || pAny.fuenteFinanciamientoObra || '',
@@ -1578,11 +1578,12 @@ export function ProyectoDetalleView({ proyecto: initialProyecto, slugId }: { pro
     const listaOpciones: any[] = []
 
     // 1. Contactos vinculados en la empresa (BD)
-    if (matchedEmp && Array.isArray(matchedEmp.contactos)) {
-      for (const c of matchedEmp.contactos) {
+    const contactosEmp = matchedEmp?.contactos || matchedEmp?.contacto_contratista || []
+    if (matchedEmp && Array.isArray(contactosEmp)) {
+      for (const c of contactosEmp) {
         const u = c.usuario || {}
-        const du = u.dato_usuario || {}
-        const cNom = c.nombre || `${du.primer_nombre || ''} ${du.primer_apellido || ''}`.trim() || u.correo || du.username
+        const du = Array.isArray(u.dato_usuario) ? u.dato_usuario[0] : (u.dato_usuario || {})
+        const cNom = c.nombre || `${du.primer_nombre || ''} ${du.primer_apellido || ''}`.trim() || u.nombre || u.correo || du.username
         const rCargo = `${c.cargo || ''} ${c.rol || ''} ${u.rol || ''} ${u.cargo || ''}`
         if (cNom && !esRolExcluido(rCargo)) {
           listaOpciones.push({
@@ -2022,7 +2023,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto, slugId }: { pro
           direccion: editFormData.direccionContratista,
           telefono: editFormData.telefonoContratista,
           correo: editFormData.correoContratista,
-          responsable: editFormData.responsableNombre,
+          responsable: editFormData.superintendente,
           colegiadoActivoSuperintendente: editFormData.colegiadoSuperintendente,
           actaInicioNumero: editFormData.actaInicioEjecutora,
           programa: editFormData.programaObra,
@@ -2128,14 +2129,31 @@ export function ProyectoDetalleView({ proyecto: initialProyecto, slugId }: { pro
       const { documentos: _d, renglones: _r, planTrabajo: _p, ...datosBase } = editFormData
       const payloadParaEnviar = {
         ...datosBase,
+        superintendente: editFormData.superintendente,
+        contratistaSuperintendente: editFormData.superintendente,
         colegiadoSuperintendente: editFormData.colegiadoSuperintendente,
         colegiadoActivoSuperintendente: editFormData.colegiadoSuperintendente,
+        responsableNombre: editFormData.responsableNombre,
         latitud: editFormData.latitud ?? editFormData.coordenadasMapa?.lat,
         longitud: editFormData.longitud ?? editFormData.coordenadasMapa?.lng,
       }
 
       await (proyectoService.actualizarProyecto as any)(proyecto.id, payloadParaEnviar)
-      setProyecto((prev) => (prev ? { ...prev, ...editFormData, documentos: prev.documentos ?? [] } : prev))
+      setProyecto((prev) => (prev ? {
+        ...prev,
+        ...editFormData,
+        superintendente: editFormData.superintendente,
+        colegiadoSuperintendente: editFormData.colegiadoSuperintendente,
+        colegiadoActivoSuperintendente: editFormData.colegiadoSuperintendente,
+        responsableNombre: editFormData.responsableNombre,
+        contratoEjecucion: {
+          ...prev.contratoEjecucion,
+          ...editFormData.contratoEjecucion,
+          responsable: editFormData.superintendente,
+          colegiadoActivoSuperintendente: editFormData.colegiadoSuperintendente,
+        },
+        documentos: prev.documentos ?? []
+      } : prev))
       setEditingSection(null)
       showSuccessToast('Datos del proyecto actualizados correctamente')
     } catch (err: any) {
@@ -3121,8 +3139,8 @@ export function ProyectoDetalleView({ proyecto: initialProyecto, slugId }: { pro
                       isEditing={editingSection === 'marco_legal_contratista'}
                       onChange={(v) => handleFieldChange('superintendente', v)}
                       placeholder="Seleccionar o escribir Superintendente..."
-                      userOptions={userOptionsGenerales}
-                      onEmptyUserAction={handleAbrirCrearUsuario}
+                      userOptions={getUserOptionsForCompany(editingSection === 'marco_legal_contratista' ? editFormData.empresaContratista : proyecto.empresaContratista, editingSection === 'marco_legal_contratista' ? editFormData.superintendente : pAny.superintendente)}
+                      onEmptyUserAction={() => handleAbrirCrearUsuario({ tipo: 'contratista', campo: 'superintendente', empresaNombre: editingSection === 'marco_legal_contratista' ? editFormData.empresaContratista : proyecto.empresaContratista, cargo: 'Superintendente' })}
                       kind="nombre"
                       required
                     />
@@ -3528,8 +3546,8 @@ export function ProyectoDetalleView({ proyecto: initialProyecto, slugId }: { pro
                             isEditing={editingSection === 'ficha_obra'}
                             onChange={(v) => handleFieldChange('responsableNombre', v)}
                             placeholder="Seleccionar o buscar responsable..."
-                            userOptions={userOptionsIngenieros.length > 0 ? userOptionsIngenieros : userOptionsGenerales}
-                            onEmptyUserAction={handleAbrirCrearUsuario}
+                            userOptions={getUserOptionsForCompany(editingSection === 'ficha_obra' ? editFormData.empresaContratista : proyecto.empresaContratista, editingSection === 'ficha_obra' ? editFormData.responsableNombre : pAny.responsableNombre)}
+                            onEmptyUserAction={() => handleAbrirCrearUsuario({ tipo: 'contratista', campo: 'responsableNombre', empresaNombre: editingSection === 'ficha_obra' ? editFormData.empresaContratista : proyecto.empresaContratista, cargo: 'Responsable del Proyecto' })}
                             kind="nombre"
                             required
                           />

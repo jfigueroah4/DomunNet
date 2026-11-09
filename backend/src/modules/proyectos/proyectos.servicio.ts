@@ -1362,7 +1362,7 @@ export async function obtenerProyectoPorId(proyectoId: string) {
   const estimacionesSecundarias: any[] = []
   if (estimacionesPrincipales.length > 0) {
     const responsableSec = perspectivaSecundariaEst === 'ejecutora'
-      ? (contratoEjecucion?.responsable || contratoEjecucion?.propietario || 'Ing. Roberto Caballeros')
+      ? (contratoEjecucion?.responsable || contratoEjecucion?.propietario || 'Superintendente de Obra')
       : (contratoSupervision?.responsable || delegadoResidenteNombre || 'Ing. Supervisor Residente')
     const empresaSec = perspectivaSecundariaEst === 'ejecutora'
       ? (nomCont || 'Constructora Ejecutora, S.A.')
@@ -2391,8 +2391,8 @@ export async function actualizarProyecto(proyectoId: string, datosFormulario: Re
       detalleUpdates.plazo_ejecucion_original = p
     }
   }
-  if ('responsable' in datosFormulario || 'responsable_id' in datosFormulario || 'responsableId' in datosFormulario) {
-    const rawResp = datosFormulario.responsable || datosFormulario.responsable_id || datosFormulario.responsableId
+  if ('responsable' in datosFormulario || 'responsable_id' in datosFormulario || 'responsableId' in datosFormulario || 'responsableNombre' in datosFormulario) {
+    const rawResp = datosFormulario.responsable || datosFormulario.responsable_id || datosFormulario.responsableId || datosFormulario.responsableNombre
     const respVal = esUuidValido(rawResp)
     if (respVal) proyectoUpdates.responsable_id = respVal
   }
@@ -2582,7 +2582,7 @@ async function guardarContratosProyecto(proyectoId: string, datosFormulario: any
         direccion: c.direccion || (esEjec ? (datosFormulario.direccionContratista || datosFormulario.contratistaDireccion) : (datosFormulario.direccionSupervisora || datosFormulario.supervisoraDireccion)) || (esDomun ? DATOS_INSTITUCIONALES_DOMUN.direccion : null),
         telefono: c.telefono || (esEjec ? (datosFormulario.telefonoContratista || datosFormulario.contratistaTelefono) : (datosFormulario.telefonoSupervisora || datosFormulario.supervisoraTelefono)) || (esDomun ? DATOS_INSTITUCIONALES_DOMUN.telefono : null),
         correo: c.correo || (esEjec ? (datosFormulario.correoContratista || datosFormulario.contratistaCorreo) : (datosFormulario.correoSupervisora || datosFormulario.supervisoraCorreo)) || (esDomun ? DATOS_INSTITUCIONALES_DOMUN.correo_institucional : null),
-        responsable: c.responsable || (esEjec ? (datosFormulario.superintendente || datosFormulario.responsableNombre) : (datosFormulario.delegadoResidente || datosFormulario.responsableSupervisora || datosFormulario.supervisoraResponsable)) || null,
+        responsable: (esEjec ? (datosFormulario.superintendente || datosFormulario.contratistaSuperintendente || c.responsable) : (c.responsable || datosFormulario.delegadoResidente || datosFormulario.responsableSupervisora || datosFormulario.supervisoraResponsable)) || null,
         colegiado_activo_superintendente: esEjec
           ? (c.colegiadoActivoSuperintendente || c.colegiado_activo_superintendente || datosFormulario.colegiadoActivoSuperintendente || datosFormulario.colegiadoSuperintendente || datosFormulario.contratistaColegiadoActivo || null)
           : null,

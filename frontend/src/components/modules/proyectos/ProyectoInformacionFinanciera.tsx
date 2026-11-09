@@ -318,7 +318,7 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
         pAny.contratoEjecucion?.responsable ||
         pAny.superintendente ||
         pAny.responsableNombre ||
-        'Ing. Roberto Caballeros'
+        'Superintendente de Obra'
       const responsableSupervisoraNombre =
         nombreDelegadoProyecto !== '-'
           ? nombreDelegadoProyecto

@@ -537,12 +537,12 @@ export default function ProyectoDocumentos({
                   {isSubiendo ? (
                     <>
                       <Loader2 size={14} className="animate-spin" />
-                      <span>Subiendo a Supabase...</span>
+                      <span>Subiendo...</span>
                     </>
                   ) : (
                     <>
                       <UploadCloud size={14} />
-                      <span>Subir Documento</span>
+                      <span>Subir</span>
                     </>
                   )}
                 </button>
