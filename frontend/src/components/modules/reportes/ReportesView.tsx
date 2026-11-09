@@ -18,6 +18,9 @@ import {
   History,
   MessageSquare,
   UploadCloud,
+  Download,
+  HardDrive,
+  CheckCircle2,
   Loader2,
 } from 'lucide-react'
 import { ReportesObservacionesContratante } from './ReportesObservacionesContratante'
@@ -37,6 +40,7 @@ import { useUIStore } from '@/stores/useUIStore'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { esProyectoNoBorrador } from '@/lib/proyectos/estado'
 import { subirReporteSupabase } from '@/lib/supabase/storage'
+
 export interface ReporteGeneradoRegistro {
   id: string
   titulo: string
@@ -63,15 +67,16 @@ export default function ReportesView() {
   const [bitacoraRegistros, setBitacoraRegistros] = useState<any[]>([])
   const [fotografiasRegistros, setFotografiasRegistros] = useState<any[]>([])
 
-  // Modal de Historial de Reportes
+  // Modal de Historial de Reportes y Exportación
   const [modalHistorialAbierto, setModalHistorialAbierto] = useState(false)
   const [historialReportes, setHistorialReportes] = useState<ReporteGeneradoRegistro[]>([])
   const [almacenandoEnSupabase, setAlmacenandoEnSupabase] = useState(false)
+  const [modalExportarAbierto, setModalExportarAbierto] = useState(false)
+  const [formatoExportarSeleccionado, setFormatoExportarSeleccionado] = useState<'pdf' | 'word' | null>(null)
   const esContratante = useMemo(() => String(userProfile?.rol || '').toLowerCase().trim().includes('contratante'), [userProfile?.rol])
 
   // Modal de Observaciones del Contratante
   const [modalObservacionesAbierto, setModalObservacionesAbierto] = useState(false)
-
 
   // Drawer de Detalle y Lightbox de Fotografía
   const [drawerRegistro, setDrawerRegistro] = useState<any | null>(null)
@@ -96,12 +101,18 @@ export default function ReportesView() {
 
   // Ocultar la barra inferior de navegación móvil cuando se abre cualquier modal o drawer
   useEffect(() => {
-    const modalActivo = modalHistorialAbierto || modalObservacionesAbierto || Boolean(drawerRegistro) || modalMapaGTAbierto || Boolean(fotoExpandida)
+    const modalActivo =
+      modalHistorialAbierto ||
+      modalObservacionesAbierto ||
+      modalExportarAbierto ||
+      Boolean(drawerRegistro) ||
+      modalMapaGTAbierto ||
+      Boolean(fotoExpandida)
     setOcultarBottomNav(modalActivo)
     return () => {
       setOcultarBottomNav(false)
     }
-  }, [modalHistorialAbierto, modalObservacionesAbierto, drawerRegistro, modalMapaGTAbierto, fotoExpandida, setOcultarBottomNav])
+  }, [modalHistorialAbierto, modalObservacionesAbierto, modalExportarAbierto, drawerRegistro, modalMapaGTAbierto, fotoExpandida, setOcultarBottomNav])
 
   const todayStr = useMemo(() => new Date().toISOString().split('T')[0], [])
 
@@ -249,7 +260,7 @@ export default function ReportesView() {
         }
       })
 
-            // Cargar IDs eliminados para no presentarlos en reportes
+      // Cargar IDs eliminados para no presentarlos en reportes
       let idsEliminados = new Set<string>()
       try {
         idsEliminados = new Set(JSON.parse(localStorage.getItem('domun_bitacora_eliminados') || '[]').map(String))
@@ -454,7 +465,7 @@ export default function ReportesView() {
       const registroFechaStr = registro.fecha ? String(registro.fecha).slice(0, 10) : ''
       const matchDesde = !fechaDesde || (registroFechaStr && registroFechaStr >= fechaDesde)
       const matchHasta = !fechaHasta || (registroFechaStr && registroFechaStr <= fechaHasta)
-      
+
       const matchProyecto =
         !proyectoId ||
         proyectoId === 'todos' ||
@@ -539,7 +550,7 @@ export default function ReportesView() {
       try {
         const { api } = await import('@/lib/api/cliente')
         const res = await api.get('/mantenimiento/reporte?limite=100').catch(() => null)
-        
+
         if (!cancelado && res?.data?.success && Array.isArray(res.data.data) && res.data.data.length > 0) {
           const proyMap = new Map<string, string>()
           proyectosValidos.forEach((p: any) => {
@@ -689,15 +700,15 @@ export default function ReportesView() {
     const nombreArchivo = `Reporte_${proyNomLimpio}_${fechaLimpia}.${extension}`
 
     exportReport(format, html, nombreArchivo, (nombreFinal) => {
-      showSuccessToast(`Descarga completada: El reporte ${format.toUpperCase()} (${nombreFinal}) se ha guardado en tus descargas.`)
+      showSuccessToast(`Descarga local completada: El reporte ${format.toUpperCase()} (${nombreFinal}) se ha guardado en tus descargas.`)
     })
   }
 
-  // Almacenar explícitamente en la nube de Supabase (Storage + BD)
+  // Exportar y almacenar explícitamente en la nube de Supabase (Storage + BD)
   const handleAlmacenarEnSupabase = async (format: 'pdf' | 'word' = 'pdf') => {
     if (almacenandoEnSupabase) return
     if (bitacoraParaReporte.length === 0 && fotosParaReporte.length === 0) {
-      showErrorToast('No hay registros ni evidencias para almacenar.')
+      showErrorToast('No hay registros ni evidencias para exportar y almacenar.')
       return
     }
 
@@ -806,7 +817,10 @@ export default function ReportesView() {
         }
       } catch (_) {}
 
-      showSuccessToast('Reporte almacenado exitosamente en Supabase.')
+      setModalExportarAbierto(false)
+      setFormatoExportarSeleccionado(null)
+      exportReport(format, html, nombreArchivo)
+      showSuccessToast(`Reporte ${format.toUpperCase()} exportado y almacenado exitosamente en Supabase.`)
     } catch (err: any) {
       console.error('Error al almacenar reporte en Supabase:', err)
       showErrorToast('No se pudo almacenar el reporte en Supabase.')
@@ -968,57 +982,227 @@ export default function ReportesView() {
           })()}
         </div>
 
-        {/* Barra de Exportación con Descargar (Word / PDF) y Almacenar en Supabase */}
+        {/* Barra de Exportación Unificada con botón Exportar */}
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2.5 border-t border-gray-100 pt-3">
           <p className="text-[11px] sm:text-[10px] text-gray-500 font-medium">
             Se exportarán {bitacoraParaReporte.length} registros y {fotosParaReporte.length} imágenes.
           </p>
-          <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+          <div className="flex flex-wrap gap-2 w-full sm:w-auto justify-end">
             <button
-              disabled={bitacoraParaReporte.length === 0 && fotosParaReporte.length === 0}
-              onClick={() => handleExport('word')}
-              className="flex-1 sm:flex-initial inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3.5 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50 hover:border-gray-300 disabled:cursor-not-allowed disabled:opacity-40 shadow-2xs cursor-pointer active:scale-95"
-              title="Descargar documento Word en tus descargas"
+              type="button"
+              disabled={almacenandoEnSupabase || (bitacoraParaReporte.length === 0 && fotosParaReporte.length === 0)}
+              onClick={() => {
+                setFormatoExportarSeleccionado(null)
+                setModalExportarAbierto(true)
+              }}
+              className="w-full sm:w-auto inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-[#9B0F06] px-4 text-xs font-semibold text-white transition-colors hover:bg-[#5E0006] disabled:cursor-not-allowed disabled:opacity-40 shadow-2xs cursor-pointer active:scale-95"
+              title="Exportar reporte en formato PDF o Word"
             >
-              <FileText size={14} className="text-gray-500" />
-              <span>Word</span>
+              {almacenandoEnSupabase ? (
+                <>
+                  <Loader2 size={14} className="animate-spin text-white" />
+                  <span>Procesando...</span>
+                </>
+              ) : (
+                <>
+                  <Download size={14} className="text-white" />
+                  <span>Exportar</span>
+                </>
+              )}
             </button>
-            <button
-              disabled={bitacoraParaReporte.length === 0 && fotosParaReporte.length === 0}
-              onClick={() => handleExport('pdf')}
-              className="flex-1 sm:flex-initial inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3.5 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50 hover:border-gray-300 disabled:cursor-not-allowed disabled:opacity-40 shadow-2xs cursor-pointer active:scale-95"
-              title="Descargar documento PDF en tus descargas"
-            >
-              <FileType size={14} className="text-gray-500" />
-              <span>PDF</span>
-            </button>
-            {!esContratante && (
-              <button
-                disabled={almacenandoEnSupabase || (bitacoraParaReporte.length === 0 && fotosParaReporte.length === 0)}
-                onClick={() => handleAlmacenarEnSupabase('pdf')}
-                className="flex-1 sm:flex-initial inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-[#9B0F06] px-3.5 text-xs font-semibold text-white transition-colors hover:bg-[#5E0006] disabled:cursor-not-allowed disabled:opacity-40 shadow-2xs cursor-pointer active:scale-95"
-                title="Almacenar reporte en Supabase (Nube)"
-              >
-                {almacenandoEnSupabase ? (
-                  <>
-                    <Loader2 size={14} className="animate-spin text-white" />
-                    <span>Almacenando...</span>
-                  </>
-                ) : (
-                  <>
-                    <UploadCloud size={14} className="text-white" />
-                    <span>Almacenar</span>
-                  </>
-                )}
-              </button>
-            )}
           </div>
         </div>
       </section>
 
-      {/* MODAL DE OBSERVACIONES Y COMENTARIOS DEL CONTRATANTE */}
-      
+      {/* MODAL INTERACTIVO DE EXPORTACIÓN (Paso 1: Formato PDF/Word -> Paso 2: Almacenar en Supabase o Guardar Localmente) */}
+      {modalExportarAbierto && (
+        <Portal>
+          <div
+            className="fixed inset-0 z-[10002] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs font-[Poppins]"
+            onClick={() => {
+              if (!almacenandoEnSupabase) {
+                setModalExportarAbierto(false)
+                setFormatoExportarSeleccionado(null)
+              }
+            }}
+          >
+            <div
+              className="w-full max-w-md rounded-2xl bg-white p-5 sm:p-6 shadow-2xl border border-gray-200 animate-in fade-in zoom-in-95 duration-200"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Encabezado del Modal */}
+              <div className="flex items-start justify-between gap-3 border-b border-gray-100 pb-3.5">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-50 text-[#9B0F06] border border-red-100">
+                    <Download size={18} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-gray-900 leading-tight">
+                      Exportar Reporte Oficial
+                    </h3>
+                    <p className="text-[11px] text-gray-500 mt-0.5">
+                      {!formatoExportarSeleccionado
+                        ? 'Paso 1 de 2 · Seleccione el formato de exportación'
+                        : 'Paso 2 de 2 · Elija dónde desea guardar el reporte'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  disabled={almacenandoEnSupabase}
+                  onClick={() => {
+                    setModalExportarAbierto(false)
+                    setFormatoExportarSeleccionado(null)
+                  }}
+                  className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors cursor-pointer disabled:opacity-40"
+                  title="Cerrar"
+                >
+                  <X size={16} />
+                </button>
+              </div>
 
+              {/* PASO 1: Seleccionar Formato (PDF o Word) */}
+              {!formatoExportarSeleccionado ? (
+                <div className="mt-4 space-y-3">
+                  <p className="text-xs text-gray-600 font-medium">
+                    Indique en qué formato desea generar el reporte ({bitacoraParaReporte.length} registros y {fotosParaReporte.length} imágenes):
+                  </p>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setFormatoExportarSeleccionado('pdf')}
+                      className="group flex flex-col items-start gap-2 rounded-xl border border-gray-200 bg-white p-3.5 text-left transition-all hover:border-[#9B0F06] hover:bg-red-50/30 hover:shadow-xs cursor-pointer active:scale-98"
+                    >
+                      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-red-50 text-[#9B0F06] group-hover:bg-[#9B0F06] group-hover:text-white transition-colors">
+                        <FileType size={18} />
+                      </div>
+                      <div>
+                        <span className="text-xs font-bold text-gray-900 block">Formato PDF</span>
+                        <span className="text-[10.5px] text-gray-500 leading-snug block mt-0.5">
+                          Documento oficial listo para impresión y firma
+                        </span>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setFormatoExportarSeleccionado('word')}
+                      className="group flex flex-col items-start gap-2 rounded-xl border border-gray-200 bg-white p-3.5 text-left transition-all hover:border-[#9B0F06] hover:bg-red-50/30 hover:shadow-xs cursor-pointer active:scale-98"
+                    >
+                      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 text-gray-700 group-hover:bg-[#9B0F06] group-hover:text-white transition-colors">
+                        <FileText size={18} />
+                      </div>
+                      <div>
+                        <span className="text-xs font-bold text-gray-900 block">Formato Word</span>
+                        <span className="text-[10.5px] text-gray-500 leading-snug block mt-0.5">
+                          Documento editable compatible con Microsoft Word
+                        </span>
+                      </div>
+                    </button>
+                  </div>
+
+                  <div className="mt-4 flex justify-end border-t border-gray-100 pt-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setModalExportarAbierto(false)
+                        setFormatoExportarSeleccionado(null)
+                      }}
+                      className="rounded-lg border border-gray-200 px-3.5 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* PASO 2: Confirmar si desea almacenar en Supabase o solo guardar localmente */
+                <div className="mt-4 space-y-3.5">
+                  <div className="flex items-center justify-between rounded-xl bg-gray-50 border border-gray-200 px-3 py-2">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 size={15} className="text-[#9B0F06] shrink-0" />
+                      <span className="text-xs font-semibold text-gray-800">
+                        Formato elegido:{' '}
+                        <strong className="uppercase text-[#9B0F06]">{formatoExportarSeleccionado}</strong>
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={almacenandoEnSupabase}
+                      onClick={() => setFormatoExportarSeleccionado(null)}
+                      className="text-[11px] font-semibold text-gray-500 hover:text-[#9B0F06] underline cursor-pointer disabled:opacity-40"
+                    >
+                      Cambiar formato
+                    </button>
+                  </div>
+
+                  <div className="space-y-1">
+                    <p className="text-xs font-bold text-gray-900">
+                      ¿Desea que el reporte también se guarde y almacene en el sistema (Supabase)?
+                    </p>
+                    <p className="text-[11px] text-gray-500 leading-relaxed">
+                      Si selecciona <strong>Sí</strong>, el reporte se almacenará en Supabase y quedará registrado en el historial además de descargarse. Si selecciona <strong>No</strong>, solo se guardará localmente en su dispositivo.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2 pt-1">
+                    {!esContratante && (
+                      <button
+                        type="button"
+                        disabled={almacenandoEnSupabase}
+                        onClick={() => handleAlmacenarEnSupabase(formatoExportarSeleccionado)}
+                        className="w-full flex items-center justify-between gap-3 rounded-xl bg-[#9B0F06] hover:bg-[#5E0006] text-white p-3 text-left transition-all shadow-xs cursor-pointer disabled:opacity-50 active:scale-98"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          {almacenandoEnSupabase ? (
+                            <Loader2 size={18} className="animate-spin shrink-0" />
+                          ) : (
+                            <UploadCloud size={18} className="shrink-0" />
+                          )}
+                          <div>
+                            <span className="text-xs font-bold block">
+                              {almacenandoEnSupabase ? 'Almacenando y exportando...' : 'Sí, almacenar en Supabase y exportar'}
+                            </span>
+                            <span className="text-[10px] text-white/85 block">
+                              Se guarda en la nube (historial de reportes) y descarga el archivo {formatoExportarSeleccionado.toUpperCase()}
+                            </span>
+                          </div>
+                        </div>
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      disabled={almacenandoEnSupabase}
+                      onClick={() => {
+                        const fmt = formatoExportarSeleccionado
+                        setModalExportarAbierto(false)
+                        setFormatoExportarSeleccionado(null)
+                        void handleExport(fmt)
+                      }}
+                      className="w-full flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 hover:border-gray-300 text-gray-800 p-3 text-left transition-all cursor-pointer disabled:opacity-50 active:scale-98"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <HardDrive size={18} className="text-gray-600 shrink-0" />
+                        <div>
+                          <span className="text-xs font-bold block">
+                            No, guardar solo localmente
+                          </span>
+                          <span className="text-[10px] text-gray-500 block">
+                            Solo descarga el documento {formatoExportarSeleccionado.toUpperCase()} en tu dispositivo sin subirlo a Supabase
+                          </span>
+                        </div>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </Portal>
+      )}
+
+      {/* MODAL DE OBSERVACIONES Y COMENTARIOS DEL CONTRATANTE */}
       <ReportesObservacionesContratante
         isOpen={modalObservacionesAbierto}
         onClose={() => setModalObservacionesAbierto(false)}

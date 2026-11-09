@@ -91,6 +91,20 @@ export function BitacoraFiltros({
   const esAdmin = rolUsuario.includes('admin') || rolUsuario.includes('director')
   const esResidente = rolUsuario.includes('residente')
   const esRestringido = esRolCampoRestringido || (!esAdmin && !esResidente)
+  const esPresentador = rolUsuario.includes('presentad')
+  const esRolSinEliminacion =
+    esPresentador ||
+    esRolCampoRestringido ||
+    rolUsuario.includes('contratante') ||
+    rolUsuario.includes('auxiliar') ||
+    rolUsuario.includes('topograf') ||
+    rolUsuario.includes('laborator') ||
+    rolUsuario.includes('inspector') ||
+    rolUsuario === 'campo' ||
+    rolUsuario.includes('ejecutora') ||
+    rolUsuario.includes('contratista') ||
+    rolUsuario.includes('supervis')
+  const puedeEliminar = (esAdmin || rolUsuario.includes('gerenc')) && !esRolSinEliminacion && Boolean(setModoSeleccion)
 
   useEffect(() => {
     const cargarDatosIniciales = async () => {
@@ -652,7 +666,7 @@ export function BitacoraFiltros({
                     setModoSeleccion?.((prev) => !prev)
                     cerrarSheetFiltros()
                   }}
-                  className={`flex-1 h-[36px] rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                  className={`${!puedeEliminar ? 'hidden' : 'flex-1 h-[36px] rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5'} ${
                     modoSeleccion
                       ? 'bg-[#9B0F06] text-white hover:bg-[#7D0C05]'
                       : 'border border-gray-200 bg-white text-gray-700 hover:bg-red-50 hover:text-[#9B0F06]'
@@ -797,7 +811,7 @@ export function BitacoraFiltros({
             disabled={!hayProyecto}
             onClick={() => setModoSeleccion?.((prev) => !prev)}
             title={modoSeleccion ? 'Desactivar modo selección' : 'Activar selección para eliminar registros'}
-            className={`inline-flex shrink-0 items-center justify-center rounded-lg h-[28px] text-xs font-medium transition-all cursor-pointer shadow-2xs ${
+            className={`${!puedeEliminar ? 'hidden' : 'inline-flex shrink-0 items-center justify-center rounded-lg h-[28px] text-xs font-medium transition-all cursor-pointer shadow-2xs'} ${
               !hayProyecto
                 ? 'border border-gray-200 bg-gray-100 text-gray-300 cursor-not-allowed'
                 : modoSeleccion

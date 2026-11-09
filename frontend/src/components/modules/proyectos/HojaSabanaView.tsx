@@ -1232,17 +1232,121 @@ const GENERAR_RENGLONES_VACIOS = (): RenglonDetalladoSabana[] => {
 }
 
 export const GENERAR_MEDICIONES_ANALITICAS_DEFAULT = (proyectoId?: string): MedicionAnaliticaCampo[] => [
-  { id: 'med-01', codigoDGC: '201.03 (b)', descripcionRenglon: 'Retiro de Pavimento, Aceras y Otros (OTS-3)', estacionInicio: '14+200', estacionFin: '14+700', longitudL: 500, anchoA: 7.3, alturaH: 0.15, ladoVia: 'Sección Completa', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 547.5, unidad: 'm³', origenTipo: 'Libreta', referenciaOrigen: 'Libreta topográfica N° 01 - Est. 01', numEstimacion: 'Estimación 01', mesPeriodo: 'Mar 2026', observaciones: 'Espesor verificado mediante calas de prueba en carril derecho.', fechaMedicion: '2026-03-25' },
-  { id: 'med-02', codigoDGC: '202.03', descripcionRenglon: 'Limpia, chapeo y destronque', estacionInicio: '14+000', estacionFin: '15+500', longitudL: 1500, anchoA: 10, alturaH: 0, ladoVia: 'Sección Completa', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 1.5, unidad: 'Ha', origenTipo: 'Plano', referenciaOrigen: 'Anotación Bitácora N° 03', numEstimacion: 'Estimación 01', mesPeriodo: 'Mar 2026', observaciones: 'Despeje de derecho de vía conforme a planos constructivos (1,500 m x 10 m = 15,000 m² = 1.50 Ha).', fechaMedicion: '2026-03-28' },
-  { id: 'med-03', codigoDGC: '203.03 (a)', descripcionRenglon: 'Excavación No Clasificada(OC-2)(OC-3)', estacionInicio: '14+300', estacionFin: '15+100', longitudL: 800, anchoA: 8.5, alturaH: 1.4, ladoVia: 'Lado Izquierdo', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 9520, unidad: 'm³', origenTipo: 'Libreta', referenciaOrigen: 'Libreta de nivelación N° 04', numEstimacion: 'Estimación 02', mesPeriodo: 'Abr 2026', observaciones: 'Sección transversal verificada con estación total en talud.', fechaMedicion: '2026-04-20' },
-  { id: 'med-04', codigoDGC: '203.03 (b)', descripcionRenglon: 'Excavación No Clasificada de Desperdicio (OTS-1)(OTS-2)(OTS-3)', estacionInicio: '14+800', estacionFin: '15+600', longitudL: 800, anchoA: 7.5, alturaH: 1.2, ladoVia: 'Sección Completa', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 7200, unidad: 'm³', origenTipo: 'Libreta', referenciaOrigen: 'Reporte de volquetes N° 12', numEstimacion: 'Estimación 02', mesPeriodo: 'Abr 2026', observaciones: 'Material transportado a botadero autorizado.', fechaMedicion: '2026-04-24' },
-  { id: 'med-05', codigoDGC: '203.03 (c)', descripcionRenglon: 'Excavación No Clasificada para Préstamo', estacionInicio: '15+000', estacionFin: '16+000', longitudL: 1000, anchoA: 9.0, alturaH: 1.5, ladoVia: 'Sección Completa', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 13500, unidad: 'm³', origenTipo: 'Libreta', referenciaOrigen: 'Registro densímetro nuclear N° 08', numEstimacion: 'Estimación 03', mesPeriodo: 'May 2026', observaciones: 'Densidad in-situ mayor al 95% de la prueba Proctor estándar.', fechaMedicion: '2026-05-18' },
-  { id: 'med-06', codigoDGC: '203.04 (g)', descripcionRenglon: 'Cortes en Roca (OTS-1)(OTS-2)(OTS3)', estacionInicio: '15+400', estacionFin: '16+100', longitudL: 700, anchoA: 6.5, alturaH: 2.0, ladoVia: 'Lado Derecho', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 9100, unidad: 'm³', origenTipo: 'Libreta', referenciaOrigen: 'Control de voladura N° 06', numEstimacion: 'Estimación 03', mesPeriodo: 'May 2026', observaciones: 'Volumen derivado de perforación y voladura en banco de roca dura.', fechaMedicion: '2026-05-22' },
-  { id: 'med-07', codigoDGC: '203.03 (d)', descripcionRenglon: 'Sub-Excavación', estacionInicio: '15+800', estacionFin: '16+600', longitudL: 800, anchoA: 7.3, alturaH: 0.6, ladoVia: 'Sección Completa', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 3504, unidad: 'm³', origenTipo: 'Libreta', referenciaOrigen: 'Anotación Bitácora N° 18', numEstimacion: 'Estimación 04', mesPeriodo: 'Jun 2026', observaciones: 'Reemplazo de estrato fangoso arcilloso bajo subrasante.', fechaMedicion: '2026-06-19' },
-  { id: 'med-08', codigoDGC: '203.04 (h)', descripcionRenglon: 'Contracunetas (OC-1)(OC-3)', estacionInicio: '15+200', estacionFin: '15+920', longitudL: 720, anchoA: 0, alturaH: 0, ladoVia: 'Lado Izquierdo', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 720, unidad: 'm', origenTipo: 'Plano', referenciaOrigen: 'Plano hidráulico D-04', numEstimacion: 'Estimación 04', mesPeriodo: 'Jun 2026', observaciones: 'Contracuneta revestida de concreto para protección de taludes.', fechaMedicion: '2026-06-25' },
-  { id: 'med-09', codigoDGC: '204.02', descripcionRenglon: 'Excavación de canales (oc-1)(oc-3)', estacionInicio: '14+200', estacionFin: '16+200', longitudL: 2000, anchoA: 1.8, alturaH: 0.8, ladoVia: 'Sección Completa', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 2880, unidad: 'm³', origenTipo: 'Libreta', referenciaOrigen: 'Bitácora N° 25 - Est. 05', numEstimacion: 'Estimación 05', mesPeriodo: 'Jul 2026', observaciones: 'Canal de desagüe principal con sección trapecial completada.', fechaMedicion: '2026-07-21' },
-  { id: 'med-10', codigoDGC: '155.07', descripcionRenglon: 'Mantenimiento de la carretera durante la ejecución del trabajo', estacionInicio: '0+000', estacionFin: '10+000', longitudL: 10000, anchoA: 1, alturaH: 1, ladoVia: 'Sección Completa', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 1, unidad: 'u', origenTipo: 'Plano', referenciaOrigen: 'Certificación de paso vehicular expedida por supervisión', numEstimacion: 'Estimación 05', mesPeriodo: 'Jul 2026', observaciones: 'Paso continuo garantizado durante el mes de julio sin interrupciones.', fechaMedicion: '2026-07-28' },
+  // Estimación 01 — Mayo 2026 (4 apartados diferenciados)
+  { id: 'med-01', codigoDGC: '155.07', descripcionRenglon: 'Mantenimiento de la carretera durante la ejecución del trabajo', estacionInicio: '14+000', estacionFin: '14+850', longitudL: 850, anchoA: 1, alturaH: 1, ladoVia: 'Sección Completa', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 0.24, unidad: 'Glb', origenTipo: 'Plano', referenciaOrigen: 'Acta de Inicio y Bitácora N° 01 - Est. 01', numEstimacion: 'Estimación 01', mesPeriodo: 'May 2026', observaciones: 'Señalización preventiva inicial y desvío provisional habilitado.', fechaMedicion: '2026-05-14' },
+  { id: 'med-02', codigoDGC: '201.03 (b)', descripcionRenglon: 'Retiro de Pavimento, Aceras y Otros (OTS-3)', estacionInicio: '14+000', estacionFin: '14+520', longitudL: 520, anchoA: 7.4, alturaH: 0.18, ladoVia: 'Sección Completa', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 692.64, unidad: 'm³', origenTipo: 'Libreta', referenciaOrigen: 'Libreta topográfica N° 01 - Folio 04', numEstimacion: 'Estimación 01', mesPeriodo: 'May 2026', observaciones: 'Demolición y retiro de carpeta deteriorada y bordillos existentes.', fechaMedicion: '2026-05-19' },
+  { id: 'med-03', codigoDGC: '202.03', descripcionRenglon: 'Limpia, chapeo y destronque', estacionInicio: '14+000', estacionFin: '15+350', longitudL: 1350, anchoA: 12, alturaH: 0, ladoVia: 'Sección Completa', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 1.62, unidad: 'Ha', origenTipo: 'Plano', referenciaOrigen: 'Anotación Bitácora N° 03 - Est. 01', numEstimacion: 'Estimación 01', mesPeriodo: 'May 2026', observaciones: 'Despeje de derecho de vía en área de rampas norte y sur.', fechaMedicion: '2026-05-24' },
+  { id: 'med-04', codigoDGC: '203.03 (a)', descripcionRenglon: 'Excavación No Clasificada(OC-2)(OC-3)', estacionInicio: '14+100', estacionFin: '14+640', longitudL: 540, anchoA: 8.2, alturaH: 1.35, ladoVia: 'Lado Izquierdo', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 5977.8, unidad: 'm³', origenTipo: 'Libreta', referenciaOrigen: 'Secciones transversales Topografía N° 02', numEstimacion: 'Estimación 01', mesPeriodo: 'May 2026', observaciones: 'Corte inicial en aproximación norte del paso a desnivel.', fechaMedicion: '2026-05-28' },
+
+  // Estimación 02 — Junio 2026 (4 apartados diferenciados)
+  { id: 'med-05', codigoDGC: '203.03 (a)', descripcionRenglon: 'Excavación No Clasificada(OC-2)(OC-3)', estacionInicio: '14+640', estacionFin: '15+380', longitudL: 740, anchoA: 8.8, alturaH: 1.65, ladoVia: 'Sección Completa', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 10744.8, unidad: 'm³', origenTipo: 'Libreta', referenciaOrigen: 'Libreta de nivelación N° 05 - Folio 11', numEstimacion: 'Estimación 02', mesPeriodo: 'Jun 2026', observaciones: 'Excavación masiva en rampa deprimida central.', fechaMedicion: '2026-06-12' },
+  { id: 'med-06', codigoDGC: '203.03 (b)', descripcionRenglon: 'Excavación No Clasificada de Desperdicio (OTS-1)(OTS-2)(OTS-3)', estacionInicio: '14+450', estacionFin: '15+150', longitudL: 700, anchoA: 7.6, alturaH: 1.25, ladoVia: 'Sección Completa', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 6650, unidad: 'm³', origenTipo: 'Libreta', referenciaOrigen: 'Control de acarreo a botadero N° 09', numEstimacion: 'Estimación 02', mesPeriodo: 'Jun 2026', observaciones: 'Desalojo de material plástico inadecuado hacia banco autorizado.', fechaMedicion: '2026-06-18' },
+  { id: 'med-07', codigoDGC: '204.01', descripcionRenglon: 'Excavación Estructural', estacionInicio: '14+820', estacionFin: '14+960', longitudL: 140, anchoA: 4.5, alturaH: 2.8, ladoVia: 'Sección Completa', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 1764, unidad: 'm³', origenTipo: 'Libreta', referenciaOrigen: 'Bitácora N° 08 - Estribos E-1 y E-2', numEstimacion: 'Estimación 02', mesPeriodo: 'Jun 2026', observaciones: 'Excavación para cimentación de estribos y pilas centrales.', fechaMedicion: '2026-06-23' },
+  { id: 'med-08', codigoDGC: '551.01', descripcionRenglon: 'Concreto Clase 28 (4000 psi) para Subestructura', estacionInicio: '14+830', estacionFin: '14+950', longitudL: 120, anchoA: 3.2, alturaH: 1.15, ladoVia: 'Sección Completa', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 441.6, unidad: 'm³', origenTipo: 'Plano', referenciaOrigen: 'Certificados de resistencia cilindros Lab-14', numEstimacion: 'Estimación 02', mesPeriodo: 'Jun 2026', observaciones: 'Fundición de zapatas aisladas y corridas de apoyo.', fechaMedicion: '2026-06-28' },
+
+  // Estimación 03 — Julio 2026 (4 apartados diferenciados)
+  { id: 'med-09', codigoDGC: '203.03 (c)', descripcionRenglon: 'Excavación No Clasificada para Préstamo', estacionInicio: '15+000', estacionFin: '15+950', longitudL: 950, anchoA: 9.2, alturaH: 1.5, ladoVia: 'Sección Completa', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 13110, unidad: 'm³', origenTipo: 'Libreta', referenciaOrigen: 'Densímetro nuclear N° 11 - Folio 08', numEstimacion: 'Estimación 03', mesPeriodo: 'Jul 2026', observaciones: 'Conformación de terraplén estructural compactado al 95% Proctor.', fechaMedicion: '2026-07-11' },
+  { id: 'med-10', codigoDGC: '203.04 (g)', descripcionRenglon: 'Cortes en Roca (OTS-1)(OTS-2)(OTS3)', estacionInicio: '15+350', estacionFin: '15+980', longitudL: 630, anchoA: 6.8, alturaH: 1.9, ladoVia: 'Lado Derecho', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 8139.6, unidad: 'm³', origenTipo: 'Libreta', referenciaOrigen: 'Control de corte mecánico en roca N° 04', numEstimacion: 'Estimación 03', mesPeriodo: 'Jul 2026', observaciones: 'Corte en estrato basáltico fracturado mediante martillo hidráulico.', fechaMedicion: '2026-07-17' },
+  { id: 'med-11', codigoDGC: '552.02', descripcionRenglon: 'Acero de Refuerzo Grado 60 (fy = 4,200 kg/cm²)', estacionInicio: '14+820', estacionFin: '14+980', longitudL: 160, anchoA: 245, alturaH: 1.25, ladoVia: 'Sección Completa', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 49000, unidad: 'kg', origenTipo: 'Plano', referenciaOrigen: 'Planilla de hierros aprobada E-07', numEstimacion: 'Estimación 03', mesPeriodo: 'Jul 2026', observaciones: 'Armado de columnas cilíndricas y vigas cabezales.', fechaMedicion: '2026-07-23' },
+  { id: 'med-12', codigoDGC: '601.04', descripcionRenglon: 'Tubería de Concreto Reforzado Clase III D=36"', estacionInicio: '14+300', estacionFin: '15+180', longitudL: 284, anchoA: 1, alturaH: 1, ladoVia: 'Sección Completa', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 284, unidad: 'm', origenTipo: 'Plano', referenciaOrigen: 'Plano de drenaje pluvial DP-02', numEstimacion: 'Estimación 03', mesPeriodo: 'Jul 2026', observaciones: 'Colector transversal y candelas domiciliares instaladas.', fechaMedicion: '2026-07-29' },
+
+  // Estimación 04 — Agosto 2026 (4 apartados diferenciados)
+  { id: 'med-13', codigoDGC: '203.03 (d)', descripcionRenglon: 'Sub-Excavación', estacionInicio: '15+600', estacionFin: '16+340', longitudL: 740, anchoA: 7.5, alturaH: 0.65, ladoVia: 'Sección Completa', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 3607.5, unidad: 'm³', origenTipo: 'Libreta', referenciaOrigen: 'Anotación Bitácora N° 19 - Est. 04', numEstimacion: 'Estimación 04', mesPeriodo: 'Ago 2026', observaciones: 'Saneamiento de subrasante arcillosa y sustitución con material selecto.', fechaMedicion: '2026-08-10' },
+  { id: 'med-14', codigoDGC: '303.01', descripcionRenglon: 'Sub-Base Granular Clase B (CBR >= 40%)', estacionInicio: '14+100', estacionFin: '15+420', longitudL: 1320, anchoA: 10.4, alturaH: 0.25, ladoVia: 'Sección Completa', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 3432, unidad: 'm³', origenTipo: 'Libreta', referenciaOrigen: 'Certificado Laboratorio Compactación N° 21', numEstimacion: 'Estimación 04', mesPeriodo: 'Ago 2026', observaciones: 'Tendido y compactación de sub-base granular en carriles principales.', fechaMedicion: '2026-08-18' },
+  { id: 'med-15', codigoDGC: '551.02', descripcionRenglon: 'Vigas Postensadas Tipo AASHTO IV L=28.00 m', estacionInicio: '14+840', estacionFin: '14+940', longitudL: 8, anchoA: 1, alturaH: 1, ladoVia: 'Sección Completa', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 8, unidad: 'U', origenTipo: 'Plano', referenciaOrigen: 'Protocolo de tensado e izaje N° 03', numEstimacion: 'Estimación 04', mesPeriodo: 'Ago 2026', observaciones: 'Izaje con grúas telescópicas y colocación sobre neoprenos.', fechaMedicion: '2026-08-24' },
+  { id: 'med-16', codigoDGC: '203.04 (h)', descripcionRenglon: 'Contracunetas (OC-1)(OC-3)', estacionInicio: '15+100', estacionFin: '15+860', longitudL: 760, anchoA: 1, alturaH: 1, ladoVia: 'Lado Izquierdo', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 760, unidad: 'm', origenTipo: 'Plano', referenciaOrigen: 'Plano hidráulico D-04 - Folio 14', numEstimacion: 'Estimación 04', mesPeriodo: 'Ago 2026', observaciones: 'Contracunetas revestidas de concreto f’c=210 kg/cm² en corona de talud.', fechaMedicion: '2026-08-29' },
+
+  // Estimación 05 — Septiembre 2026 (4 apartados diferenciados)
+  { id: 'med-17', codigoDGC: '304.01', descripcionRenglon: 'Base de Piedra Triturada (CBR >= 85%)', estacionInicio: '14+100', estacionFin: '15+580', longitudL: 1480, anchoA: 10.2, alturaH: 0.22, ladoVia: 'Sección Completa', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 3321.12, unidad: 'm³', origenTipo: 'Libreta', referenciaOrigen: 'Ensayos Proctor Modificado Lab-29', numEstimacion: 'Estimación 05', mesPeriodo: 'Sep 2026', observaciones: 'Base triturada graduación A-1 compactada al 98% AASHTO T-180.', fechaMedicion: '2026-09-11' },
+  { id: 'med-18', codigoDGC: '204.02', descripcionRenglon: 'Excavación de canales (oc-1)(oc-3)', estacionInicio: '14+250', estacionFin: '16+050', longitudL: 1800, anchoA: 1.75, alturaH: 0.85, ladoVia: 'Sección Completa', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 2677.5, unidad: 'm³', origenTipo: 'Libreta', referenciaOrigen: 'Bitácora N° 27 - Est. 05', numEstimacion: 'Estimación 05', mesPeriodo: 'Sep 2026', observaciones: 'Canal trapecial de descarga pluvial hacia quebrada natural.', fechaMedicion: '2026-09-19' },
+  { id: 'med-19', codigoDGC: '551.03', descripcionRenglon: 'Losa de Superestructura de Concreto f’c=280 kg/cm²', estacionInicio: '14+835', estacionFin: '14+945', longitudL: 110, anchoA: 12.6, alturaH: 0.22, ladoVia: 'Sección Completa', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 304.92, unidad: 'm³', origenTipo: 'Plano', referenciaOrigen: 'Bitácora N° 30 - Fundición continua', numEstimacion: 'Estimación 05', mesPeriodo: 'Sep 2026', observaciones: 'Fundición monolítica de losa de rodadura sobre puente principal.', fechaMedicion: '2026-09-24' },
+  { id: 'med-20', codigoDGC: '401.01', descripcionRenglon: 'Riego de Imprimación con Asfalto Rebajado MC-70', estacionInicio: '14+100', estacionFin: '15+500', longitudL: 1400, anchoA: 10.0, alturaH: 1.35, ladoVia: 'Sección Completa', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 18900, unidad: 'Lt', origenTipo: 'Libreta', referenciaOrigen: 'Control de dosificación petrolizadora N° 06', numEstimacion: 'Estimación 05', mesPeriodo: 'Sep 2026', observaciones: 'Tasa de aplicación verificada en bandeja: 1.35 Lt/m².', fechaMedicion: '2026-09-29' },
+
+  // Estimación 06 — Octubre 2026 (4 apartados diferenciados)
+  { id: 'med-21', codigoDGC: '403.01', descripcionRenglon: 'Mezcla Asfáltica en Caliente Graduación C (Espesor 8 cm)', estacionInicio: '14+100', estacionFin: '15+450', longitudL: 1350, anchoA: 9.8, alturaH: 0.19, ladoVia: 'Sección Completa', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 2513.7, unidad: 'ton', origenTipo: 'Libreta', referenciaOrigen: 'Báscula certificada y extracción de núcleos Lab-36', numEstimacion: 'Estimación 06', mesPeriodo: 'Oct 2026', observaciones: 'Carpeta de rodadura colocada con pavimentadora electrónica.', fechaMedicion: '2026-10-12' },
+  { id: 'med-22', codigoDGC: '501.02', descripcionRenglon: 'Pavimento de Concreto Hidráulico MR=4.5 MPa (e=22 cm)', estacionInicio: '14+680', estacionFin: '15+080', longitudL: 400, anchoA: 8.6, alturaH: 1, ladoVia: 'Sección Completa', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 3440, unidad: 'm²', origenTipo: 'Plano', referenciaOrigen: 'Ensayos de módulo de rotura vigas Lab-39', numEstimacion: 'Estimación 06', mesPeriodo: 'Oct 2026', observaciones: 'Losas de concreto hidráulico con pasajuntas y texturizado transversal.', fechaMedicion: '2026-10-20' },
+  { id: 'med-23', codigoDGC: '605.02', descripcionRenglon: 'Cunetas Revestidas de Concreto Tipo L', estacionInicio: '14+150', estacionFin: '15+390', longitudL: 1240, anchoA: 1, alturaH: 1, ladoVia: 'Ambos Lados', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 1240, unidad: 'm', origenTipo: 'Libreta', referenciaOrigen: 'Libreta topográfica N° 14 - Est. 06', numEstimacion: 'Estimación 06', mesPeriodo: 'Oct 2026', observaciones: 'Cunetas laterales conformadas y fundidas con juntas selladas.', fechaMedicion: '2026-10-25' },
+  { id: 'med-24', codigoDGC: '155.07', descripcionRenglon: 'Mantenimiento de la carretera durante la ejecución del trabajo', estacionInicio: '14+000', estacionFin: '16+500', longitudL: 2500, anchoA: 1, alturaH: 1, ladoVia: 'Sección Completa', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 0.31, unidad: 'Glb', origenTipo: 'Plano', referenciaOrigen: 'Informe mensual de control vial Octubre 2026', numEstimacion: 'Estimación 06', mesPeriodo: 'Oct 2026', observaciones: 'Control de tráfico nocturno durante pavimentación de rampas.', fechaMedicion: '2026-10-30' },
+
+  // Estimación 07 — Noviembre 2026 (Estimación Abierta en Revisión — 4 apartados diferenciados)
+  { id: 'med-25', codigoDGC: '403.01', descripcionRenglon: 'Mezcla Asfáltica en Caliente Graduación C (Espesor 8 cm)', estacionInicio: '15+450', estacionFin: '16+320', longitudL: 870, anchoA: 9.8, alturaH: 0.19, ladoVia: 'Sección Completa', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 1619.94, unidad: 'ton', origenTipo: 'Libreta', referenciaOrigen: 'Libreta de campo N° 18 - Est. 07 (Abierta)', numEstimacion: 'Estimación 07', mesPeriodo: 'Nov 2026', observaciones: 'Tendido de carpeta asfáltica en rampa sur y carriles auxiliares.', fechaMedicion: '2026-11-04' },
+  { id: 'med-26', codigoDGC: '701.01', descripcionRenglon: 'Defensa Metálica Galvanizada Tipo Flex-Beam Doble Cresta', estacionInicio: '14+420', estacionFin: '15+360', longitudL: 940, anchoA: 1, alturaH: 1, ladoVia: 'Ambos Lados', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 940, unidad: 'm', origenTipo: 'Plano', referenciaOrigen: 'Bitácora N° 38 - Hincado de postes IPR', numEstimacion: 'Estimación 07', mesPeriodo: 'Nov 2026', observaciones: 'Instalación de barrera de contención vehicular y terminales abatibles.', fechaMedicion: '2026-11-06' },
+  { id: 'med-27', codigoDGC: '702.01', descripcionRenglon: 'Señalización Horizontal Termoplástica Reflectiva 15 cm', estacionInicio: '14+000', estacionFin: '16+100', longitudL: 4200, anchoA: 1, alturaH: 1, ladoVia: 'Sección Completa', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 4200, unidad: 'm', origenTipo: 'Libreta', referenciaOrigen: 'Control de retroreflectividad N° 02', numEstimacion: 'Estimación 07', mesPeriodo: 'Nov 2026', observaciones: 'Demarcación de línea continua blanca, amarilla y microesfera de vidrio.', fechaMedicion: '2026-11-07' },
+  { id: 'med-28', codigoDGC: '703.02', descripcionRenglon: 'Señalización Vertical Preventiva y Restrictiva Alta Intensidad', estacionInicio: '14+050', estacionFin: '16+250', longitudL: 36, anchoA: 1, alturaH: 1, ladoVia: 'Sección Completa', multiplicador: 1, descuento: 0, tipoDescuento: 'monto', cantidadCalculada: 36, unidad: 'U', origenTipo: 'Plano', referenciaOrigen: 'Anotación Bitácora N° 41 - Est. 07', numEstimacion: 'Estimación 07', mesPeriodo: 'Nov 2026', observaciones: 'Colocación de señales SIAC en postes galvanizados con cimentación.', fechaMedicion: '2026-11-08' },
 ]
+
+function generarMedicionesAnaliticasDesdeRenglones(
+  renglonesList: RenglonDetalladoSabana[],
+  estimacionesList: any[]
+): MedicionAnaliticaCampo[] {
+  if (!Array.isArray(renglonesList) || renglonesList.length === 0) {
+    return GENERAR_MEDICIONES_ANALITICAS_DEFAULT()
+  }
+  const numEsts = Math.max(1, Array.isArray(estimacionesList) && estimacionesList.length > 0 ? estimacionesList.length : 7)
+  const mesesDefault = ['May 2026', 'Jun 2026', 'Jul 2026', 'Ago 2026', 'Sep 2026', 'Oct 2026', 'Nov 2026', 'Dic 2026', 'Ene 2027', 'Feb 2027']
+  const resultado: MedicionAnaliticaCampo[] = []
+  const renglonesConAvance = renglonesList.filter((r) => (r.cantidadEstePeriodo + r.cantidadAcumuladaAnterior) > 0)
+  if (renglonesConAvance.length === 0) return []
+
+  for (let eIdx = 0; eIdx < numEsts; eIdx++) {
+    const estNumStr = `Estimación ${String(eIdx + 1).padStart(2, '0')}`
+    const estObj = estimacionesList?.[eIdx]
+    const mesCorto = estObj?.mes
+      ? String(estObj.mes).slice(0, 3) + ' ' + (String(estObj.mes).split(' ')[1] || '2026')
+      : (mesesDefault[eIdx] || `Mes ${eIdx + 1}`)
+    const fechaCorte = estObj?.fechaCorte || estObj?.fechaFin || `2026-${String(Math.min(12, 5 + eIdx)).padStart(2, '0')}-28`
+
+    // Seleccionar entre 4 y 6 renglones distintos para esta estimación (rotando por capítulo/índice para que no se repitan)
+    const cantidadApartados = Math.min(renglonesConAvance.length, 5)
+    for (let k = 0; k < cantidadApartados; k++) {
+      const rIdx = (eIdx * 3 + k * 2) % renglonesConAvance.length
+      const r = renglonesConAvance[rIdx]
+      const cantEst = Number(r.avancesMensuales?.[estNumStr] ?? r.avancesMensuales?.[mesCorto] ?? 0)
+      const cantFinal = cantEst > 0
+        ? cantEst
+        : Math.round(((r.cantidadEstePeriodo + r.cantidadAcumuladaAnterior) / numEsts) * (0.82 + ((eIdx + k) % 5) * 0.09) * 100) / 100
+      if (cantFinal <= 0) continue
+
+      const kmBase = 14 + Math.floor((eIdx * 180 + k * 95) / 1000)
+      const mIni = (eIdx * 180 + k * 95) % 1000
+      const longTramo = 120 + ((eIdx * 45 + k * 60) % 380)
+      const kmFin = 14 + Math.floor((eIdx * 180 + k * 95 + longTramo) / 1000)
+      const mFin = (eIdx * 180 + k * 95 + longTramo) % 1000
+      const estIni = `${kmBase}+${String(mIni).padStart(3, '0')}`
+      const estFin = `${kmFin}+${String(mFin).padStart(3, '0')}`
+      const lados: Array<'Sección Completa' | 'Lado Izquierdo' | 'Lado Derecho' | 'Ambos Lados'> = [
+        'Sección Completa',
+        'Lado Derecho',
+        'Lado Izquierdo',
+        'Ambos Lados',
+      ]
+
+      resultado.push({
+        id: `med-auto-${eIdx + 1}-${k + 1}-${r.codigoDGC}`,
+        codigoDGC: r.codigoDGC,
+        descripcionRenglon: r.descripcion,
+        estacionInicio: estIni,
+        estacionFin: estFin,
+        longitudL: longTramo,
+        anchoA: r.unidad === 'm³' || r.unidad === 'm²' ? Number((7.2 + (k % 3) * 1.1).toFixed(2)) : 1,
+        alturaH: r.unidad === 'm³' ? Number((0.25 + (eIdx % 4) * 0.15).toFixed(2)) : 1,
+        ladoVia: lados[(eIdx + k) % lados.length],
+        multiplicador: 1,
+        descuento: 0,
+        tipoDescuento: 'monto',
+        cantidadCalculada: cantFinal,
+        unidad: r.unidad,
+        origenTipo: k % 2 === 0 ? 'Libreta' : 'Plano',
+        referenciaOrigen: `Libreta Topográfica N° ${String(eIdx * 2 + k + 1).padStart(2, '0')} - ${estNumStr}`,
+        numEstimacion: estNumStr,
+        mesPeriodo: mesCorto,
+        observaciones: `Verificación conjunta en campo de ${r.descripcion} (Tramo ${estIni} a ${estFin}).`,
+        fechaMedicion: fechaCorte,
+      })
+    }
+  }
+  return resultado.length > 0 ? resultado : GENERAR_MEDICIONES_ANALITICAS_DEFAULT()
+}
 
 // Trabajos Pendientes realistas para pruebas y conciliación
 export const TRABAJOS_PENDIENTES_MOCK: TrabajoPendienteBolsa[] = [
@@ -1444,19 +1548,22 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
   }, [proyecto])
 
   useEffect(() => {
+    const mObra = (proyecto as any)?.modoObra || (proyecto as any)?.modo_obra
+    const mSup = (proyecto as any)?.modoSupervision || (proyecto as any)?.modo_supervision
+    if (mObra === 'sabana' && mSup !== 'sabana') {
+      setPerspectivaActiva('ejecutora')
+      return
+    }
+    if (mSup === 'sabana' && mObra !== 'sabana') {
+      setPerspectivaActiva('supervisora')
+      return
+    }
     if (typeof window !== 'undefined') {
       const p = new URLSearchParams(window.location.search).get('perspectiva')
       if (p === 'ejecutora' || p === 'supervisora') {
         setPerspectivaActiva(p)
         return
       }
-    }
-    const mObra = (proyecto as any)?.modoObra || (proyecto as any)?.modo_obra
-    const mSup = (proyecto as any)?.modoSupervision || (proyecto as any)?.modo_supervision
-    if (mObra === 'sabana' && mSup !== 'sabana') {
-      setPerspectivaActiva('ejecutora')
-    } else if (mSup === 'sabana' && mObra !== 'sabana') {
-      setPerspectivaActiva('supervisora')
     }
   }, [(proyecto as any)?.modoObra, (proyecto as any)?.modo_obra, (proyecto as any)?.modoSupervision, (proyecto as any)?.modo_supervision])
 
@@ -1565,23 +1672,55 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
     const targetProjId = proyecto?.id || proyectoIdSeleccionado || id
     if (!targetProjId || targetProjId === 'nuevo' || targetProjId === 'crear') return
     try {
-      let currentLista: any[] = []
-      const storedLista = localStorage.getItem(`domun_estimaciones_sabana_${targetProjId}_${perspectivaActiva}`) || (perspectivaActiva === 'supervisora' ? localStorage.getItem(`domun_estimaciones_sabana_${targetProjId}`) : null)
-      if (storedLista) {
-        const parsedLista = JSON.parse(storedLista)
-        if (Array.isArray(parsedLista) && parsedLista.length > 0) {
-          setListaEstimaciones(parsedLista)
-          currentLista = parsedLista
+      const syncKeyV9 = `domun_sabana_sync_v9_${targetProjId}`
+      if (!localStorage.getItem(syncKeyV9)) {
+        localStorage.removeItem(`domun_estimaciones_sabana_${targetProjId}_supervisora`)
+        localStorage.removeItem(`domun_estimaciones_sabana_${targetProjId}_ejecutora`)
+        localStorage.removeItem(`domun_estimaciones_sabana_${targetProjId}`)
+        localStorage.removeItem(`domun_estimacion_activa_${targetProjId}_supervisora`)
+        localStorage.removeItem(`domun_estimacion_activa_${targetProjId}_ejecutora`)
+        localStorage.removeItem(`domun_estimacion_activa_${targetProjId}`)
+        localStorage.removeItem(`sabana_renglones_${targetProjId}`)
+        localStorage.setItem(syncKeyV9, '1')
+      }
+
+      const rawBackendEsts = Array.isArray((proyecto as any)?.estimacionesSabana) && (proyecto as any).estimacionesSabana.length > 0
+        ? (proyecto as any).estimacionesSabana
+        : (Array.isArray(proyecto?.estimaciones)
+            ? proyecto.estimaciones.filter((e: any) => !e.perspectiva || e.perspectiva === perspectivaActiva)
+            : [])
+
+      const backendMapped = rawBackendEsts.map((e: any) => {
+        const estRaw = String(e.estado || '').toLowerCase()
+        const esAbierta = estRaw === 'en_revision' || estRaw === 'actual' || estRaw === 'en_proceso' || estRaw === 'borrador'
+        return {
+          ...e,
+          id: e.id,
+          numero: e.numero || `Estimación ${String(e.numeroEstimacion || 1).padStart(2, '0')}`,
+          mes: e.mes || 'Periodo',
+          fechaInicio: e.fechaInicio || e.fecha_inicio || '',
+          fechaCorte: e.fechaCorte || e.fechaFin || e.fecha_corte || '',
+          estado: esAbierta ? ('actual' as const) : ('cerrada' as const),
+          montoEstimacion: Number(e.montoEstimacion ?? e.valorBrutoTrabajado ?? 0),
+          valorBruto: Number(e.valorBrutoTrabajado ?? e.montoEstimacion ?? 0),
+          montoLiquido: Number(e.montoLiquidoAPagar ?? e.montoNetoPagar ?? 0),
         }
-      }
-      const estList = perspectivaActiva === 'ejecutora' ? ((proyecto as any)?.estimacionesSecundarias || (proyecto as any)?.estimacionesEjecutora || []) : (proyecto?.estimaciones || [])
-      if (currentLista.length === 0 && Array.isArray(estList) && estList.length > 0) {
-        setListaEstimaciones(estList)
-        currentLista = estList
-      }
-      if (false) {
-        setListaEstimaciones(proyecto.estimaciones)
-        currentLista = proyecto.estimaciones
+      })
+
+      let currentLista: any[] = []
+      if (backendMapped.length > 0) {
+        setListaEstimaciones(backendMapped)
+        currentLista = backendMapped
+        localStorage.setItem(`domun_estimaciones_sabana_${targetProjId}_${perspectivaActiva}`, JSON.stringify(backendMapped))
+      } else {
+        const storedLista = localStorage.getItem(`domun_estimaciones_sabana_${targetProjId}_${perspectivaActiva}`) || (perspectivaActiva === 'supervisora' ? localStorage.getItem(`domun_estimaciones_sabana_${targetProjId}`) : null)
+        if (storedLista) {
+          const parsedLista = JSON.parse(storedLista)
+          if (Array.isArray(parsedLista) && parsedLista.length > 0) {
+            setListaEstimaciones(parsedLista)
+            currentLista = parsedLista
+          }
+        }
       }
 
       // Calcular número progresivo basado en las estimaciones existentes
@@ -1597,44 +1736,47 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
       const proxStr = proxNum < 10 ? `Estimación 0${proxNum}` : `Estimación ${proxNum}`
       setFormEstNumero(proxStr)
 
-      const stored = localStorage.getItem(`domun_estimacion_activa_${targetProjId}_${perspectivaActiva}`) || (perspectivaActiva === 'supervisora' ? localStorage.getItem(`domun_estimacion_activa_${targetProjId}`) : null)
-      if (stored) {
-        const parsed = JSON.parse(stored)
-        // Verificar si la estimación almacenada ya fue cerrada o fue superada por estimaciones existentes
-        const estaCerrada = currentLista.some((e: any) => {
-          const nE = (e.numero || '').toLowerCase().replace(/\s+/g, '')
-          const nP = (parsed.numero || '').toLowerCase().replace(/\s+/g, '')
-          return nE === nP && (e.estado === 'cerrada' || e.estado === 'aprobada' || e.estado === 'pagada')
-        })
-        const matchParsedNum = (parsed.numero || '').match(/\d+/)
-        const parsedNumInt = matchParsedNum ? parseInt(matchParsedNum[0], 10) : 0
-        const esSuperada = maxNum > parsedNumInt
-
-        if (estaCerrada || esSuperada) {
-          localStorage.removeItem(`domun_estimacion_activa_${targetProjId}_${perspectivaActiva}`)
-          localStorage.removeItem(`domun_estimacion_activa_${targetProjId}_${perspectivaActiva}`)
-      localStorage.removeItem(`domun_estimacion_activa_${targetProjId}`)
-          const abiertaReal = currentLista.find((e: any) => e.estado === 'actual' || e.estado === 'en_proceso' || e.estado === 'borrador')
-          if (abiertaReal) {
-            setEstimacionEnProgreso(abiertaReal)
-            localStorage.setItem(`domun_estimacion_activa_${targetProjId}_${perspectivaActiva}`, JSON.stringify(abiertaReal))
-            localStorage.setItem(`domun_estimacion_activa_${targetProjId}`, JSON.stringify(abiertaReal))
-          } else {
-            setEstimacionEnProgreso(null)
-          }
-        } else {
-          setEstimacionEnProgreso(parsed)
+      const abiertaEnLista = currentLista.find((e: any) => e.estado === 'actual' || e.estado === 'en_revision' || e.estado === 'en_proceso' || e.estado === 'borrador')
+      if (abiertaEnLista) {
+        const objAbierta = {
+          id: abiertaEnLista.id,
+          numero: abiertaEnLista.numero,
+          mes: abiertaEnLista.mes || 'Noviembre 2026',
+          fechaInicio: abiertaEnLista.fechaInicio,
+          fechaCorte: abiertaEnLista.fechaCorte,
+          notas: abiertaEnLista.observaciones || 'Estimación abierta en revisión y conciliación de cantidades',
+          creadoEn: abiertaEnLista.fechaInicio || new Date().toISOString(),
+          creadoPor: abiertaEnLista.delegadoResidente || 'Ing. Residente Supervisión',
         }
+        setEstimacionEnProgreso(objAbierta)
+        localStorage.setItem(`domun_estimacion_activa_${targetProjId}_${perspectivaActiva}`, JSON.stringify(objAbierta))
+        localStorage.setItem(`domun_estimacion_activa_${targetProjId}`, JSON.stringify(objAbierta))
       } else {
-        const abiertaReal = currentLista.find((e: any) => e.estado === 'actual' || e.estado === 'en_proceso' || e.estado === 'borrador')
-        if (abiertaReal) {
-          setEstimacionEnProgreso(abiertaReal)
+        const stored = localStorage.getItem(`domun_estimacion_activa_${targetProjId}_${perspectivaActiva}`) || (perspectivaActiva === 'supervisora' ? localStorage.getItem(`domun_estimacion_activa_${targetProjId}`) : null)
+        if (stored) {
+          const parsed = JSON.parse(stored)
+          const estaCerrada = currentLista.some((e: any) => {
+            const nE = (e.numero || '').toLowerCase().replace(/\s+/g, '')
+            const nP = (parsed.numero || '').toLowerCase().replace(/\s+/g, '')
+            return nE === nP && (e.estado === 'cerrada' || e.estado === 'aprobada' || e.estado === 'pagada')
+          })
+          const matchParsedNum = (parsed.numero || '').match(/\d+/)
+          const parsedNumInt = matchParsedNum ? parseInt(matchParsedNum[0], 10) : 0
+          const esSuperada = maxNum > parsedNumInt
+
+          if (estaCerrada || esSuperada) {
+            localStorage.removeItem(`domun_estimacion_activa_${targetProjId}_${perspectivaActiva}`)
+            localStorage.removeItem(`domun_estimacion_activa_${targetProjId}`)
+            setEstimacionEnProgreso(null)
+          } else {
+            setEstimacionEnProgreso(parsed)
+          }
         } else {
           setEstimacionEnProgreso(null)
         }
       }
     } catch {}
-  }, [proyecto?.id, proyectoIdSeleccionado, id, perspectivaActiva, (proyecto as any)?.estimacionesSecundarias, (proyecto as any)?.estimaciones])
+  }, [proyecto?.id, proyectoIdSeleccionado, id, perspectivaActiva, (proyecto as any)?.estimacionesSabana, (proyecto as any)?.estimaciones])
 
   const handleAbrirAperturaEstimacion = () => {
     let maxNum = 0
@@ -1949,10 +2091,10 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
             }))
             setMedicionesAnaliticas(mapeadas)
           } else {
-            setMedicionesAnaliticas(GENERAR_MEDICIONES_ANALITICAS_DEFAULT(targetId))
+            setMedicionesAnaliticas(generarMedicionesAnaliticasDesdeRenglones(renglonesCargados || [], proyData?.estimacionesSabana || proyData?.estimaciones || []))
           }
         } else {
-          setMedicionesAnaliticas(GENERAR_MEDICIONES_ANALITICAS_DEFAULT(targetId))
+          setMedicionesAnaliticas(generarMedicionesAnaliticasDesdeRenglones(renglonesCargados || [], proyData?.estimacionesSabana || proyData?.estimaciones || []))
         }
       } catch (e) {
         console.warn('Error en carga de datos:', e)
@@ -2605,23 +2747,58 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
     })
 
     const isPlan = modoVistaSabana === 'planificacion'
+    const numEstTotal = Math.max(1, listaEstimaciones.length || 7)
     renglones.forEach((r) => {
       const cantContratada = isPlan ? (r.cantidadContratadaPlan ?? r.cantidadContratada) : r.cantidadContratada
       const cantAjustada = isPlan ? (r.cantidadAjustadaPlan ?? r.cantidadAjustada) : r.cantidadAjustada
       const pu = isPlan ? (r.costoUnitarioDirectoPlan ?? r.costoUnitarioDirecto) : r.costoUnitarioDirecto
 
-      let cantPeriodo = isPlan ? 0 : Number(r.cantidadEstePeriodo || r.cantidad_este_periodo || 0)
-      let cantAcum = isPlan ? 0 : Number(r.cantidadAcumuladaAnterior || r.cantidad_acumulada_anterior || (r.cantidadEjecutada ? Math.max(0, r.cantidadEjecutada - cantPeriodo) : 0))
+      let cantPeriodo = 0
+      let cantAcum = 0
 
-      if (!isPlan && numEstimacionFiltro !== 'todos') {
-        const medEst = medicionesAnaliticas.filter(
-          (m) => m.codigoDGC === r.codigoDGC && (m.numEstimacion === numEstimacionFiltro || m.mesPeriodo === numEstimacionFiltro)
-        )
-        if (medEst.length > 0) {
-          cantPeriodo = medEst.reduce((sum, m) => sum + (m.cantidadCalculada || 0), 0)
+      if (isPlan) {
+        if (esBorrador) {
+          cantPeriodo = 0
+          cantAcum = 0
         } else {
-          cantPeriodo = Number(r.avancesMensuales?.[numEstimacionFiltro] || 0)
+          const matchFiltro = numEstimacionFiltro !== 'todos' ? numEstimacionFiltro.match(/\d+/) : null
+          const kEst = matchFiltro ? parseInt(matchFiltro[0], 10) : numEstTotal
+          const estKeyActual = `Estimación ${String(kEst).padStart(2, '0')}`
+          const mesActualKey = listaMesesDinamicos[kEst - 1]
+          cantPeriodo = Number(r.avancesMensualesPlan?.[estKeyActual] ?? (mesActualKey ? r.avancesMensualesPlan?.[mesActualKey] : undefined) ?? (cantAjustada / Math.max(1, listaMesesDinamicos.length || 12)))
+          let sumPrevPlan = 0
+          for (let i = 1; i < kEst; i++) {
+            const eKey = `Estimación ${String(i).padStart(2, '0')}`
+            const mKey = listaMesesDinamicos[i - 1]
+            sumPrevPlan += Number(r.avancesMensualesPlan?.[eKey] ?? (mKey ? r.avancesMensualesPlan?.[mKey] : undefined) ?? (cantAjustada / Math.max(1, listaMesesDinamicos.length || 12)))
+          }
+          cantAcum = Math.round(sumPrevPlan * 100) / 100
+          cantPeriodo = Math.round(cantPeriodo * 100) / 100
         }
+      } else if (numEstimacionFiltro !== 'todos') {
+        const matchFiltro = numEstimacionFiltro.match(/\d+/)
+        const kEst = matchFiltro ? parseInt(matchFiltro[0], 10) : 1
+        const estKeyActual = `Estimación ${String(kEst).padStart(2, '0')}`
+        const mesActualKey = listaMesesDinamicos[kEst - 1]
+        const valFromAvances = Number(r.avancesMensuales?.[estKeyActual] ?? r.avancesMensuales?.[numEstimacionFiltro] ?? (mesActualKey ? r.avancesMensuales?.[mesActualKey] : 0) ?? 0)
+        if (valFromAvances > 0) {
+          cantPeriodo = valFromAvances
+        } else {
+          const medEst = medicionesAnaliticas.filter(
+            (m) => m.codigoDGC === r.codigoDGC && (m.numEstimacion === numEstimacionFiltro || m.mesPeriodo === numEstimacionFiltro)
+          )
+          cantPeriodo = medEst.reduce((sum, m) => sum + (m.cantidadCalculada || 0), 0)
+        }
+        let sumPrevReal = 0
+        for (let i = 1; i < kEst; i++) {
+          const eKey = `Estimación ${String(i).padStart(2, '0')}`
+          const mKey = listaMesesDinamicos[i - 1]
+          sumPrevReal += Number(r.avancesMensuales?.[eKey] ?? (mKey ? r.avancesMensuales?.[mKey] : 0) ?? 0)
+        }
+        cantAcum = Math.round(sumPrevReal * 100) / 100
+      } else {
+        cantPeriodo = Number(r.cantidadEstePeriodo || r.cantidad_este_periodo || 0)
+        cantAcum = Number(r.cantidadAcumuladaAnterior || r.cantidad_acumulada_anterior || (r.cantidadEjecutada ? Math.max(0, r.cantidadEjecutada - cantPeriodo) : 0))
       }
 
       const costoContratado = cantContratada * pu
@@ -3096,24 +3273,12 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
   const montoContractualOriginalTotal = resLiquidacionContratadoGlobal.valorTotalEstimacion
 
   const subtotalCostoDirectoGlobalPeriodo = useMemo(() => {
-    if (modoVistaSabana === 'planificacion') return 0
-    if (numEstimacionFiltro !== 'todos') {
-      return renglones.reduce((sum, r) => {
-        const medEst = medicionesAnaliticas.filter(
-          (m) => m.codigoDGC === r.codigoDGC && (m.numEstimacion === numEstimacionFiltro || m.mesPeriodo === numEstimacionFiltro)
-        )
-        const cantEst = medEst.length > 0
-          ? medEst.reduce((s, m) => s + (m.cantidadCalculada || 0), 0)
-          : Number(r.avancesMensuales?.[numEstimacionFiltro] || 0)
-        return sum + cantEst * r.costoUnitarioDirecto
-      }, 0)
-    }
-    return renglones.reduce((sum, r) => sum + r.cantidadEstePeriodo * r.costoUnitarioDirecto, 0)
-  }, [renglones, modoVistaSabana, numEstimacionFiltro, medicionesAnaliticas])
+    return Object.values(subtotalesPorCapitulo).reduce((sum, cap) => sum + (cap.costoDirectoEstePeriodo || 0), 0)
+  }, [subtotalesPorCapitulo])
 
   const subtotalCostoDirectoAcumuladoAnteriorGlobal = useMemo(() => {
-    return renglones.reduce((sum, r) => sum + (r.cantidadAcumuladaAnterior || 0) * r.costoUnitarioDirecto, 0)
-  }, [renglones])
+    return Object.values(subtotalesPorCapitulo).reduce((sum, cap) => sum + (cap.costoDirectoAcumuladoAnterior || 0), 0)
+  }, [subtotalesPorCapitulo])
 
   const resLiquidacionAcumuladaAnterior = calcularLiquidacionEstimacion({
     montoDirectoPeriodo: subtotalCostoDirectoAcumuladoAnteriorGlobal,
@@ -4269,18 +4434,51 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                             const costoTotalDirectoG = Math.round(cantContratadaD * costoUnitF * 100) / 100
                             const costoTotalAjustadoH = Math.round(cantAjustadaE * costoUnitF * 100) / 100
 
-                            let cantEstePeriodoI = isPlanMode ? 0 : Number(r.cantidadEstePeriodo || r.cantidad_este_periodo || 0)
-                            let cantAcumAnteriorJ = isPlanMode ? 0 : (esEditando ? Number(datosEditando.cantidadAcumuladaAnterior ?? r.cantidadAcumuladaAnterior) : Number(r.cantidadAcumuladaAnterior || r.cantidad_acumulada_anterior || (r.cantidadEjecutada ? Math.max(0, r.cantidadEjecutada - cantEstePeriodoI) : 0)))
+                            const numEstTotalRow = Math.max(1, listaEstimaciones.length || 7)
+                            let cantEstePeriodoI = 0
+                            let cantAcumAnteriorJ = 0
 
-                            if (!isPlanMode && numEstimacionFiltro !== 'todos') {
-                              const medEst = medicionesAnaliticas.filter(
-                                (m) => m.codigoDGC === r.codigoDGC && (m.numEstimacion === numEstimacionFiltro || m.mesPeriodo === numEstimacionFiltro)
-                              )
-                              if (medEst.length > 0) {
-                                cantEstePeriodoI = medEst.reduce((sum, m) => sum + (m.cantidadCalculada || 0), 0)
-                              } else {
-                                cantEstePeriodoI = Number(r.avancesMensuales?.[numEstimacionFiltro] || 0)
+                            if (isPlanMode) {
+                              if (!esBorrador) {
+                                const matchFiltro = numEstimacionFiltro !== 'todos' ? numEstimacionFiltro.match(/\d+/) : null
+                                const kEst = matchFiltro ? parseInt(matchFiltro[0], 10) : numEstTotalRow
+                                const estKeyActual = `Estimación ${String(kEst).padStart(2, '0')}`
+                                const mesActualKey = listaMesesDinamicos[kEst - 1]
+                                cantEstePeriodoI = Math.round(Number(r.avancesMensualesPlan?.[estKeyActual] ?? (mesActualKey ? r.avancesMensualesPlan?.[mesActualKey] : undefined) ?? (cantAjustadaE / Math.max(1, listaMesesDinamicos.length || 12))) * 100) / 100
+                                let sumPrevPlan = 0
+                                for (let i = 1; i < kEst; i++) {
+                                  const eKey = `Estimación ${String(i).padStart(2, '0')}`
+                                  const mKey = listaMesesDinamicos[i - 1]
+                                  sumPrevPlan += Number(r.avancesMensualesPlan?.[eKey] ?? (mKey ? r.avancesMensualesPlan?.[mKey] : undefined) ?? (cantAjustadaE / Math.max(1, listaMesesDinamicos.length || 12)))
+                                }
+                                cantAcumAnteriorJ = Math.round(sumPrevPlan * 100) / 100
                               }
+                            } else if (numEstimacionFiltro !== 'todos') {
+                              const matchFiltro = numEstimacionFiltro.match(/\d+/)
+                              const kEst = matchFiltro ? parseInt(matchFiltro[0], 10) : 1
+                              const estKeyActual = `Estimación ${String(kEst).padStart(2, '0')}`
+                              const mesActualKey = listaMesesDinamicos[kEst - 1]
+                              const valFromAvances = Number(r.avancesMensuales?.[estKeyActual] ?? r.avancesMensuales?.[numEstimacionFiltro] ?? (mesActualKey ? r.avancesMensuales?.[mesActualKey] : 0) ?? 0)
+                              if (valFromAvances > 0) {
+                                cantEstePeriodoI = valFromAvances
+                              } else {
+                                const medEst = medicionesAnaliticas.filter(
+                                  (m) => m.codigoDGC === r.codigoDGC && (m.numEstimacion === numEstimacionFiltro || m.mesPeriodo === numEstimacionFiltro)
+                                )
+                                cantEstePeriodoI = medEst.reduce((sum, m) => sum + (m.cantidadCalculada || 0), 0)
+                              }
+                              let sumPrevReal = 0
+                              for (let i = 1; i < kEst; i++) {
+                                const eKey = `Estimación ${String(i).padStart(2, '0')}`
+                                const mKey = listaMesesDinamicos[i - 1]
+                                sumPrevReal += Number(r.avancesMensuales?.[eKey] ?? (mKey ? r.avancesMensuales?.[mKey] : 0) ?? 0)
+                              }
+                              cantAcumAnteriorJ = Math.round(sumPrevReal * 100) / 100
+                            } else {
+                              cantEstePeriodoI = Number(r.cantidadEstePeriodo || r.cantidad_este_periodo || 0)
+                              cantAcumAnteriorJ = esEditando
+                                ? Number(datosEditando.cantidadAcumuladaAnterior ?? r.cantidadAcumuladaAnterior)
+                                : Number(r.cantidadAcumuladaAnterior || r.cantidad_acumulada_anterior || (r.cantidadEjecutada ? Math.max(0, r.cantidadEjecutada - cantEstePeriodoI) : 0))
                             }
 
                             const cantTotalFechaK = cantEstePeriodoI + cantAcumAnteriorJ
@@ -4436,7 +4634,7 @@ export default function HojaSabanaView({ id: idProp }: { id?: string }) {
                                       className="w-16 rounded border-2 border-gray-700 bg-white px-1 py-0.5 text-right font-mono text-[9px] font-normal text-gray-900 focus:outline-none"
                                     />
                                   ) : (
-                                    <span>{formatQuantity(r.cantidadAcumuladaAnterior, r.unidad)}</span>
+                                    <span>{formatQuantity(cantAcumAnteriorJ, r.unidad)}</span>
                                   )}
                                 </td>
 

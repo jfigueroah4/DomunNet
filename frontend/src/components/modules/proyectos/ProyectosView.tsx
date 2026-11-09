@@ -569,7 +569,7 @@ export function ProyectosView() {
           setBusqueda={setBusqueda}
           proyectoSeleccionadoId={proyectoFiltroId}
           setProyectoSeleccionadoId={(valor) => { setProyectoFiltroId(valor); setPagina(1); }}
-          mostrarSelectorProyecto={true}
+          mostrarSelectorProyecto={false}
           estadoFiltro={estadoFiltro}
           setEstadoFiltro={(valor) => { setEstadoFiltro(valor); setPagina(1); }}
           filtroDepa={filtroDepa}
@@ -581,12 +581,12 @@ export function ProyectosView() {
           filtroFechaFin={filtroFechaFin}
           setFiltroFechaFin={(valor) => { setFiltroFechaFin(valor); setPagina(1); }}
           onLimpiar={handleLimpiarFiltros}
-          modoSeleccion={esPresentador ? false : modoSeleccion}
-          setModoSeleccion={esPresentador ? (() => {}) : setModoSeleccion}
+          modoSeleccion={puedeCrearProyecto ? modoSeleccion : false}
+          setModoSeleccion={puedeCrearProyecto ? setModoSeleccion : undefined}
         />
       </div>
 
-      {modoSeleccion && !esPresentador && (
+      {modoSeleccion && puedeCrearProyecto && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 rounded-xl border border-gray-200 bg-gray-50/90 p-2.5 px-4 shadow-2xs font-[Poppins] text-xs font-semibold text-gray-800">
           <div className="flex items-center gap-2">
             <input

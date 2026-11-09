@@ -840,6 +840,7 @@ export async function obtenerProyectoPorId(proyectoId: string) {
         cantidad_ejecutada,
         cantidad_ajustada,
         precio_unitario_directo,
+        capitulo:capitulo_id(id, numero_capitulo, nombre_capitulo),
         especificacion:especificacion_id(codigo, descripcion, unidad),
         unidad:unidad_id(abreviatura, nombre)
       `)
@@ -911,24 +912,71 @@ export async function obtenerProyectoPorId(proyectoId: string) {
     resolverCodigoEstado(proyecto.estado_id),
   ])
 
-  const mesesListaDinamicos = ['Mar 2026', 'Abr 2026', 'May 2026', 'Jun 2026', 'Jul 2026', 'Ago 2026', 'Sep 2026', 'Oct 2026', 'Nov 2026', 'Dic 2026', 'Ene 2027', 'Feb 2027']
-  // Pesos contractuales S-curve para plan de trabajo a 12 meses
-  const pesosPlanMeses = [0.03, 0.05, 0.07, 0.09, 0.11, 0.13, 0.13, 0.12, 0.10, 0.08, 0.05, 0.04]
-
-  // Distribución realista y diferenciada por capítulo para las 5 estimaciones aprobadas (Marzo a Julio 2026)
-  // Cada capítulo sigue la secuencia constructiva real de obra vial:
-  const factoresPorCapitulo: Record<number, number[]> = {
-    1: [0.32, 0.35, 0.18, 0.10, 0.05], // Preliminares / Control del trabajo (alta al inicio)
-    2: [0.10, 0.26, 0.34, 0.18, 0.12], // Movimiento de tierras y excavación (pico en meses 2 y 3)
-    3: [0.05, 0.15, 0.35, 0.28, 0.17], // Terraplenes y estructuras (meses 3 y 4)
-    4: [0.08, 0.16, 0.26, 0.28, 0.22], // Estructuras puentes
-    5: [0.02, 0.08, 0.24, 0.38, 0.28], // Sub-bases y bases (sube en mes 4 y 5)
-    6: [0.00, 0.04, 0.16, 0.40, 0.40], // Pavimentos asfálticos (concentrado al final)
-    7: [0.00, 0.05, 0.15, 0.40, 0.40], // Pavimentos rígidos
-    8: [0.14, 0.24, 0.28, 0.20, 0.14], // Estructuras de drenaje (continuo meses 2, 3, 4)
-    9: [0.00, 0.05, 0.15, 0.35, 0.45], // Señalización y obras complementarias
+  const fInicioCalc = detalle.fecha_inicio_contractual || proyecto.fecha_inicio || detalle.fecha_adjudicacion || '2026-05-01'
+  const plazoNumCalc = detalle.plazo_ejecucion_original || detalle.plazo_ejecucion_ampliado || null
+  let fFinCalc = detalle.fecha_finalizacion_real || proyecto.fecha_fin_estimada || ''
+  if (!fFinCalc && fInicioCalc && plazoNumCalc) {
+    const dInicio = new Date(fInicioCalc)
+    if (!isNaN(dInicio.getTime())) {
+      const dFin = new Date(dInicio.getTime() + (plazoNumCalc * 86400000))
+      fFinCalc = dFin.toISOString().split('T')[0]
+    }
   }
-  const factoresDefault = [0.12, 0.20, 0.26, 0.24, 0.18]
+  const plazoStrCalc = plazoNumCalc ? `${plazoNumCalc} días` : (fInicioCalc && fFinCalc ? `${Math.round((new Date(fFinCalc).getTime() - new Date(fInicioCalc).getTime()) / 86400000)} días` : '')
+
+  const nombresMesCorto = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+  const totalEstimacionesBD = Array.isArray(estimacionesRes.data) ? estimacionesRes.data.length : 0
+  const totalMesesPlan = Math.max(
+    totalEstimacionesBD,
+    plazoNumCalc ? Math.max(6, Math.min(18, Math.round(Number(plazoNumCalc) / 30))) : 12
+  )
+
+  const mesesListaDinamicos: string[] = []
+  const partesIni = String(fInicioCalc || '2026-05-01').split('-')
+  const anioIni = parseInt(partesIni[0], 10) || 2026
+  const mesIni0 = (parseInt(partesIni[1], 10) || 5) - 1
+  for (let m = 0; m < totalMesesPlan; m++) {
+    const dMes = new Date(anioIni, mesIni0 + m, 1)
+    mesesListaDinamicos.push(`${nombresMesCorto[dMes.getMonth()]} ${dMes.getFullYear()}`)
+  }
+
+  // Pesos contractuales S-curve dinámicos según el número de meses del plan
+  const pesosRawPlan: number[] = []
+  for (let m = 0; m < totalMesesPlan; m++) {
+    const t = (m + 0.5) / totalMesesPlan
+    const w = Math.sin(Math.PI * t) * (0.85 + 0.3 * t) + 0.18
+    pesosRawPlan.push(w)
+  }
+  const sumaPesosRawPlan = pesosRawPlan.reduce((acc, v) => acc + v, 0) || 1
+  const pesosPlanMeses = pesosRawPlan.map((w) => w / sumaPesosRawPlan)
+
+  // Perfiles constructivos base por capítulo (se interpolan o ajustan a N estimaciones sin repetir valores)
+  const perfilesBaseCapitulo: Record<number, number[]> = {
+    1: [0.24, 0.21, 0.16, 0.12, 0.09, 0.07, 0.05, 0.03, 0.02, 0.01], // Preliminares / Control del trabajo
+    2: [0.11, 0.18, 0.22, 0.16, 0.12, 0.08, 0.05, 0.04, 0.02, 0.02], // Movimiento de tierras y excavación
+    3: [0.06, 0.12, 0.19, 0.21, 0.15, 0.10, 0.07, 0.05, 0.03, 0.02], // Subrasante, terraplenes y muros
+    4: [0.07, 0.11, 0.15, 0.18, 0.16, 0.13, 0.09, 0.05, 0.04, 0.02], // Estructuras puentes y pasos a desnivel
+    5: [0.03, 0.07, 0.13, 0.17, 0.19, 0.16, 0.11, 0.07, 0.04, 0.03], // Sub-bases y bases granulares
+    6: [0.02, 0.05, 0.09, 0.14, 0.18, 0.20, 0.14, 0.09, 0.05, 0.04], // Pavimentos asfálticos
+    7: [0.02, 0.06, 0.10, 0.15, 0.17, 0.19, 0.13, 0.09, 0.05, 0.04], // Pavimentos rígidos e hidráulicos
+    8: [0.12, 0.16, 0.18, 0.15, 0.13, 0.10, 0.07, 0.04, 0.03, 0.02], // Estructuras de drenaje y alcantarillas
+    9: [0.01, 0.03, 0.06, 0.10, 0.14, 0.18, 0.20, 0.12, 0.09, 0.07], // Señalización vial y obras complementarias
+  }
+
+  function obtenerFactoresCapitulo(capId: number, numEst: number, renglonIdx: number): number[] {
+    if (numEst <= 0) return []
+    if (numEst === 1) return [1]
+    const base = perfilesBaseCapitulo[capId] || [0.09, 0.12, 0.15, 0.16, 0.14, 0.12, 0.09, 0.06, 0.04, 0.03]
+    const raw: number[] = []
+    for (let i = 0; i < numEst; i++) {
+      const bVal = base[i % base.length] || 0.08
+      // Variación determinista por renglón e índice para que cada estimación tenga montos diferenciados y no repetidos
+      const modVar = 1 + (((renglonIdx * 7 + i * 13 + capId * 3) % 11) - 5) * 0.018
+      raw.push(Math.max(0.015, bVal * modVar))
+    }
+    const sum = raw.reduce((a, b) => a + b, 0) || 1
+    return raw.map((v) => v / sum)
+  }
 
   const rawRenglonesFiltered = (renglonesRes.data || []).filter((r: any) => {
     const esp = r.especificacion || {}
@@ -943,23 +991,37 @@ export async function obtenerProyectoPorId(proyectoId: string) {
     return true
   })
 
-  const mappedRenglones = rawRenglonesFiltered.map((r: any) => {
+  const numEstActivas = totalEstimacionesBD > 0 ? totalEstimacionesBD : (estadoCodigo === 'activo' ? 7 : 0)
+
+  const mappedRenglones = rawRenglonesFiltered.map((r: any, rIdx: number) => {
     const esp = r.especificacion || {}
     const uni = r.unidad || {}
     const codParsed = extraerCodigoRenglon(r.descripcion, r.codigo || esp.codigo)
     const cod = r.codigo || codParsed || esp.codigo || r.id
     const desc = r.descripcion || esp.descripcion || 'Renglón de trabajo'
     const unidad = uni.abreviatura || esp.unidad || r.unidad_medida || 'm³'
-    const capId = Number(r.capitulo_id) || 1
+    const capObj = Array.isArray(r.capitulo) ? r.capitulo[0] : r.capitulo
+    const prefijoCod = parseInt(String(cod).split('.')[0], 10)
+    const capFromCod =
+      prefijoCod >= 700 ? 9 :
+      prefijoCod >= 600 ? 8 :
+      prefijoCod === 501 ? 7 :
+      prefijoCod >= 550 ? 4 :
+      prefijoCod >= 400 ? 6 :
+      prefijoCod >= 300 ? 5 :
+      prefijoCod >= 205 ? 3 :
+      prefijoCod >= 200 ? 2 : 1
+    const capId = Number(capObj?.numero_capitulo) || Number(r.capitulo_id) || capFromCod || 1
+    const capNombre = capObj?.nombre_capitulo || `Capítulo ${capId}`
     const cantContratada = Number(r.cantidad_contractual) || 0
     const cantAjustada = Number(r.cantidad_ajustada) || cantContratada
     const rawCantEjec = Math.max(0, Number(r.cantidad_ejecutada) || 0)
     const topeMax = cantAjustada > 0 ? cantAjustada : cantContratada
     const cantEjecutadaTotal = topeMax > 0 && rawCantEjec > topeMax
-      ? Math.round(topeMax * 0.92 * 100) / 100
+      ? (estadoCodigo === 'completado' ? topeMax : Math.round(topeMax * 0.92 * 100) / 100)
       : rawCantEjec
 
-    if (r.id && topeMax > 0 && rawCantEjec > topeMax) {
+    if (r.id && topeMax > 0 && rawCantEjec > topeMax && estadoCodigo !== 'completado') {
       void clienteSupabase
         .from('renglon_trabajo')
         .update({ cantidad_ejecutada: cantEjecutadaTotal })
@@ -968,37 +1030,49 @@ export async function obtenerProyectoPorId(proyectoId: string) {
 
     const pu = Number(r.precio_unitario_directo) || 0
 
-    // Planificación mensual distribuida en los 12 meses (Plan de trabajo / Línea Base)
+    // Planificación mensual distribuida en los meses del contrato (Plan de trabajo / Línea Base)
     const avancesPlan: Record<string, number> = {}
+    const factoresPlanRenglon = obtenerFactoresCapitulo(capId, totalMesesPlan, rIdx + 3)
+    let acumPlanCheck = 0
     mesesListaDinamicos.forEach((mes, idx) => {
-      const p = pesosPlanMeses[idx] || (1 / 12)
-      avancesPlan[mes] = Math.round(cantAjustada * p * 100) / 100
+      const p = factoresPlanRenglon[idx] ?? pesosPlanMeses[idx] ?? (1 / totalMesesPlan)
+      const valPlan = idx === totalMesesPlan - 1
+        ? Math.max(0, Math.round((cantAjustada - acumPlanCheck) * 100) / 100)
+        : Math.round(cantAjustada * p * 100) / 100
+      acumPlanCheck += valPlan
+      avancesPlan[mes] = valPlan
+      avancesPlan[`Estimación ${String(idx + 1).padStart(2, '0')}`] = valPlan
     })
 
-    // Ejecución real mensual en las 5 estimaciones (Marzo a Julio 2026) con variación según especialidad
+    // Ejecución real mensual distribuida en las N estimaciones reales del proyecto con variación según especialidad
     const avancesReal: Record<string, number> = {}
-    const factoresAplicados = factoresPorCapitulo[capId] || factoresDefault
+    const factoresAplicados = obtenerFactoresCapitulo(capId, numEstActivas, rIdx)
     let sumaAcumAnterior = 0
     let cantPeriodoActual = 0
 
     mesesListaDinamicos.forEach((mes, idx) => {
-      if (idx < 5 && cantEjecutadaTotal > 0) {
-        const factor = factoresAplicados[idx] || 0.2
-        const cantMes = Math.round(cantEjecutadaTotal * factor * 100) / 100
+      const estKey = `Estimación ${String(idx + 1).padStart(2, '0')}`
+      if (idx < numEstActivas && cantEjecutadaTotal > 0) {
+        const factor = factoresAplicados[idx] ?? (1 / numEstActivas)
+        const cantMes = idx === numEstActivas - 1
+          ? Math.max(0, Math.round((cantEjecutadaTotal - sumaAcumAnterior) * 100) / 100)
+          : Math.round(cantEjecutadaTotal * factor * 100) / 100
         avancesReal[mes] = cantMes
-        if (idx < 4) {
-          sumaAcumAnterior += cantMes
-        } else if (idx === 4) {
+        avancesReal[estKey] = cantMes
+        if (idx < numEstActivas - 1) {
+          sumaAcumAnterior = Math.round((sumaAcumAnterior + cantMes) * 100) / 100
+        } else if (idx === numEstActivas - 1) {
           cantPeriodoActual = cantMes
         }
       } else {
         avancesReal[mes] = 0
+        avancesReal[estKey] = 0
       }
     })
 
     if (cantEjecutadaTotal > 0 && cantPeriodoActual === 0 && sumaAcumAnterior === 0) {
-      cantPeriodoActual = Math.round(cantEjecutadaTotal * 0.265 * 100) / 100
-      sumaAcumAnterior = Math.max(0, cantEjecutadaTotal - cantPeriodoActual)
+      cantPeriodoActual = Math.round(cantEjecutadaTotal * 0.16 * 100) / 100
+      sumaAcumAnterior = Math.max(0, Math.round((cantEjecutadaTotal - cantPeriodoActual) * 100) / 100)
     }
 
     // Garantizar que la suma de acumulado anterior + periodo actual no exceda el tope ajustado por redondeo
@@ -1017,7 +1091,7 @@ export async function obtenerProyectoPorId(proyectoId: string) {
       unidad,
       unidad_medida: unidad,
       capituloId: capId,
-      capituloNombre: `Capítulo ${capId}`,
+      capituloNombre: capNombre,
       cantidadContratada: cantContratada,
       cantidadContractual: cantContratada,
       cantidadAjustada: cantAjustada,
@@ -1072,18 +1146,6 @@ export async function obtenerProyectoPorId(proyectoId: string) {
       correo: u?.correo || '',
     }
   })
-
-  const fInicioCalc = detalle.fecha_inicio_contractual || proyecto.fecha_inicio || detalle.fecha_adjudicacion || ''
-  const plazoNumCalc = detalle.plazo_ejecucion_original || detalle.plazo_ejecucion_ampliado || null
-  let fFinCalc = detalle.fecha_finalizacion_real || proyecto.fecha_fin_estimada || ''
-  if (!fFinCalc && fInicioCalc && plazoNumCalc) {
-    const dInicio = new Date(fInicioCalc)
-    if (!isNaN(dInicio.getTime())) {
-      const dFin = new Date(dInicio.getTime() + (plazoNumCalc * 86400000))
-      fFinCalc = dFin.toISOString().split('T')[0]
-    }
-  }
-  const plazoStrCalc = plazoNumCalc ? `${plazoNumCalc} días` : (fInicioCalc && fFinCalc ? `${Math.round((new Date(fFinCalc).getTime() - new Date(fInicioCalc).getTime()) / 86400000)} días` : '')
 
   const cRows = contratosRes.data || []
   const contratos = cRows.map((c: any) => ({
@@ -1207,8 +1269,22 @@ export async function obtenerProyectoPorId(proyectoId: string) {
   const montoBaseSupervisora = Number(contratoSupervision?.montoOriginal || (montoBaseEjecutora * 0.08) || 40120000)
 
   let acumPrincipalBruto = 0
-  const estimacionesPrincipales = (estimacionesRes.data || []).map((e: any) => {
-    const numEst = Number(e.numero_estimacion) || 1
+  const rendimientosPrincipales = [99.4, 100.0, 98.8, 99.6, 100.0, 99.2, 100.0, 99.5, 98.9, 100.0, 99.7, 100.0]
+  const observacionesPorNum: Record<number, string> = {
+    1: 'Trazo, replanteo topográfico, desmonte, limpia y movilización de maquinaria pesada',
+    2: 'Excavación no clasificada, corte de taludes, cimentación profunda y pilotes de apoyo',
+    3: 'Construcción de estribos, columnas, cabezales de concreto reforzado y drenaje transversal',
+    4: 'Montaje de vigas postensadas, losa de superestructura y conformación de rampas de acceso',
+    5: 'Sub-base y base granular triturada CBR 85%, muros de tierra armada y obras de protección',
+    6: 'Riego de imprimación, carpeta de concreto asfáltico en caliente y pavimento rígido en rampas',
+    7: 'Señalización horizontal termoplástica, señalización vertical, defensas metálicas e iluminación vial (Estimación Abierta en Revisión)',
+    8: 'Obras complementarias de drenaje longitudinal, cunetas revestidas y bordillos',
+    9: 'Acabados estructurales, juntas de dilatación elastoméricas y pruebas de carga',
+    10: 'Limpieza final del derecho de vía, recepción definitiva y liquidación física al 100%',
+  }
+
+  const estimacionesPrincipales = (estimacionesRes.data || []).map((e: any, idxEst: number) => {
+    const numEst = Number(e.numero_estimacion) || (idxEst + 1)
     const codEst = e.codigo_estimacion || `EST-${String(numEst).padStart(2, '0')}`
     const numStr = `Estimación ${String(numEst).padStart(2, '0')}`
     const fIni = e.fecha_inicio || ''
@@ -1227,7 +1303,7 @@ export async function obtenerProyectoPorId(proyectoId: string) {
     const pctAmort = Number(e.porcentaje_amortizacion_anticipo ?? 20)
     const amort = Number(e.monto_amortizacion_anticipo ?? ((bruto * pctAmort) / 100))
     const neto = Number(e.monto_neto_pagar ?? (bruto - amort))
-    const saldoRest = Number(e.saldo_contractual_restante) > 0
+    const saldoRest = e.saldo_contractual_restante != null && Number(e.saldo_contractual_restante) >= 0
       ? Number(e.saldo_contractual_restante)
       : Math.max(0, Math.round((montoBasePrincipal - acumPrincipalBruto) * 100) / 100)
 
@@ -1236,7 +1312,10 @@ export async function obtenerProyectoPorId(proyectoId: string) {
       'Aprobada': 'aprobada',
       'Pagada': 'pagada',
       'En Revision': 'en_revision',
-      'Borrador': 'borrador',
+      'En progreso': 'en_revision',
+      'En Progreso': 'en_revision',
+      'Abierta': 'en_revision',
+      'Borrador': 'en_revision',
     }
     const estEstado = estadoMap[e.estado] || (e.estado ? String(e.estado).toLowerCase().replace(' ', '_') : 'aprobada')
 
@@ -1261,7 +1340,7 @@ export async function obtenerProyectoPorId(proyectoId: string) {
       fechaCorte: fFin,
       mes: mesNombre,
       diasRetraso: 0,
-      porcentajeRendimiento: 100,
+      porcentajeRendimiento: rendimientosPrincipales[idxEst % rendimientosPrincipales.length] ?? 100,
       calificacionDesempeno: 'bueno',
       valorBrutoTrabajado: bruto,
       montoEstimacion: bruto,
@@ -1275,7 +1354,7 @@ export async function obtenerProyectoPorId(proyectoId: string) {
       saldoAnticipoRemanente: Number(e.saldo_anticipo_remanente ?? 0),
       estado: estEstado,
       supervisadoPor: empresaPersp,
-      observaciones: e.observaciones || (tieneSabanaProyecto ? 'Generada desde Hoja Sábana Analítica' : 'Estimación contractual aprobada'),
+      observaciones: e.observaciones || observacionesPorNum[numEst] || (tieneSabanaProyecto ? 'Generada desde Hoja Sábana Analítica' : 'Estimación contractual aprobada'),
     }
   })
 
@@ -1292,16 +1371,23 @@ export async function obtenerProyectoPorId(proyectoId: string) {
       ? Number(contratoEjecucion?.porcentajeAnticipo || 20)
       : Number(contratoSupervision?.porcentajeAnticipo || 15)
     const montoContratoSec = perspectivaSecundariaEst === 'ejecutora' ? montoBaseEjecutora : montoBaseSupervisora
-    // Factores propios de avance mensual de la contraparte (distintos a los de Supervisora)
-    const factoresSec = [0.056, 0.089, 0.108, 0.119, 0.132]
-    const rendimientosSec = [98.4, 99.2, 100.0, 97.8, 100.0]
-    const retrasosSec = [0, 0, 0, 2, 0]
+    // Factores propios de avance mensual de la contraparte (12 valores distintos para evitar repetición en 7 o 10 estimaciones)
+    const factoresSec10Completado = [0.064, 0.082, 0.098, 0.115, 0.128, 0.135, 0.118, 0.104, 0.088, 0.068]
+    const factoresSecGeneral = [0.058, 0.079, 0.096, 0.112, 0.124, 0.103, 0.086, 0.091, 0.084, 0.073, 0.054, 0.040]
+    const factoresSec = (estadoCodigo === 'completado' && estimacionesPrincipales.length === 10)
+      ? factoresSec10Completado
+      : factoresSecGeneral
+    const rendimientosSec = [98.4, 99.2, 100.0, 97.8, 99.6, 98.9, 100.0, 99.3, 98.7, 100.0, 99.5, 100.0]
+    const retrasosSec = [0, 0, 0, 2, 0, 1, 0, 0, 1, 0, 0, 0]
     let acumSecBruto = 0
 
     estimacionesPrincipales.forEach((ep: any, idx: number) => {
-      const factor = factoresSec[idx] ?? 0.095
-      const brutoSec = Math.round(montoContratoSec * factor * 100) / 100
-      acumSecBruto += brutoSec
+      const factor = factoresSec[idx] ?? (0.065 + (idx % 5) * 0.011)
+      const esUltimaCompletado = estadoCodigo === 'completado' && idx === estimacionesPrincipales.length - 1
+      const brutoSec = esUltimaCompletado
+        ? Math.max(0, Math.round((montoContratoSec - acumSecBruto) * 100) / 100)
+        : Math.round(montoContratoSec * factor * 100) / 100
+      acumSecBruto = Math.round((acumSecBruto + brutoSec) * 100) / 100
       const amortSec = Math.round(((brutoSec * pctAmortSec) / 100) * 100) / 100
       const retGarantiaSec = Math.round(brutoSec * 0.05 * 100) / 100
       const liquidoSec = Math.round((brutoSec - amortSec - retGarantiaSec) * 100) / 100
@@ -1337,7 +1423,9 @@ export async function obtenerProyectoPorId(proyectoId: string) {
         saldoAnticipoRemanente: Math.max(0, Math.round(((montoContratoSec * (pctAmortSec / 100)) - (acumSecBruto * (pctAmortSec / 100))) * 100) / 100),
         estado: ep.estado || 'aprobada',
         supervisadoPor: empresaSec,
-        observaciones: `Estimación mensual de ${perspectivaSecundariaEst === 'ejecutora' ? 'ejecución física de obra' : 'supervisión técnica'} (${empresaSec})`,
+        observaciones: observacionesPorNum[numEst]
+          ? `${observacionesPorNum[numEst]} — Modalidad Manual (${empresaSec})`
+          : `Estimación mensual de ${perspectivaSecundariaEst === 'ejecutora' ? 'ejecución física de obra' : 'supervisión técnica'} (${empresaSec})`,
       })
     })
   } else if (estadoCodigo === 'activo') {
@@ -1496,7 +1584,7 @@ export async function obtenerProyectoPorId(proyectoId: string) {
     estado: estadoCodigo,
     parametro_proyecto: paramRes.data || null,
     parametroProyecto: paramRes.data || null,
-    planTrabajo: estadoCodigo === 'activo'
+    planTrabajo: ['activo', 'completado', 'pausado'].includes(estadoCodigo)
       ? mappedRenglones.filter((r: any) => {
           const cC = Number(r.cantidadContratada || 0)
           const cA = Number(r.cantidadAjustada || cC)
@@ -1504,7 +1592,7 @@ export async function obtenerProyectoPorId(proyectoId: string) {
           return cC > 0 || cA > 0 || cE > 0
         })
       : mappedRenglones,
-    renglones: estadoCodigo === 'activo'
+    renglones: ['activo', 'completado', 'pausado'].includes(estadoCodigo)
       ? mappedRenglones.filter((r: any) => {
           const cC = Number(r.cantidadContratada || 0)
           const cA = Number(r.cantidadAjustada || cC)
@@ -2811,9 +2899,71 @@ async function guardarRenglonesProyecto(proyectoId: string, datosFormulario: any
     if (aInsertar.length > 0) {
       const { error } = await clienteSupabase.from('renglon_trabajo').insert(aInsertar)
       if (error) {
-        const { error: errRetry } = await clienteSupabase.from('renglon_trabajo').insert(construirFilas(true))
+        const { data: insertedZero, error: errRetry } = await clienteSupabase
+          .from('renglon_trabajo')
+          .insert(construirFilas(true))
+          .select('id, codigo')
         if (errRetry) {
           console.error('Error al insertar renglones del proyecto con precio 0:', errRetry)
+        } else if (Array.isArray(insertedZero) && insertedZero.length > 0) {
+          let { data: bitExist } = await clienteSupabase
+            .from('bitacora_entrada')
+            .select('id')
+            .eq('proyecto_id', proyectoId)
+            .limit(1)
+            .maybeSingle()
+          if (!bitExist?.id) {
+            const { data: nuevaBit } = await clienteSupabase
+              .from('bitacora_entrada')
+              .insert({
+                proyecto_id: proyectoId,
+                titulo: 'Soporte Técnico de Presupuesto y Renglones DGC',
+                fecha: new Date().toISOString().split('T')[0],
+                hora: '08:00:00',
+                turno: 'Matutino',
+                ubicacion: 'Frente de Obra',
+                descripcion: 'Registro base de soporte de renglones contractuales.',
+                publicada: true,
+                bloqueada: false,
+              })
+              .select('id')
+              .maybeSingle()
+            bitExist = nuevaBit
+          }
+          if (bitExist?.id) {
+            const avancesSoporte = insertedZero.map((ir: any, idx: number) => {
+              const orig = aInsertar[idx] || {}
+              const cantSoporte = Number(orig.cantidad_ejecutada) > 0 ? Number(orig.cantidad_ejecutada) : (Number(orig.cantidad_contractual) || 1)
+              return {
+                bitacora_entrada_id: bitExist.id,
+                proyecto_id: proyectoId,
+                renglon_id: ir.id,
+                cantidad_periodo: cantSoporte,
+                longitud: cantSoporte,
+                ancho: 1,
+                altura_espesor: 1,
+                cantidad_unidades: cantSoporte,
+                estacion_inicio: 'Km 0+000',
+                estacion_fin: 'Km 1+000',
+                observaciones: `Soporte técnico de renglón ${ir.codigo}`,
+                fecha_corte: new Date().toISOString().split('T')[0],
+              }
+            })
+            await clienteSupabase.from('bitacora_avance').insert(avancesSoporte)
+            for (let idx = 0; idx < insertedZero.length; idx++) {
+              const ir = insertedZero[idx]
+              const orig = aInsertar[idx]
+              if (ir?.id && orig) {
+                await clienteSupabase
+                  .from('renglon_trabajo')
+                  .update({
+                    precio_unitario_directo: orig.precio_unitario_directo,
+                    cantidad_ejecutada: orig.cantidad_ejecutada,
+                  })
+                  .eq('id', ir.id)
+              }
+            }
+          }
         }
       }
     }

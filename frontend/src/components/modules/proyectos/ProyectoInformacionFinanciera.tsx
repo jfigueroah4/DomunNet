@@ -281,6 +281,19 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
   useEffect(() => {
     if (!proyecto?.id) return
     try {
+      const syncKeyV9 = `domun_sabana_sync_v9_${proyecto.id}`
+      if (!localStorage.getItem(syncKeyV9)) {
+        localStorage.removeItem(`domun_estimaciones_sabana_${proyecto.id}`)
+        localStorage.removeItem(`domun_estimaciones_sabana_${proyecto.id}_ejecutora`)
+        localStorage.removeItem(`domun_estimaciones_sabana_${proyecto.id}_supervisora`)
+        localStorage.removeItem(`domun_estimaciones_manuales_${proyecto.id}`)
+        localStorage.removeItem(`domun_estimacion_activa_${proyecto.id}`)
+        localStorage.removeItem(`domun_estimacion_activa_${proyecto.id}_ejecutora`)
+        localStorage.removeItem(`domun_estimacion_activa_${proyecto.id}_supervisora`)
+        localStorage.removeItem(`sabana_renglones_${proyecto.id}`)
+        localStorage.setItem(syncKeyV9, '1')
+      }
+
       const sabanaStored = localStorage.getItem(`domun_estimaciones_sabana_${proyecto.id}`)
       const sabanaEjecStored = localStorage.getItem(`domun_estimaciones_sabana_${proyecto.id}_ejecutora`)
       const sabanaSupStored = localStorage.getItem(`domun_estimaciones_sabana_${proyecto.id}_supervisora`)

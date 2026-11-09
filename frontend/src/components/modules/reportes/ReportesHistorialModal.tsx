@@ -176,7 +176,18 @@ export function ReportesHistorialModal({
   // Comprobar si el usuario actual es de rol Contratante
   const esContratante = useMemo(() => {
     const rol = (userRole || '').toLowerCase().trim()
-    return rol.includes('contratante')
+    return (
+      rol.includes('contratante') ||
+      rol.includes('auxiliar') ||
+      rol.includes('topograf') ||
+      rol.includes('laborator') ||
+      rol.includes('inspector') ||
+      rol === 'campo' ||
+      rol.includes('presentad') ||
+      rol.includes('ejecutora') ||
+      rol.includes('contratista') ||
+      rol.includes('supervis')
+    )
   }, [userRole])
 
   // Cantidad de filtros activos

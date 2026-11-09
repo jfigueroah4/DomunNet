@@ -55,6 +55,19 @@ export default function BitacoraPage() {
     rolUsuario === 'campo' ||
     rolUsuario === 'inspector'
   const esRolCampoRestringido = esPersonalCampo
+  const esRolSinEliminacion =
+    esPresentador ||
+    esPersonalCampo ||
+    rolUsuario.includes('contratante') ||
+    rolUsuario.includes('auxiliar') ||
+    rolUsuario.includes('topograf') ||
+    rolUsuario.includes('laborator') ||
+    rolUsuario.includes('inspector') ||
+    rolUsuario === 'campo' ||
+    rolUsuario.includes('ejecutora') ||
+    rolUsuario.includes('contratista') ||
+    rolUsuario.includes('supervis')
+  const puedeEliminar = esAdmin && !esRolSinEliminacion
 
   const [vista, setVista] = useState<'lista' | 'crear'>('lista')
   const [registrosApi, setRegistrosApi] = useState<any[]>([])
@@ -462,6 +475,7 @@ export default function BitacoraPage() {
   }
 
   const abrirModalEliminarMultiples = () => {
+    if (!puedeEliminar) return
     if (seleccionados.length === 0) return
     setRegistrosAEliminarIds([...seleccionados])
     setTextoConfirmacion('')
@@ -469,12 +483,14 @@ export default function BitacoraPage() {
   }
 
   const abrirModalEliminarIndividual = (id: string) => {
+    if (!puedeEliminar) return
     setRegistrosAEliminarIds([id])
     setTextoConfirmacion('')
     setModalEliminarAbierto(true)
   }
 
   const handleConfirmarEliminar = async () => {
+    if (!puedeEliminar) return
     if (registrosAEliminarIds.length === 0) return
     if (textoConfirmacion.trim().toUpperCase() !== 'CONFIRMAR') return
 
@@ -650,12 +666,12 @@ export default function BitacoraPage() {
             setRolFiltro('todos')
             setUsuarioFiltro('')
           }}
-          modoSeleccion={modoSeleccion}
-          setModoSeleccion={setModoSeleccion}
+          modoSeleccion={puedeEliminar ? modoSeleccion : false}
+          setModoSeleccion={puedeEliminar ? setModoSeleccion : undefined}
           onAbrirCalendario={() => setModalCalendarioAbierto(true)}
         />
 
-        {modoSeleccion && !esPresentador && (
+        {modoSeleccion && puedeEliminar && (
           <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50/90 p-1.5 px-3 shadow-2xs font-[Poppins] text-[11px] font-medium text-gray-700 animate-in fade-in duration-150">
             <div className="flex items-center gap-2">
               <input
@@ -704,7 +720,7 @@ export default function BitacoraPage() {
                     <BitacoraCard
                       key={registro.id}
                       registro={registro}
-                      modoSeleccion={modoSeleccion}
+                      modoSeleccion={puedeEliminar ? modoSeleccion : false}
                       isSelected={seleccionados.includes(String(registro.id))}
                       onToggleSelect={() => toggleSeleccionarRegistro(String(registro.id))}
                       onClick={() => setDrawerRegistro(registro)}
@@ -1046,7 +1062,7 @@ export default function BitacoraPage() {
 
                 {/* Drawer Footer */}
                 <div className="p-3 border-t border-gray-200 bg-gray-50 flex items-center justify-between gap-3 font-[Poppins]">
-                  {!esPresentador && (
+                  {puedeEliminar && (
                     <button
                       type="button"
                       onClick={() => abrirModalEliminarIndividual(String(drawerRegistro.id))}
@@ -1056,7 +1072,7 @@ export default function BitacoraPage() {
                       <Trash2 size={16} />
                     </button>
                   )}
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 ml-auto">
                     <span className="text-[9px] text-gray-400 font-medium hidden sm:inline">ID: {drawerRegistro.id}</span>
                     <button
                       type="button"

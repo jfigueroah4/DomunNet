@@ -48,13 +48,20 @@ export default function ConfiguracionPage() {
           transition: transform 0.28s ease, box-shadow 0.28s ease, filter 0.28s ease;
         }
         .config-module-card:hover {
-          transform: translateY(-4px) scale(1.008);
-          box-shadow: 0 16px 32px rgba(15, 23, 42, 0.16);
-          filter: saturate(1.03);
+          transform: translateY(-4px) scale(1.01);
+          box-shadow: 0 16px 32px rgba(155, 15, 6, 0.18);
+          filter: saturate(1.02);
+        }
+        .config-module-icon {
+          opacity: 0.20;
+          transition: transform 0.28s ease, opacity 0.28s ease;
         }
         .config-module-card:hover .config-module-icon {
           transform: scale(1.08) rotate(-4deg);
-          opacity: 0.26;
+          opacity: 0.28;
+        }
+        .config-module-link {
+          transition: transform 0.28s ease, opacity 0.28s ease;
         }
         .config-module-card:hover .config-module-link {
           transform: translateX(3px);
@@ -75,9 +82,10 @@ export default function ConfiguracionPage() {
             <Link
               key={module.key}
               href={module.href}
+              prefetch={true}
               className={`${module.bgColor} config-module-card relative flex min-h-[155px] sm:min-h-[175px] md:min-h-[185px] flex-col justify-between overflow-hidden rounded-[22px] p-5 sm:p-6 md:p-7 text-white shadow-xs`}
             >
-              <div className="config-module-icon absolute -bottom-3 -right-3 opacity-18 transition-transform duration-300 pointer-events-none">
+              <div className="config-module-icon absolute -bottom-3 -right-3 opacity-20 pointer-events-none">
                 <Icon size={120} color="white" className="w-[100px] h-[100px] sm:w-[120px] sm:h-[120px] md:w-[135px] md:h-[135px]" />
               </div>
 
@@ -85,7 +93,7 @@ export default function ConfiguracionPage() {
                 <div className="p-2 sm:p-2.5 rounded-xl bg-white/10 backdrop-blur-xs flex items-center justify-center">
                   <Icon size={24} color="white" className="w-5 h-5 sm:w-6 sm:h-6 drop-shadow-[0_2px_4px_rgba(0,0,0,0.15)]" />
                 </div>
-                <div className="config-module-link flex items-center gap-1 text-[11px] sm:text-xs font-bold tracking-wide opacity-90 transition-all duration-200">
+                <div className="config-module-link flex items-center gap-1 text-[11px] sm:text-xs font-bold tracking-wide opacity-90">
                   <span>Ir a la sección</span>
                   <ChevronRight size={13} className="opacity-80" />
                 </div>

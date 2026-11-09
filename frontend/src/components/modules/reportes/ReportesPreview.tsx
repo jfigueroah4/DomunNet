@@ -35,7 +35,7 @@ export function ReportesPreview({
   const tieneFotos = fotosFiltradas.length > 0
   const [paginaActual, setPaginaActual] = useState(1)
   const [busquedaDesktop, setBusquedaDesktop] = useState('')
-  const itemsPorPagina = 4
+  const itemsPorPagina = 10
 
   const listaBase = useMemo(() => {
     return tieneFotos ? fotosFiltradas : bitacoraFiltrada
@@ -69,7 +69,7 @@ export function ReportesPreview({
     setPaginaActual(1)
   }, [busquedaDesktop])
 
-  // Obtener items de la página actual (4 por hoja de reporte)
+  // Obtener items de la página actual (hasta 10 por vista)
   const itemsPaginados = useMemo(() => {
     const inicio = (paginaActual - 1) * itemsPorPagina
     return listaCompleta.slice(inicio, inicio + itemsPorPagina)
@@ -141,8 +141,8 @@ export function ReportesPreview({
           </div>
         </div>
 
-        {/* Listado de 4 elementos por página con Selección Persistente */}
-        <div className="space-y-2.5 sm:space-y-2">
+        {/* Listado de hasta 10 elementos por página con Selección Persistente */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
           {tieneFotos ? (
             itemsPaginados.length > 0 ? (
               itemsPaginados.map((foto: any) => {
@@ -171,7 +171,7 @@ export function ReportesPreview({
                   <div
                     key={foto.id}
                     onClick={() => toggleFotoSeleccionada(String(foto.id))}
-                    className={`rounded-xl border bg-white p-2 sm:p-2.5 flex items-center gap-2 sm:gap-3 transition-all cursor-pointer shadow-2xs select-none ${
+                    className={`rounded-xl border bg-white p-2 sm:p-2 flex items-center gap-2 sm:gap-2.5 transition-all cursor-pointer shadow-2xs select-none ${
                       checked
                         ? 'border-gray-200 hover:border-gray-300'
                         : 'border-gray-100 opacity-60 bg-gray-50/50'
@@ -197,7 +197,7 @@ export function ReportesPreview({
                         }
                       }}
                       title="Oprime para ampliar la imagen"
-                      className="relative group/thumb h-11 w-14 sm:h-12 sm:w-16 rounded-lg overflow-hidden border border-gray-200 shrink-0 bg-gray-100 flex items-center justify-center cursor-zoom-in active:scale-95 transition-transform"
+                      className="relative group/thumb h-11 w-14 sm:h-11 sm:w-14 rounded-lg overflow-hidden border border-gray-200 shrink-0 bg-gray-100 flex items-center justify-center cursor-zoom-in active:scale-95 transition-transform"
                     >
                       {fotoUrl ? (
                         <>
@@ -246,7 +246,7 @@ export function ReportesPreview({
                 )
               })
             ) : (
-              <div className="rounded-xl bg-white p-6 text-center space-y-1">
+              <div className="col-span-full rounded-xl bg-white p-6 text-center space-y-1">
                 <p className="text-xs text-gray-500 font-semibold">
                   No se encontraron imágenes que coincidan con &quot;{busquedaDesktop}&quot;
                 </p>
@@ -270,7 +270,7 @@ export function ReportesPreview({
                   <div
                     key={registro.id}
                     onClick={() => toggleRegistroSeleccionado(String(registro.id))}
-                    className={`rounded-xl border bg-white p-2 sm:p-2.5 flex items-center gap-2 sm:gap-3 transition-all cursor-pointer shadow-2xs select-none ${
+                    className={`rounded-xl border bg-white p-2 sm:p-2 flex items-center gap-2 sm:gap-2.5 transition-all cursor-pointer shadow-2xs select-none ${
                       checked
                         ? 'border-gray-200 hover:border-gray-300'
                         : 'border-gray-100 opacity-60 bg-gray-50/50'
@@ -294,7 +294,7 @@ export function ReportesPreview({
                         }
                       }}
                       title={fotoUrl ? 'Oprime para ampliar la imagen' : undefined}
-                      className={`relative group/thumb h-11 w-14 sm:h-12 sm:w-16 rounded-lg overflow-hidden border border-gray-200 shrink-0 bg-gray-100 flex items-center justify-center transition-transform ${
+                      className={`relative group/thumb h-11 w-14 sm:h-11 sm:w-14 rounded-lg overflow-hidden border border-gray-200 shrink-0 bg-gray-100 flex items-center justify-center transition-transform ${
                         fotoUrl ? 'cursor-zoom-in active:scale-95' : ''
                       }`}
                     >
@@ -344,7 +344,7 @@ export function ReportesPreview({
                 )
               })
             ) : (
-              <div className="rounded-xl bg-white p-6 text-center space-y-1">
+              <div className="col-span-full rounded-xl bg-white p-6 text-center space-y-1">
                 <p className="text-xs text-gray-500 font-semibold">
                   No se encontraron registros que coincidan con &quot;{busquedaDesktop}&quot;
                 </p>
@@ -360,12 +360,12 @@ export function ReportesPreview({
           )}
         </div>
 
-        {/* Paginación de 4 por página (hoja de reporte) */}
+        {/* Paginación de hasta 10 por página */}
         {listaCompleta.length > 0 && (
           <div className="paginacion-control mt-2.5 flex flex-wrap items-center justify-between gap-2 border-t border-gray-200/70 pt-2 text-[9.5px] sm:text-[11px] text-gray-500 font-medium font-[Poppins]">
             <div className="flex items-center gap-1 text-[9.5px] sm:text-[11px]">
               <span>Vista:</span>
-              <span className="font-bold text-gray-800">4</span>
+              <span className="font-bold text-gray-800">{itemsPorPagina}</span>
               <span>reg/pág ({listaCompleta.length} tot.)</span>
             </div>
             <div className="flex items-center gap-1.5 text-[9.5px] sm:text-[11px]">
