@@ -73,12 +73,9 @@ export default function LoginPage() {
   const [showRememberedDropdown, setShowRememberedDropdown] = useState(false);
 
   useEffect(() => {
-    // Despertar el backend inmediatamente en segundo plano al cargar el login para eliminar cold starts en Render
+    // Despertar el backend en segundo plano usando la ruta proxy para evitar bloqueos CORS/AdBlock (ERR_BLOCKED_BY_CLIENT)
     try {
       api.get('/health', { timeout: 35000 }).catch(() => {});
-      if (typeof window !== 'undefined') {
-        fetch('https://domunnet-backend.onrender.com/health', { mode: 'no-cors' }).catch(() => {});
-      }
     } catch (_) {}
 
     // Limpiar bloqueo expirado si existía de intentos previos
@@ -169,17 +166,34 @@ export default function LoginPage() {
     const deviceId = getOrCreateDeviceId();
     const dispositivo = detectarDispositivoCliente();
 
-    const res = await api.post(
-      '/auth/iniciar-sesion',
-      {
-        correo: identificador,
-        contrasena,
-        deviceId,
-        dispositivo,
-        cerrarOtrasSesiones: Boolean(cerrarOtrasSesiones),
-      },
-      { timeout: 45000 }
-    );
+    let res: any;
+    let lastErr: any;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        res = await api.post(
+          '/auth/iniciar-sesion',
+          {
+            correo: identificador,
+            contrasena,
+            deviceId,
+            dispositivo,
+            cerrarOtrasSesiones: Boolean(cerrarOtrasSesiones),
+          },
+          { timeout: 45000 }
+        );
+        break;
+      } catch (err: any) {
+        lastErr = err;
+        const st = err?.response?.status;
+        if ((st === 429 || st === 502 || st === 503 || st === 504) && attempt < 2) {
+          setLoginStatusText('Sincronizando con el servidor...');
+          await new Promise((r) => setTimeout(r, 2500 * (attempt + 1)));
+          continue;
+        }
+        throw err;
+      }
+    }
+    if (!res) throw lastErr;
 
     const token = res.data?.data?.token;
     if (token && typeof document !== 'undefined') {

@@ -52,7 +52,8 @@ app.use(morgan('combined'))
 app.use(
   rateLimit({
     windowMs: 1 * 60 * 1000,
-    max: entorno.modo === 'development' ? 10000 : 2000,
+    max: entorno.modo === 'development' ? 10000 : 5000,
+    skip: (req) => req.path.includes('/health') || req.path.includes('/auth/'),
   })
 )
 app.use(express.json({ limit: '50mb' }))
