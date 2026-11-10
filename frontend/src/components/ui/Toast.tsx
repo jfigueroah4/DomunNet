@@ -1,13 +1,13 @@
 'use client';
 
 import React from "react";
-import { Check, X as CloseIcon } from "lucide-react";
+import { Check, X as CloseIcon, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
 export interface ToastProps {
   id?: string | number;
   message: string;
-  type?: "success" | "error";
+  type?: "success" | "error" | "warning";
   onClose?: () => void;
 }
 
@@ -46,7 +46,7 @@ export function Toast({ id, message, type = "success", onClose }: ToastProps) {
           width: "18px",
           height: "18px",
           borderRadius: "50%",
-          backgroundColor: isSuccess ? "#52C41A" : "#FF4D4F",
+          backgroundColor: type === "warning" ? "#FAAD14" : isSuccess ? "#52C41A" : "#FF4D4F",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -54,7 +54,12 @@ export function Toast({ id, message, type = "success", onClose }: ToastProps) {
           marginTop: isLong ? "1px" : "0",
         }}
       >
-        {isSuccess ? (
+        {type === "warning" ? (
+          <AlertTriangle
+            style={{ width: "11px", height: "11px", color: "#FFFFFF" }}
+            strokeWidth={3}
+          />
+        ) : isSuccess ? (
           <Check size={11} color="#FFFFFF" strokeWidth={3} />
         ) : (
           <CloseIcon size={11} color="#FFFFFF" strokeWidth={3} />
@@ -149,6 +154,24 @@ export function showErrorToast(message: string) {
         id={id}
         message={message}
         type="error"
+        onClose={() => toast.dismiss(id)}
+      />
+    ),
+    {
+      duration: calcularDuracionToast(message),
+    }
+  );
+}
+
+
+export function showWarningToast(message: string) {
+  toast.dismiss();
+  return toast.custom(
+    (id) => (
+      <Toast
+        id={id}
+        message={message}
+        type="warning"
         onClose={() => toast.dismiss(id)}
       />
     ),

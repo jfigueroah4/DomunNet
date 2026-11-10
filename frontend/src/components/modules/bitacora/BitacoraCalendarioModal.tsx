@@ -264,7 +264,7 @@ export function BitacoraCalendarioModal({
         />
 
         {/* Tarjeta flotante modal */}
-        <div className="relative w-full max-w-2xl max-h-[92vh] flex flex-col bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden z-10 animate-in zoom-in-95 duration-200">
+        <div className="relative w-full max-w-5xl max-h-[92vh] flex flex-col bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden z-10 animate-in zoom-in-95 duration-200">
           {/* Header Superior Flotante */}
           <div className="p-3.5 sm:p-4 border-b border-gray-100 bg-gradient-to-r from-gray-50 via-white to-gray-50 flex items-center justify-between gap-3 shrink-0">
             <div className="flex items-center gap-2.5 min-w-0">
@@ -390,7 +390,7 @@ export function BitacoraCalendarioModal({
           </div>
 
           {/* Área Scrolleable: Cuadrícula y Detalle */}
-          <div className="overflow-y-auto flex-1 p-3 sm:p-4 space-y-3">
+          <div className="overflow-y-auto flex-1 p-3.5 sm:p-5 space-y-4">
             {/* Cabecera Días de la semana */}
             <div className="grid grid-cols-7 gap-1 text-center font-bold text-[10px] text-gray-500 uppercase tracking-wider pb-1">
               <div>Lun</div>
@@ -403,10 +403,10 @@ export function BitacoraCalendarioModal({
             </div>
 
             {/* Grilla mensual de 7 columnas */}
-            <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
+            <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
               {gridDias.map((d) => {
                 if (d.esVacio) {
-                  return <div key={d.id} className="min-h-[46px] sm:min-h-[54px] rounded-xl bg-gray-50/40" />
+                  return <div key={d.id} className="min-h-[56px] sm:min-h-[66px] rounded-xl bg-gray-50/40" />
                 }
 
                 const esSeleccionado = diaSeleccionado === d.fechaStr
@@ -429,7 +429,7 @@ export function BitacoraCalendarioModal({
                     key={d.id}
                     type="button"
                     onClick={() => setDiaSeleccionado(d.fechaStr!)}
-                    className={`relative min-h-[46px] sm:min-h-[54px] p-1 sm:p-1.5 rounded-xl border flex flex-col justify-between items-start transition-all cursor-pointer text-left ${estiloContenedor} ${
+                    className={`relative min-h-[56px] sm:min-h-[66px] p-1 sm:p-1.5 rounded-xl border flex flex-col justify-between items-start transition-all cursor-pointer text-left ${estiloContenedor} ${
                       esSeleccionado
                         ? 'ring-2 ring-[#9B0F06] ring-offset-1 shadow-md scale-[1.02] z-10'
                         : 'shadow-2xs hover:shadow-xs'
@@ -476,34 +476,34 @@ export function BitacoraCalendarioModal({
               })}
             </div>
 
-            {/* Detalle del Día Seleccionado (Drawer inferior contextual) */}
+            {/* Detalle del Día Seleccionado (Drawer inferior contextual espacioso) */}
             {diaSeleccionadoObj && (
-              <div className="mt-3 rounded-xl border border-gray-200 bg-gray-50/80 p-3 space-y-2.5 animate-in fade-in duration-150">
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200/80 pb-2">
-                  <div className="flex items-center gap-2">
+              <div className="mt-4 rounded-2xl border border-gray-200 bg-gray-50/90 p-4 space-y-3.5 animate-in fade-in duration-150 shadow-2xs">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200/90 pb-3">
+                  <div className="flex flex-wrap items-center gap-2.5">
                     <span
-                      className={`h-2.5 w-2.5 rounded-full shrink-0 ${
+                      className={`h-3 w-3 rounded-full shrink-0 shadow-xs ${
                         diaSeleccionadoObj.estadoColor === 'verde'
-                          ? 'bg-emerald-500'
+                          ? 'bg-emerald-500 ring-2 ring-emerald-200'
                           : diaSeleccionadoObj.estadoColor === 'rojo'
-                          ? 'bg-red-500'
+                          ? 'bg-red-500 ring-2 ring-red-200'
                           : diaSeleccionadoObj.estadoColor === 'ambar'
-                          ? 'bg-amber-500'
-                          : 'bg-gray-400'
+                          ? 'bg-amber-500 ring-2 ring-amber-200'
+                          : 'bg-gray-400 ring-2 ring-gray-200'
                       }`}
                     />
-                    <h3 className="text-xs font-bold text-gray-900">
+                    <h3 className="text-sm font-bold text-gray-900">
                       Fecha: {diaSeleccionadoObj.fechaStr} {diaSeleccionadoObj.esHoy ? '(Hoy)' : ''}
                     </h3>
                     <span
-                      className={`text-[9.5px] font-semibold px-2 py-0.5 rounded-full border ${
+                      className={`text-[10.5px] font-bold px-2.5 py-0.5 rounded-full border shadow-2xs ${
                         diaSeleccionadoObj.estadoColor === 'verde'
-                          ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                          ? 'bg-emerald-100 text-emerald-950 border-emerald-300'
                           : diaSeleccionadoObj.estadoColor === 'rojo'
-                          ? 'bg-red-100 text-red-900 border-red-300'
+                          ? 'bg-red-100 text-red-950 border-red-300'
                           : diaSeleccionadoObj.estadoColor === 'ambar'
-                          ? 'bg-amber-100 text-amber-900 border-amber-300'
-                          : 'bg-gray-200 text-gray-800 border-gray-300'
+                          ? 'bg-amber-100 text-amber-950 border-amber-300'
+                          : 'bg-gray-200 text-gray-900 border-gray-300'
                       }`}
                     >
                       {diaSeleccionadoObj.estadoTexto}
@@ -511,7 +511,7 @@ export function BitacoraCalendarioModal({
                   </div>
 
                   {/* Acciones para el día */}
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-2">
                     {diaSeleccionadoObj.tieneRegistros && onFiltrarFecha && (
                       <button
                         type="button"
@@ -519,10 +519,10 @@ export function BitacoraCalendarioModal({
                           onFiltrarFecha(diaSeleccionadoObj.fechaStr!)
                           onCerrar()
                         }}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#9B0F06] text-white hover:bg-[#7D0C05] text-[10.5px] font-semibold transition-all cursor-pointer shadow-2xs active:scale-95"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-900 text-white hover:bg-black text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95"
                       >
-                        <Filter size={11} />
-                        <span>Ver en lista</span>
+                        <Filter size={13} />
+                        <span>Ver en lista ({registrosDelDia.length})</span>
                       </button>
                     )}
 
@@ -533,9 +533,9 @@ export function BitacoraCalendarioModal({
                           onCrearRegistroEnFecha(diaSeleccionadoObj.fechaStr!)
                           onCerrar()
                         }}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#9B0F06] text-white hover:bg-[#7D0C05] text-[10.5px] font-semibold transition-all cursor-pointer shadow-2xs active:scale-95"
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#9B0F06] text-white hover:bg-[#7D0C05] text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95"
                       >
-                        <Plus size={12} />
+                        <Plus size={14} />
                         <span>Registrar bitácora atrasada</span>
                       </button>
                     )}
@@ -544,24 +544,24 @@ export function BitacoraCalendarioModal({
 
                 {/* Desglose de registros de la fecha */}
                 {registrosDelDia.length > 0 ? (
-                  <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                  <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
                     {registrosDelDia.map((reg: any, i: number) => (
                       <div
                         key={reg.id || `reg-${i}`}
-                        className="p-2 rounded-lg bg-white border border-gray-200 text-[11px] space-y-1 shadow-2xs"
+                        className="p-3 rounded-xl bg-white border border-gray-200 text-xs space-y-1.5 shadow-2xs"
                       >
                         <div className="flex items-center justify-between gap-2">
-                          <span className="font-bold text-gray-800 truncate">
+                          <span className="font-bold text-gray-900 truncate">
                             {reg.titulo || 'Registro de Bitácora'}
                           </span>
-                          <span className="text-[10px] font-mono text-gray-500 shrink-0">
+                          <span className="text-[10.5px] font-mono text-gray-500 shrink-0">
                             {reg.hora || '12:00'} · {reg.turno || 'Diurno'}
                           </span>
                         </div>
-                        <p className="text-[10.5px] text-gray-600 line-clamp-2">
+                        <p className="text-xs text-gray-600 line-clamp-2">
                           {reg.descripcion || 'Sin descripción'}
                         </p>
-                        <div className="flex items-center justify-between text-[9.5px] text-gray-400 pt-0.5">
+                        <div className="flex items-center justify-between text-[10px] text-gray-400 pt-1 border-t border-gray-50">
                           <span>Por: {reg.autor || 'Ingeniero Residente'}</span>
                           <span>Ubicación: {reg.ubicacion || 'Frente de Obra'}</span>
                         </div>
@@ -569,43 +569,43 @@ export function BitacoraCalendarioModal({
                     ))}
                   </div>
                 ) : diaSeleccionadoObj.estadoColor === 'rojo' ? (
-                  <div className="flex items-start gap-2 p-2 rounded-lg bg-red-100/50 border border-red-200 text-red-900 text-[10.5px]">
-                    <AlertTriangle size={14} className="text-red-600 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-semibold">Día laboral transcurrido sin registro de campo.</p>
-                      <p className="text-[10px] text-red-700 mt-0.5">
+                  <div className="flex items-start gap-3 p-3.5 rounded-xl bg-white border border-red-200 text-red-900 text-xs shadow-2xs">
+                    <AlertTriangle size={17} className="text-red-600 shrink-0 mt-0.5" />
+                    <div className="space-y-1">
+                      <p className="font-bold text-red-950 text-xs">Día laboral transcurrido sin registro de campo.</p>
+                      <p className="text-[11px] text-red-800 leading-relaxed">
                         Este día corresponde al plazo contractual pero no tiene ninguna bitácora registrada o publicada.
                       </p>
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2 text-gray-500 text-[10.5px] py-1">
-                    <Info size={13} className="text-gray-400" />
-                    <span>Día programado dentro del calendario contractual de la obra vial.</span>
+                  <div className="flex items-center gap-2.5 p-3 rounded-xl bg-white border border-gray-200 text-gray-600 text-xs shadow-2xs">
+                    <Info size={15} className="text-gray-400 shrink-0" />
+                    <span className="text-[11.5px]">Día programado dentro del calendario contractual de la obra vial.</span>
                   </div>
                 )}
               </div>
             )}
 
             {/* Leyenda explicativa al pie */}
-            <div className="pt-2 border-t border-gray-100 flex flex-wrap items-center justify-between gap-2 text-[10px] text-gray-500">
-              <span className="font-bold text-gray-700">Leyenda:</span>
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="flex items-center gap-1.5">
-                  <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-                  <span>Día con registro (Laborado)</span>
+            <div className="pt-3 border-t border-gray-200 flex flex-wrap items-center justify-between gap-2.5 text-xs text-gray-600">
+              <span className="font-bold text-gray-800 text-[11px] uppercase tracking-wider">Leyenda:</span>
+              <div className="flex flex-wrap items-center gap-3 text-[11px]">
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-emerald-200 shadow-2xs">
+                  <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 shrink-0" />
+                  <span className="font-medium text-gray-800">Día con registro (Laborado)</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="h-2.5 w-2.5 rounded-full bg-red-500" />
-                  <span>Sin registro (Atrasado)</span>
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-red-200 shadow-2xs">
+                  <span className="h-2.5 w-2.5 rounded-full bg-red-500 shrink-0" />
+                  <span className="font-medium text-gray-800">Sin registro (Atrasado)</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
-                  <span>Con suspensión laboral</span>
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-amber-200 shadow-2xs">
+                  <span className="h-2.5 w-2.5 rounded-full bg-amber-500 shrink-0" />
+                  <span className="font-medium text-gray-800">Con suspensión laboral</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="h-2.5 w-2.5 rounded-full bg-gray-300" />
-                  <span>Programado / Futuro</span>
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-gray-200 shadow-2xs">
+                  <span className="h-2.5 w-2.5 rounded-full bg-gray-400 shrink-0" />
+                  <span className="font-medium text-gray-800">Programado / Futuro</span>
                 </div>
               </div>
             </div>

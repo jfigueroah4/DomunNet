@@ -1129,6 +1129,19 @@ export function ProyectoDetalleView({ proyecto: initialProyecto, slugId }: { pro
     }
   }, [esContratante, tabMaestra])
 
+  // Sincronizar pestaña maestra desde URL (?tab=financiera o ?tab=general)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const sp = new URLSearchParams(window.location.search)
+      const tabParam = sp.get('tab')
+      if (tabParam === 'financiera' && !esContratante) {
+        setTabMaestra('financiera')
+      } else if (tabParam === 'general') {
+        setTabMaestra('general')
+      }
+    }
+  }, [esContratante])
+
   useEffect(() => {
     if (initialProyecto) {
       setProyecto(initialProyecto)

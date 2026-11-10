@@ -1,3 +1,4 @@
+import { Portal } from '@/components/ui/Portal'
 'use client'
 
 import React from 'react'
@@ -17,8 +18,9 @@ export function EmpresaProyectosModal({
   if (!isOpen) return null
 
   return (
+    <Portal>
     <div 
-      className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 px-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 px-4 backdrop-blur-xs font-[Poppins]"
       onClick={onClose}
     >
       <div 

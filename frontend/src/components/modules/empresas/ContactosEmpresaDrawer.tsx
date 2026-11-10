@@ -111,7 +111,7 @@ export function ContactosEmpresaDrawer({
   return (
     <Portal>
       <div
-        className="fixed inset-0 z-50 flex justify-end bg-black/50 backdrop-blur-xs font-[Poppins] animate-in fade-in duration-200"
+        className="fixed inset-0 z-[9999] flex justify-end bg-black/60 backdrop-blur-xs font-[Poppins] animate-in fade-in duration-200"
         onClick={onClose}
       >
         <div
@@ -337,7 +337,7 @@ export function ContactosEmpresaDrawer({
       {/* Confirmation Modal to Delete Contact */}
       {confirmDeleteOpen && contactoEliminar && (
         <div
-          className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs font-[Poppins] animate-in fade-in duration-200"
+          className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs font-[Poppins] animate-in fade-in duration-200"
           onClick={() => setConfirmDeleteOpen(false)}
         >
           <div

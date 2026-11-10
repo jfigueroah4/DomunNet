@@ -174,7 +174,7 @@ export function ContactoFormDrawer({
   return (
     <Portal>
       <div
-      className="fixed inset-0 z-[65] flex justify-end bg-black/60 backdrop-blur-xs font-[Poppins] animate-in fade-in duration-200"
+      className="fixed inset-0 z-[10000] flex justify-end bg-black/60 backdrop-blur-xs font-[Poppins] animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div

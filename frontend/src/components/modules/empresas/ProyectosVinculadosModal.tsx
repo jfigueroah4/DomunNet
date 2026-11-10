@@ -441,7 +441,7 @@ export function ProyectosVinculadosModal({
   return (
     <Portal>
       <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/50 backdrop-blur-xs font-[Poppins] animate-in fade-in duration-200"
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs font-[Poppins] animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div

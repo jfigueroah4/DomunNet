@@ -26,7 +26,7 @@ import { RegistroBitacora } from '@/types/bitacora'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { api, apiGetDeduplicado } from '@/lib/api/cliente'
 import { esProyectoNoBorrador } from '@/lib/proyectos/estado'
-import { showSuccessToast, showErrorToast } from '@/components/ui/Toast'
+import { showSuccessToast, showErrorToast, showWarningToast } from '@/components/ui/Toast'
 import { Portal } from '@/components/ui/Portal'
 import { Combobox } from '@/components/ui/Combobox'
 import { CATALOGO_COMPLETO_88 } from '@/mocks/proyectoMock'
@@ -960,7 +960,7 @@ export function BitacoraForm({
       }
     }
 
-    const fallbackIPorProyecto = async () => {
+    const fallbackIPorProyecto = async (mensajeAviso?: string) => {
       // 1. Fallback por coordenadas del proyecto asignado si existen
       if (proyectoSeleccionadoObj?.latitud && proyectoSeleccionadoObj?.longitud) {
         await aplicarCoordenadas(
@@ -969,6 +969,9 @@ export function BitacoraForm({
           500,
           true
         )
+        if (mensajeAviso) {
+          showWarningToast(mensajeAviso)
+        }
         return
       }
 
@@ -988,7 +991,11 @@ export function BitacoraForm({
         }))
         setErrors((p) => ({ ...p, ubicacionGps: '' }))
         setObteniendoGps(false)
-        showSuccessToast('Ubicación establecida según el proyecto. Puedes ajustarla en el mapa.')
+        if (mensajeAviso) {
+          showWarningToast(mensajeAviso)
+        } else {
+          showSuccessToast('Ubicación establecida según el proyecto. Puedes ajustarla en el mapa.')
+        }
         return
       }
 
@@ -999,6 +1006,7 @@ export function BitacoraForm({
           const ipData = await resIp.json()
           if (ipData && ipData.latitude && ipData.longitude) {
             await aplicarCoordenadas(ipData.latitude, ipData.longitude, 1200, true)
+            if (mensajeAviso) showWarningToast(mensajeAviso)
             return
           }
         }
@@ -1006,38 +1014,67 @@ export function BitacoraForm({
 
       // 4. Fallback central Guatemala
       await aplicarCoordenadas(14.6349, -90.5069, 5000, true)
+      if (mensajeAviso) showWarningToast(mensajeAviso)
     }
 
     if (typeof window === 'undefined' || !navigator.geolocation) {
-      fallbackIPorProyecto()
+      fallbackIPorProyecto('Geolocalización no soportada por el navegador. Se asignó la ubicación del proyecto.')
       return
     }
 
-    // 1. Intentar con Alta Precisión (GPS real del dispositivo móvil/hardware)
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        aplicarCoordenadas(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, false)
-      },
-      (error) => {
-        if (error.code === error.PERMISSION_DENIED) {
-          setObteniendoGps(false)
-          showErrorToast('Permiso de GPS no concedido en el navegador. Por favor permítelo o usa el mapa.')
-          return
-        }
+    const ejecutarPeticionGps = () => {
+      // 1. Intentar con Alta Precisión balanceada (permitir cache de 30s para no fallar de inmediato en móviles)
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          aplicarCoordenadas(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, false)
+        },
+        (error) => {
+          // Si el permiso fue denegado o está bloqueado en ajustes del sitio / dispositivo
+          if (error.code === error.PERMISSION_DENIED) {
+            setObteniendoGps(false)
+            fallbackIPorProyecto(
+              'Ubicación bloqueada en el navegador o teléfono móvil. Toca el candado 🔒 junto a la URL para permitir la ubicación. Se asignó la ubicación del proyecto.'
+            )
+            return
+          }
 
-        // Si falló por timeout de señal satelital, intentar precisión estándar
-        navigator.geolocation.getCurrentPosition(
-          (posB) => {
-            aplicarCoordenadas(posB.coords.latitude, posB.coords.longitude, posB.coords.accuracy, true)
-          },
-          () => {
-            fallbackIPorProyecto()
-          },
-          { enableHighAccuracy: false, timeout: 6000, maximumAge: 30000 }
-        )
-      },
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
-    )
+          // Si falló por timeout de señal satelital o posición no disponible, intentar precisión estándar
+          navigator.geolocation.getCurrentPosition(
+            (posB) => {
+              aplicarCoordenadas(posB.coords.latitude, posB.coords.longitude, posB.coords.accuracy, true)
+            },
+            () => {
+              fallbackIPorProyecto(
+                'Señal GPS no disponible en este momento. Se asignó la ubicación del proyecto; puedes ajustarla en el mapa.'
+              )
+            },
+            { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
+          )
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+      )
+    }
+
+    // Si la API de permisos existe, verificar si ya está bloqueado para no confundir al usuario
+    if (typeof navigator !== 'undefined' && 'permissions' in navigator && navigator.permissions?.query) {
+      navigator.permissions
+        .query({ name: 'geolocation' })
+        .then((permissionStatus) => {
+          if (permissionStatus.state === 'denied') {
+            setObteniendoGps(false)
+            fallbackIPorProyecto(
+              'El permiso de ubicación está bloqueado en los ajustes de tu navegador o móvil. Toca el candado 🔒 junto a la URL o ve a Ajustes del sitio para activarlo. Se asignó la ubicación del proyecto.'
+            )
+          } else {
+            ejecutarPeticionGps()
+          }
+        })
+        .catch(() => {
+          ejecutarPeticionGps()
+        })
+    } else {
+      ejecutarPeticionGps()
+    }
   }
 
   // Renglón seleccionado actual

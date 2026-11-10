@@ -239,6 +239,16 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
 
   // Modales y Drawers para Gestión Renglón, Nuevo/Editar Renglón y Nuevo Capítulo
   const [modalGestionRenglonesOpen, setModalGestionRenglonesOpen] = useState(false)
+
+  // Abrir modal automáticamente si viene en URL (?modal=renglones o ?gestion=renglones)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const sp = new URLSearchParams(window.location.search)
+      if (sp.get('modal') === 'renglones' || sp.get('gestion') === 'renglones') {
+        setModalGestionRenglonesOpen(true)
+      }
+    }
+  }, [])
   const [subTabGestion, setSubTabGestion] = useState<'renglones' | 'capitulos'>('renglones')
 
   const [drawerRenglonOpen, setDrawerRenglonOpen] = useState(false)
@@ -1663,13 +1673,10 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
               <button
                 type="button"
                 onClick={() => {
-                  const targetId = proyecto?.id || pAny.id || ''
-                  if (targetId) {
-                    router.push(`/dashboard/proyectos/${targetId}/renglones`)
-                  }
+                  setModalGestionRenglonesOpen(true)
                 }}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-[#9B0F06] hover:bg-[#7A0C0D] text-white px-2.5 sm:px-3 py-1 sm:py-1.5 text-[11px] sm:text-xs font-bold transition-all shadow-xs cursor-pointer"
-                title="Abrir página dedicada de gestión de renglones y capítulos de este proyecto"
+                title="Abrir gestión de renglones y capítulos de este proyecto"
               >
                 <Layers size={12} className="text-white" />
                 <span>Gestión Renglón</span>
@@ -1725,8 +1732,7 @@ export function ProyectoInformacionFinanciera({ proyecto }: { proyecto: Proyecto
                           <button
                             type="button"
                             onClick={() => {
-                              const targetId = proyecto?.id || pAny.id || ''
-                              if (targetId) router.push(`/dashboard/proyectos/${targetId}/renglones`)
+                              setModalGestionRenglonesOpen(true)
                             }}
                             className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-[#9B0F06] hover:bg-[#7A0C0D] text-white px-3 py-1 text-xs font-bold shadow-xs cursor-pointer transition-colors"
                           >

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { MapPin, X, Navigation, Check, Loader2, Search } from 'lucide-react'
 import { Portal } from '@/components/ui/Portal'
+import { showWarningToast } from '@/components/ui/Toast'
 
 interface BitacoraUbicacionPickerModalProps {
   abierto: boolean
@@ -200,7 +201,13 @@ export function BitacoraUbicacionPickerModal({
         }
         void resolverDireccion(nuevaLat, nuevaLng)
       },
-      () => {
+      (err) => {
+        if (err.code === err.PERMISSION_DENIED) {
+          setDetectandoGps(false)
+          showWarningToast('GPS bloqueado en navegador o teléfono. Toca el candado 🔒 junto a la URL para activarlo.')
+          return
+        }
+
         // Fallback a precisión normal
         navigator.geolocation.getCurrentPosition(
           (pos) => {
@@ -219,11 +226,12 @@ export function BitacoraUbicacionPickerModal({
           },
           () => {
             setDetectandoGps(false)
+            showWarningToast('Señal GPS débil o no disponible. Puedes seleccionar tu posición tocando el mapa.')
           },
-          { enableHighAccuracy: false, timeout: 6000 }
+          { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
         )
       },
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
     )
   }
 

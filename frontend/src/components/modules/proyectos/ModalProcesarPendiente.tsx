@@ -1,3 +1,4 @@
+import { Portal } from '@/components/ui/Portal'
 import React, { useState, useMemo } from 'react'
 import {
   X,
@@ -208,38 +209,39 @@ const ModalProcesarPendienteContenido: React.FC<ModalProcesarPendienteProps & { 
   const esAnulado = item.esAnulado || !!item.anuladoEn
 
   return (
-    <div 
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs animate-in fade-in duration-200"
-      onClick={onClose}
-    >
+    <Portal>
       <div 
-        className="relative w-full max-w-2xl rounded-xl bg-white shadow-2xl border border-gray-200 overflow-hidden flex flex-col max-h-[90vh]"
-        onClick={(e) => e.stopPropagation()}
+        className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-xs font-[Poppins] animate-in fade-in duration-200"
+        onClick={onClose}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-200 bg-gray-50/80">
-          <div className="flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#9B0F06]/10 text-[#9B0F06]">
-              <Layers size={16} />
+        <div 
+          className="relative w-full max-w-2xl rounded-2xl bg-white shadow-2xl border border-gray-200 overflow-hidden flex flex-col max-h-[90vh]"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-200 bg-white">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gray-100 text-gray-700">
+                <Layers size={15} />
+              </div>
+              <div>
+                <h2 className="text-xs font-bold text-gray-900">
+                  Procesamiento de Trabajo Pendiente
+                </h2>
+                <p className="text-[10px] text-gray-500 font-mono">
+                  {item.codigoDGC} — {item.descripcion}
+                </p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-xs font-bold text-gray-900">
-                Procesamiento de Trabajo Pendiente
-              </h2>
-              <p className="text-[10px] text-gray-500 font-mono">
-                {item.codigoDGC} — {item.descripcion}
-              </p>
-            </div>
-          </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg p-1 text-gray-400 hover:bg-gray-200 hover:text-gray-700 transition-colors cursor-pointer"
-          >
-            <X size={16} />
-          </button>
-        </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors cursor-pointer"
+            >
+              <X size={16} />
+            </button>
+          </div>
 
         {/* Body */}
         <div className="p-5 overflow-y-auto space-y-4 text-[11px]">
@@ -270,8 +272,8 @@ const ModalProcesarPendienteContenido: React.FC<ModalProcesarPendienteProps & { 
           )}
 
           {/* 1. Encabezado de Solo Lectura */}
-          <div className="rounded-lg border border-gray-200 bg-gray-50/50 p-3.5 space-y-2.5">
-            <div className="flex items-center justify-between text-[10px] font-bold text-gray-700 uppercase tracking-wider border-b border-gray-200/60 pb-1.5">
+          <div className="rounded-xl border border-gray-200 bg-white p-3.5 space-y-2.5 shadow-2xs">
+            <div className="flex items-center justify-between text-[10px] font-bold text-gray-700 uppercase tracking-wider border-b border-gray-100 pb-1.5">
               <span className="flex items-center gap-1.5">
                 <FileText size={12} className="text-gray-500" />
                 Datos Heredados de Bitácora
@@ -289,8 +291,8 @@ const ModalProcesarPendienteContenido: React.FC<ModalProcesarPendienteProps & { 
                 <span className="font-semibold text-gray-800">{item.estacionFin || '-'}</span>
               </div>
               <div>
-                <span className="text-gray-400 block text-[9px]">Longitud ($L$):</span>
-                <span className="font-semibold text-blue-700">{longitudCalculada.toFixed(2)} m</span>
+                <span className="text-gray-400 block text-[9px]">Longitud (L):</span>
+                <span className="font-semibold text-gray-900">{longitudCalculada.toFixed(2)} m</span>
               </div>
               <div>
                 <span className="text-gray-400 block text-[9px]">Lado Vía:</span>
@@ -300,7 +302,7 @@ const ModalProcesarPendienteContenido: React.FC<ModalProcesarPendienteProps & { 
 
             {/* Observaciones originales / Fotos */}
             {(item.bitacoraObservaciones || item.fotoEvidenciaUrl) && (
-              <div className="pt-2 border-t border-gray-200/60 flex items-start justify-between gap-3">
+              <div className="pt-2 border-t border-gray-100 flex items-start justify-between gap-3">
                 {item.bitacoraObservaciones && (
                   <p className="text-[10px] text-gray-600 italic">
                     &ldquo;{item.bitacoraObservaciones}&rdquo;
@@ -311,7 +313,7 @@ const ModalProcesarPendienteContenido: React.FC<ModalProcesarPendienteProps & { 
                     href={item.fotoEvidenciaUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-1 text-[9.5px] font-medium text-blue-600 hover:underline shrink-0"
+                    className="inline-flex items-center gap-1 text-[9.5px] font-medium text-gray-600 hover:text-black hover:underline shrink-0"
                   >
                     <Camera size={11} /> Ver Evidencia
                   </a>
@@ -323,7 +325,7 @@ const ModalProcesarPendienteContenido: React.FC<ModalProcesarPendienteProps & { 
           {/* 2. Formulario de Parámetros Editables */}
           <div className="rounded-lg border border-gray-200 p-3.5 space-y-3">
             <h3 className="text-[10.5px] font-bold text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
-              <Sparkles size={12} className="text-[#9B0F06]" />
+              <Layers size={13} className="text-gray-600" />
               Parámetros de Medición y Dimensiones
             </h3>
 
@@ -427,45 +429,45 @@ const ModalProcesarPendienteContenido: React.FC<ModalProcesarPendienteProps & { 
           {/* 3. Cálculo en Vivo y Vista Previa de Impacto */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {/* Tarjeta de Memoria de Cálculo */}
-            <div className="rounded-lg bg-blue-50/60 border border-blue-200 p-3 space-y-1.5 font-mono text-[10.5px]">
-              <div className="flex items-center justify-between font-bold text-blue-950 font-sans text-[10px] uppercase">
+            <div className="rounded-xl bg-white border border-gray-200 p-3 space-y-1.5 font-mono text-[10.5px] shadow-2xs">
+              <div className="flex items-center justify-between font-bold text-gray-900 font-sans text-[10px] uppercase">
                 <span>Cálculo en Vivo ({item.unidad})</span>
-                <span className="bg-blue-200/80 text-blue-900 px-1.5 py-0.2 rounded text-[9px]">
+                <span className="bg-gray-100 text-gray-700 border border-gray-200 px-1.5 py-0.5 rounded text-[9px]">
                   Fórmula: {item.unidad === 'm2' ? 'L × A' : item.unidad === 'm' ? 'L' : 'L × A × H'}
                 </span>
               </div>
-              <div className="flex justify-between text-gray-700 text-[10px]">
+              <div className="flex justify-between text-gray-600 text-[10px]">
                 <span>Cantidad Bruta:</span>
-                <span className="font-semibold">{calculoEnVivo.cantidadBruta.toFixed(2)} {item.unidad}</span>
+                <span className="font-semibold text-gray-800">{calculoEnVivo.cantidadBruta.toFixed(2)} {item.unidad}</span>
               </div>
-              <div className="flex justify-between text-red-700 text-[10px]">
+              <div className="flex justify-between text-gray-600 text-[10px]">
                 <span>Descuento Aplicado:</span>
-                <span>−{calculoEnVivo.descuentoMonto.toFixed(2)} {item.unidad}</span>
+                <span className="text-gray-800">−{calculoEnVivo.descuentoMonto.toFixed(2)} {item.unidad}</span>
               </div>
-              <div className="flex justify-between text-blue-950 font-bold border-t border-blue-200 pt-1 text-[11.5px]">
+              <div className="flex justify-between text-gray-900 font-bold border-t border-gray-100 pt-1 text-[11px]">
                 <span>Cantidad Neta:</span>
                 <span>{calculoEnVivo.cantidadNeta.toFixed(2)} {item.unidad}</span>
               </div>
             </div>
 
             {/* Tarjeta de Impacto Contractual */}
-            <div className="rounded-lg bg-gray-50 border border-gray-200 p-3 space-y-1.5 font-mono text-[10.5px]">
+            <div className="rounded-xl bg-white border border-gray-200 p-3 space-y-1.5 font-mono text-[10.5px] shadow-2xs">
               <div className="flex items-center justify-between font-bold text-gray-900 font-sans text-[10px] uppercase">
                 <span>Vista Previa de Impacto</span>
-                <span className={`px-1.5 py-0.2 rounded text-[9px] ${vistaPreviaImpacto.estado === 'Sobreejecutado' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                <span className="px-1.5 py-0.5 rounded text-[9px] bg-gray-100 text-gray-700 border border-gray-200">
                   {vistaPreviaImpacto.estado}
                 </span>
               </div>
               <div className="flex justify-between text-gray-600 text-[10px]">
-                <span>Capacidad Disponible ($E - J$):</span>
-                <span>{Math.max(0, (item.cantidadAjustada || 0) - (item.cantidadEjecutada || 0)).toFixed(2)} {item.unidad}</span>
+                <span>Capacidad Disponible (E - J):</span>
+                <span className="font-semibold text-gray-800">{Math.max(0, (item.cantidadAjustada || 0) - (item.cantidadEjecutada || 0)).toFixed(2)} {item.unidad}</span>
               </div>
-              <div className="flex justify-between text-emerald-800 font-medium text-[10px]">
+              <div className="flex justify-between text-gray-700 font-medium text-[10px]">
                 <span>Se Facturará:</span>
-                <span>{vistaPreviaImpacto.facturablePeriodo.toFixed(2)} {item.unidad}</span>
+                <span className="font-semibold text-gray-900">{vistaPreviaImpacto.facturablePeriodo.toFixed(2)} {item.unidad}</span>
               </div>
               {vistaPreviaImpacto.retenidoPendiente > 0 && (
-                <div className="flex justify-between text-amber-800 font-bold border-t border-gray-200 pt-1 text-[10px]">
+                <div className="flex justify-between text-gray-700 font-bold border-t border-gray-100 pt-1 text-[10px]">
                   <span>Se Retendrá (Exceso):</span>
                   <span>{vistaPreviaImpacto.retenidoPendiente.toFixed(2)} {item.unidad}</span>
                 </div>
@@ -508,16 +510,16 @@ const ModalProcesarPendienteContenido: React.FC<ModalProcesarPendienteProps & { 
         </div>
 
         {/* Footer / Botones de Acción */}
-        <div className="flex items-center justify-between px-5 py-3 border-t border-gray-200 bg-gray-50">
+        <div className="flex items-center justify-between px-5 py-3 border-t border-gray-200 bg-white">
           <div>
             {!esAnulado && !mostrarCampoAnulacion && (
               <button
                 type="button"
                 disabled={guardando}
                 onClick={() => setMostrarCampoAnulacion(true)}
-                className="inline-flex items-center gap-1 rounded px-2.5 py-1.5 text-[10px] font-bold text-red-700 hover:bg-red-50 border border-red-200 transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-50 border border-red-200 transition-colors cursor-pointer shadow-2xs"
               >
-                <Ban size={12} />
+                <Ban size={13} />
                 <span>Anular Partida</span>
               </button>
             )}
@@ -528,7 +530,7 @@ const ModalProcesarPendienteContenido: React.FC<ModalProcesarPendienteProps & { 
               type="button"
               onClick={onClose}
               disabled={guardando}
-              className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
+              className="rounded-lg border border-gray-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer shadow-2xs"
             >
               Cerrar
             </button>
@@ -539,9 +541,9 @@ const ModalProcesarPendienteContenido: React.FC<ModalProcesarPendienteProps & { 
                   type="button"
                   disabled={guardando}
                   onClick={() => handleEjecutarAccion('pendiente')}
-                  className="inline-flex items-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-800 hover:bg-amber-100 transition-colors shadow-xs cursor-pointer"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer shadow-2xs"
                 >
-                  <Clock size={12} />
+                  <Clock size={13} className="text-gray-500" />
                   <span>Dejar en Pendiente</span>
                 </button>
 
@@ -549,7 +551,7 @@ const ModalProcesarPendienteContenido: React.FC<ModalProcesarPendienteProps & { 
                   type="button"
                   disabled={guardando}
                   onClick={() => handleEjecutarAccion('confirmar')}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#9B0F06] px-4 py-1.5 text-xs font-bold text-white hover:bg-[#5E0006] transition-colors shadow-xs cursor-pointer"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-gray-900 px-4 py-1.5 text-xs font-semibold text-white hover:bg-black transition-colors cursor-pointer shadow-2xs"
                 >
                   <CheckCircle2 size={13} />
                   <span>Confirmar (Aprobar)</span>
@@ -560,5 +562,6 @@ const ModalProcesarPendienteContenido: React.FC<ModalProcesarPendienteProps & { 
         </div>
       </div>
     </div>
+    </Portal>
   )
 }
