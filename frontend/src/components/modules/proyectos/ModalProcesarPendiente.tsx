@@ -9,7 +9,6 @@ import {
   FileText,
   Camera,
   Layers,
-  Sparkles,
 } from 'lucide-react'
 import { calcularCantidadMedicion, calcularLongitudEstaciones } from '@/lib/calculos/memoria'
 import { procesarMedicionRenglon } from '@/lib/calculos/topes'
