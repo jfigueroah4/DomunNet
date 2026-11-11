@@ -2131,7 +2131,7 @@ export function ProyectoDetalleView({ proyecto: initialProyecto, slugId }: { pro
         colegiadoActivoSuperintendente: editFormData.colegiadoSuperintendente,
         responsableNombre: editFormData.responsableNombre,
         contratoEjecucion: {
-          ...prev.contratoEjecucion,
+          ...(prev as any).contratoEjecucion,
           ...editFormData.contratoEjecucion,
           responsable: editFormData.superintendente,
           colegiadoActivoSuperintendente: editFormData.colegiadoSuperintendente,
