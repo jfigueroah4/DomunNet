@@ -1,6 +1,8 @@
 // @ts-nocheck
 'use client'
 
+export const runtime = 'edge'
+
 import { useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
