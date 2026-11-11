@@ -1422,35 +1422,6 @@ export function ProyectoDetalleView({ proyecto: initialProyecto, slugId }: { pro
     return () => clearTimeout(timer)
   }, [])
 
-  const userOptionsGenerales = useMemo(() => {
-    return usuariosDisponibles
-      .filter((u: any) => u.activo !== false && u.estado !== 'Suspendido' && u.estado !== 'Desactivado')
-      .map((u: any) => {
-        const nombreCompleto = u.nombre || `${u.primer_nombre || ''} ${u.primer_apellido || ''}`.trim() || u.correo
-        const rolCargo = u.cargo || u.rol || 'Profesional'
-        return {
-          value: nombreCompleto,
-          label: `${nombreCompleto} - ${rolCargo}`,
-        }
-      })
-  }, [usuariosDisponibles])
-
-  const userOptionsIngenieros = useMemo(() => {
-    return usuariosDisponibles
-      .filter((u: any) => {
-        if (u.activo === false || u.estado === 'Suspendido' || u.estado === 'Desactivado') return false
-        const r = (u.rol || u.cargo || '').toLowerCase().replace(/\s+/g, '')
-        return r.includes('ingeniero') || r.includes('residente') || r.includes('admin') || r.includes('director') || r.includes('gerenc') || r.includes('supervis')
-      })
-      .map((u: any) => {
-        const nombreCompleto = u.nombre || `${u.primer_nombre || ''} ${u.primer_apellido || ''}`.trim() || u.correo
-        const rolCargo = u.cargo || u.rol || 'Ingeniero'
-        return {
-          value: nombreCompleto,
-          label: `${nombreCompleto} - ${rolCargo}`,
-        }
-      })
-  }, [usuariosDisponibles])
 
   // Opciones completas para Delegado Residente (iguales al formulario de creación/edición de proyectos)
   const userOptionsDelegadosResidente = useMemo(() => {
