@@ -1,5 +1,6 @@
 import { Portal } from '@/components/ui/Portal'
 import React, { useState, useMemo } from 'react'
+import { api } from '@/lib/api/cliente'
 import {
   X,
   CheckCircle2,
@@ -146,30 +147,21 @@ const ModalProcesarPendienteContenido: React.FC<ModalProcesarPendienteProps & { 
       let datosProcesados: any = null
 
       try {
-        const res = await fetch(`/api/v1/proyectos/${proyId}/pendientes/${item.id}/procesar`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            accion,
-            motivo: accion === 'anular' ? motivoAnulacion.trim() : undefined,
-            ancho: typeof ancho === 'number' ? ancho : parseFloat(ancho) || 0,
-            alturaEspesor: typeof alturaEspesor === 'number' ? alturaEspesor : parseFloat(alturaEspesor) || 0,
-            ladoVia,
-            multiplicador,
-            descuentoAplicadoId: item.descuentoAplicadoId,
-            descuentoMonto: typeof descuentoMonto === 'number' ? descuentoMonto : parseFloat(descuentoMonto) || 0,
-            observaciones,
-            estimacionNum: numEst
-          })
+        const res = await api.post(`/proyectos/${proyId}/pendientes/${item.id}/procesar`, {
+          accion,
+          motivo: accion === 'anular' ? motivoAnulacion.trim() : undefined,
+          ancho: typeof ancho === 'number' ? ancho : parseFloat(ancho) || 0,
+          alturaEspesor: typeof alturaEspesor === 'number' ? alturaEspesor : parseFloat(alturaEspesor) || 0,
+          ladoVia,
+          multiplicador,
+          descuentoAplicadoId: item.descuentoAplicadoId,
+          descuentoMonto: typeof descuentoMonto === 'number' ? descuentoMonto : parseFloat(descuentoMonto) || 0,
+          observaciones,
+          estimacionNum: numEst
         })
 
-        if (res.ok) {
-          const data = await res.json()
-          if (data && data.success && data.data) {
-            datosProcesados = data.data
-          }
+        if (res.data && res.data.success && res.data.data) {
+          datosProcesados = res.data.data
         }
       } catch {
         // En caso de que el backend no esté disponible, se procesa en memoria local

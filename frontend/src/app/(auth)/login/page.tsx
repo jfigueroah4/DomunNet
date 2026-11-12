@@ -199,6 +199,9 @@ export default function LoginPage() {
     if (token && typeof document !== 'undefined') {
       const isHttps = window.location.protocol === 'https:';
       document.cookie = `token=${token}; path=/; max-age=${8 * 60 * 60}; SameSite=Lax; ${isHttps ? 'Secure;' : ''}`;
+      try {
+        localStorage.setItem('domun_auth_token', token);
+      } catch (_) {}
     }
 
     showSuccessToast("¡Sesión iniciada correctamente!");

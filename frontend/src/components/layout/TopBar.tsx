@@ -788,6 +788,8 @@ export default function TopBar({ section = 'INICIO', onToggle }: TopBarProps) {
                       localStorage.removeItem('domun_notificaciones_borradas')
                       sessionStorage.removeItem('domun_notificaciones_borradas')
                       localStorage.removeItem('domun_user_profile')
+                      localStorage.removeItem('domun_auth_token')
+                      sessionStorage.removeItem('domun_use_direct_backend')
                       if (typeof document !== 'undefined') {
                         document.cookie = 'token=; path=/; max-age=0'
                       }

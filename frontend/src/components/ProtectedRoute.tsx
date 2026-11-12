@@ -8,16 +8,22 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
   const [isAuthenticated, setIsAuthenticated] = useState(false)
 
   useEffect(() => {
-    // Check if token exists in cookies
-    const token = document.cookie
+    // Check if token exists in cookies or localStorage
+    const cookieToken = document.cookie
       .split('; ')
       .find((row) => row.startsWith('token='))
       ?.split('=')[1]
+    const localToken = typeof window !== 'undefined' ? localStorage.getItem('domun_auth_token') : null
+    const token = cookieToken || localToken
 
     if (!token) {
       // Directamente al login sin parámetros de redirección
       router.replace('/login')
     } else {
+      if (localToken && !cookieToken && typeof document !== 'undefined') {
+        const isHttps = window.location.protocol === 'https:';
+        document.cookie = `token=${localToken}; path=/; max-age=${8 * 60 * 60}; SameSite=Lax; ${isHttps ? 'Secure;' : ''}`;
+      }
       setIsAuthenticated(true)
     }
   }, [router])

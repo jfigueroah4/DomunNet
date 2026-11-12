@@ -3,8 +3,29 @@ import axios from 'axios'
 const defaultBackendUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'https://domunnet-backend.onrender.com'
 const cleanBackendUrl = defaultBackendUrl.replace(/\/api\/?v1\/?$/, '').replace(/\/$/, '')
 
+/**
+ * Determina la URL base de la API.
+ * En el navegador, si estamos en producción (Cloudflare Pages *.pages.dev o dominio público)
+ * o si se activó el modo directo por 429 de Cloudflare, apunta DIRECTAMENTE al backend en Render.
+ */
+function getClientBaseUrl(): string {
+  if (typeof window === 'undefined') {
+    return `${cleanBackendUrl}/api/v1`
+  }
+  try {
+    const host = window.location.hostname
+    const isLocal = host === 'localhost' || host === '127.0.0.1' || host.startsWith('192.168.') || host.startsWith('10.')
+    const useDirect = sessionStorage.getItem('domun_use_direct_backend') === 'true'
+    // En producción (Cloudflare Pages u otros dominios públicos) o si Cloudflare agotó cuota:
+    if (!isLocal || useDirect) {
+      return `${cleanBackendUrl}/api/v1`
+    }
+  } catch (_) {}
+  return '/api/v1'
+}
+
 export const api = axios.create({
-  baseURL: typeof window === 'undefined' ? `${cleanBackendUrl}/api/v1` : '/api/v1',
+  baseURL: getClientBaseUrl(),
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json; charset=utf-8',
@@ -15,10 +36,31 @@ export const api = axios.create({
 api.interceptors.request.use((config) => {
   if (typeof window !== 'undefined') {
     try {
+      const host = window.location.hostname
+      const isLocal = host === 'localhost' || host === '127.0.0.1' || host.startsWith('192.168.') || host.startsWith('10.')
+      const useDirect = sessionStorage.getItem('domun_use_direct_backend') === 'true'
+
+      if ((!isLocal || useDirect) && (config.baseURL === '/api/v1' || !config.baseURL)) {
+        config.baseURL = `${cleanBackendUrl}/api/v1`
+      }
+
       const devId = localStorage.getItem('domun_device_id')
       if (devId) {
         config.headers = config.headers || {}
         config.headers['x-device-id'] = devId
+      }
+
+      // Adjuntar Authorization Bearer si hay token guardado
+      let token = localStorage.getItem('domun_auth_token')
+      if (!token && typeof document !== 'undefined') {
+        const match = document.cookie.match(/(?:^|;\s*)token=([^;]+)/)
+        if (match) token = decodeURIComponent(match[1])
+      }
+      if (token) {
+        config.headers = config.headers || {}
+        if (!config.headers['Authorization']) {
+          config.headers['Authorization'] = `Bearer ${token}`
+        }
       }
     } catch (_) {}
   } else {
@@ -54,7 +96,53 @@ api.interceptors.response.use(
     }
     return response
   },
-  (error) => {
+  async (error) => {
+    const originalConfig = error.config
+    // Si recibimos 429 de Cloudflare Pages Functions o fallo de proxy, reintentar DIRECTO a Render
+    if (
+      typeof window !== 'undefined' &&
+      error.response?.status === 429 &&
+      originalConfig &&
+      !(originalConfig as any)._retriedDirect
+    ) {
+      ;(originalConfig as any)._retriedDirect = true
+      try {
+        sessionStorage.setItem('domun_use_direct_backend', 'true')
+        api.defaults.baseURL = `${cleanBackendUrl}/api/v1`
+      } catch (_) {}
+
+      // Normalizar la URL para apuntar a Render directamente
+      let targetUrl = originalConfig.url || ''
+      if (!targetUrl.startsWith('http')) {
+        if (!targetUrl.startsWith('/api/v1')) {
+          targetUrl = `/api/v1${targetUrl.startsWith('/') ? '' : '/'}${targetUrl}`
+        }
+        targetUrl = `${cleanBackendUrl}${targetUrl}`
+      }
+      originalConfig.baseURL = undefined
+      originalConfig.url = targetUrl
+
+      // Asegurar cabeceras de autorización y dispositivo
+      try {
+        const devId = localStorage.getItem('domun_device_id')
+        if (devId) {
+          originalConfig.headers = originalConfig.headers || {}
+          originalConfig.headers['x-device-id'] = devId
+        }
+        let token = localStorage.getItem('domun_auth_token')
+        if (!token && typeof document !== 'undefined') {
+          const match = document.cookie.match(/(?:^|;\s*)token=([^;]+)/)
+          if (match) token = decodeURIComponent(match[1])
+        }
+        if (token) {
+          originalConfig.headers = originalConfig.headers || {}
+          originalConfig.headers['Authorization'] = `Bearer ${token}`
+        }
+      } catch (_) {}
+
+      return api(originalConfig)
+    }
+
     if (error.response?.status === 401) {
       if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
         window.location.href = '/login';

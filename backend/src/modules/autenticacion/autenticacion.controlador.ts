@@ -65,7 +65,7 @@ export async function iniciarSesionControlador(req: Request, res: Response) {
     res.cookie('token', acceso.token, {
       httpOnly: true,
       secure: Boolean(esHttps),
-      sameSite: 'lax',
+      sameSite: esHttps ? 'none' : 'lax',
       maxAge: 8 * 60 * 60 * 1000 // 8 horas
     })
 
@@ -130,12 +130,12 @@ export async function cerrarSesionControlador(req: Request, res: Response) {
     res.clearCookie('token', {
       httpOnly: true,
       secure: Boolean(esHttps),
-      sameSite: 'lax',
+      sameSite: esHttps ? 'none' : 'lax',
     })
     res.clearCookie('refreshToken', {
       httpOnly: true,
       secure: Boolean(esHttps),
-      sameSite: 'lax',
+      sameSite: esHttps ? 'none' : 'lax',
     })
 
     return sendResponse(res, 200, null, 'Sesión cerrada correctamente')
