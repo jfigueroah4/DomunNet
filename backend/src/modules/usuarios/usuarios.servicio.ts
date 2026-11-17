@@ -517,27 +517,35 @@ export async function crearUsuario(datos: DatosUsuario) {
   }
 
   const contrasena = datos.contrasena || 'Temporal123*'
-  const { data: cuentaAuth, error: errorAuth } = await clienteSupabase.auth.admin.createUser({
-    email: datos.correo,
-    password: contrasena,
-    email_confirm: true,
-    user_metadata: {
-      nombre: datos.primer_nombre,
-      apellido: datos.primer_apellido,
-      telefono: datos.telefono,
-      rol: datos.rol,
-    },
-  })
+  let authUserId: string | null = null
 
-  if (errorAuth || !cuentaAuth.user) {
-    throw new Error(errorAuth?.message || 'No se pudo crear la cuenta de autenticación')
+  try {
+    const { data: cuentaAuth, error: errorAuth } = await clienteSupabase.auth.admin.createUser({
+      email: datos.correo,
+      password: contrasena,
+      email_confirm: true,
+      user_metadata: {
+        nombre: datos.primer_nombre,
+        apellido: datos.primer_apellido,
+        telefono: datos.telefono,
+        rol: datos.rol,
+      },
+    })
+
+    if (errorAuth) {
+      console.warn('Advertencia al crear usuario en Supabase Auth:', errorAuth.message)
+    } else if (cuentaAuth?.user) {
+      authUserId = cuentaAuth.user.id
+    }
+  } catch (errAuth) {
+    console.warn('Excepción al crear usuario en Supabase Auth:', errAuth)
   }
 
   // 1. Insertar cuenta de usuario
   const { data: nuevoUsuario, error: errorUsuario } = await clienteSupabase
     .from('usuario')
     .insert({
-      auth_user_id: cuentaAuth.user.id,
+      auth_user_id: authUserId,
       correo: datos.correo,
       rol_id: rol.id,
       activo: datos.estado !== 'Suspendido',
@@ -546,7 +554,9 @@ export async function crearUsuario(datos: DatosUsuario) {
     .single()
 
   if (errorUsuario) {
-    await clienteSupabase.auth.admin.deleteUser(cuentaAuth.user.id)
+    if (authUserId) {
+      try { await clienteSupabase.auth.admin.deleteUser(authUserId) } catch {}
+    }
     throw new Error(errorUsuario.message)
   }
 
@@ -570,7 +580,9 @@ export async function crearUsuario(datos: DatosUsuario) {
   if (errorDato) {
     // Rollback manual de la cuenta de usuario para mantener consistencia
     await clienteSupabase.from('usuario').delete().eq('id', nuevoUsuario.id)
-    await clienteSupabase.auth.admin.deleteUser(cuentaAuth.user.id)
+    if (authUserId) {
+      try { await clienteSupabase.auth.admin.deleteUser(authUserId) } catch {}
+    }
     throw new Error(errorDato.message)
   }
 
@@ -652,13 +664,17 @@ export async function actualizarUsuario(id: string, datos: DatosUsuario) {
       payloadAuth.password = datos.contrasena
     }
 
-    const { error: errorAuth } = await clienteSupabase.auth.admin.updateUserById(
-      cuentaUsuario.auth_user_id,
-      payloadAuth
-    )
+    try {
+      const { error: errorAuth } = await clienteSupabase.auth.admin.updateUserById(
+        cuentaUsuario.auth_user_id,
+        payloadAuth
+      )
 
-    if (errorAuth) {
-      throw new Error(errorAuth.message)
+      if (errorAuth) {
+        console.warn('Advertencia al actualizar auth_user_id en Supabase Auth:', errorAuth.message)
+      }
+    } catch (errAuth) {
+      console.warn('Excepción al actualizar auth_user_id en Supabase Auth:', errAuth)
     }
   }
 
@@ -698,10 +714,23 @@ export async function eliminarUsuario(id: string) {
   const cuentaUsuario = await obtenerCuentaUsuario(id)
 
   if (cuentaUsuario?.auth_user_id) {
-    const { error: errorAuth } = await clienteSupabase.auth.admin.deleteUser(cuentaUsuario.auth_user_id)
-    if (errorAuth) {
-      throw new Error(errorAuth.message)
+    try {
+      const { error: errorAuth } = await clienteSupabase.auth.admin.deleteUser(cuentaUsuario.auth_user_id)
+      if (errorAuth) {
+        console.warn('Advertencia al eliminar auth_user_id en Supabase Auth:', errorAuth.message)
+      }
+    } catch (errAuth) {
+      console.warn('Excepción al eliminar auth_user_id en Supabase Auth:', errAuth)
     }
+  }
+
+  // Limpiar relaciones dependientes antes de eliminar usuario de la tabla maestra
+  try {
+    await clienteSupabase.from('sesion_usuario').delete().eq('usuario_id', id)
+    await clienteSupabase.from('dato_usuario').delete().eq('usuario_id', id)
+    await clienteSupabase.from('proyecto_usuario').delete().eq('usuario_id', id)
+  } catch (errRel) {
+    console.warn('Advertencia al limpiar relaciones de usuario:', errRel)
   }
 
   const { error } = await clienteSupabase.from('usuario').delete().eq('id', id)

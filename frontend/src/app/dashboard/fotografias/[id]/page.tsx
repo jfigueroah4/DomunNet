@@ -132,7 +132,7 @@ export default function FotografiasDetail() {
 
           const fotosResult: any[] = []
 
-          // 1. Fotos desde evidencia_fotografica en BD
+          // 1. Bitácoras asociadas al proyecto (BD + locales)
           const bitacoras =
             resBit.status === 'fulfilled' && Array.isArray(resBit.value.data?.data)
               ? resBit.value.data.data
@@ -140,7 +140,17 @@ export default function FotografiasDetail() {
           const bitacorasDelProy = bitacoras.filter(
             (b: any) => matchProy(b.proyecto_id || b.proyectoId)
           )
-          const bitacoraIdsSet = new Set(bitacorasDelProy.map((b: any) => String(b.id)))
+
+          let locales: any[] = []
+          try {
+            locales = JSON.parse(localStorage.getItem('domun_bitacora_locales') || '[]')
+          } catch (_) {}
+
+          const todosLosRegistrosBitacora = [
+            ...locales.filter((l: any) => matchProy(l.proyectoId || l.proyecto_id)),
+            ...bitacorasDelProy,
+          ]
+          const bitacoraIdsSet = new Set(todosLosRegistrosBitacora.map((b: any) => String(b.id)))
 
           const evidencias =
             resEvid.status === 'fulfilled' && Array.isArray(resEvid.value.data?.data)
@@ -148,7 +158,7 @@ export default function FotografiasDetail() {
               : []
 
           evidencias.forEach((ev: any) => {
-            const bitEntry = bitacoras.find(
+            const bitEntry = todosLosRegistrosBitacora.find(
               (b: any) => String(b.id) === String(ev.bitacora_entrada_id)
             )
             const matchesThisProject =
@@ -172,6 +182,16 @@ export default function FotografiasDetail() {
                 const estFi = ev.estacion_fin || ev.estacion_final || bitEntry?.estacion_fin || bitEntry?.estacion_final || bitEntry?.estacionFin || '0+500'
                 const ladoVal = ev.lado_via || ev.lado || bitEntry?.lado_via || bitEntry?.ladoVia || bitEntry?.lado || 'Ambos'
 
+                const rNomEvidencia =
+                  bitEntry?.renglon_nombre ||
+                  bitEntry?.renglonNombre ||
+                  (bitEntry?.renglon && (typeof bitEntry.renglon === 'object' ? (bitEntry.renglon.codigo ? `${bitEntry.renglon.codigo} - ${bitEntry.renglon.descripcion || ''}` : bitEntry.renglon.descripcion) : bitEntry.renglon)) ||
+                  bitEntry?.categoriaTrabajo ||
+                  (bitEntry?.descripcion?.includes('Renglón') ? bitEntry.descripcion.split('Renglón')[1]?.split('·')[0]?.trim() : '') ||
+                  ev.renglon ||
+                  ev.renglon_nombre ||
+                  'Avance Físico'
+
                 fotosResult.push({
                   id: ev.id,
                   titulo: ev.descripcion || `Evidencia ${ev.fecha_hora?.slice(0, 10) || ''}`,
@@ -185,7 +205,7 @@ export default function FotografiasDetail() {
                   proyectoId: String(proyectoId),
                   proyectoNombre: proyNombre,
                   ubicacionObra: bitEntry?.ubicacion || proyData?.ubicacion || 'Frente de Trabajo',
-                  etiquetas: [bitEntry?.renglon_nombre || 'Avance Físico', 'Bitácora'],
+                  etiquetas: [rNomEvidencia, 'Bitácora'],
                   tamanio: ev.tamanio || '245 KB',
                   lat: rawLat,
                   lng: rawLng,
@@ -193,7 +213,7 @@ export default function FotografiasDetail() {
                   estacionInicio: estIni,
                   estacionFin: estFi,
                   lado: ladoVal,
-                  renglon: bitEntry?.renglon_nombre || bitEntry?.renglonNombre || bitEntry?.categoriaTrabajo || 'Avance Físico',
+                  renglon: rNomEvidencia,
                   departamento: bitEntry?.departamento || proyData?.departamento_nombre || proyData?.departamento || 'Guatemala',
                 })
               }
@@ -201,15 +221,7 @@ export default function FotografiasDetail() {
           })
 
           // 2. Fotos desde bitacora local y entradas de bitacora
-          let locales: any[] = []
-          try {
-            locales = JSON.parse(localStorage.getItem('domun_bitacora_locales') || '[]')
-          } catch (_) {}
-
-          const todosLosRegistrosBitacora = [...locales, ...bitacorasDelProy]
-
           todosLosRegistrosBitacora
-            .filter((l: any) => matchProy(l.proyectoId || l.proyecto_id))
             .forEach((l: any) => {
               const listaAdjuntos = Array.isArray(l.adjuntos) ? [...l.adjuntos] : []
               if (l.fotografiaPrincipal?.url) {
@@ -218,6 +230,14 @@ export default function FotografiasDetail() {
               if (l.firma_url) {
                 listaAdjuntos.push({ url: l.firma_url, nombre: 'Evidencia / Firma' })
               }
+
+              const rNomLocal =
+                l.renglon_nombre ||
+                l.renglonNombre ||
+                (l.renglon && (typeof l.renglon === 'object' ? (l.renglon.codigo ? `${l.renglon.codigo} - ${l.renglon.descripcion || ''}` : l.renglon.descripcion) : l.renglon)) ||
+                l.categoriaTrabajo ||
+                (l.descripcion?.includes('Renglón') ? l.descripcion.split('Renglón')[1]?.split('·')[0]?.trim() : '') ||
+                'Terracería'
 
               listaAdjuntos.forEach((adj: any) => {
                 const url = typeof adj === 'string' ? adj : adj?.url
@@ -241,7 +261,7 @@ export default function FotografiasDetail() {
                     proyectoId: String(proyectoId),
                     proyectoNombre: l.proyectoNombre || proyNombre,
                     ubicacionObra: l.ubicacion || proyData?.ubicacion || 'Frente de Trabajo',
-                    etiquetas: [l.renglon_nombre || 'Terracería', 'Bitácora'],
+                    etiquetas: [rNomLocal, 'Bitácora'],
                     tamanio: adj.tamanio || '245 KB',
                     lat: rawLat,
                     lng: rawLng,
@@ -249,7 +269,7 @@ export default function FotografiasDetail() {
                     estacionInicio: estIni,
                     estacionFin: estFi,
                     lado: ladoVal,
-                    renglon: l.renglon_nombre || l.renglonNombre || l.categoriaTrabajo || 'Terracería',
+                    renglon: rNomLocal,
                     departamento: l.departamento || proyData?.departamento_nombre || proyData?.departamento || 'Guatemala',
                   })
                 }
@@ -288,38 +308,79 @@ export default function FotografiasDetail() {
     return PROYECTOS_MOCK.find((p) => String(p.id) === String(proyectoId)) || null
   }, [proyectoApi, proyectoId])
 
-  // Renglones disponibles según el plan de trabajo del proyecto y registros cargados
+  // Renglones disponibles: ÚNICAMENTE los renglones que tienen fotografías registradas en este proyecto
   const renglonesDisponibles = useMemo(() => {
     const renglonMap = new Map<string, { id: string; codigo: string; descripcion: string }>()
 
-    const list =
-      proyectoApi?.planTrabajo ||
-      proyectoApi?.renglones ||
-      proyectoApi?.renglones_sabana ||
-      proyectoApi?.parametro_proyecto?.planTrabajo ||
-      []
-    if (Array.isArray(list)) {
-      list.forEach((item: any) => {
-        const cod = String(item.codigoDGC || item.codigo || item.id || '').trim()
-        const desc = item.descripcion || item.desc || item.nombre || cod || 'Renglón de trabajo'
-        if (cod && !renglonMap.has(cod)) {
-          renglonMap.set(cod, { id: cod, codigo: cod, descripcion: desc })
-        }
-      })
-    }
-
-    // Incluir renglones de las fotografías cargadas
-    fotosCargadas.forEach((f: any) => {
-      const rVal = f.renglon_nombre || f.renglonNombre || f.renglon || (f.etiquetas && f.etiquetas[0])
-      if (rVal && typeof rVal === 'string' && !['Campo', 'Bitácora', 'Avance Físico'].includes(rVal)) {
-        if (!renglonMap.has(rVal)) {
-          renglonMap.set(rVal, { id: rVal, codigo: '', descripcion: rVal })
-        }
+    // Catálogo de apoyo para enriquecer descripción si solo se tiene el código
+    const planItems = [
+      ...(Array.isArray(proyectoApi?.planTrabajo) ? proyectoApi.planTrabajo : []),
+      ...(Array.isArray(proyectoApi?.renglones) ? proyectoApi.renglones : []),
+      ...(Array.isArray(proyectoApi?.renglones_sabana) ? proyectoApi.renglones_sabana : []),
+      ...(Array.isArray(proyectoApi?.parametro_proyecto?.planTrabajo) ? proyectoApi.parametro_proyecto.planTrabajo : []),
+    ]
+    const catalogoDescMap = new Map<string, string>()
+    planItems.forEach((item: any) => {
+      const cod = String(item.codigoDGC || item.codigo || item.id || '').trim()
+      const desc = String(item.descripcion || item.desc || item.nombre || '').trim()
+      if (cod && desc) {
+        catalogoDescMap.set(cod.toLowerCase(), desc)
       }
     })
 
-    return Array.from(renglonMap.values())
-  }, [proyectoApi, fotosCargadas])
+    const agregarDeTexto = (texto: string) => {
+      if (!texto || typeof texto !== 'string') return
+      const t = texto.trim()
+      if (!t || t === 'Bitácora' || t === 'Campo') return
+
+      let cod = t
+      let desc = ''
+      if (t.includes('-')) {
+        const partes = t.split('-')
+        cod = partes[0]?.trim() || t
+        desc = partes.slice(1).join('-').trim()
+      }
+
+      const descCatalogo = catalogoDescMap.get(cod.toLowerCase())
+      const finalDesc = desc || descCatalogo || t
+
+      if (!renglonMap.has(cod)) {
+        renglonMap.set(cod, {
+          id: cod,
+          codigo: cod === finalDesc ? '' : cod,
+          descripcion: finalDesc,
+        })
+      }
+    }
+
+    // Extraer renglones presentes EXCLUSIVAMENTE en las fotografías cargadas
+    fotosBase.forEach((f: any) => {
+      if (f.renglon) agregarDeTexto(f.renglon)
+      if (f.renglon_nombre) agregarDeTexto(f.renglon_nombre)
+      if (f.renglonNombre) agregarDeTexto(f.renglonNombre)
+      if (Array.isArray(f.etiquetas)) {
+        f.etiquetas.forEach((e: string) => agregarDeTexto(e))
+      }
+    })
+
+    return Array.from(renglonMap.values()).sort((a, b) =>
+      (a.codigo || a.descripcion).localeCompare(b.codigo || b.descripcion, undefined, { numeric: true })
+    )
+  }, [proyectoApi, fotosBase])
+
+  // Resetear filtro si el renglón seleccionado ya no está presente en las fotos
+  useEffect(() => {
+    if (renglonFiltro) {
+      const existe = renglonesDisponibles.some(
+        (r) =>
+          String(r.codigo || r.id).toLowerCase() === renglonFiltro.toLowerCase() ||
+          r.descripcion.toLowerCase().includes(renglonFiltro.toLowerCase())
+      )
+      if (!existe) {
+        setRenglonFiltro('')
+      }
+    }
+  }, [renglonFiltro, renglonesDisponibles])
 
   // Roles y Usuarios disponibles en el proyecto
   const { rolesDisponibles, usuariosDisponibles } = useMemo(() => {
@@ -441,7 +502,11 @@ export default function FotografiasDetail() {
 
       const matchRenglon =
         !renglonFiltro ||
-        (Array.isArray(foto.etiquetas) && foto.etiquetas.some((e: string) => e.toLowerCase().includes(renglonFiltro.toLowerCase()))) ||
+        (foto.renglon || '').toLowerCase().includes(renglonFiltro.toLowerCase()) ||
+        ((foto as any).renglon_nombre || '').toLowerCase().includes(renglonFiltro.toLowerCase()) ||
+        ((foto as any).renglonNombre || '').toLowerCase().includes(renglonFiltro.toLowerCase()) ||
+        (Array.isArray(foto.etiquetas) &&
+          foto.etiquetas.some((e: string) => e.toLowerCase().includes(renglonFiltro.toLowerCase()))) ||
         (foto.descripcion || '').toLowerCase().includes(renglonFiltro.toLowerCase()) ||
         (foto.titulo || '').toLowerCase().includes(renglonFiltro.toLowerCase())
 

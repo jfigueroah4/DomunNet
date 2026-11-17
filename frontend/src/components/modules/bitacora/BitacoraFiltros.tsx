@@ -350,79 +350,91 @@ export function BitacoraFiltros({
     return [{ value: '', label: 'Todos los Usuarios' }, ...res]
   }, [hayProyecto, proyectoSeleccionadoObj, rolFiltro, registrosBitacora, proyectoId])
 
-  // 4. Opciones Renglones: Renglones registrados en bitácoras + Plan de Trabajo + Hoja Sábana
+  // 4. Opciones Renglones: ÚNICAMENTE Renglones con registros de bitácora existentes en el proyecto
   const opcionesRenglones = useMemo(() => {
     if (!hayProyecto || !proyectoId) {
       return [{ value: 'todos', label: 'Todos los Renglones' }]
     }
 
-    const bitacorasDelProyecto = (registrosBitacora || []).filter(
-      (b: any) => String(b.proyecto_id || b.proyectoId) === String(proyectoId)
-    )
-
-    const renglonesMap = new Map<string, { cod: string; desc: string }>()
-
-    // 1. Extraer renglones presentes en los registros de bitácora
-    bitacorasDelProyecto.forEach((b: any) => {
-      const rNombre = b.renglon_nombre || b.renglonNombre || b.categoriaTrabajo
-      if (rNombre) {
-        const cod = rNombre.split('-')[0]?.trim() || rNombre
-        renglonesMap.set(cod, { cod, desc: rNombre })
-      }
-      if (b.renglon) {
-        const cod = b.renglon.codigo || b.renglon.codigoDGC || b.renglon.id || b.renglon
-        const desc = b.renglon.descripcion || b.renglon.nombre || cod
-        renglonesMap.set(String(cod), { cod: String(cod), desc: String(desc) })
-      }
-      if (Array.isArray(b.etiquetas)) {
-        b.etiquetas.forEach((e: string) => {
-          if (!renglonesMap.has(e)) {
-            renglonesMap.set(e, { cod: e, desc: e })
-          }
-        })
-      }
+    const bitacorasDelProyecto = (registrosBitacora || []).filter((b: any) => {
+      const bProyId = String(b.proyecto_id || b.proyectoId || '')
+      const pId = String(proyectoId || '')
+      if (!pId) return true
+      return (
+        bProyId === pId ||
+        (pId.startsWith('proj-') && (bProyId === pId.replace('proj-', '') || bProyId === pId.replace('proj-00', '').replace('proj-0', ''))) ||
+        (bProyId.startsWith('proj-') && (pId === bProyId.replace('proj-', '') || pId === bProyId.replace('proj-00', '').replace('proj-0', '')))
+      )
     })
 
-    // 2. Extraer renglones del catálogo/plan del proyecto
-    const plan = [
+    // Mapa de apoyo del catálogo del proyecto para enriquecer la descripción si solo está el código
+    const catalogoDescMap = new Map<string, string>()
+    const planItems = [
       ...(Array.isArray(proyectoSeleccionadoObj?.planTrabajo) ? proyectoSeleccionadoObj.planTrabajo : []),
       ...(Array.isArray(proyectoSeleccionadoObj?.renglones) ? proyectoSeleccionadoObj.renglones : []),
       ...(Array.isArray(proyectoSeleccionadoObj?.renglones_sabana) ? proyectoSeleccionadoObj.renglones_sabana : []),
       ...(Array.isArray(proyectoSeleccionadoObj?.renglones_seleccionados) ? proyectoSeleccionadoObj.renglones_seleccionados : []),
     ]
-    plan.forEach((item: any) => {
+    planItems.forEach((item: any) => {
       const cod = String(item.codigoDGC || item.codigo || item.id || '').trim()
-      const desc = (item.descripcion || item.desc || item.nombre || cod).trim()
-      if (cod && !renglonesMap.has(cod)) {
-        renglonesMap.set(cod, { cod, desc: cod === desc ? cod : `${cod} - ${desc}` })
+      const desc = String(item.descripcion || item.desc || item.nombre || '').trim()
+      if (cod && desc) {
+        catalogoDescMap.set(cod.toLowerCase(), desc)
       }
     })
 
-    // 3. Extraer renglones de localStorage si existen
-    if (typeof window !== 'undefined') {
-      try {
-        const localKeys = [
-          `domun_proyecto_renglones_${proyectoId}`,
-          `sabana_renglones_${proyectoId}`,
-          `domun_renglones_seleccionados_${proyectoId}`,
-        ]
-        localKeys.forEach((key) => {
-          const raw = localStorage.getItem(key)
-          if (raw) {
-            const parsed = JSON.parse(raw)
-            if (Array.isArray(parsed)) {
-              parsed.forEach((item: any) => {
-                const cod = String(item.codigoDGC || item.codigo || item.id || '').trim()
-                const desc = (item.descripcion || item.desc || item.nombre || cod).trim()
-                if (cod && !renglonesMap.has(cod)) {
-                  renglonesMap.set(cod, { cod, desc: cod === desc ? cod : `${cod} - ${desc}` })
-                }
-              })
-            }
+    const renglonesMap = new Map<string, { cod: string; desc: string }>()
+
+    const agregarRenglon = (rawCod: string, rawDesc?: string) => {
+      if (!rawCod) return
+      let cod = rawCod.trim()
+      let desc = (rawDesc || '').trim()
+
+      if (cod.includes('-') && !desc) {
+        const parts = cod.split('-')
+        cod = parts[0]?.trim() || cod
+        desc = parts.slice(1).join('-').trim()
+      }
+
+      const descCatalogo = catalogoDescMap.get(cod.toLowerCase())
+      const finalDesc = desc || descCatalogo || cod
+
+      if (!renglonesMap.has(cod)) {
+        renglonesMap.set(cod, { cod, desc: finalDesc })
+      }
+    }
+
+    // Extraer renglones presentes EXCLUSIVAMENTE en los registros de bitácora del proyecto
+    bitacorasDelProyecto.forEach((b: any) => {
+      const rNombre = b.renglon_nombre || b.renglonNombre || b.categoriaTrabajo
+      if (rNombre) {
+        agregarRenglon(rNombre)
+      }
+      if (b.renglon) {
+        if (typeof b.renglon === 'object') {
+          const cod = String(b.renglon.codigo || b.renglon.codigoDGC || b.renglon.id || '').trim()
+          const desc = String(b.renglon.descripcion || b.renglon.nombre || '').trim()
+          agregarRenglon(cod, desc)
+        } else if (typeof b.renglon === 'string') {
+          agregarRenglon(b.renglon)
+        }
+      }
+      if (Array.isArray(b.renglones)) {
+        b.renglones.forEach((r: any) => {
+          if (typeof r === 'object' && r !== null) {
+            const cod = String(r.codigoDgc || r.codigo || r.id || '').trim()
+            const desc = String(r.descripcion || r.nombre || '').trim()
+            agregarRenglon(cod, desc)
+          } else if (typeof r === 'string') {
+            agregarRenglon(r)
           }
         })
-      } catch (_) {}
-    }
+      }
+      if (b.descripcion?.includes('Renglón')) {
+        const extraido = b.descripcion.split('Renglón')[1]?.split('·')[0]?.trim()
+        if (extraido) agregarRenglon(extraido)
+      }
+    })
 
     if (renglonesMap.size === 0) {
       return [{ value: 'todos', label: 'Todos los Renglones' }]
@@ -430,13 +442,29 @@ export function BitacoraFiltros({
 
     const res = Array.from(renglonesMap.values())
       .sort((a, b) => a.cod.localeCompare(b.cod, undefined, { numeric: true }))
-      .map((r) => ({
-        value: r.cod,
-        label: r.cod === r.desc ? r.cod : `[${r.cod}] ${r.desc}`,
-      }))
+      .map((r) => {
+        let label = r.desc
+        if (!label.startsWith(r.cod) && !label.startsWith(`[${r.cod}]`)) {
+          label = `[${r.cod}] ${label}`
+        }
+        return {
+          value: r.cod,
+          label: label,
+        }
+      })
 
     return [{ value: 'todos', label: 'Todos los Renglones' }, ...res]
   }, [hayProyecto, proyectoId, registrosBitacora, proyectoSeleccionadoObj])
+
+  // Resetear a 'todos' si el renglón previamente seleccionado ya no tiene registros
+  useEffect(() => {
+    if (tipo && tipo !== 'todos') {
+      const existe = opcionesRenglones.some((op) => op.value === tipo)
+      if (!existe) {
+        onTipoChange('todos')
+      }
+    }
+  }, [tipo, opcionesRenglones, onTipoChange])
 
   // Contar cuántos filtros secundarios activos existen
   const cantidadFiltrosActivos = useMemo(() => {
